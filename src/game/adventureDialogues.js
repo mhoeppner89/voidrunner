@@ -77,11 +77,11 @@ export const ADVENTURE_DIALOGUES={
     }},
     'paul-rescue':{start:'thanks',nodes:{
         thanks:{text:pair("Danke! Ohne dich wäre meine Freya jetzt ein weiteres Wrack. Paul ist mein Name, schön dich kennenzulernen.","Thank you! Without you, my Freya would be another wreck. I am Paul; nice to meet you."),next:'repairs'},
-        repairs:{text:pair("Das sind Reperaturdrohnen. Die flicken meine und auch deine Hülle. Bleib dafür einfach innerhalb von 200 km von mir.","Those are repair drones. They patch my hull and yours too. Just stay within 200 km of me."),choices:[
+        repairs:{text:pair("Was führt dich eigentlich hierher?","What brings you out here, anyway?"),choices:[
             {label:pair("Was hast du da für Drohnen?","What kind of drones are those?"),next:'support'},
             {label:pair('Ich kartiere die Wracks hier.','I am charting the wrecks here.'),next:'route'}
         ]},
-        support:{text:pair("Sie nutzen die Energie meiner Freya und versorgen zuerst mein Schiff, dann Verbündete in der Nähe.","They use my Freya’s energy and repair my ship first, then nearby allies."),returnTo:'repairs'},
+        support:{text:pair("Das sind Reparaturdrohnen. Sie nutzen die Energie meiner Freya und flicken zuerst meine Hülle, dann die von Verbündeten. Bleib dafür innerhalb von 200 km von mir.","Those are repair drones. They use my Freya’s energy to patch my hull first, then nearby allies. Stay within 200 km of me for repairs."),returnTo:'repairs'},
         route:{text:pair('Du kartierst das Feld? Dann fliegen wir die übrigen Punkte zusammen ab. Den Träger kenne ich noch aus besseren Zeiten. Ich schulde dir ohnehin einen Gefallen.','You are surveying the field? Let us visit the remaining points together. I remember that carrier from better days. I owe you a favour anyway.'),choices:[end("Gut. Bleib an meiner Seite.","Good. Stay by my side.")]},
     }},
     'paul-hide':{start:'transponder',nodes:{

@@ -581,6 +581,13 @@ export const graveyardCollisionMesh = (piece) => {
 };
 
 const wreckNodeGeometryCache = [];
+const damagedWreckNodeGeometryCache = [];
+export const salvageImpactFace = (node) => {
+    const p=node.salvageImpactLocal;
+    if(!Array.isArray(p)||p.length!==3||!p.every(Number.isFinite))return 0;
+    const axis=Math.abs(p[0])>=Math.abs(p[1])&&Math.abs(p[0])>=Math.abs(p[2])?0:Math.abs(p[1])>=Math.abs(p[2])?1:2;
+    return axis*2+(p[axis]<0?1:0);
+};
 export const getWreckNodeGeometry = (shape = 0) => {
     const index = Math.abs(Math.trunc(shape)) % 4;
     if (!wreckNodeGeometryCache[index]) {
@@ -596,8 +603,37 @@ export const getWreckNodeGeometry = (shape = 0) => {
     return wreckNodeGeometryCache[index];
 };
 export const wreckNodeVisualScale = (node) => node.radius * 1.6;
+// Fold one side inward into an uneven exposed bulkhead. Geometry is shared by
+// every opened chunk of the same shape, and the collision mesh uses it too.
+export const getDamagedWreckNodeGeometry = (shape = 0, face = 0) => {
+    const index = Math.abs(Math.trunc(shape)) % 4;
+    const key=index*6+face, axis=Math.floor(face/2), sign=face%2?-1:1;
+    if (!damagedWreckNodeGeometryCache[key]) {
+        const base = getWreckNodeGeometry(index);
+        const geometry = base.index ? base.toNonIndexed() : base.clone();
+        const positions = geometry.getAttribute('position');
+        const colors = new Float32Array(positions.count * 3);
+        for (let i=0;i<positions.count;i++) {
+            const x=positions.getX(i), y=positions.getY(i), z=positions.getZ(i);
+            const xyz=[x,y,z], edge=.08+.07*Math.sin(x*9+y*7+z*5);
+            const exposed=xyz[axis]*sign>edge;
+            if(exposed)positions.setComponent(i,axis,sign*edge);
+            colors[i*3]=exposed ? .36 : 1;colors[i*3+1]=exposed ? .31 : 1;colors[i*3+2]=exposed ? .27 : 1;
+        }
+        geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
+        geometry.computeVertexNormals();geometry.computeBoundingBox();geometry.computeBoundingSphere();
+        damagedWreckNodeGeometryCache[key]=geometry;
+    }
+    return damagedWreckNodeGeometryCache[key];
+};
 export const wreckNodeCollisionMesh = (node) => {
-    node._collisionMesh ??= scaledGeometryCollisionMesh(getWreckNodeGeometry(node.shape), [wreckNodeVisualScale(node), wreckNodeVisualScale(node), wreckNodeVisualScale(node)]);
+    const damaged=Boolean(node.salvageDamaged || node.remaining<=0);
+    const face=salvageImpactFace(node);
+    if(!node._collisionMesh || node._collisionDamaged!==damaged || damaged&&node._collisionFace!==face){
+        node._collisionMesh = scaledGeometryCollisionMesh(damaged?getDamagedWreckNodeGeometry(node.shape,face):getWreckNodeGeometry(node.shape), [wreckNodeVisualScale(node), wreckNodeVisualScale(node), wreckNodeVisualScale(node)]);
+        node._collisionDamaged=damaged;
+        node._collisionFace=face;
+    }
     return node._collisionMesh;
 };
 // The debris field is composed as a handful of readable spaces rather than a

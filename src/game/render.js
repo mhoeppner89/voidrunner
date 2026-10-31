@@ -36,7 +36,7 @@ import {createJumpGateStructure} from './jumpGate.js';
 import { LOCATIONS, SUN_POSITION, sunPositionForSystem } from './data.js';
 import { createVoxelShipModel, createVoxelStationModel, paletteForFaction, shipVariantForRole } from './voxelModels.js';
 import { clamp, seededRandom } from './random.js';
-import { GRAVEYARD_MODEL_WRECKS, getAsteroidBaseMeshes, getGraveyardGeometry, getWreckNodeGeometry, wreckNodeVisualScale } from './worldData.js';
+import { GRAVEYARD_MODEL_WRECKS, getAsteroidBaseMeshes, getGraveyardGeometry, getWreckNodeGeometry, getDamagedWreckNodeGeometry, salvageImpactFace, wreckNodeVisualScale } from './worldData.js';
 import { loadGlb } from './glbLoader.js';
 import { paintShipMaterial, shipPaintFrames } from './shipLivery.js';
 import { addStationOccupants, STATION_OCCUPANTS } from './stationOccupants.js';
@@ -2879,17 +2879,36 @@ export class SpaceRenderer {
         // Wreck chunks share four geometries and two value-tinted materials.
         // Keeping them as one instanced batch per combination removes dozens of
         // draw calls without changing their shapes or scan targets.
+        const damagedMaterials={tech:techMaterial.clone(),bulk:bulkMaterial.clone()};
+        damagedMaterials.tech.vertexColors=true;damagedMaterials.bulk.vertexColors=true;
+        const plateShape=new THREE.Shape();
+        plateShape.moveTo(-.26,-.16);plateShape.lineTo(.08,-.24);plateShape.lineTo(.27,-.06);
+        plateShape.lineTo(.17,.20);plateShape.lineTo(-.12,.23);plateShape.lineTo(-.28,.04);plateShape.closePath();
+        const loosePlate=new THREE.ExtrudeGeometry(plateShape,{depth:.055,bevelEnabled:false});
         groups.forEach((entries, key) => {
             const [geometryIndex, tier] = key.split(':');
-            const mesh = new THREE.InstancedMesh(geometries[Number(geometryIndex)], tier === 'tech' ? techMaterial : bulkMaterial, entries.length);
+          for(const face of [-1,0,1,2,3,4,5]){
+            const damaged=face>=0;
+            const mesh = new THREE.InstancedMesh(damaged?getDamagedWreckNodeGeometry(Number(geometryIndex),face):geometries[Number(geometryIndex)], damaged?damagedMaterials[tier]:(tier === 'tech' ? techMaterial : bulkMaterial), entries.length);
+            const white=this.tmpWreckColor??=new THREE.Color();
+            for(let i=0;i<entries.length;i++)mesh.setColorAt(i,white.setRGB(1,1,1));
+            mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
             mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
             mesh.frustumCulled = false;
             mesh.name = `wreck-nodes-${key}`;
             mesh.userData.targetKind = 'wreck';
             mesh.userData.nodeIndices = entries.map((entry) => entry.nodeIndex);
             root?.add(mesh);
-            this.wreckBatches.push({ mesh, entries });
-            entries.forEach((entry) => this.wreckNodeMeshes.set(entry.node.id, mesh));
+            const batchEntries=entries.map(entry=>({...entry}));
+            let plate;
+            if(damaged){
+                plate=new THREE.InstancedMesh(loosePlate,tier==='tech'?techMaterial:bulkMaterial,entries.length);
+                plate.instanceMatrix.setUsage(THREE.DynamicDrawUsage);plate.frustumCulled=false;
+                plate.name='opened-wreck-loose-plate';root?.add(plate);
+            }
+            this.wreckBatches.push({ mesh, entries:batchEntries, damaged, face, plate });
+            if(!damaged)entries.forEach((entry) => this.wreckNodeMeshes.set(entry.node.id, mesh));
+          }
         });
         this.updateWreckNodeInstances();
     }
@@ -2937,15 +2956,7 @@ export class SpaceRenderer {
             if(mesh.visible){
                 mesh.position.fromArray(node.position);
                 if(mesh.userData.lootRarity!==(node.lootRarity??'common'))setLootVisualRarity(mesh,this.combatLootResources,node.lootRarity);
-                const beacon=mesh.userData.lootBeacon,distance=Math.sqrt(dx*dx+dy*dy+dz*dz);
-                // World-space, depth-tested beacons: legible nearby, never an
-                // always-on-top HUD card or a marker for distant systems.
-                beacon.visible=distance<Math.min(2400,node.sensorRange??2400);
-                if(beacon.visible){
-                    const size=Math.max(3,Math.min(80,distance*2*Math.tan(this.camera.fov*Math.PI/360)*26/this.viewportHeight));
-                    beacon.scale.setScalar(size);beacon.position.y=mesh.userData.lootBodySize*.75+size*.8;
-                    beacon.quaternion.copy(this.camera.quaternion);
-                }
+                if(!node.derelict){const time=this.skyTime??0;mesh.rotation.set(time*.055,time*.085,time*.025);}
             }
         }
     }
@@ -2953,17 +2964,27 @@ export class SpaceRenderer {
         const cam = this.camera.position;
         for (const batch of this.wreckBatches) {
             let matrixStart = Infinity, matrixEnd = 0;
+            let colorStart = Infinity, colorEnd = 0;
+            let visibleCount=0;
             batch.entries.forEach((entry, index) => {
                 const node = entry.node;
                 const dx = node.position[0] - cam.x;
                 const dy = node.position[1] - cam.y;
                 const dz = node.position[2] - cam.z;
                 const culled = dx * dx + dy * dy + dz * dz > WRECK_RENDER_DISTANCE_SQ && node.id !== this.selectedWreckId;
-                const depleted = node.remaining <= 0;
-                const hidden = culled || depleted;
+                const damaged = Boolean(node.salvageDamaged || node.remaining <= 0);
+                const hidden = culled || damaged !== batch.damaged || damaged && salvageImpactFace(node)!==batch.face;
+                if(!hidden)visibleCount++;
                 const stateChanged = entry.hidden !== hidden;
-                if (entry.initialized && !stateChanged && (hidden || dt <= 0))
+                const scorched=Boolean(node.salvageScorched || damaged);
+                const colorChanged=entry.scorched!==scorched;
+                if (entry.initialized && !stateChanged && !colorChanged && (hidden || dt <= 0))
                     return;
+                if(colorChanged){
+                    const shade=scorched ? .73 : 1;
+                    batch.mesh.setColorAt(index,this.tmpWreckColor.setRGB(shade,shade*.98,shade*.95));
+                    entry.scorched=scorched;colorStart=Math.min(colorStart,index*3);colorEnd=(index+1)*3;
+                }
                 if (!hidden && dt > 0) {
                     entry.rotation[0] += dt * 0.22;
                     entry.rotation[1] -= dt * 0.17;
@@ -2977,10 +2998,31 @@ export class SpaceRenderer {
                 this.tmpScale.setScalar(hidden ? HIDDEN_SCALE[0] : wreckNodeVisualScale(node));
                 this.tmpMatrix.compose(this.tmpPosition, this.tmpQuaternion, this.tmpScale);
                 batch.mesh.setMatrixAt(index, this.tmpMatrix);
+                if(batch.plate){
+                    const platePosition=this.tmpWreckPlatePosition??=new THREE.Vector3();
+                    const plateRotation=this.tmpWreckPlateRotation??=new THREE.Quaternion();
+                    const plateTilt=this.tmpWreckPlateTilt??=new THREE.Quaternion().setFromEuler(new THREE.Euler(.28,-.22,.36));
+                    const local=node.salvageImpactLocal;
+                    if(local){
+                        const normal=this.tmpWreckPlateNormal??=new THREE.Vector3();
+                        normal.fromArray(local).normalize();
+                        platePosition.fromArray(local).addScaledVector(normal,.10).multiplyScalar(wreckNodeVisualScale(node)).applyQuaternion(this.tmpQuaternion).add(this.tmpPosition);
+                        plateRotation.setFromUnitVectors(this.tmpWreckPlateAxis??=new THREE.Vector3(0,0,1),normal).premultiply(this.tmpQuaternion).multiply(plateTilt);
+                    }else{
+                        platePosition.set(.5,.22,.18).multiplyScalar(wreckNodeVisualScale(node)).applyQuaternion(this.tmpQuaternion).add(this.tmpPosition);
+                        plateRotation.copy(this.tmpQuaternion).multiply(plateTilt);
+                    }
+                    this.tmpMatrix.compose(platePosition,plateRotation,this.tmpScale);
+                    batch.plate.setMatrixAt(index,this.tmpMatrix);
+                }
                 matrixStart = Math.min(matrixStart, index * 16);
                 matrixEnd = (index + 1) * 16;
             });
             markAttributeSpan(batch.mesh.instanceMatrix, matrixStart, matrixEnd);
+            if(batch.plate)markAttributeSpan(batch.plate.instanceMatrix,matrixStart,matrixEnd);
+            if(batch.mesh.instanceColor)markAttributeSpan(batch.mesh.instanceColor,colorStart,colorEnd);
+            batch.mesh.visible=visibleCount>0;
+            if(batch.plate)batch.plate.visible=visibleCount>0;
         }
     }
     createHyperdriveStreakTexture() {
@@ -4145,13 +4187,14 @@ export class SpaceRenderer {
                 mesh = undefined;
             }
             if (!mesh) {
-                const color = pickup.source === 'mining' ? 0xd7c07a : 0x80d1bf;
-                const group = new THREE.Group();
-                const body = new THREE.Mesh(pickup.source === 'mining' ? new THREE.DodecahedronGeometry(0.62, 0) : new THREE.BoxGeometry(0.9, 0.52, 0.72), new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.45, emissive: color, emissiveIntensity: 0.16 }));
-                group.add(body);
-                const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.radialTexture(`#${color.toString(16).padStart(6, '0')}`, `#${color.toString(16).padStart(6, '0')}`), transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }));
-                glow.scale.setScalar(3.2);
-                group.add(glow);
+                let group;
+                if(pickup.source==='mining'){
+                    group=new THREE.Group();
+                    group.add(new THREE.Mesh(new THREE.DodecahedronGeometry(.62,0),new THREE.MeshStandardMaterial({color:0xd7c07a,roughness:.55,metalness:.45})));
+                }else{
+                    this.combatLootResources??=createLootVisualResources();
+                    group=createLootVisual({radius:1,position:[0,0,0],lootRarity:'common'},this.combatLootResources);
+                }
                 mesh = group;
                 // The group carries its target identity so a raycast hit walks
                 // up to it (see pickTarget).
@@ -4168,8 +4211,8 @@ export class SpaceRenderer {
                 this.tmpPrevPos.set(prevPos[i], prevPos[i + 1], prevPos[i + 2]);
                 mesh.position.lerpVectors(this.tmpPrevPos, mesh.position, alpha);
             }
-            mesh.rotation.x += 0.018;
-            mesh.rotation.y += 0.024;
+            const time=this.skyTime??0;
+            mesh.rotation.set(time*.055,time*.085,time*.025);
         });
         // Identity can change without a count change. Mark during the existing
         // update pass, then retire unseen meshes without building live arrays.
@@ -5217,8 +5260,7 @@ export class SpaceRenderer {
             const wreckBatch = this.wreckBatches.find(({ mesh }) => mesh === hit.object);
             if (wreckBatch && hit.instanceId !== undefined) {
                 const node = this.wreckNodes[wreckBatch.mesh.userData.nodeIndices[hit.instanceId]];
-                if (node?.remaining && node.remaining > 0)
-                    return { kind: 'wreck', id: node.id };
+                if (node) return { kind: 'wreck', id: node.id };
             }
             let object = hit.object;
             while (object) {
@@ -5297,6 +5339,14 @@ export class SpaceRenderer {
     }
     updateCamera(position, prevPosition, rotation, prevRotation, angularVelocity, speedRatio, afterburner, dt, alpha = 0) {
         this.ringParticleDt = dt;
+        // Presentation only: a bounded, smoothed response to speed change.
+        // It never modifies the camera's flight orientation or ship physics.
+        if(this.flightCueSpeed===undefined || dt<=0 || dt>.25){this.flightCueSpeed=speedRatio;this.flightCueAccel=0;}
+        else {
+            const accel=clamp((speedRatio-this.flightCueSpeed)/dt,-1,1);
+            this.flightCueSpeed=speedRatio;
+            this.flightCueAccel+=(accel-(this.flightCueAccel??0))*(1-Math.exp(-4*dt));
+        }
         this.camera.position.set(...position);
         if (prevPosition && alpha > 0) {
             this.tmpPrevPos.set(prevPosition[0], prevPosition[1], prevPosition[2]);
@@ -5311,7 +5361,7 @@ export class SpaceRenderer {
         this.updateDistantInstanceVisibility();
         this.skyRoot.position.copy(this.camera.position);
         // Tighter FOV swing so the cockpit frame doesn't punch in.
-        this.fovTarget = (afterburner ? 80 : 70 + speedRatio * 2.0) + (this.reducedHyperdriveMotion?0:(this.raceSpeedIntensity??0)*3);
+        this.fovTarget = (afterburner ? 80 : 70 + speedRatio * 2.0) + (this.reducedHyperdriveMotion?0:(this.raceSpeedIntensity??0)*3+clamp(this.flightCueAccel,-1,1)*.65);
         this.updateRaceSpeedLines(dt);
         const previousFov = this.camera.fov;
         this.camera.fov += (this.fovTarget - this.camera.fov) * (1 - Math.exp(-5 * dt));
@@ -5339,7 +5389,7 @@ export class SpaceRenderer {
             this.cockpit.scale.set(grimeScale, grimeScale, 1);
         }
         const shiftX = clamp(-angularVelocity[1] * 2.4, -7, 7);
-        const shiftY = clamp(angularVelocity[0] * 1.8 - speedRatio * 1.4, -5, 4);
+        const shiftY = clamp(angularVelocity[0] * 1.8 - speedRatio * 1.4 + (this.reducedHyperdriveMotion?0:this.flightCueAccel*.8), -5, 4);
         const roll = clamp(-angularVelocity[2] * 0.30, -1.2, 1.2);
         this.setShellStyle('--cockpit-shift-x', `${shiftX.toFixed(2)}px`);
         this.setShellStyle('--cockpit-shift-y', `${shiftY.toFixed(2)}px`);
@@ -5506,6 +5556,10 @@ export class SpaceRenderer {
     spawnSalvageRelease(position, direction, released) {
         this.laserFx ??= new LaserFx(this.scene, this.effects);
         this.laserFx.salvageRelease(position,direction,released);
+    }
+    spawnSalvageImpact(position, center) {
+        this.laserFx ??= new LaserFx(this.scene, this.effects);
+        this.laserFx.salvageImpact(position,center);
     }
     showDisabledCapitalMount(id,position,rotation,actor,index) {
         this.showTurret(id,position,(this.tmpDisabledDirection??=new THREE.Vector3()).set(0,1,0).applyQuaternion(rotation),index<4?'M':'S',index<4?'laser':'pdc',rotation,index===0||index===1||index>5?-1:1,0,index<4?112.9/18:112.9/22,index<4?0:1,actor);

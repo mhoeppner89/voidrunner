@@ -293,6 +293,12 @@ export class LaserFx {
         this.rockBurst(position, rockCenter, tuning.chipColor, tuning.chipCount, tuning.chipSpeedMin, tuning.chipSpeedMax, tuning.chipLife, tuning.chipSize, 0.95, tuning.chipDamping);
         this.rockBurst(position, rockCenter, tuning.dustColor, tuning.dustCount, tuning.dustSpeedMin, tuning.dustSpeedMax, tuning.dustLife, tuning.dustSize, 0.4, tuning.dustDamping);
     }
+    // Fine soot and metal flecks, pushed away from the struck surface.
+    salvageImpact(position, center) {
+        // The ordinary weapon impact already supplies sparks; one muted dust
+        // batch avoids allocating two particle systems for each hit.
+        this.rockBurst(position,center,0x817b70,9,1,6,.75,2,.32,4);
+    }
     // A released cargo pod leaves a few solid, thick pieces of plating behind.
     // One instanced draw call per release; the actual collectible stays still.
     salvageRelease(position, direction, released = 1) {
@@ -305,19 +311,19 @@ export class LaserFx {
         mesh.name='salvage-release-fragments';mesh.position.set(...position);mesh.frustumCulled=false;
         const length=Math.hypot(direction.x,direction.y,direction.z)||1;
         const nx=-direction.x/length,ny=-direction.y/length,nz=-direction.z/length;
-        const pieces=Array.from({length:count},()=>{
+        const pieces=Array.from({length:count},(_,piecesIndex)=>{
             let x=Math.random()*2-1,y=Math.random()*2-1,z=Math.random()*2-1;
             if(x*nx+y*ny+z*nz<0){x=-x;y=-y;z=-z;}
-            const magnitude=Math.hypot(x,y,z)||1,speed=5+Math.random()*9;
+            const magnitude=Math.hypot(x,y,z)||1,large=piecesIndex<2,speed=large?3+Math.random()*3:7+Math.random()*10;
             return {x:0,y:0,z:0,vx:x/magnitude*speed+nx*2,vy:y/magnitude*speed+ny*2,vz:z/magnitude*speed+nz*2,
                 rx:Math.random()*6,ry:Math.random()*6,rz:Math.random()*6,
                 ax:(Math.random()-.5)*4,ay:(Math.random()-.5)*4,az:(Math.random()-.5)*4,
-                size:.7+Math.random()*1.2};
+                size:large?1.4+Math.random()*.7:.35+Math.random()*.8,wide:large?1.6:.7+Math.random()*.7};
         });
         const transform=new THREE.Object3D();let age=0;const life=1.2;
         const update=dt=>{age+=dt;const fade=Math.min(1,Math.max(0,(life-age)/.3));
             for(let i=0;i<count;i++){const p=pieces[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;p.rx+=p.ax*dt;p.ry+=p.ay*dt;p.rz+=p.az*dt;
-                transform.position.set(p.x,p.y,p.z);transform.rotation.set(p.rx,p.ry,p.rz);transform.scale.setScalar(p.size*fade);transform.updateMatrix();mesh.setMatrixAt(i,transform.matrix);}
+                transform.position.set(p.x,p.y,p.z);transform.rotation.set(p.rx,p.ry,p.rz);transform.scale.set(p.size*p.wide*fade,p.size*fade,p.size*fade);transform.updateMatrix();mesh.setMatrixAt(i,transform.matrix);}
             mesh.instanceMatrix.needsUpdate=true;
         };
         update(0);this.scene.add(mesh);this.effects.push({object:mesh,life,maxLife:life,update});

@@ -32,7 +32,7 @@ test('German variables, radio entries and the labels used in lessons remain cons
     assert.equal(GameUI.prototype.missionBadge({kind:'mining'}),'ABBAU');
     assert.ok(ADVENTURE_DIALOGUES.salvage.nodes.risk.text.de.includes('PDC'));
     assert.ok(t('Deploy your miners: tap MINE, or press M on desktop.').includes(t('MINE')));
-    assert.ok(dialogueText(ADVENTURE_DIALOGUES['survey-ready'].nodes.salvage.text,'de').includes(t('SALVAGE')));
+    assert.match(dialogueText(ADVENTURE_DIALOGUES['survey-ready'].nodes.salvage.text,'de'),/gescannt.*Beschieße/s);
     assert.doesNotMatch(JSON.stringify(ADVENTURE_DIALOGUES),/Hundekampfarena|Langbasis-Radar|BERGUNG gedrückt|Impulswaffe/);
 });
 

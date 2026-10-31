@@ -1380,6 +1380,7 @@ export class GameSession {
         this.initializeExploration();
         this.initializeDistress();
         this.wreckNodes = generateWreckNodes(save.world.seed, save.world.depletedWrecks, save.world.scannedNodes);
+        for(const node of this.wreckNodes){const point=save.world.salvageImpactFaces?.[node.id];if(Array.isArray(point)&&point.length===3&&point.every(Number.isFinite)&&Math.hypot(...point)<3)node.salvageImpactLocal=point;}
         if(!save.arena)for(const wreck of Object.values(save.world.combatWrecks??{}))if(wreck.contents?.length||wreck.derelict)this.wreckNodes.push(combatWreckNode(wreck));
         this.input = new InputManager(ui.root);
         this.input.configureTilt(save.settings);
@@ -5740,6 +5741,16 @@ export class GameSession {
             if(this.save.player.currentTargetId===node.id)this.setMonitorStatus(t('Scan this wreck first.'));
             return;
         }
+        node.salvageScorched=true;
+        if(!node.salvageImpactLocal){
+            const local=new THREE.Vector3(...hit).sub(new THREE.Vector3(...node.position)).applyQuaternion(new THREE.Quaternion().setFromEuler(new THREE.Euler(...node.rotation)).invert()).divideScalar(node.radius*1.6);
+            node.salvageImpactLocal=local.toArray();
+            (this.save.world.salvageImpactFaces??={})[node.id]=node.salvageImpactLocal;
+        }
+        if(this.save.world.time >= (node.salvageDustAfter ?? 0)){
+            this.renderer.spawnSalvageImpact?.(hit,node.position);
+            node.salvageDustAfter=this.save.world.time+.25;
+        }
         const quest=getTutorialQuest(this.save);
         const recorder=quest?.stepId==='salvage-black-box' && quest.flags.blackBoxTargetId===node.id && !quest.flags.blackBoxDropId;
         let accumulated=(this.extractionCarry.get(node.id)??0)+damage*(this.playerStats().salvageRate??1);
@@ -5748,6 +5759,10 @@ export class GameSession {
         this.lastExtractionAt=this.save.world.time;
         this.seenWorkingUntil=this.save.world.time+SEEN_WORKING_SECONDS;
         const shotLength=Math.hypot(direction.x,direction.y,direction.z)||1;
+        const lateral=this.tmpSalvageLateral??=new THREE.Vector3();
+        lateral.set(-direction.z,0,direction.x);
+        if(lateral.lengthSq()<1e-6)lateral.set(1,0,0);
+        lateral.normalize();
         let released=0,lastDrop;
         while(accumulated>=threshold && node.remaining>0 && released<4){
             accumulated-=threshold;released++;
@@ -5757,9 +5772,10 @@ export class GameSession {
             const commodity=recorder||claim||rng()>=.25?node.salvage:'scrap';
             const serial=this.save.world.lootShipCounter=(this.save.world.lootShipCounter??0)+1;
             const id=`wreck-salvage-${serial}`,entry={id:`${id}-cargo`,kind:'cargo',commodity,quantity:1,sourceNodeId:node.id,...(claim?{sourceClaimId:claim.id}:{}),...(recorder&&released===1?{tutorialRecorder:true}:{})};
-            const offset=10+released*3;
-            const position=[hit[0]-direction.x/shotLength*offset,hit[1]-direction.y/shotLength*offset,hit[2]-direction.z/shotLength*offset];
-            const drop={id,name:`${node.name} — ${t('Loot')}`,position,velocity:[0,0,0],radius:3,systemId:this.save.player.systemId,instanceId:this.activeInstanceId,contents:[entry],scanned:true};
+            const offset=3.5+released*1.6;
+            const spread=(rng()-.5)*2;
+            const position=[hit[0]-direction.x/shotLength*offset+lateral.x*spread,hit[1]-direction.y/shotLength*offset+lateral.y*spread,hit[2]-direction.z/shotLength*offset+lateral.z*spread];
+            const drop={id,name:`${node.name} — ${t('Loot')}`,position,velocity:[-direction.x/shotLength*7+lateral.x*spread,-direction.y/shotLength*7+lateral.y*spread,-direction.z/shotLength*7+lateral.z*spread],driftActive:true,salvageDrift:true,radius:3,systemId:this.save.player.systemId,instanceId:this.activeInstanceId,contents:[entry],scanned:true};
             lastDrop=drop;
             this.save.world.combatWrecks??={};this.save.world.combatWrecks[id]=drop;
             const live=combatWreckNode(drop);this.wreckNodes.push(live);this.renderer.addCombatLootNode?.(live);
@@ -5767,11 +5783,16 @@ export class GameSession {
             if(entry.tutorialRecorder){quest.flags.blackBoxDropId=id;this.applyTarget({kind:'wreck',id,position,name:t('BLACK BOX SIGNAL')});break;}
         }
         this.extractionCarry.set(node.id,Math.min(accumulated,threshold-.001));
-        if(released)this.renderer.spawnSalvageRelease?.(hit,direction,released);
+        if(released){
+            if(!node.salvageDamaged){node.salvageDamaged=true;this.obstacleGridBuiltAt=-Infinity;}
+            this.renderer.spawnSalvageRelease?.(hit,direction,released);
+            this.audio.play('salvage',.6);
+            this.setOwnMonitorStatus(t('CARGO RELEASED'),1600);
+        }
         this.triggerSalvageAmbush(node);
         if(node.remaining<=0){
             if(node.salvage==='electronics'||node.salvage==='arms')this.recoverWreckEquipment(node,lastDrop);
-            if(this.save.player.currentTargetId===node.id){this.setMonitorStatus(t('WRECK STRIPPED'));this.clearTarget();}
+            if(this.save.player.currentTargetId===node.id)this.setMonitorStatus(t('WRECK STRIPPED'));
             this.obstacleGridBuiltAt=-Infinity;
         }
         this.persistSave();
@@ -5981,7 +6002,9 @@ export class GameSession {
         const slot = this.pickupStore.alloc();
         const originPos = this.tmpP0.copy(vec(origin)).add(offset);
         this.pickupStore.setPos(slot, originPos.x, originPos.y, originPos.z);
-        this.pickupStore.setVel(slot, 0, 0, 0);
+        const speed = source === 'mining' ? 2 : 5;
+        this.pickupStore.setVel(slot, offset.x*speed/offset.length(), offset.y*speed/offset.length(), offset.z*speed/offset.length());
+        this.pickupStore.snapshot(slot);
         const pickup = {
             id: `pickup-${this.pickupCounter}`,
             commodity,
@@ -5997,11 +6020,16 @@ export class GameSession {
         const player = vec(this.save.player.position, this.tmpP1);
         const range = this.playerStats().lootRange ?? 0;
         const enabled = lootCollectionEnabled(this);
+        const decay = Math.exp(-1.25 * dt), travel = (1 - decay) / 1.25;
         for (const pickup of this.pickups) {
             pickup.life -= dt;
             const position = this.pickupStore.getPos(pickup.slot, this.tmpP0);
-            // Old saves may carry velocity; loot is always stationary now.
-            this.pickupStore.setVel(pickup.slot, 0, 0, 0);
+            const velocity = this.pickupStore.getVel(pickup.slot, this.tmpP4);
+            position.addScaledVector(velocity, travel);
+            velocity.multiplyScalar(decay);
+            if (velocity.lengthSq() < .0009) velocity.set(0, 0, 0);
+            this.pickupStore.setPosV(pickup.slot, position);
+            this.pickupStore.setVelV(pickup.slot, velocity);
             const canCollect = this.save.world.time >= (pickup.collectAfter ?? 0);
             if (enabled && canCollect && pickup.life > 0 && this.save.world.time >= (pickup.retryCollectionAt??0)) {
                 const point = this.tmpP2.set(position.x,position.y,position.z);
@@ -6018,7 +6046,7 @@ export class GameSession {
                 }
             }
         }
-        updateCombatLoot(this);
+        updateCombatLoot(this,dt);
     }
 
     collectPickup(pickup) {
@@ -6527,7 +6555,7 @@ export class GameSession {
                 target = gateTarget;
         }
         else {
-            const node = this.wreckNodes.find((entry) => entry.id === id && entry.remaining > 0);
+            const node = this.wreckNodes.find((entry) => entry.id === id && (entry.remaining > 0 || !entry.combatLoot));
             if (node && (node.combatLoot ? node.systemId === this.save.player.systemId : this.activeInstanceId === 'mourning-line')) {
                 this.save.player.mode = 'salvage';
                 target = { kind, id, position: node.position, name: node.name };
@@ -6608,7 +6636,7 @@ export class GameSession {
             this.clearTarget();
             return;
         }
-        const wreck = this.wreckNodes.find((entry) => entry.id === id && entry.remaining > 0);
+        const wreck = this.wreckNodes.find((entry) => entry.id === id && (entry.remaining > 0 || !entry.combatLoot));
         if (wreck && (wreck.combatLoot || this.activeInstanceId === 'mourning-line') && player.distanceTo(vec(wreck.position)) > stats.radarRange) {
             this.clearTarget();
             return;
@@ -6665,7 +6693,7 @@ export class GameSession {
         if (asteroid && (!clearInvalid || this.activeInstanceId === 'shardbelt')) {
             return { kind: 'asteroid', id, position: asteroid.position, name: asteroid.tunnelPart ? 'Rock Crown Deposit' : 'Asteroid Deposit' };
         }
-        const wreck = this.wreckNodes.find((entry) => entry.id === id && entry.remaining > 0);
+        const wreck = this.wreckNodes.find((entry) => entry.id === id && (entry.remaining > 0 || !entry.combatLoot));
         if (wreck && (wreck.combatLoot ? wreck.systemId === this.save.player.systemId : !clearInvalid || this.activeInstanceId === 'mourning-line'))
             return { kind: 'wreck', id, position: wreck.position, name: wreck.name, combatLoot:Boolean(wreck.combatLoot) };
         const gate = this.raceGateTarget(id);
@@ -12056,7 +12084,7 @@ export class GameSession {
                 });
             }
             for (const node of this.wreckNodes) {
-                if (node.combatLoot || node.remaining <= 0)
+                if (node.combatLoot)
                     continue;
                 const collisionMesh = wreckNodeCollisionMesh(node);
                 const q = (this.tmpFieldQuaternion ??= new THREE.Quaternion()).setFromEuler((this.tmpFieldEuler ??= new THREE.Euler()).set(...node.rotation, 'XYZ'));
@@ -13728,7 +13756,7 @@ export class GameSession {
         }
         if(action==='jettison'){
             const item=this.save.player.inventory?.items?.[args.id];if(item?.location?.kind!=='cargo')return {ok:false,code:'Only cargo can be jettisoned.'};
-            const node={id:`wreck-${item.id}`,name:'Equipment cargo',collectAfter:this.save.world.time+8,position:new THREE.Vector3(0,0,-18).applyQuaternion(new THREE.Quaternion().fromArray(this.save.player.rotation)).add(new THREE.Vector3(...this.save.player.position)).toArray(),velocity:[0,0,0],radius:3,systemId:this.save.player.systemId,instanceId:this.activeInstanceId,scanned:true,contents:[{id:item.id,kind:'equipment',item:{...item,location:{kind:'wreck'}}}]};
+            const node={id:`wreck-${item.id}`,name:'Equipment cargo',collectAfter:this.save.world.time+8,position:new THREE.Vector3(0,0,-18).applyQuaternion(new THREE.Quaternion().fromArray(this.save.player.rotation)).add(new THREE.Vector3(...this.save.player.position)).toArray(),velocity:new THREE.Vector3(0,0,-4).applyQuaternion(new THREE.Quaternion().fromArray(this.save.player.rotation)).toArray(),driftActive:true,radius:3,systemId:this.save.player.systemId,instanceId:this.activeInstanceId,scanned:true,contents:[{id:item.id,kind:'equipment',item:{...item,location:{kind:'wreck'}}}]};
             if(item.droneUnitId){const fleet=this.save.player.droneFleet,unit=fleet.unitsById[item.droneUnitId];if(!unit||unit.state!=='stowed')return {ok:false,code:'Drones are returning automatically.'};node.contents=[{id:item.id,kind:'drone',type:unit.type,hull:unit.hull}];delete fleet.unitsById[unit.id];fleet.lockerIds=fleet.lockerIds.filter(id=>id!==unit.id);}this.save.world.combatWrecks??={};this.save.world.combatWrecks[node.id]=node;delete this.save.player.inventory.items[item.id];refreshInventoryProjection(this.save.player);const live=combatWreckNode(node);this.wreckNodes.push(live);this.renderer.addCombatLootNode?.(live);this._statsDirty=true;this.persistSave();return {ok:true,code:'Equipment jettisoned.'};
         }
         if(action==='recover-drone'){
@@ -14330,13 +14358,19 @@ export class GameSession {
                 // A claimed wreck mirrors mining's manifest counter; ordinary
                 // scanned wrecks keep the commodity + recoveries-left readout.
                 const scanStatus = node.scanned
-                    ? claim
-                        ? t('CLAIM · {current}/{total} RECOVERED', { current: claim.salvaged ?? 0, total: claim.quantity })
-                        : t('{commodity} · {amount} LEFT', { commodity: t(commodity), amount: Math.ceil(node.remaining) })
+                    ? node.remaining <= 0 ? t('WRECK STRIPPED') : claim
+                        ? t('RECOVERED {current}/{total}', { current: claim.salvaged ?? 0, total: claim.quantity })
+                        : t('SHOOT TO RELEASE CARGO')
                     : distance > stats.scanRange
                         ? t('OUT OF RANGE · {current}/{max} km', { current: Math.round(distance), max: stats.scanRange })
                         : t('SCANNING…');
-                hudTarget = { kind: 'wreck', combatLoot:Boolean(node.combatLoot), name: node.name, subtitle: node.combatLoot ? t('Loot') : node.scanned ? (claim ? t('SALVAGE CLAIM') : t(commodity)) : t('UNRESOLVED WRECK'), distance, scanned: node.scanned, readout: node.combatLoot ? (node.locked?(distance>2000?t('ACTIVATE HYPERDRIVE'):t('SALVAGE CLAIM')):cargoFree(this.save.player)<1?t('CARGO FULL'):stats.lootRange>0?t('AUTO COLLECTION · {range} km',{range:stats.lootRange}):t('FLY OVER TO COLLECT')) : scanStatus, ...screen };
+                const quest = getTutorialQuest(this.save);
+                const recorder = quest?.stepId === 'salvage-black-box' && quest.flags.blackBoxTargetId === node.id && !quest.flags.blackBoxDropId;
+                const contents = !node.combatLoot && node.scanned && node.remaining>0 ? {
+                    material: recorder ? t('FLIGHT RECORDER') : t(commodity),
+                    detail: recorder ? '' : claim || node.salvage === 'scrap' ? t('{amount} PIECES LEFT', {amount: Math.ceil(node.remaining)}) : t('{amount} PIECES · SCRAP POSSIBLE', {amount: Math.ceil(node.remaining)}),
+                } : undefined;
+                hudTarget = { kind: 'wreck', combatLoot:Boolean(node.combatLoot), name: node.name, subtitle: node.combatLoot ? t('Loot') : node.scanned ? (claim ? t('SALVAGE CLAIM') : t(commodity)) : t('UNRESOLVED WRECK'), distance, scanned: node.scanned, contents, readout: node.combatLoot ? (node.locked?(distance>2000?t('ACTIVATE HYPERDRIVE'):t('SALVAGE CLAIM')):cargoFree(this.save.player)<1?t('CARGO FULL'):stats.lootRange>0?t('AUTO COLLECTION · {range} km',{range:stats.lootRange}):t('FLY OVER TO COLLECT')) : scanStatus, ...screen };
             }
             else if (target.kind === 'pickup') {
                 const pickup = this.pickups.find((entry) => entry.id === target.id);
@@ -14921,7 +14955,7 @@ export class GameSession {
         }
         for (const node of this.wreckNodes) {
             if (!(node.combatLoot ? node.systemId === this.save.player.systemId : this.save.player.mode === 'salvage' && this.activeInstanceId === 'mourning-line')
-                || node.remaining <= 0 || node.id === tutorialTarget?.id
+                || (node.remaining <= 0 && node.id !== this.save.player.currentTargetId) || node.id === tutorialTarget?.id
                 || (node.sensorRange&&node.id!==this.save.player.currentTargetId&&Math.hypot(node.position[0]-this.save.player.position[0],node.position[1]-this.save.player.position[1],node.position[2]-this.save.player.position[2])>node.sensorRange)
                 || !(node.combatLoot || node.scanned || node.id === this.save.player.currentTargetId)) continue;
             const contact=add(node.position,'wreck',node.id===this.save.player.currentTargetId);

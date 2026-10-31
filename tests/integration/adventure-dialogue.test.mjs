@@ -70,6 +70,15 @@ test('space dialogue holds the modal pause until the final reply',()=>{
     ui.advanceAdventure(0);
     assert.equal(ui.isModalOpen,false);assert.equal(ui.storyDismissed,true);assert.equal(calls.length,0);
 });
+test('Paul explains his repair drones only after the player asks',()=>{
+    const script=ADVENTURE_DIALOGUES['paul-rescue'];
+    for(const lang of ['de','en']){
+        assert.doesNotMatch(script.nodes.thanks.text[lang],/drohn|drone/i);
+        assert.doesNotMatch(script.nodes.repairs.text[lang],/drohn|drone/i);
+        assert.match(script.nodes.repairs.choices[0].label[lang],/drohn|drone/i);
+        assert.match(script.nodes.support.text[lang],/200 km/);
+    }
+});
 test('repair and loot details are optional without completing their conversations early',()=>{
     for(const [script,intro,detail,continuation] of [
         ['paul-rescue','repairs','support','route'],['loot','find','rarity','recover']

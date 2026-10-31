@@ -78,13 +78,6 @@ const sphericalOffset = (rng, radius, inner = 0) => {
         Math.sin(phi) * Math.sin(theta) * r,
     ];
 };
-// Depletion overlays a worked-out amount but must not re-order the rng
-// stream. The layout therefore stays byte-identical after a node is mined.
-const depletedOrRoll = (rng, depleted, id, low, high) => {
-    const roll = randomBetween(rng, low, high);
-    return Math.max(0, depleted[id] ?? roll);
-};
-
 const overlapsGraveyardModelWreck = (local, reach = 0) => GRAVEYARD_MODEL_WRECKS.some((wreck) => {
     const dx = local[0] - wreck.local[0];
     const dy = local[1] - wreck.local[1];
@@ -203,9 +196,13 @@ export const generateWreckNodes = (seed, depleted, scanned = []) => {
         const radius = randomBetween(rng, 2.6, 7.2);
         const salvage = pick(rng, hotspot ? hotspotSalvageTypes : salvageTypes);
         const id = `salvage-node-${candidateIndex}`;
+        const name = `${t(site.label)} · ${t(pick(rng, names))} ${String.fromCharCode(65 + randomInt(rng, 0, 18))}-${randomInt(rng, 10, 99)}`;
+        // Keep the same random draw for every save; the original capacity lets
+        // the renderer recognize a partially opened piece after a reload.
+        const initialRemaining = randomBetween(rng, hotspot ? 1.6 : 0.9, hotspot ? 5.4 : 4.2);
         return {
             id,
-            name: `${t(site.label)} · ${t(pick(rng, names))} ${String.fromCharCode(65 + randomInt(rng, 0, 18))}-${randomInt(rng, 10, 99)}`,
+            name,
             position: [0, 0, 0],
             radius,
             shape,
@@ -215,7 +212,9 @@ export const generateWreckNodes = (seed, depleted, scanned = []) => {
                 (candidateIndex * 0.41) % Math.PI,
             ],
             salvage,
-            remaining: depletedOrRoll(rng, depleted, id, hotspot ? 1.6 : 0.9, hotspot ? 5.4 : 4.2),
+            initialRemaining,
+            remaining: Math.max(0, depleted[id] ?? initialRemaining),
+            salvageDamaged: Object.hasOwn(depleted,id) && depleted[id] < initialRemaining,
             scanned: scanned.includes(id),
             zone: site.zone,
             route: site.route,

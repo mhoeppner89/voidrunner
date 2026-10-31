@@ -2,9 +2,10 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from '../../vendor/three.module.min.js';
 import {tutorialFixture} from '../helpers/tutorial.mjs';
-import {wreckNodeCollisionMesh} from '../../src/game/worldData.js';
+import {wreckNodeCollisionMesh,salvageImpactFace,getDamagedWreckNodeGeometry} from '../../src/game/worldData.js';
 import {recoverWreckEntry,combatWreckNode} from '../../src/game/careerLoot.js';
 import {hydrateSave} from '../../src/game/save.js';
+import {generateWreckNodes} from '../../src/game/worldData.js';
 
 function setup(step='earn-standing'){
  const f=tutorialFixture(step),s=f.session;f.save.player.dockedAt=undefined;s.activeInstanceId='mourning-line';s.arena=undefined;
@@ -25,6 +26,7 @@ test('actual beam hits release persistent cargo instead of filling the hold',()=
  const {session:s,save,node}=setup(),before=node.remaining,cargo={...save.player.cargo};fireBeam(s);
  assert.ok(node.remaining<before);assert.deepEqual(save.player.cargo,cargo);const drops=Object.values(save.world.combatWrecks);assert.equal(drops.length,1);
  assert.ok(['scrap',node.salvage].includes(drops[0].contents[0].commodity));assert.equal(drops[0].contents[0].sourceNodeId,node.id);
+ assert.equal(drops[0].driftActive,true);assert.ok(drops[0].velocity[2]>0,'salvage drifts out of the hit surface');
  const loaded=hydrateSave(JSON.parse(JSON.stringify(save)));assert.ok(loaded.world.combatWrecks[drops[0].id]);
  const commodity=drops[0].contents[0].commodity;save.player.position.splice(0,3,...drops[0].position);assert.equal(recoverWreckEntry(s,drops[0].id,drops[0].contents[0].id).ok,true);assert.equal(save.player.cargo[commodity],(cargo[commodity]??0)+1);
 });
@@ -62,4 +64,27 @@ test('ordinary wreckage yields both its commodity and scrap across deterministic
  const {session:s,save,node}=setup();node.salvage='electronics';const results=new Set();
  for(let seed=1;seed<=40;seed++){save.world.seed=seed;node.remaining=1;s.hitSalvageWreck(node.id,30,[0,0,-90],new THREE.Vector3(0,0,-1));const drop=save.world.combatWrecks[`wreck-salvage-${save.world.lootShipCounter}`];results.add(drop.contents[0].commodity);}
  assert.deepEqual([...results].sort(),['electronics','scrap']);
+});
+test('damage reveals a collidable remnant that remains targetable and depleted after reload',()=>{
+ const {session:s,save,node}=setup();s.selectTarget('wreck',node.id);node.remaining=1;
+ const original=wreckNodeCollisionMesh(node);s.hitSalvageWreck(node.id,1,[0,0,-90],new THREE.Vector3(0,0,-1));
+ assert.equal(node.salvageScorched,true);assert.equal(node.salvageDamaged,false);assert.equal(wreckNodeCollisionMesh(node),original);
+ s.hitSalvageWreck(node.id,29,[0,0,-90],new THREE.Vector3(0,0,-1));
+ assert.equal(node.remaining,0);assert.equal(node.salvageDamaged,true);assert.notEqual(wreckNodeCollisionMesh(node),original);
+ const face=salvageImpactFace(node);assert.ok(face>=0&&face<6);assert.ok(getDamagedWreckNodeGeometry(node.shape,face).getAttribute('position').count>0);
+ assert.equal(s.getTargetRef()?.id,node.id);s.renderer.projectTargetToScreen=()=>({});assert.match(s.buildHudModel().target.readout,/STRIPPED|AUSGESCHLACHTET/);
+ const count=Object.keys(save.world.combatWrecks).length;s.hitSalvageWreck(node.id,300,[0,0,-90],new THREE.Vector3(0,0,-1));assert.equal(Object.keys(save.world.combatWrecks).length,count);
+ const loaded=hydrateSave(JSON.parse(JSON.stringify(save))),restored=generateWreckNodes(loaded.world.seed,loaded.world.depletedWrecks,loaded.world.scannedNodes).find(n=>n.id===node.id);
+ assert.deepEqual(loaded.world.salvageImpactFaces[node.id],node.salvageImpactLocal);
+ restored.salvageImpactLocal=loaded.world.salvageImpactFaces[node.id];assert.equal(salvageImpactFace(restored),face);
+ assert.equal(restored.remaining,0);assert.equal(restored.salvageDamaged,true);assert.ok(wreckNodeCollisionMesh(restored).indices.length>0);
+});
+test('the opened side follows all six local impact directions',()=>{
+ for(let axis=0;axis<3;axis++)for(const sign of [-1,1]){
+  const point=[0,0,0];point[axis]=sign;
+  const face=salvageImpactFace({salvageImpactLocal:point});assert.equal(face,axis*2+(sign<0?1:0));
+  const geometry=getDamagedWreckNodeGeometry(2,face),p=geometry.getAttribute('position');let outer=-Infinity;
+  for(let i=0;i<p.count;i++)outer=Math.max(outer,p.getComponent(i,axis)*sign);
+  assert.ok(outer<.2,`face ${face} must be opened on the struck side`);
+ }
 });

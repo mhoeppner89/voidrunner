@@ -48,7 +48,7 @@ export function equipCapitalLoot(session,ship){
 export function combatWreckNode(wreck){
  for(const entry of wreck.contents)if(entry.item)registerInventoryDefinitions({items:{[entry.item.id]:entry.item}});
  const count=wreck.contents.reduce((n,e)=>n+(e.quantity??1),0);
- return {id:wreck.id,name:wreck.name,position:[...wreck.position],rotation:[0,0,0],radius:wreck.radius,shape:0,salvage:'scrap',remaining:count,scanned:wreck.scanned??false,combatLoot:true,salvageFragment:wreck.contents.some(entry=>entry.sourceNodeId&&!entry.tutorialRecorder),locked:Boolean(wreck.locked),derelict:wreck.derelict,sensorRange:wreck.sensorRange,lootRarity:highestLootRarity(wreck.contents),systemId:wreck.systemId,instanceId:wreck.instanceId,velocity:[0,0,0]};
+ return {id:wreck.id,name:wreck.name,position:wreck.position,rotation:[0,0,0],radius:wreck.radius,shape:0,salvage:'scrap',remaining:count,scanned:wreck.scanned??false,combatLoot:true,locked:Boolean(wreck.locked),derelict:wreck.derelict,sensorRange:wreck.sensorRange,lootRarity:highestLootRarity(wreck.contents),systemId:wreck.systemId,instanceId:wreck.instanceId};
 }
 export function makeCareerWreck(session,ship,{captured=false}={}){
  if(session.arena||ship.lootResolved)return null;
@@ -76,10 +76,13 @@ export function makeCareerWreck(session,ship,{captured=false}={}){
  }
  // Cosmetic debris always appears; an empty hull does not advertise loot.
  if(!contents.length)return null;
- const ext=session.npcHullExtents(ship),wreck={id:`wreck-${ship.lootKey}`,name:`${ship.name} — ${t('Loot')}`,position:[...ship.position],velocity:[0,0,0],radius:Math.max(3,Math.min(35,Math.max(...ext)*.5)),systemId:session.save.player.systemId,instanceId:session.activeInstanceId,contents,scanned:captured};
+ const velocity=ship.velocity??[0,0,0],speed=Math.hypot(...velocity),scale=speed?Math.min(5,speed*.08)/speed:0;
+ const drift=[velocity[0]*scale+(rng()-.5)*4,velocity[1]*scale+(rng()-.5)*4,velocity[2]*scale+(rng()-.5)*4];
+ const driftSpeed=Math.hypot(...drift);if(driftSpeed>8)for(let i=0;i<3;i++)drift[i]*=8/driftSpeed;
+ const ext=session.npcHullExtents(ship),wreck={id:`wreck-${ship.lootKey}`,name:`${ship.name} — ${t('Loot')}`,position:[...ship.position],velocity:drift,driftActive:true,radius:Math.max(3,Math.min(35,Math.max(...ext)*.5)),systemId:session.save.player.systemId,instanceId:session.activeInstanceId,contents,scanned:captured};
  session.save.world.combatWrecks[wreck.id]=wreck;return wreck;
 }
-// Drops stay stationary. Test the swept hull envelope so a fast fly-over cannot
+// Test the swept hull envelope so a fast fly-over cannot
 // jump past a small crate between fixed steps. Long teleports are never swept.
 export function lootCollectionEnabled(session){
  const p=session.save.player;
@@ -104,7 +107,16 @@ export function lootInReach(session,position,range=0,swept=false,ignoreId,checkS
  }
  return !checkSight || !session.lineBlocked?.(session.tmpP3.set(x,y,z),session.tmpP4.fromArray(position),ignoreId);
 }
-export function updateCombatLoot(session){
+export function updateCombatLoot(session,dt=0){
+ // Only newly released boxes drift; anchored exploration wrecks and legacy
+ // saves remain in place. Their bounded momentum is persisted with the box.
+ if(dt>0)for(const id in session.save.world.combatWrecks){
+  const wreck=session.save.world.combatWrecks[id];
+  if(!wreck.driftActive||wreck.derelict||wreck.systemId!==session.save.player.systemId)continue;
+  const damping=wreck.salvageDrift ? .65 : 1.25,factor=Math.exp(-damping*dt),distance=(1-factor)/damping;
+  for(let i=0;i<3;i++){wreck.position[i]+=wreck.velocity[i]*distance;wreck.velocity[i]*=factor;}
+  if(Math.hypot(wreck.velocity[0],wreck.velocity[1],wreck.velocity[2])<.03){wreck.velocity.fill(0);wreck.driftActive=false;}
+ }
  if(session.arena||!lootCollectionEnabled(session))return;
  const range=session.playerStats().lootRange??0;
  const retry=session.lootRetryAt??=new WeakMap();
@@ -193,7 +205,9 @@ export function normalizeCareerLoot(world, player) {
    used.add(entry.id);contents.push(entry);
   }
   if(!contents.length&&!(raw.derelict==='atlas-freighter'&&raw.explorationId==='finale'))continue;
-  wrecks[id]={...raw,name:String(raw.name??'Ship wreck').slice(0,150),contents,radius:Math.max(1,Math.min(35,Number(raw.radius)||3)),velocity:[0,0,0],scanned:Boolean(raw.scanned)};
+  const validDrift=raw.driftActive===true&&!raw.derelict&&tuple(raw.velocity,3);
+  const speed=validDrift?Math.hypot(...raw.velocity):0,scale=speed>8?8/speed:1;
+  wrecks[id]={...raw,name:String(raw.name??'Ship wreck').slice(0,150),contents,radius:Math.max(1,Math.min(35,Number(raw.radius)||3)),velocity:validDrift?raw.velocity.map(v=>v*scale):[0,0,0],driftActive:validDrift&&speed>.03,scanned:Boolean(raw.scanned)};
  }
  if(world.combatWrecks)world.combatWrecks=wrecks;
  const orphans={};

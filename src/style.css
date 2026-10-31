@@ -3425,6 +3425,17 @@ html[lang="de"] .comms-bar.story::after {
   text-shadow: 0 0 6px rgba(226, 136, 116, 0.5);
 }
 
+/* Scanned contents have their own space so status alerts and claims cannot hide them. */
+#game-shell .screen-target-contents {
+  position:relative; z-index:1; flex:1; min-height:0; padding:3px 5px;
+  display:flex; flex-direction:column; justify-content:center; gap:2px;
+  color:var(--void-cream); font:clamp(9px, 6cqh, 13px)/1.15 var(--pixel-font);
+  overflow:hidden; overflow-wrap:anywhere;
+}
+#game-shell .screen-target-contents.is-hidden { display:none; }
+#game-shell .screen-target-contents b { color:var(--void-gold); }
+#game-shell .screen-target-contents span { color:#8fd1c1; font-size:.82em; }
+
 /* A locked ship the sensors can no longer resolve: the readout flashes the
    CONTACT LOST state in warning amber instead of pretending the picture is
    fresh. */

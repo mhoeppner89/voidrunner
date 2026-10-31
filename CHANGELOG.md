@@ -1,3 +1,29 @@
+## 0.8.2mt — Salvage direction and flight feedback
+
+- Open and collide with the side of wreckage closest to the impact, including after reload.
+- Add a restrained, smoothed acceleration and braking response to the cockpit presentation without changing flight physics.
+
+## 0.8.2ms — Salvage refinement
+
+- Add metallic impact flecks, varied breakup fragments and cargo spread; position the torn plate at the impact site.
+
+## 0.8.2mr — Salvage impacts
+
+- Add short dust and chip bursts to salvage impacts and let released cargo drift farther before settling.
+
+## 0.8.2mq — Salvage feedback and remnants
+
+- Wreck pieces show damage as they are opened and remain visible, solid and identifiable when stripped. Released cargo emerges beside the impact with a short cue.
+
+## 0.8.2mp — Minimal loot boxes
+
+- Replace loot beacons with simple containers and rarity-colored edges. New drops drift briefly before settling and keep a gentle spin.
+
+## 0.8.2mo — Wreck scans and Paul’s introduction
+
+- Give scanned wreck contents a dedicated target-monitor display, including salvage claims and possible scrap.
+- Let the player ask Paul about his repair drones before he explains them.
+
 ## 0.8.2mn — Salvage scanning and breakup
 
 - Restore scanning of wreckage before recovery and show the identified contents and remaining material on the target monitor.

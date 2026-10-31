@@ -19,10 +19,10 @@ for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1440,hei
   });
   await page.locator('[data-ui-command="adventure-choice"]').first().click();
   assert.equal(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.adventure.nodeId),'repairs');assert.ok(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.adventure.space),'Repair introduction must be an in-flight transmission');
-  assert.ok((await page.locator('.adventure-panel').innerText()).includes('200 km'));
-  await page.screenshot({path:`${out}/${name}-repair-introduction.png`});
   await page.locator('[data-ui-command="adventure-choice"]').first().click();
   assert.equal(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.adventure.nodeId),'support');
+  assert.ok((await page.locator('.adventure-panel').innerText()).includes('200 km'));
+  await page.screenshot({path:`${out}/${name}-repair-introduction.png`});
   const bounds=await page.locator('.adventure-choices button').first().boundingBox();assert.ok(bounds&&bounds.y>=0&&bounds.y+bounds.height<=device.viewport.height+1,'reply remains visible on phone');
   await page.locator('[data-ui-command="adventure-choice"]').first().click();await page.locator('[data-ui-command="adventure-choice"]').first().click();
   const repair=await page.evaluate(async()=>{

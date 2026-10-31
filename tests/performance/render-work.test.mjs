@@ -9,6 +9,16 @@ const { skipHiddenWorldMatrices, markAttributeSpan } = await import('../../src/g
 const { CanvasSizeCache } = await import('../../src/game/canvasSizeCache.js');
 const { SpaceRenderer } = await import('../../src/game/render.js');
 
+test('flight feedback responds smoothly to acceleration and braking without changing flight state',()=>{
+ const r=Object.create(SpaceRenderer.prototype),styles={};
+ Object.assign(r,{camera:new THREE.PerspectiveCamera(70,1),skyRoot:new THREE.Group(),tmpPrevPos:new THREE.Vector3(),tmpPrevQuat:new THREE.Quaternion(),tmpCurQuat:new THREE.Quaternion(),cockpitZoom:1,cockpit:null,updateDistantInstanceVisibility(){},updateRaceSpeedLines(){},setShellStyle(k,v){styles[k]=v;}});
+ const pos=[0,0,0],rotation=[0,0,0,1],angular=[0,0,0],frame=(speed,dt=1/60)=>r.updateCamera(pos,null,rotation,null,angular,speed,false,dt,0);
+ frame(0);frame(.05);assert.ok(r.flightCueAccel>0);assert.ok(r.fovTarget>70+.05*2);
+ frame(.01);assert.ok(r.flightCueAccel<0);assert.ok(r.fovTarget<70+.01*2);
+ r.reducedHyperdriveMotion=true;frame(.2);assert.equal(r.fovTarget,70+.2*2);assert.deepEqual(pos,[0,0,0]);assert.deepEqual(rotation,[0,0,0,1]);
+ frame(1,0);assert.equal(r.flightCueAccel,0);
+});
+
 function tree() {
     const scene = new THREE.Scene(), parent = new THREE.Group(), branch = new THREE.Group();
     const leaf = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());

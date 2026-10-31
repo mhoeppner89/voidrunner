@@ -1508,3 +1508,29 @@ Follow-up: restore wreck scanning and improve salvage visuals.
 - Wreckage must again be scanned automatically in range before hits release cargo, and the target monitor shows the identified material and remaining units. Updated the recorder and salvage-contract instructions.
 - Salvage releases shed short-lived instanced solid metal fragments; ordinary recovered wreckage has a shared irregular thick model and unchanged rarity beacon. Pickup positions stay stationary. Shortened the recorder receipt to fit cockpit monitors.
 - Focused scanning, salvage, loot visuals, resource-lifecycle, tutorial and mission tests passed. Muted desktop and Android browser checks verified the scan, firing, breakup, pickup, recorder progress and readable HUD; screenshots reviewed.
+
+Follow-up: make wreck scan contents visible and make Paul's drone explanation responsive.
+- Scanned wrecks show material and remaining pieces independently of claim progress and transient status messages. Ordinary salvage indicates the possibility of scrap; the tutorial recorder is identified explicitly.
+- Paul describes repair drones only if the player asks. Kept the direct route through the conversation and both translations.
+- Focused integration tests passed; desktop and Android browser checks verified scanning, claim contents and salvage. Muted bilingual dialogue paths passed on desktop. Final muted desktop and Android salvage checks passed with claim progress and alerts; iPhone and desktop dialogue paths passed in both languages. Runtime packaging passed.
+
+Follow-up: simplify and animate loot boxes.
+- Replaced floating rarity beacons with depth-tested colored box edges. Loose cargo uses the same simple box, and drops rotate slowly based on simulation time.
+- New drops have bounded decaying motion; salvage moves away from the hit face. Persistent motion survives saves, while authored caches and older saves remain anchored.
+- Focused loot, salvage, lifecycle, exploration and save checks passed; muted desktop and Android visual and collection reviews passed. No known outstanding issues.
+
+Follow-up: improve shooting salvage and retain stripped debris.
+- Hits darken the piece; releasing cargo opens a shared damaged variant, leaves a detached plate, emits fragments and a short salvage cue, and ejects the crate near the impact.
+- Stripped wrecks stay visible, solid, selectable and marked as empty. Generated layouts and saved depletion remain stable, and collision uses the same damaged geometry.
+- Focused salvage, loot, mission, localization and tutorial checks passed; muted desktop and Android gameplay/screenshot checks passed. Runtime packaged and 0.8.2mq served on port 4207.
+- A broader station-collider test still reports the previously documented Rook NPC approach intersections; unrelated to this change.
+
+Follow-up: independent salvage quality review and refinement.
+- Independent review identified generic dust, uniform shards and misaligned damage. Added a lighter dust burst, varied plates, laterally varied cargo, and a torn plate positioned at the first impact; the impact location survives save hydration.
+- Focused loot and salvage checks and a muted desktop gameplay check passed. Packaged 0.8.2ms on port 4207.
+- Remaining visual limitation: the main shared damaged geometry still opens along its local axis rather than the actual impact direction.
+
+Follow-up: planned salvage and flight-feel pass.
+- Opened wreck geometry and its collider now use the nearest of six faces to the recorded local hit; stored hit locations restore the same face after reload. Unused face batches are hidden.
+- Added smoothed, bounded acceleration/braking cockpit and FOV response; reduced-motion settings suppress the added motion. Ship and race physics are unchanged.
+- Directional collision, salvage, loot, localization, tutorial and render-work checks passed. Muted desktop/Android gameplay checks passed; additional acceleration, braking and reduced-motion checks passed in both desktop and Android browser runs. The previously documented unrelated Rook approach collision test still fails.

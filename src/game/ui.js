@@ -462,7 +462,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2mn';
+const GAME_VERSION = '0.8.2mt';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -1248,6 +1248,7 @@ export class GameUI {
             <div class="monitor-damage" aria-hidden="true"></div><div class="screen-heading"><span>${t('TARGET STATUS')}</span><b id="screen-target-name">${t('NO LOCK')}</b></div>
             <button type="button" id="capital-subtarget" class="is-hidden" aria-label="Cycle capital ship component"><span class="capital-cycle-arrow" aria-hidden="true">‹</span><span id="capital-subtarget-label"></span><span id="capital-subtarget-health"></span><span class="capital-cycle-arrow" aria-hidden="true">›</span></button>
             <div id="screen-target-distance" class="screen-target-distance">—</div><div id="screen-target-readout" class="screen-target-readout">—</div>
+            <div id="screen-target-contents" class="screen-target-contents is-hidden"><b></b><span></span></div>
             <div id="screen-drone-telemetry" class="screen-drone-telemetry is-hidden"><div id="screen-drone-bays"></div><div id="screen-drone-state"></div><div id="screen-drone-cargo"></div><div id="screen-drone-losses"></div></div>
             <div class="screen-target-layout"><canvas class="hull-outline" id="target-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span data-short="S">${t('SHIELDS')}</span><i><b id="screen-target-shield"></b></i></div><div><span data-short="H">${t('HULL')}</span><i><b id="screen-target-hull"></b></i></div></div></div>
           </div>
@@ -4611,6 +4612,12 @@ export class GameUI {
             throttleFill.style.height = `${model.throttle * 100}%`;
     }
     updateTarget(target, mode = this.lastHud?.mode ?? 'combat', drones) {
+        const contents = this.el('#screen-target-contents');
+        if (contents) {
+            contents.classList.toggle('is-hidden', !target?.contents);
+            contents.querySelector('b').textContent = target?.contents?.material ?? '';
+            contents.querySelector('span').textContent = target?.contents?.detail ?? '';
+        }
         const capital=Boolean(target?.capitalClass||target?.capitalSubtarget);
         this.el('#screen-target-readout').classList.toggle('is-capital-warning',capital&&(target.capitalTorpedoWarning||!target.capitalDisarmed&&['CHARGING','SALVO'].includes(target.capitalAttack)));
         const subtarget=this.el('#capital-subtarget');
