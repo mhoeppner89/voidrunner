@@ -128,7 +128,7 @@ export const CampaignWingMethods={
         ship.targetId=undefined;ship.wingTargetId=undefined;
         ship.combatThreatId=undefined;ship.combatThreatUntil=0;
         ship.destination=[...ship.position];
-        this.ui.showPilotLine?.(ship.storyPersonId==='paul'?'Paul':'Rin Vek',t('Hull breach. I am disabled. I will restart once the fighting is over.'),'ally',9000);
+        this.ui.showPilotLine?.(ship.storyPersonId==='paul'?'Paul':'Rin Vek',t(ship.storyPersonId==='paul'?'Hull breach. I am disabled. I will restart once the fighting is over.':'Hull breach. I am out for now and need time for repairs.'),'ally',9000);
         this.ui.pushEvent(t('{name} is disabled until the fighting ends.',{name:ship.name}),'danger',7000);
         return true;
     },
@@ -140,7 +140,7 @@ export const CampaignWingMethods={
         ship.shield=ship.maxShield;ship.energy=ship.combatFit?.stats.energyCapacity??ship.energy;
         ship.shieldDelay=0;
         ship.destination=[...ship.position];
-        this.ui.showPilotLine?.(ship.storyPersonId==='paul'?'Paul':'Rin Vek',t('Reactor online. I am back on your wing. The hull is still damaged.'),'ally',8000);
+        this.ui.showPilotLine?.(ship.storyPersonId==='paul'?'Paul':'Rin Vek',t(ship.storyPersonId==='paul'?'Reactor online. I am back on your wing. The hull is still damaged.':'Reactor online. I am back on your wing.'),'ally',8000);
         return true;
     },
     // The HUD wing rail is published every frame from the companion's live

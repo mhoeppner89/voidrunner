@@ -1,4 +1,4 @@
-import {t} from '../../src/game/i18n.js';
+import {t,setLanguage} from '../../src/game/i18n.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {tutorialFixture} from '../helpers/tutorial.mjs';
@@ -74,11 +74,27 @@ test('Rin’s combat lesson opens immediately beside the pirate and is remembere
  session.playTutorialBriefing('combat');session.playTutorialBriefing('combat');
  assert.equal(calls.length,1);assert.equal(calls[0][3],'tutorial-combat');assert.equal(session.storyLineUntil,Infinity);
  assert.equal(session.pendingStoryConversations,undefined,'the nearby pirate cannot delay his own combat lesson');
- assert.match(dialogueText(ADVENTURE_DIALOGUES.combat.nodes.weapons.text,'en'),/Space.*fire pad.*energy/);
- for(const phrase of [/Y.*wing card/,/cover you and stay close/i])assert.match(dialogueText(ADVENTURE_DIALOGUES.combat.nodes.wing.text,'en'),phrase);
+ assert.match(dialogueText(ADVENTURE_DIALOGUES.combat.nodes.weapons.text,'en'),/Space.*fire button.*energy/);
+ for(const phrase of [/Y.*display/,/cover you and stay close/i])assert.match(dialogueText(ADVENTURE_DIALOGUES.combat.nodes.wing.text,'en'),phrase);
  session.finishTutorialBriefing('tutorial-combat',true);assert.equal(quest.flags['briefingRead-combat'],true);
  session.playTutorialBriefing('combat');assert.equal(calls.length,1);assert.equal(quest.stepId,'defeat-raider');
  const resumed=tutorialFixture('defeat-raider',hydrateSave(JSON.parse(JSON.stringify(save))));resumed.session.playTutorialBriefing=GameSession.prototype.playTutorialBriefing;resumed.session.ui.showStoryLine=()=>assert.fail('completed combat lesson repeated');resumed.session.playTutorialBriefing('combat');
+});
+
+test('the edited first-combat lines and branches agree in German and English',()=>{
+ const d=ADVENTURE_DIALOGUES;
+ assert.match(d.combat.nodes.scrapper.text.de,/ein Pirat in einer rostigen Balor/);
+ assert.match(d.combat.nodes.scrapper.text.en,/one pirate in a rusty Balor/i);
+ assert.match(d.surrender.nodes.capture.text.de,/400 km.*rechts unten/);
+ assert.match(d.surrender.nodes.capture.text.en,/400 km.*bottom right/);
+ assert.match(d.loot.nodes.find.text.de,/Aus dem Wrack.*Teile oder die Fracht/);
+ assert.match(d.loot.nodes.find.text.en,/recover equipment or cargo/);
+ assert.match(d.loot.nodes.rarity.text.de,/aktuelles Schiff.*Stufe I/);
+ assert.match(d.loot.nodes.rarity.text.en,/current ship.*tier I/);
+ assert.equal(d['loot-surrender-killed'].nodes.find.text.de,'Aus dem Wrack kannst du manchmal noch einige Teile oder die Fracht retten und später einbauen oder verkaufen.');
+ assert.match(d['loot-surrender-killed'].nodes.reproach.text.en,/surrendered/);
+ for(const lang of ['de','en']){setLanguage(lang);assert.match(t('Keep the pirate targeted, fly within 400 km and press M or tap Capture.'),/400 km/);assert.match(t('Nice cargo. I will take it! Cut your drive and drop the ore, then you can go.'),lang==='de'?/Nette Fracht/:/Nice cargo/);}
+ setLanguage('en');
 });
 
 test('resuming an unfinished first-combat briefing restores it once, including older stuck saves',()=>{

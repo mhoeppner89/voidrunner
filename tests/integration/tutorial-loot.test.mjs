@@ -57,7 +57,7 @@ test('first pirate surrenders at 40%, survives a lethal volley and can be captur
  s.damageShip(enemy,10000,'player',enemy.position);assert.equal(enemy.hull,enemy.maxHull*.4,'same volley cannot destroy the surrendering ship');
  save.player.position.splice(0,3,enemy.position[0]+2000,enemy.position[1],enemy.position[2]);save.player.currentTargetId=enemy.id;
  s.captureTarget();assert.equal(enemy.captured,false,'capture still requires approaching');assert.equal(quest.stepId,'defeat-raider');
- save.player.position.splice(0,3,...enemy.position);
+ save.player.position.splice(0,3,enemy.position[0]+399,enemy.position[1],enemy.position[2]);
  s.captureTarget();assert.equal(enemy.captured,true);assert.equal(quest.stepId,'land-mining');
  const wreck=save.world.combatWrecks[quest.flags.tutorialLootWreckId];assert.ok(wreck);assert.equal(wreck.contents.length,1);assert.equal(wreck.contents[0].item.id,enemy.guaranteedLootId);assert.deepEqual(briefings,['surrender','loot']);
 });

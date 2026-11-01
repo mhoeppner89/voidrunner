@@ -1,6 +1,6 @@
 # Voidrunner
 
-A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2mx**.
+A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2my**.
 
 Phone flight uses the on-screen joystick; older tilt-steering preferences migrate to the joystick automatically.
 

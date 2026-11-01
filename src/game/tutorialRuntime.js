@@ -320,7 +320,7 @@ export const TutorialRuntimeMethods={
             const destination=this.tutorialSummary()?.destinationId;if(destination)this.setTutorialDestination(destination);
         }
         if(s==='return-mining')this.ui.showPilotLine?.('Rin Vek',t('That covers the contract. We can return to Vesper whenever you are ready.'),'ally',12000,true);
-        if(s==='raider-standoff'){this.save.player.mode='combat';this.utilityActive=false;q.flags.standoffStartedAt=this.save.world.time;this.ensureTutorialEnemy();this.ui.showPilotLine?.('Ash Moth',t('Cut your drive. That ore belongs to us. Drop it and you can leave.'),'hostile',12000,true);}
+        if(s==='raider-standoff'){this.save.player.mode='combat';this.utilityActive=false;q.flags.standoffStartedAt=this.save.world.time;this.ensureTutorialEnemy();this.ui.showPilotLine?.('Ash Moth',t('Nice cargo. I will take it! Cut your drive and drop the ore, then you can go.'),'hostile',12000,true);}
         if(s==='defeat-raider'){
             const enemy=this.ensureTutorialEnemy();if(enemy&&!enemy.surrendered){enemy.holdFire=false;enemy.pursuitHoldFire=false;enemy.demandUntil=0;enemy.targetId='player';}
             this.save.player.mode='combat';this.utilityActive=false;this.introduceCampaignWingOrders();
@@ -428,7 +428,7 @@ export const TutorialRuntimeMethods={
             if(p.throttle>.01||Math.hypot(...p.velocity)>=12)return say('stop','Set thrust to zero inside the hangar.');
             return say('hidden','Stay hidden while the patrol passes.');
         }
-        if(s==='defeat-raider'&&q.flags.firstRaiderSurrendered)return say('capture','Keep the surrendered pirate targeted, move closer and press M or tap the capture button.');
+        if(s==='defeat-raider'&&q.flags.firstRaiderSurrendered)return say('capture','Keep the pirate targeted, fly within 400 km and press M or tap Capture.');
         const oneTask={'rescue-paul':'Help Paul defeat the two Balors.','defeat-raider':'Fire as the pirate crosses your sights: hold Space on desktop or FIRE on phone.','black-box-fight':'Defeat the four pirate ships.','carrier-wait':'Stay near the carrier while Paul checks the flight deck.','talk-paul':'Open Paul’s transmission.'};
         if(oneTask[s])return say(s,oneTask[s]);
     },

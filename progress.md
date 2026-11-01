@@ -1,5 +1,9 @@
 Original prompt: Review and revise all equipment names for ambiguity and visible tiers.
 
+Follow-up: apply the edited first-combat dialogue in German and English.
+- Updated the pirate demand, Rin's combat and surrender lesson, loot branches, return message and optional reminders. Rin's damaged-wing radio remains distinct from Paul's existing lines.
+- 62 focused dialogue, capture, wing and localization checks passed; verified 400 km capture. Muted desktop and iPhone browser checks passed in German and English; screenshots reviewed. Packaged runtime 0.8.2my.
+
 Follow-up: restore consistent phone joystick steering.
 - Removed the active tilt-selection paths and migrated new, restored and legacy preferences to the joystick. Updated the tutorial and flight settings.
 - Focused input, save, tutorial and localization checks passed. Muted Android and iPhone browser checks verified visibility, touch steering and reload; Android simulation confirmed the ship turns. Screenshots reviewed.

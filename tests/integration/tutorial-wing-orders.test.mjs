@@ -256,7 +256,7 @@ test('the story companion is disabled at one hull and returns when the fight is 
     assert.equal(wing.poweredDown,true,'and she powers down instead of dying');
     assert.equal(wing.energy,0);assert.equal(wing.shield,0);
     assert.equal(wing.holdFire,true);assert.equal(wing.targetId,undefined);assert.equal(wing.wingTargetId,undefined);
-    assert.match(lines.at(-1)[1],/disabled/);
+    assert.match(lines.at(-1)[1],/out for now.*repairs/);
     assert.match(events.at(-1)[0],/disabled/);
     // A disabled companion takes no orders, so the order control goes with her.
     assert.equal(session.campaignWingActive(),false);

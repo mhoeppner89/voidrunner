@@ -1,3 +1,7 @@
+## 0.8.2my — First combat dialogue
+
+- Apply the revised first-pirate encounter, surrender and loot dialogue in German, with a matching English version.
+
 ## 0.8.2mx — Phone steering
 
 - Always show and use the on-screen joystick on phones, including careers with older tilt-steering preferences. Update the flight lesson and settings accordingly.
