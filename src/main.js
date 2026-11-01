@@ -138,70 +138,6 @@ const scheduleLikelyFlightWarmup = () => {
         }, 600);
     }));
 };
-// Tilt state shared with the title screen, where no session (and no
-// InputManager) exists yet. The gyro listener keeps live readings so
-// ENABLE TILT STEER and SET NEUTRAL work before a career starts.
-let tiltGranted = false;
-let tiltSeen = false;
-let tiltBeta = 0;
-let tiltGamma = 0;
-let tiltAngle = 0;
-const tiltSampleWaiters = new Set();
-const normalizeTiltAngle = (value) => {
-    let angle = Number(value);
-    if (!Number.isFinite(angle))
-        angle = 0;
-    while (angle > 180)
-        angle -= 360;
-    while (angle < -180)
-        angle += 360;
-    return angle;
-};
-if (typeof DeviceOrientationEvent !== 'undefined') {
-    window.addEventListener('deviceorientation', (event) => {
-        const rawBeta = Number(event.beta);
-        const rawGamma = Number(event.gamma);
-        if (!Number.isFinite(rawBeta) || !Number.isFinite(rawGamma))
-            return;
-        // Same screen-frame rotation the InputManager applies (see input.js).
-        tiltAngle = normalizeTiltAngle(globalThis.screen?.orientation?.angle ?? globalThis.window?.orientation ?? 0);
-        const radians = (tiltAngle * Math.PI) / 180;
-        const cos = Math.cos(radians);
-        const sin = Math.sin(radians);
-        tiltBeta = rawBeta * cos + rawGamma * sin;
-        tiltGamma = -rawBeta * sin + rawGamma * cos;
-        tiltSeen = true;
-        for (const resolve of tiltSampleWaiters)
-            resolve(true);
-        tiltSampleWaiters.clear();
-    }, { passive: true });
-}
-const waitForTitleTiltSample = (timeoutMs = 1800) => {
-    if (tiltSeen)
-        return Promise.resolve(true);
-    return new Promise((resolve) => {
-        const finish = (seen) => {
-            clearTimeout(timeoutId);
-            tiltSampleWaiters.delete(finish);
-            resolve(seen);
-        };
-        const timeoutId = setTimeout(() => finish(false), timeoutMs);
-        tiltSampleWaiters.add(finish);
-    });
-};
-const requestTiltPermission = async () => {
-    if (typeof DeviceOrientationEvent === 'undefined')
-        return false;
-    const request = DeviceOrientationEvent.requestPermission;
-    if (typeof request !== 'function')
-        return true;
-    try {
-        return (await request.call(DeviceOrientationEvent)) === 'granted';
-    }
-    catch {
-        return false;
-    }
-};
 const beginSession = (mode, arena, tutorial = true) => {
     if (sessionStarting)
         return sessionStarting;
@@ -224,16 +160,6 @@ const beginSession = (mode, arena, tutorial = true) => {
     // career-specific progress. Apply the latest global record to new,
     // resumed, and simulator sessions alike.
     Object.assign(save.settings, titleSettings);
-    // iOS only accepts the orientation permission request in the original
-    // tap/click task. Start it here, before the deferred game module and scene
-    // work, then hand the resolved state to the InputManager. Previously a new
-    // session tried too late and silently changed tilt back to stick steering.
-    const touchDevice = Number(navigator.maxTouchPoints ?? 0) > 0
-        || Boolean(globalThis.matchMedia?.('(any-pointer: coarse)').matches);
-    const shouldStartTilt = save.settings.steering !== 'stick' && (touchDevice || tiltGranted);
-    const tiltPermissionRequest = shouldStartTilt
-        ? (tiltGranted ? Promise.resolve(true) : requestTiltPermission())
-        : Promise.resolve(false);
     // Keep the language mirrors in sync so the next boot and settings UI agree.
     // The probe/dev key (`__VOID_PRIVATEER_PROBE_LANG__`) is single-shot: it
     // forces the boot language once, then clears itself — a value left behind
@@ -341,12 +267,7 @@ const beginSession = (mode, arena, tutorial = true) => {
             warmBinary(SHIP_WARM_ASSETS[shipId][0], 'high'),
             ui.preloadSessionAssets(save, { priority: 'high', includeLocation: mode !== 'arena' && mode !== 'observer' }),
         ]);
-        const [tiltPermission, gameModule] = await Promise.all([
-            settleWithin(tiltPermissionRequest, 4000, false),
-            settleWithin(loadGameSession(), 20000, undefined, true),
-        ]);
-        if (tiltPermission === true)
-            tiltGranted = true;
+        const gameModule = await settleWithin(loadGameSession(), 20000, undefined, true);
         const { GameSession } = gameModule;
         const nextSession = new GameSession(save, ui, () => {
             session = undefined;
@@ -356,7 +277,7 @@ const beginSession = (mode, arena, tutorial = true) => {
                 saveGame(cachedSave);
             }
             showTitleScreen();
-        }, mode === 'arena' || mode === 'observer' ? arena : null, tiltPermission, audioManager);
+        }, mode === 'arena' || mode === 'observer' ? arena : null, false, audioManager);
         session = nextSession;
         if (!arena && save.player.dockedAt) {
             if (!await nextSession.prepareDockedFlightRuntime({ showLoading: false }))
@@ -419,7 +340,7 @@ const assignSetting = (settings, key, value) => {
         settings[key] = Number(value);
     }
     else if (key === 'steering') {
-        settings.steering = value === 'stick' ? 'stick' : 'tilt';
+        settings.steering = 'stick';
     }
     else if (key === 'tiltInvertPitch' || key === 'tiltInvertYaw' || key === 'flightAssist' || key === 'aimAssist' || key === 'vibration' || key === 'easyMode') {
         settings[key] = Boolean(value);
@@ -563,51 +484,7 @@ const actions = {
             saveGame(save);
         }
     },
-    enableTilt: async () => {
-        // In a session the InputManager owns tilt; on the title screen there is
-        // no session yet, so request permission here and let the next session
-        // inherit it (the constructor auto-enables when tiltGranted is set).
-        if (session) {
-            const granted = await session.enableTilt();
-            if (granted)
-                syncTitleSettings(session.save.settings);
-            return granted;
-        }
-        const granted = await requestTiltPermission();
-        if (!granted)
-            return false;
-        tiltGranted = true;
-        if (!await waitForTitleTiltSample())
-            return false;
-        titleSettings.steering = 'tilt';
-        saveSettingsPreferences(titleSettings);
-        const save = cachedSave ?? loadGame();
-        if (save) {
-            save.settings.steering = 'tilt';
-            cachedSave = save;
-            saveGame(save);
-        }
-        return true;
-    },
-    calibrateTilt: () => {
-        if (session) {
-            const calibrated = session.calibrateTilt();
-            if (calibrated)
-                syncTitleSettings(session.save.settings);
-            return calibrated;
-        }
-        if (!tiltSeen)
-            return false;
-        titleSettings.tiltNeutral = { beta: tiltBeta, gamma: tiltGamma, angle: tiltAngle };
-        saveSettingsPreferences(titleSettings);
-        const save = cachedSave ?? loadGame();
-        if (save) {
-            save.settings.tiltNeutral = { beta: tiltBeta, gamma: tiltGamma, angle: tiltAngle };
-            cachedSave = save;
-            saveGame(save);
-        }
-        return true;
-    },
+
 };
 ui.mugStandoff = () => session?.standoffBriefing();
 ui.setActions(actions);

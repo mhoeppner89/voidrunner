@@ -1,5 +1,9 @@
 Original prompt: Review and revise all equipment names for ambiguity and visible tiers.
 
+Follow-up: restore consistent phone joystick steering.
+- Removed the active tilt-selection paths and migrated new, restored and legacy preferences to the joystick. Updated the tutorial and flight settings.
+- Focused input, save, tutorial and localization checks passed. Muted Android and iPhone browser checks verified visibility, touch steering and reload; Android simulation confirmed the ship turns. Screenshots reviewed.
+
 Follow-up: investigate Android career loading hang.
 - Flight-code imports and motion permission could remain pending indefinitely; startup errors were also sent to an invisible cockpit log. Added bounded waits and a visible title-screen recovery message.
 - Service worker falls back to the current release's cached code on stalled requests. Fault-injected Android testing verified recovery from a stuck download and permission prompt; service-worker checks and Android online, stalled-network, offline and reconnect tests passed. Packaged 0.8.2mw and updated the local preview.

@@ -1,3 +1,7 @@
+## 0.8.2mx — Phone steering
+
+- Always show and use the on-screen joystick on phones, including careers with older tilt-steering preferences. Update the flight lesson and settings accordingly.
+
 ## 0.8.2mw — Career startup recovery
 
 - Prevent an unresponsive flight-code download or motion-permission prompt from leaving the loading screen indefinitely. Show a reload option if the flight code cannot start.

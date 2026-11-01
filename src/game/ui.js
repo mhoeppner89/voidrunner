@@ -462,7 +462,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2mw';
+const GAME_VERSION = '0.8.2mx';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -1715,7 +1715,7 @@ export class GameUI {
             case 'skip-new-career':
                 if (this.newCareerConfirm) {
                     this.closeNewCareerConfirmation(false);
-                    // Keep start and tilt permission within this user gesture.
+                    // Start the selected career from this user gesture.
                     this.actions?.startNew(command === 'confirm-new-career');
                 }
                 break;
@@ -1835,16 +1835,6 @@ export class GameUI {
                 // Flip between German (default) and English. setSetting persists
                 // the choice and reloads the page in the new language.
                 this.actions?.setSetting('language', getLanguage() === 'de' ? 'en' : 'de');
-                break;
-            case 'use-stick':
-                this.actions?.setSetting('steering', 'stick');
-                break;
-            case 'enable-tilt':
-                void this.actions?.enableTilt().then((active) => this.showToast(active ? 'Tilt steering engaged. Set neutral if the ship drifts.' : 'Tilt steering unavailable (no gyroscope, or permission denied).', active ? 'success' : 'warning', 4200));
-                break;
-            case 'calibrate-tilt':
-                if (this.actions?.calibrateTilt())
-                    this.showToast('Tilt neutral set: hold the phone level and fly.', 'success', 3200);
                 break;
             case 'resume-flight':
                 this.hidePause();
@@ -5965,7 +5955,7 @@ export class GameUI {
         this.root.querySelector('#ship-panel')?.classList.add('is-hidden');
         this.updateOrientationNotice();
     }
-    // The settings sections (FLIGHT / TILT STEER / AUDIO / controls) shared by
+    // The settings sections shared by
     // the in-flight pause panel and the options panel on the title and dock
     // screens — one source of truth for the toggles and sliders.
     settingsTabs() {
@@ -5981,7 +5971,7 @@ export class GameUI {
         const selected=this.settingsTab??'flight';
         return `
         <div class="settings-content">
-        <div class="settings-pane" id="settings-flight-pane" data-settings-pane="flight" role="tabpanel" aria-labelledby="settings-flight-tab" ${selected==='flight'?'':'hidden'}><div class="pause-grid"><section><label><span>${t('Flight assist')}</span><input type="checkbox" data-setting="flightAssist" ${settings.flightAssist ? 'checked' : ''}></label><label><span>${t('Aim assistance')}</span><input type="checkbox" data-setting="aimAssist" ${settings.aimAssist ? 'checked' : ''}></label><label><span>${t('Touch scale')}</span><input type="range" min="0.8" max="1.3" step="0.05" value="${settings.touchScale}" data-setting="touchScale"></label><label><span>${t('Easy mode · 50% damage taken')}</span><input type="checkbox" data-setting="easyMode" ${settings.easyMode ? 'checked' : ''}></label></section><section><label><span>${t('Steering')}</span><select data-setting="steering"><option value="tilt" ${settings.steering !== 'stick' ? 'selected' : ''}>${t('Tilt')}</option><option value="stick" ${settings.steering === 'stick' ? 'selected' : ''}>${t('Stick')}</option></select></label><label><span>${t('Sensitivity')}</span><input type="range" min="0.4" max="1.8" step="0.05" value="${settings.tiltSensitivity}" data-setting="tiltSensitivity"></label><label><span>${t('Invert pitch')}</span><input type="checkbox" data-setting="tiltInvertPitch" ${settings.tiltInvertPitch ? 'checked' : ''}></label><label><span>${t('Invert yaw')}</span><input type="checkbox" data-setting="tiltInvertYaw" ${settings.tiltInvertYaw ? 'checked' : ''}></label><div class="tilt-actions"><button data-ui-command="enable-tilt">${t('ENABLE')}</button><button data-ui-command="calibrate-tilt">${t('SET NEUTRAL')}</button></div></section></div></div>
+        <div class="settings-pane" id="settings-flight-pane" data-settings-pane="flight" role="tabpanel" aria-labelledby="settings-flight-tab" ${selected==='flight'?'':'hidden'}><div class="pause-grid"><section><label><span>${t('Flight assist')}</span><input type="checkbox" data-setting="flightAssist" ${settings.flightAssist ? 'checked' : ''}></label><label><span>${t('Aim assistance')}</span><input type="checkbox" data-setting="aimAssist" ${settings.aimAssist ? 'checked' : ''}></label><label><span>${t('Touch scale')}</span><input type="range" min="0.8" max="1.3" step="0.05" value="${settings.touchScale}" data-setting="touchScale"></label><label><span>${t('Easy mode · 50% damage taken')}</span><input type="checkbox" data-setting="easyMode" ${settings.easyMode ? 'checked' : ''}></label></section><section><label><span>${t('Invert pitch')}</span><input type="checkbox" data-setting="tiltInvertPitch" ${settings.tiltInvertPitch ? 'checked' : ''}></label><label><span>${t('Invert yaw')}</span><input type="checkbox" data-setting="tiltInvertYaw" ${settings.tiltInvertYaw ? 'checked' : ''}></label></section></div></div>
         <div class="settings-pane" id="settings-audio-pane" data-settings-pane="audio" role="tabpanel" aria-labelledby="settings-audio-tab" ${selected==='audio'?'':'hidden'}><div class="pause-grid"><section><label><span>${t('Music')}</span><input type="range" min="0" max="1" step="0.05" value="${settings.music}" data-setting="music"></label><label><span>${t('Effects')}</span><input type="range" min="0" max="1" step="0.05" value="${settings.effects}" data-setting="effects"></label><label><span>${t('Haptics')}</span><input type="checkbox" data-setting="vibration" ${settings.vibration ? 'checked' : ''}></label></section></div></div>
         <div class="settings-pane" id="settings-display-pane" data-settings-pane="display" role="tabpanel" aria-labelledby="settings-display-tab" ${selected==='display'?'':'hidden'}><div class="pause-grid"><section><label><span>${t('Power use')}</span><select data-setting="powerMode"><option value="auto" ${!settings.powerMode || settings.powerMode === 'auto' ? 'selected' : ''}>${t('Automatic')}</option><option value="battery" ${settings.powerMode === 'battery' ? 'selected' : ''}>${t('Battery saving · 30 FPS')}</option><option value="performance" ${settings.powerMode === 'performance' ? 'selected' : ''}>${t('Smoother motion · 60 FPS')}</option></select></label><label><span>${t('Reduced damage effects')}</span><input type="checkbox" data-setting="reducedDamageEffects" ${settings.reducedDamageEffects ? 'checked' : ''}></label><label><span>${t('Fullscreen')}</span><button type="button" class="fullscreen-switch" data-ui-command="toggle-fullscreen" role="switch" aria-label="${t('Toggle fullscreen')}" aria-checked="false">⛶</button></label></section><section><label><span>${t('Language')}</span><select data-setting="language"><option value="de" ${settings.language !== 'en' ? 'selected' : ''}>Deutsch</option><option value="en" ${settings.language === 'en' ? 'selected' : ''}>English</option></select></label></section></div></div>
         <div class="settings-pane" id="settings-controls-pane" data-settings-pane="controls" role="tabpanel" aria-labelledby="settings-controls-tab" ${selected==='controls'?'':'hidden'}><section class="controls-reference"><details class="ui-details"><summary>${t('KEYBOARD / CONTROLLER')}</summary><p>${t('W/S pitch · A/D yaw · Q/E roll · R/F throttle · Shift afterburn · Space fire · X fire group · L launcher · hold M secondary tool / tap missile or capture · T target · C mode · N nav · J hyperdrive · K map · B transponder')}</p><p>${t('Gamepad: left stick steer · right stick roll/throttle · RT fire · hold RB secondary tool / tap missile or capture · LB afterburn · face buttons target/mode/fire group/hyperdrive · left stick click transponder · D-pad launcher/capture/hostile/nav.')}</p></details></section></div>
@@ -6408,11 +6398,9 @@ export class GameUI {
     setTouchScale(scale) {
         this.root.style.setProperty('--touch-scale', String(scale));
     }
-    setTouchSteering(mode) {
-        this.el('[data-ui-command="use-stick"]')?.setAttribute('aria-pressed', String(mode !== 'tilt'));
-        this.el('[data-ui-command="enable-tilt"]')?.setAttribute('aria-pressed', String(mode === 'tilt'));
-        this.root.classList.toggle('steering-tilt', mode === 'tilt');
-        this.root.classList.toggle('steering-stick', mode !== 'tilt');
+    setTouchSteering() {
+        this.root.classList.remove('steering-tilt');
+        this.root.classList.add('steering-stick');
     }
     // Every fullscreen control — the HUD corner button, the title-screen
     // switch, and the options/pause switch — mirrors the live fullscreen state

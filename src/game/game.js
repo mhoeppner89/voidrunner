@@ -1384,27 +1384,10 @@ export class GameSession {
         if(!save.arena)for(const wreck of Object.values(save.world.combatWrecks??{}))if(wreck.contents?.length||wreck.derelict)this.wreckNodes.push(combatWreckNode(wreck));
         this.input = new InputManager(ui.root);
         this.input.configureTilt(save.settings);
-        // Permission and the first physical gyro sample are separate events.
-        // Keep stick as the safe runtime fallback until both have arrived, then
-        // calibrate from the real sample (never the constructor's zeroes).
-        const wantsTilt = save.settings.steering !== 'stick';
-        const needsGesturePermission = typeof globalThis.DeviceOrientationEvent?.requestPermission === 'function';
-        const canEnableTilt = tiltPermission === true
-            || (tiltPermission === undefined && !needsGesturePermission);
-        if (wantsTilt && canEnableTilt) {
-            this.ui.setTouchSteering('stick');
-            void this.activateTiltSteering({
-                alreadyGranted: tiltPermission === true,
-                recalibrate: !save.settings.tiltNeutral,
-            });
-        }
-        else {
-            if (wantsTilt) {
-                save.settings.steering = 'stick';
-                saveGame(save);
-            }
-            this.ui.setTouchSteering('stick');
-        }
+        // Normalize even direct/debug sessions that bypass save hydration.
+        save.settings.steering = 'stick';
+        this.input.disableTilt();
+        this.ui.setTouchSteering('stick');
         this.audio.setVolumes(save.settings.music, save.settings.effects);
         this.audio.setStationMode(Boolean(save.player.dockedAt));
         this.ui.setTouchScale(save.settings.touchScale);
@@ -14068,8 +14051,9 @@ export class GameSession {
             this.input.configureTilt({ tiltSensitivity: this.save.settings.tiltSensitivity });
         }
         else if (key === 'steering') {
-            this.save.settings.steering = value === 'stick' ? 'stick' : 'tilt';
-            this.syncTiltSteering(this.save.settings.steering === 'tilt');
+            this.save.settings.steering = 'stick';
+            this.input.disableTilt();
+            this.ui.setTouchSteering('stick');
         }
         else if (key === 'tiltInvertPitch' || key === 'tiltInvertYaw') {
             this.save.settings[key] = Boolean(value);
@@ -14102,58 +14086,6 @@ export class GameSession {
         // persisted above, so the pilot resumes where they were.
         if (key === 'language' && typeof location !== 'undefined')
             location.reload();
-    }
-    syncTiltSteering(useTilt) {
-        this.input.onBlur();
-        this.tiltRequest = (this.tiltRequest ?? 0) + 1;
-        if (useTilt) {
-            void this.activateTiltSteering({ recalibrate: true });
-        }
-        else {
-            // Actually switch off tilt input, not just the touch layout — the
-            // joystick was appearing while tilt still steered the ship.
-            this.input.disableTilt();
-            this.save.settings.steering = 'stick';
-            this.ui.setTouchSteering('stick');
-        }
-    }
-    async activateTiltSteering({ alreadyGranted = false, recalibrate = false } = {}) {
-        const request = this.tiltRequest = (this.tiltRequest ?? 0) + 1;
-        const permitted = await this.input.enableTilt(alreadyGranted);
-        if (request !== this.tiltRequest) {
-            if (this.save.settings.steering === 'stick') this.input.disableTilt();
-            return false;
-        }
-        const sampled = permitted ? await this.input.waitForTiltSample() : false;
-        if (!this.active || request !== this.tiltRequest)
-            return false;
-        let neutral;
-        if (sampled && (recalibrate || !this.input.tiltCalibrated))
-            neutral = this.input.calibrateTilt();
-        const active = Boolean(sampled && this.input.tiltActive);
-        if (active) {
-            if (neutral)
-                this.save.settings.tiltNeutral = neutral;
-            this.save.settings.steering = 'tilt';
-        }
-        else {
-            this.input.disableTilt();
-            this.save.settings.steering = 'stick';
-        }
-        this.ui.setTouchSteering(active ? 'tilt' : 'stick');
-        this.persistSave();
-        return active;
-    }
-    enableTilt() {
-        return this.activateTiltSteering({ recalibrate: true });
-    }
-    calibrateTilt() {
-        const neutral = this.input.calibrateTilt();
-        if (!neutral)
-            return undefined;
-        this.save.settings.tiltNeutral = neutral;
-        this.persistSave();
-        return neutral;
     }
     syncRender(dt, now) {
         if (this.arena?.observer) {

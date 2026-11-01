@@ -1,6 +1,8 @@
 # Voidrunner
 
-A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2mw**.
+A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2mx**.
+
+Phone flight uses the on-screen joystick; older tilt-steering preferences migrate to the joystick automatically.
 
 In flight, choose how much loose cargo to jettison from the equipment and cargo monitor, or select a cargo-held item to drop it. The resulting container remains in space and can be recovered after the ship has moved clear.
 

@@ -6,7 +6,7 @@ const base=process.env.VR_BASE_URL??'http://127.0.0.1:4192',out='output/startup-
 const browser=await chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',args:['--no-sandbox','--disable-gpu-sandbox','--mute-audio','--use-gl=angle','--use-angle=swiftshader']});
 try{
  const context=await browser.newContext({...devices['Pixel 7 landscape'],serviceWorkers:'block'});
- await context.addInitScript(()=>{localStorage.setItem('void-privateer-settings-v1',JSON.stringify({music:0,effects:0}));const A=window.AudioContext??window.webkitAudioContext;if(A)A.prototype.resume=async function(){await this.suspend();};Object.defineProperty(window,'DeviceOrientationEvent',{configurable:true,value:class extends Event{static requestPermission(){return new Promise(()=>{});}}});});
+ await context.addInitScript(()=>{localStorage.setItem('void-privateer-settings-v1',JSON.stringify({music:0,effects:0}));const A=window.AudioContext??window.webkitAudioContext;if(A)A.prototype.resume=async function(){await this.suspend();};});
  const page=await context.newPage();page.setDefaultTimeout(120000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
  let releaseRequest;const pending=new Promise(resolve=>{releaseRequest=resolve;});
  const intercept=async route=>{await pending;try{await route.continue();}catch{/* The aborted page is already gone. */}};
@@ -22,5 +22,5 @@ try{
  await page.locator('[data-ui-command="reload-page"]').tap();await page.waitForFunction(()=>window.__VOID_PRIVATEER__?.resume);
  await page.locator('[data-ui-command="resume"]').tap();await page.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime()?.flightPrepared&&document.querySelector('#loading-screen').classList.contains('is-hidden'),null,{timeout:120000});
  assert.ok(await page.locator('#title-startup-error').isHidden());assert.deepEqual(errors,[]);await page.screenshot({path:`${out}/android-recovered.png`});
- console.log('Android stalled flight download and motion permission: visible recovery and successful career resume passed');
+ console.log('Android stalled flight download: visible recovery and successful career resume passed');
 }finally{await browser.close();}

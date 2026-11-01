@@ -54,6 +54,10 @@ assert.equal(hasSavedGame(), false);
 assert.equal(storage.has(SETTINGS_KEY), true);
 assert.deepEqual(loadSettingsPreferences(), { ...firstRunSettings, quality: 'high' });
 assert.equal(defaultSettings().easyMode, false);
+assert.equal(defaultSettings().steering, 'stick');
+saveSettingsPreferences({...firstRunSettings,steering:'tilt'});
+assert.equal(loadSettingsPreferences().steering,'stick','legacy global tilt settings migrate to the joystick');
+assert.equal(hydrateSave({version:SAVE_VERSION,player:canonicalPlayer(),world:{seed:1190},settings:{steering:'tilt'}}).settings.steering,'stick','legacy career tilt settings migrate to the joystick');
 
 const easyModeSave = hydrateSave({
     version: SAVE_VERSION,

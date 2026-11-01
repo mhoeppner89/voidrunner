@@ -60,7 +60,7 @@ export const defaultSettings = () => ({
     vibration: true,
     reducedDamageEffects: false,
     easyMode: false,
-    steering: 'tilt',
+    steering: 'stick',
     tiltSensitivity: 1.35,
     tiltInvertPitch: false,
     tiltInvertYaw: false,
@@ -247,7 +247,9 @@ const normalizeSettings = (candidate) => {
         vibration: boolean('vibration'),
         reducedDamageEffects: boolean('reducedDamageEffects'),
         easyMode: boolean('easyMode'),
-        steering: source.steering === 'stick' ? 'stick' : 'tilt',
+        // Older careers may still have tilt selected; phone steering now uses
+        // the on-screen stick in both new and restored games.
+        steering: 'stick',
         tiltSensitivity: numberInRange('tiltSensitivity', 0.4, 1.8),
         tiltInvertPitch: boolean('tiltInvertPitch'),
         tiltInvertYaw: boolean('tiltInvertYaw'),

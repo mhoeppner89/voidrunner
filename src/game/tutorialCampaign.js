@@ -48,7 +48,7 @@ const definitions = [
 export const TUTORIAL_STEPS = Object.freeze(Object.fromEntries(definitions.map(([id,chapter,chapterTitle,objective,detail,destinationId])=>[id,Object.freeze({id,chapter,chapterTitle,objective,detail,destinationId})])));
 export const TUTORIAL_FLIGHT_LESSONS = [
     {id:'thrust',objective:'Raise thrust and get moving.',detail:'Drag the thrust slider on the left upward.'},
-    {id:'steering',objective:'Turn the ship.',detail:'Desktop: WASD or arrow keys. Phone: tilt to steer. The edge marker points to your selected target.'},
+    {id:'steering',objective:'Turn the ship.',detail:'Desktop: WASD or arrow keys. Phone: use the joystick. The edge marker points to your selected target.'},
     {id:'target-monitor',objective:'Try the target monitor.',detail:'Tap the right monitor to cycle contacts. It shows your target and its distance.'},
     {id:'ship-monitor',objective:'Open your ship monitor.',detail:'Tap the left monitor to see your equipment, cargo and mission. Close it to return to flight.'},
 ];
