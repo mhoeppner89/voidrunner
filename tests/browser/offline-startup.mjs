@@ -14,14 +14,16 @@ const report=[];
 // flag: WebKit's automation backend can fail navigation internally with that
 // flag before its service worker gets to handle the request.
 async function testOrigin(){
+ let stallGameModule=false;const stalled=new Set();
  const server=createServer(async(req,res)=>{
+  if(stallGameModule&&new URL(req.url,'http://test').pathname==='/src/game/game.js'){stalled.add(res);res.once('close',()=>stalled.delete(res));return;}
   try{const response=await fetch(base+req.url);res.writeHead(response.status,{'content-type':response.headers.get('content-type')??'application/octet-stream'});res.end(Buffer.from(await response.arrayBuffer()));}
   catch{if(!res.destroyed){res.writeHead(502);res.end('Preview upstream unavailable');}}
  });
  const listen=port=>new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',()=>{server.removeListener('error',reject);resolve();});});
  await listen(0);const port=server.address().port;
  const disconnect=async()=>{if(!server.listening)return;const stopped=new Promise(resolve=>server.close(resolve));server.closeAllConnections();await stopped;};
- return {url:`http://127.0.0.1:${port}`,disconnect,reconnect:()=>listen(port)};
+ return {url:`http://127.0.0.1:${port}`,disconnect,reconnect:()=>listen(port),stallGameModule(value){stallGameModule=value;if(!value)for(const res of stalled)res.destroy();}};
 }
 for(const [name,engine,device] of profiles){
  const origin=await testOrigin();
@@ -60,6 +62,12 @@ for(const [name,engine,device] of profiles){
    return page.evaluate(()=>[...document.querySelectorAll('#dock-screen img')].filter(i=>i.getClientRects().length).map(i=>({src:i.dataset.retroSource??i.getAttribute('src'),width:i.naturalWidth,height:i.naturalHeight})));
   };
   const online=await imagesReady();await page.screenshot({path:`${out}/${name}-online-helix.png`});
+  // A request that never finishes must still use this release's cached flight
+  // module, rather than holding a mobile career on its loading screen forever.
+  await page.waitForFunction(async()=>Boolean(await(await caches.open((await caches.keys()).find(n=>n.startsWith('voidrunner-')))).match(new URL('src/game/game.js',document.baseURI))));
+  origin.stallGameModule(true);
+  const recovered=await page.evaluate(async()=>{const start=performance.now(),response=await fetch('src/game/game.js');return{ok:response.ok,elapsed:performance.now()-start,text:(await response.text()).slice(0,80)};});
+  origin.stallGameModule(false);assert.ok(recovered.ok&&recovered.elapsed<10000&&recovered.text.includes('import'),JSON.stringify(recovered));
   const chapterCount=await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().tutorialSummary().chapterCount);assert.equal(chapterCount,6);
   await page.waitForFunction(async name=>{if(!(await caches.keys()).includes(name))return false;const c=await caches.open(name);return(await Promise.all(['art/locations/simplified/helix-hd-v1.webp','art/portraits/simplified/rin-vek-hd-v1.webp','assets/models/ships/wayfarer.glb','assets/fonts/void-vga.ttf','src/game/retroDisplay.js','src/game/pixelResolve.js'].map(p=>c.match(new URL(p,document.baseURI))))).every(Boolean);},currentCache);
   // Cache a real report, then prove an unvisited report is not the game.

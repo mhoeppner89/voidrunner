@@ -1,6 +1,10 @@
 # Voidrunner
 
-A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2mt**.
+A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2mw**.
+
+In flight, choose how much loose cargo to jettison from the equipment and cargo monitor, or select a cargo-held item to drop it. The resulting container remains in space and can be recovered after the ship has moved clear.
+
+Mission boards offer local and inter-system contracts. During the tutorial's gate repairs, inaccessible offers remain hidden until the gate opens.
 
 Equipment improves its primary performance with technology tier and rarity. Gear above the hull tier draws up to 6% of the bare reactor output per excess tier and installed item; the equipment screen shows the regeneration load. Exceptional equipment is less common in wrecks, while stations may stock one-off colored items that rotate after 30 minutes of simulation time and cost substantially more than common gear. Shipyard hull prices are doubled.
 

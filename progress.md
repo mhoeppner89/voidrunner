@@ -1,5 +1,18 @@
 Original prompt: Review and revise all equipment names for ambiguity and visible tiers.
 
+Follow-up: investigate Android career loading hang.
+- Flight-code imports and motion permission could remain pending indefinitely; startup errors were also sent to an invisible cockpit log. Added bounded waits and a visible title-screen recovery message.
+- Service worker falls back to the current release's cached code on stalled requests. Fault-injected Android testing verified recovery from a stuck download and permission prompt; service-worker checks and Android online, stalled-network, offline and reconnect tests passed. Packaged 0.8.2mw and updated the local preview.
+
+Follow-up: drop selected cargo quantities and equipment in flight.
+- Cargo and cargo-held equipment (including drones) use persistent physical containers; pickup requires moving clear, then returning. Pirate demands track partial drops.
+- Focused integration and localization checks passed. Muted desktop, Android and iPhone browser checks verified quantity selection, equipment and drone drops, save hydration and recovery; screenshots reviewed.
+
+Follow-up: keep mission boards usable during tutorial gate repairs.
+- Hide saved outbound offers until the gate opens; preserve active contracts and check acceptance as well as the board.
+- Reserve local and outbound procedural bounty slots on new ordinary boards. Verify multiple systems and saved offers.
+- Focused mission, tutorial and multi-seed board checks passed. Muted desktop and Android browser checks verified the rendered board before and after gate opening; reviewed screenshots. Packaged 0.8.2mu and updated the local preview.
+
 - Replaced Arena-only shorthand with shared equipment names; revised all 27 definitions in English/German.
 - Named loot retains hardware identity. Technology tier is separate from rarity and weapon model.
 - 42 focused item, inventory, outfitting, localization and Arena presentation checks passed.

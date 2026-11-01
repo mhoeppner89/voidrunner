@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v620-0-8-2mt-salvage-flight';
+const CACHE = 'voidrunner-v623-0-8-2mw-startup';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -332,6 +332,20 @@ self.addEventListener('fetch', (event) => {
   const network = fetchAndCache(request);
   event.waitUntil(network.lifetime);
   event.respondWith((async () => {
+    // A mobile connection can remain half-open indefinitely. For code already
+    // cached by this release, stop waiting after a short interval; an uncached
+    // response still waits for the network instead of returning a fake module.
+    if (new URL(request.url).pathname.endsWith('.js')) {
+      const pending = Symbol('network pending');
+      let timer;
+      const first = await Promise.race([network.response, new Promise(resolve => { timer = setTimeout(() => resolve(pending), 4000); })]);
+      clearTimeout(timer);
+      if (first !== pending) return first ?? (await offlineFallback(request));
+      try {
+        const cached = await (await caches.open(CACHE)).match(request);
+        if (cached?.ok) return cached;
+      } catch { /* Keep waiting for the network when the cache is unavailable. */ }
+    }
     return (await network.response) ?? (await offlineFallback(request));
   })());
 });

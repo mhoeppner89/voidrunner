@@ -9,7 +9,7 @@ import { rollPilot, TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
 import { t } from './i18n.js';
 import { RACE_COURSES, raceBriefingLine, raceOffersForLocation, raceCourseUnlocked, normalizeRaceRecord } from './racing.js';
 import { LOCAL_CONTRACT_CHAIN_IDS, findNextLocalContractStage, localContractToMissionOffer } from './localContracts.js';
-import { tutorialContentUnlocked } from './tutorialCampaign.js';
+import { tutorialContentUnlocked, tutorialGateOpen } from './tutorialCampaign.js';
 import { recordSortieCredit, recordSortieMission } from './careerMetrics.js';
 export function contractRegionDanger(originId, destinationId) {
     const origin=LOCATIONS[originId], destination=LOCATIONS[destinationId];
@@ -36,6 +36,15 @@ const ACE_WARRANT_REP = 10;
 const chooseDestination = (rng, origin) => {
     const candidates = DOCK_LOCATION_IDS.filter((id) => id !== origin);
     return pick(rng, candidates);
+};
+// Check every location required by an offer, including bounty and race targets.
+// Existing posted offers stay intact so they reappear when the gate opens.
+export const missionAvailableThroughGate = (save, mission, locationId = mission?.origin) => {
+    if (tutorialGateOpen(save)) return true;
+    const systemId = LOCATIONS[locationId]?.systemId;
+    if (!systemId) return false;
+    return [mission?.origin, mission?.destination, mission?.targetZone]
+        .every(id => !id || LOCATIONS[id]?.systemId === systemId);
 };
 const chooseCommodity = (rng) => {
     // Gold stays a mined jackpot — it never shows up as generic delivery cargo.
@@ -252,7 +261,13 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             // your current system (or in a non-dock field) reads as "hunt near
             // the station you're standing at" and the encounter can never
             // trigger, because the spawn check sits inside the approach path.
-            const targetZone = pick(rng, DOCK_LOCATION_IDS.filter((id) => id !== locationId));
+            const targets = DOCK_LOCATION_IDS.filter((id) => id !== locationId);
+            // Reserve the last two warrant slots for a local and an outbound
+            // job. Both are generated even while the tutorial gate is closed.
+            const desiredLocal = index === count - 2 ? true : index === count - 1 ? false : undefined;
+            const matchingTargets = desiredLocal === undefined ? targets : targets.filter(id =>
+                (LOCATIONS[id].systemId === LOCATIONS[locationId].systemId) === desiredLocal);
+            const targetZone = pick(rng, matchingTargets.length ? matchingTargets : targets);
             const danger = dangerBase + LOCATIONS[targetZone].security.danger * 1.6 + randomBetween(rng, 0.35, 1.4) + rank * 0.25;
             const targetName = proceduralCallsign(rng);
             const reward = bountyReward(danger, rank, targetZone);
@@ -480,6 +495,8 @@ export const acceptMission = (save, locationId, missionId) => {
     const offered = save.world.offers[locationId]?.find((mission) => mission.id === missionId);
     if (!offered || offered.status !== 'offered')
         return { ok: false, message: t('Contract is no longer available.') };
+    if (!missionAvailableThroughGate(save, offered, locationId))
+        return { ok: false, message: t('JUMP GATE CLOSED · REPAIRS IN PROGRESS') };
     if (save.activeMissions.length >= 6)
         return { ok: false, message: t('Mission computer has reached its active-contract limit.') };
     if (save.player.credits < offered.deposit)

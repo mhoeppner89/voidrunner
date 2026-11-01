@@ -553,6 +553,8 @@ export const DE_CATALOG = {
     'LOADING CAREER': 'KARRIERE WIRD GELADEN',
     'PREPARING FLIGHT': 'FLUG WIRD VORBEREITET',
     'Flight systems could not be loaded. Reload and try again.': 'Die Flugsysteme konnten nicht geladen werden. Lade die Seite neu und versuche es noch einmal.',
+    'The game could not start. Check your connection and reload the page.': 'Das Spiel konnte nicht starten. Prüfe deine Internetverbindung und lade die Seite neu.',
+    'RELOAD': 'NEU LADEN',
     // ── Title screen ──────────────────────────────────────────────────────
     'Make your name.': 'Mach dir einen Namen.',
     'RESUME FLIGHT': 'FLUG FORTSETZEN',
@@ -972,6 +974,8 @@ export const DE_CATALOG = {
     'SHIP + EQUIPMENT · HALF CASH · NO CARGO': 'SCHIFF + AUSRÜSTUNG · GUTHABEN HALB · KEINE FRACHT',
     'MASS': 'MASSE',
     'JETTISON': 'ABWERFEN',
+    'Move clear before collecting dropped cargo.': 'Entferne dich zuerst, bevor du abgeworfene Fracht einsammelst.',
+    'Cargo jettisoned — pirates break off.': 'Fracht abgeworfen – die Piraten ziehen ab.',
     'Hold empty. The market is one jump away.': 'Frachtraum leer. Der Markt ist nur einen Sprung entfernt.',
 
     // ── Missions ──────────────────────────────────────────────────────────

@@ -6,7 +6,7 @@ import vm from 'node:vm';
 const source=await readFile(new URL('../../sw.js',import.meta.url),'utf8');
 function workerFixture(scope='https://example.test/voidrunner/') {
  const handlers=new Map(),stores=new Map(),requests=[];
- let online=false,contentType='image/webp';
+ let online=false,contentType='image/webp',hang=false;
  const key=input=>new URL(typeof input==='string'?input:input.url,scope).href;
  const cacheFor=name=>{
   if(!stores.has(name))stores.set(name,new Map());
@@ -14,16 +14,21 @@ function workerFixture(scope='https://example.test/voidrunner/') {
   return {match:async request=>store.get(key(request))?.clone(),put:async(request,response)=>store.set(key(request),response.clone())};
  };
  const self={location:new URL('sw.js',scope),clients:{claim:async()=>{}},skipWaiting:async()=>{},addEventListener:(name,fn)=>handlers.set(name,fn)};
- vm.runInNewContext(source,{self,URL,Response,Promise,caches:{open:async name=>cacheFor(name),keys:async()=>[...stores.keys()],delete:async name=>stores.delete(name)},fetch:async request=>{
-  requests.push(key(request));if(!online)throw Error('offline');
+ vm.runInNewContext(source,{self,URL,Response,Promise,setTimeout,clearTimeout,caches:{open:async name=>cacheFor(name),keys:async()=>[...stores.keys()],delete:async name=>stores.delete(name)},fetch:async request=>{
+  requests.push(key(request));if(hang)return new Promise(()=>{});if(!online)throw Error('offline');
   return new Response('network asset',{headers:{'content-type':contentType}});
  }});
  const cacheName=source.match(/const CACHE = '([^']+)'/)[1];
- return {requests,cache:cacheFor(cacheName),online:value=>{online=value;},contentType:value=>{contentType=value;},async event(name){let task;handlers.get(name)({waitUntil:p=>{task=p;}});await task;},async fetch(path,mode='navigate'){
+ return {requests,cache:cacheFor(cacheName),online:value=>{online=value;},hang:value=>{hang=value;},contentType:value=>{contentType=value;},async event(name){let task;handlers.get(name)({waitUntil:p=>{task=p;}});await task;},async fetch(path,mode='navigate',responseOnly=false){
   let response;const tasks=[];handlers.get('fetch')({request:{url:key(path),method:'GET',mode},respondWith:p=>{response=p;},waitUntil:p=>tasks.push(p)});
-  const result=await response;await Promise.all(tasks);return result;
+  const result=await response;if(!responseOnly)await Promise.all(tasks);return result;
  }};
 }
+
+test('a stalled network request falls back to the cached flight module',async()=>{
+ const w=workerFixture();await w.cache.put('./src/game/game.js',new Response('cached flight module'));w.hang(true);
+ const response=await w.fetch('./src/game/game.js','cors',true);assert.equal(await response.text(),'cached flight module');
+});
 
 test('offline fallback serves the shell only at actual game entries, including scoped deployment',async()=>{
  const w=workerFixture();await w.cache.put('./index.html',new Response('<main>cached game</main>',{headers:{'content-type':'text/html'}}));

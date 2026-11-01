@@ -1,3 +1,18 @@
+## 0.8.2mw — Career startup recovery
+
+- Prevent an unresponsive flight-code download or motion-permission prompt from leaving the loading screen indefinitely. Show a reload option if the flight code cannot start.
+- Use cached code from the current release when a mobile network request stalls.
+
+## 0.8.2mv — Jettison cargo
+
+- Choose the quantity of cargo to drop, and jettison cargo-held equipment and drones from the in-flight inventory.
+- Dropped items and cargo remain in recoverable containers across saves; move clear before collecting them again.
+
+## 0.8.2mu — Accessible mission boards
+
+- Hide contracts requiring another system while the tutorial jump gate is closed; restore the same offers when it opens.
+- Generate local and inter-system warrants on ordinary mission boards.
+
 ## 0.8.2mt — Salvage direction and flight feedback
 
 - Open and collide with the side of wreckage closest to the impact, including after reload.

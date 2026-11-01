@@ -20,7 +20,14 @@ const loadGameSession = () => {
     gameSessionModulePromise ??= import('./game/game.js');
     return gameSessionModulePromise;
 };
-const nextPaint = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+const settleWithin = (promise, timeoutMs, fallback, rejectOnTimeout = false) => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => rejectOnTimeout ? reject(new Error('Flight code did not finish loading.')) : resolve(fallback), timeoutMs);
+    Promise.resolve(promise).then(value => { clearTimeout(timer); resolve(value); }, error => { clearTimeout(timer); reject(error); });
+});
+const nextPaint = () => new Promise((resolve) => {
+    const timer=setTimeout(resolve,250);
+    requestAnimationFrame(() => {clearTimeout(timer);resolve();});
+});
 // Title options must work before the first career save exists. Preferences
 // override the factory defaults (and an older career mirror), while language
 // remains anchored to i18n's dedicated boot key so the static shell agrees.
@@ -199,6 +206,7 @@ const beginSession = (mode, arena, tutorial = true) => {
     if (sessionStarting)
         return sessionStarting;
     const previousSession = session;
+    ui.showStartupError(false);
     session = undefined;
     previousSession?.dispose();
     if (mode !== 'observer') ui.hideObserverView();
@@ -334,8 +342,8 @@ const beginSession = (mode, arena, tutorial = true) => {
             ui.preloadSessionAssets(save, { priority: 'high', includeLocation: mode !== 'arena' && mode !== 'observer' }),
         ]);
         const [tiltPermission, gameModule] = await Promise.all([
-            tiltPermissionRequest,
-            loadGameSession(),
+            settleWithin(tiltPermissionRequest, 4000, false),
+            settleWithin(loadGameSession(), 20000, undefined, true),
         ]);
         if (tiltPermission === true)
             tiltGranted = true;
@@ -350,8 +358,10 @@ const beginSession = (mode, arena, tutorial = true) => {
             showTitleScreen();
         }, mode === 'arena' || mode === 'observer' ? arena : null, tiltPermission, audioManager);
         session = nextSession;
-        if (!arena && save.player.dockedAt)
-            await nextSession.prepareDockedFlightRuntime({ showLoading: false });
+        if (!arena && save.player.dockedAt) {
+            if (!await nextSession.prepareDockedFlightRuntime({ showLoading: false }))
+                throw new Error('Flight preparation failed.');
+        }
         else if (nextSession.renderer)
             await nextSession.prepareFlightScene();
         if (!arena && save.player.dockedAt) await ui.prepareDockView();
@@ -364,8 +374,9 @@ const beginSession = (mode, arena, tutorial = true) => {
         else
             audioManager.dispose();
         session = undefined;
+        gameSessionModulePromise = undefined;
         showTitleScreen();
-        ui.showToast(t('Flight systems could not be loaded. Reload and try again.'), 'danger', 5200);
+        ui.showStartupError(true);
         return undefined;
     }).finally(() => {
         ui.setLoading(false);
@@ -488,7 +499,7 @@ const actions = {
     launcherCycle: () => session?.cycleLauncher(),
     selectTarget: (kind, id) => session?.selectTarget(kind, id, 'map'),
     trade: (kind, commodityId, quantity) => session?.trade(kind, commodityId, quantity),
-    jettison: (commodityId) => session?.jettisonCargo(commodityId),
+    jettison: (commodityId, quantity) => session?.jettisonCargo(commodityId, quantity),
     payOffMug: () => session?.payOffMug(),
     patrolReply: () => session?.patrolReply(),
     paySyndicateBerth: () => session?.paySyndicateBerth(),

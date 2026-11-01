@@ -10491,11 +10491,18 @@ export class GameSession {
         this.audio.play('ui', 0.6);
         return true;
     }
-    // The mugging out: hand over cargo to a demanding pirate group. If an
-    // active standoff wants this commodity, the group takes the demanded share
-    // and breaks off; otherwise the cargo becomes drifting pickups the pilot
-    // can scoop back up.
-    jettisonCargo(commodityId = 'gold') {
+    // The same persistent container is used for equipment and loose cargo.
+    makeJettisonCrate(id, contents) {
+        const player=this.save.player, rotation=new THREE.Quaternion().fromArray(player.rotation);
+        const position=new THREE.Vector3(0,0,-18).applyQuaternion(rotation).add(new THREE.Vector3(...player.position)).toArray();
+        const velocity=new THREE.Vector3(0,0,-4).applyQuaternion(rotation).toArray();
+        const crate={id,name:t('EJECTED CARGO'),collectAfter:this.save.world.time+8,ownerMustLeave:true,position,velocity,driftActive:true,radius:3,systemId:player.systemId,instanceId:this.activeInstanceId,scanned:true,contents};
+        this.save.world.combatWrecks??={};this.save.world.combatWrecks[id]=crate;
+        const node=combatWreckNode(crate);this.wreckNodes.push(node);this.renderer.addCombatLootNode?.(node);
+        return crate;
+    }
+    jettisonCargo(commodityId = 'gold', quantity) {
+        if (this.arena || this.save.player.dockedAt || !Object.hasOwn(COMMODITIES,commodityId)) return false;
         const tutorial = this.tutorialSummary();
         if (commodityId === 'food' && tutorial?.active && ['meet-family','buy-supplies','launch-helix','plot-vesper','flight-checks','fly-vesper','sell-supplies'].includes(tutorial.stepId)) {
             this.ui.showToast(t('Keep the delivery cargo aboard until you sell it at Vesper.'), 'info', 4200);
@@ -10505,19 +10512,17 @@ export class GameSession {
         if (owned <= 0)
             return false;
         const mugger = this.ships.find((ship) => ship.mug && ship.holdFire && ship.mug.demand?.kind === 'cargo' && ship.mug.demand.commodity === commodityId);
-        if (mugger) {
-            const take = Math.min(owned, mugger.mug.demand.quantity);
-            this.save.player.cargo[commodityId] = owned - take;
-            this.standDownMug(mugger);
-            this.ui.pushEvent(t('{commodity} jettisoned ({units}) — pirates take it and break off.', { commodity: t(COMMODITIES[commodityId].name), units: take }), 'info', 5200);
-            this.audio.play('ui', 0.6);
-            return true;
+        const take = quantity === undefined ? Math.min(Math.floor(owned),mugger?.mug.demand.quantity??Infinity) : Number(quantity);
+        if (!Number.isSafeInteger(take) || take<1 || take>owned || take>100000) return false;
+        const serial=this.save.world.lootShipCounter=(this.save.world.lootShipCounter??0)+1;
+        const id=`wreck-jettison-${serial}`;
+        this.makeJettisonCrate(id,[{id:`${id}-cargo`,kind:'cargo',commodity:commodityId,quantity:take}]);
+        this.save.player.cargo[commodityId] = owned-take;
+        if(mugger){
+            mugger.mug.demand.quantity=Math.max(0,mugger.mug.demand.quantity-take);
+            if(mugger.mug.demand.quantity===0){this.standDownMug(mugger);this.ui.pushEvent(t('Cargo jettisoned — pirates break off.'),'info',5200);}
         }
-        this.save.player.cargo[commodityId] = 0;
-        const pickup = this.spawnPickup(commodityId, this.save.player.position, 'combat', owned);
-        // Give the pilot time to leave an ejected crate before automatic scooping resumes.
-        pickup.collectAfter = this.save.world.time + 8;
-        this.ui.pushEvent(t('{commodity} jettisoned ({units} units).', { commodity: t(COMMODITIES[commodityId].name), units: owned }), 'info', 5200);
+        this.ui.pushEvent(t('{commodity} jettisoned ({units} units).', { commodity: t(COMMODITIES[commodityId].name), units: take }), 'info', 5200);
         this.audio.play('ui', 0.6);
         this.persistSave();
         return true;
@@ -13755,9 +13760,11 @@ export class GameSession {
             }
         }
         if(action==='jettison'){
+            if(this.save.player.dockedAt)return {ok:false,code:'Only cargo can be jettisoned.'};
             const item=this.save.player.inventory?.items?.[args.id];if(item?.location?.kind!=='cargo')return {ok:false,code:'Only cargo can be jettisoned.'};
-            const node={id:`wreck-${item.id}`,name:'Equipment cargo',collectAfter:this.save.world.time+8,position:new THREE.Vector3(0,0,-18).applyQuaternion(new THREE.Quaternion().fromArray(this.save.player.rotation)).add(new THREE.Vector3(...this.save.player.position)).toArray(),velocity:new THREE.Vector3(0,0,-4).applyQuaternion(new THREE.Quaternion().fromArray(this.save.player.rotation)).toArray(),driftActive:true,radius:3,systemId:this.save.player.systemId,instanceId:this.activeInstanceId,scanned:true,contents:[{id:item.id,kind:'equipment',item:{...item,location:{kind:'wreck'}}}]};
-            if(item.droneUnitId){const fleet=this.save.player.droneFleet,unit=fleet.unitsById[item.droneUnitId];if(!unit||unit.state!=='stowed')return {ok:false,code:'Drones are returning automatically.'};node.contents=[{id:item.id,kind:'drone',type:unit.type,hull:unit.hull}];delete fleet.unitsById[unit.id];fleet.lockerIds=fleet.lockerIds.filter(id=>id!==unit.id);}this.save.world.combatWrecks??={};this.save.world.combatWrecks[node.id]=node;delete this.save.player.inventory.items[item.id];refreshInventoryProjection(this.save.player);const live=combatWreckNode(node);this.wreckNodes.push(live);this.renderer.addCombatLootNode?.(live);this._statsDirty=true;this.persistSave();return {ok:true,code:'Equipment jettisoned.'};
+            let contents=[{id:item.id,kind:'equipment',item:{...item,location:{kind:'wreck'}}}];
+            if(item.droneUnitId){const fleet=this.save.player.droneFleet,unit=fleet.unitsById[item.droneUnitId];if(!unit||unit.state!=='stowed')return {ok:false,code:'Drones are returning automatically.'};contents=[{id:item.id,kind:'drone',type:unit.type,hull:unit.hull,ammo:unit.ammo}];delete fleet.unitsById[unit.id];fleet.lockerIds=fleet.lockerIds.filter(id=>id!==unit.id);}
+            this.makeJettisonCrate(`wreck-${item.id}`,contents);delete this.save.player.inventory.items[item.id];refreshInventoryProjection(this.save.player);this._statsDirty=true;this.persistSave();return {ok:true,code:'Equipment jettisoned.'};
         }
         if(action==='recover-drone'){
             const unit=this.npcDroneUnits?.[args.id],player=this.save.player;

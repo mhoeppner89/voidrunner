@@ -31,7 +31,7 @@ import { ADVENTURE_DIALOGUES, dialogueText } from './adventureDialogues.js';
 import { HULL_TRADE_IN_RATE, quoteShipTrade } from './shipTrade.js';
 import { LOADOUT_KEYS, HARDPOINT_SPECS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, RESALE_RATE, itemAvailable, itemFitsMount, loadoutFor, quoteOutfitting } from './outfitting.js';
 import { playerStrengthValue } from './playerStrength.js';
-import { guildJoinCost, missionBriefing, missionTitle } from './missions.js';
+import { guildJoinCost, missionAvailableThroughGate, missionBriefing, missionTitle } from './missions.js';
 import { getTutorialQuest, tutorialCampaignSummary, tutorialCardContent, tutorialDialogue, tutorialPeople, tutorialConversation, tutorialContentUnlocked, tutorialTradePrice, tutorialLaunchBlock, TUTORIAL_MINING_CONTRACT_ID, TUTORIAL_MARA_CALL_MIN_COMBAT_VALUE } from './tutorialCampaign.js';
 import { canMineWithHull, DRONE_BAY_CAPACITY, DRONE_TYPES, droneBayLayoutFor } from './droneData.js';
 const WARM_IMAGE_TIMEOUT_MS = 5000;
@@ -462,7 +462,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2mt';
+const GAME_VERSION = '0.8.2mw';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -1295,6 +1295,7 @@ export class GameUI {
             </div>
             <h1>VOID<br><b>RUNNER</b></h1>
             <p>${t('Make your name.')}</p>
+            <div id="title-startup-error" class="title-startup-error is-hidden" role="alert"><span>${t('The game could not start. Check your connection and reload the page.')}</span> <button type="button" data-ui-command="reload-page">${t('RELOAD')}</button></div>
             <div class="title-actions">
               <button class="primary" data-ui-command="resume">${t('RESUME FLIGHT')}</button>
               <button data-ui-command="new">${t('NEW CAREER')}</button>
@@ -1827,6 +1828,9 @@ export class GameUI {
             case 'toggle-fullscreen':
                 this.actions?.toggleFullscreen();
                 break;
+            case 'reload-page':
+                window.location.reload();
+                break;
             case 'toggle-language':
                 // Flip between German (default) and English. setSetting persists
                 // the choice and reloads the page in the new language.
@@ -2083,6 +2087,9 @@ export class GameUI {
             label.textContent = message;
         screen?.classList.toggle('is-hidden', !active);
         this.root.querySelector('#game-shell')?.setAttribute('aria-busy', String(Boolean(active)));
+    }
+    showStartupError(visible) {
+        this.root.querySelector('#title-startup-error')?.classList.toggle('is-hidden', !visible);
     }
     showDock(save, locationId, {arrival=false}={}) {
         this.cancelVesperLaunchTransition();
@@ -3567,7 +3574,7 @@ export class GameUI {
             && this.save.world.raceRecords?.[mission.id.slice(5)]?.active === true);
         return tab === 'active'
             ? [...this.save.activeMissions, ...activeRaces]
-            : posted.filter((mission) => !activeRaces.includes(mission) && (tutorialContentUnlocked(this.save)||mission.id===TUTORIAL_MINING_CONTRACT_ID));
+            : posted.filter((mission) => !activeRaces.includes(mission) && missionAvailableThroughGate(this.save, mission, this.dockLocation) && (tutorialContentUnlocked(this.save)||mission.id===TUTORIAL_MINING_CONTRACT_ID));
     }
     droneHudSnapshot(model) {
         let live = model?.miningDrones ?? model?.drones;

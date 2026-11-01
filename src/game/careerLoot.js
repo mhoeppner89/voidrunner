@@ -120,10 +120,16 @@ export function updateCombatLoot(session,dt=0){
  if(session.arena||!lootCollectionEnabled(session))return;
  const range=session.playerStats().lootRange??0;
  const retry=session.lootRetryAt??=new WeakMap();
- let changed=false,beams=0;
+ let changed=false,departureChanged=false,beams=0;
  for(const id in session.save.world.combatWrecks){
   const wreck=session.save.world.combatWrecks[id];
-  if(!wreck.contents.length||wreck.explorationId&&session.explorationLootAllowed?.()===false||wreck.locked||wreck.systemId!==session.save.player.systemId || session.save.world.time<(wreck.collectAfter??0) || session.save.world.time<(retry.get(wreck)??0))continue;
+  if(!wreck.contents.length||wreck.explorationId&&session.explorationLootAllowed?.()===false||wreck.locked||wreck.systemId!==session.save.player.systemId)continue;
+  if(wreck.ownerMustLeave){
+   const p=session.save.player.position,clearance=Math.max(40,range+10);
+   if((p[0]-wreck.position[0])**2+(p[1]-wreck.position[1])**2+(p[2]-wreck.position[2])**2<=clearance*clearance)continue;
+   wreck.ownerMustLeave=false;departureChanged=true;
+  }
+  if(session.save.world.time<(wreck.collectAfter??0) || session.save.world.time<(retry.get(wreck)??0))continue;
   if(!lootInReach(session,wreck.position,range,true,wreck.id))continue;
   // Bounded work even for imported wrecks with a very large manifest. Cargo
   // stacks transfer in bulk, retaining any remainder when the hold fills.
@@ -138,12 +144,14 @@ export function updateCombatLoot(session,dt=0){
   }
   if(wreck.contents.length)retry.set(wreck,session.save.world.time+.5);
  }
- if(changed){session.audio?.play('pickup',.7);session.persistSave?.();}
+ if(changed)session.audio?.play('pickup',.7);
+ if(changed||departureChanged)session.persistSave?.();
 }
 export function recoverWreckEntry(session,wreckId,entryId){
  if(session.arena)return {ok:false,code:'Career salvage only.'};
  const wreck=session.save.world.combatWrecks?.[wreckId];
  if(!wreck||wreck.systemId!==session.save.player.systemId)return {ok:false,code:'Loot is unavailable.'};
+ if(wreck.ownerMustLeave)return {ok:false,code:'Move clear before collecting dropped cargo.'};
  if(session.save.world.time<(wreck.collectAfter??0))return {ok:false,code:'Loot is not ready for collection.'};
  if(!lootInReach(session,wreck.position,session.playerStats().lootRange??0,false,wreck.id,false))return {ok:false,code:'Loot is outside collection range.'};
  if(session.lineBlocked?.(session.tmpP3.fromArray(session.save.player.position),session.tmpP4.fromArray(wreck.position),wreck.id))return {ok:false,code:'BEAM OBSTRUCTED'};

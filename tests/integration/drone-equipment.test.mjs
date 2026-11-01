@@ -64,7 +64,7 @@ test('jettisoning and salvaging a drone preserves its damage without duplicating
  assert.ok(equipmentAction(p,'carry',{id:buy.id}).ok);const unitId=p.inventory.items[buy.id].droneUnitId;p.droneFleet.unitsById[unitId].hull=11;p.dockedAt=undefined;
  assert.ok(r.inventoryCommand('jettison',{id:buy.id}).ok);assert.equal(p.inventory.items[buy.id],undefined);assert.equal(p.droneFleet.unitsById[unitId],undefined);
  const wreck=save.world.combatWrecks[`wreck-${buy.id}`];assert.equal(wreck.contents.length,1);assert.equal(wreck.contents[0].kind,'drone');assert.equal(wreck.contents[0].hull,11);
- save.world.time=wreck.collectAfter; p.position.splice(0,3,...wreck.position);
+ save.world.time=wreck.collectAfter;p.position.splice(0,3,300,0,0);r.updatePickups(1/60);p.position.splice(0,3,...wreck.position);
  assert.ok(r.inventoryCommand('recover',{wreckId:wreck.id,id:buy.id}).ok);
  const recovered=Object.values(p.droneFleet.unitsById).filter(u=>u.type==='repair');assert.equal(recovered.length,1);assert.equal(recovered[0].hull,11);
  assert.equal(Object.values(p.inventory.items).filter(i=>i.baseId==='repair-drone').length,1);assert.equal(cargoMass(p),1);

@@ -88,7 +88,25 @@ test('ejected equipment and cargo observe their eight-second delay, including re
  const f=fixture(),id=install(f),p=f.save.player;p.dockedAt='rook';const buy=equipmentAction(p,'buy',{baseId:'pulse-cannon'});assert.ok(equipmentAction(p,'carry',{id:buy.id}).ok);p.dockedAt=undefined;
  assert.ok(f.session.inventoryCommand('jettison',{id:buy.id}).ok);const w=f.save.world.combatWrecks[`wreck-${buy.id}`];assert.equal(w.collectAfter,f.save.world.time+8);tick(f);assert.ok(f.save.world.combatWrecks[w.id]);assert.equal(p.inventory.items[buy.id],undefined);
  const restored=hydrateSave(JSON.parse(JSON.stringify(f.save)));assert.equal(restored.world.combatWrecks[w.id].collectAfter,w.collectAfter);assert.ok(restored.player.inventory.items[id]);
- f.save.world.time=w.collectAfter;tick(f);assert.equal(f.save.world.combatWrecks[w.id],undefined);assert.equal(p.inventory.items[buy.id].location.kind,'cargo');
+ f.save.world.time=w.collectAfter;tick(f);assert.ok(f.save.world.combatWrecks[w.id],'the tractor does not immediately re-collect a jettisoned item');
+ p.position[0]=300;tick(f);assert.equal(w.ownerMustLeave,false);p.position.splice(0,3,...w.position);tick(f);assert.equal(f.save.world.combatWrecks[w.id],undefined);assert.equal(p.inventory.items[buy.id].location.kind,'cargo');
+});
+
+test('jettisoned commodity quantities persist, stay clear of the tractor and can be recovered exactly once',()=>{
+ const f=fixture();install(f);const p=f.save.player;p.cargo.ore=9;
+ for(const invalid of [0,-1,1.5,10,NaN])assert.equal(f.session.jettisonCargo('ore',invalid),false);
+ assert.equal(f.session.jettisonCargo('ore',3),true);assert.equal(p.cargo.ore,6);
+ const w=Object.values(f.save.world.combatWrecks)[0];assert.deepEqual(w.contents.map(e=>[e.kind,e.commodity,e.quantity]),[['cargo','ore',3]]);assert.ok(f.session.wreckNodes.some(n=>n.id===w.id));
+ const restored=hydrateSave(JSON.parse(JSON.stringify(f.save)));assert.equal(restored.player.cargo.ore,6);assert.equal(restored.world.combatWrecks[w.id].contents[0].quantity,3);assert.equal(restored.world.combatWrecks[w.id].ownerMustLeave,true);
+ f.save.world.time=w.collectAfter+1;tick(f);assert.equal(p.cargo.ore,6);assert.ok(f.save.world.combatWrecks[w.id]);
+ p.position[0]=300;tick(f);assert.equal(w.ownerMustLeave,false);p.position.splice(0,3,...w.position);tick(f);assert.equal(p.cargo.ore,9);assert.equal(f.save.world.combatWrecks[w.id],undefined);tick(f);assert.equal(p.cargo.ore,9);
+});
+
+test('partial cargo jettison satisfies only the dropped share of a pirate demand',()=>{
+ const f=fixture();f.save.player.cargo.gold=8;const mug={demand:{kind:'cargo',commodity:'gold',quantity:5}};const pirate={mug,holdFire:true};f.session.ships=[pirate];
+ assert.equal(f.session.jettisonCargo('gold',2),true);assert.equal(mug.demand.quantity,3);assert.equal(pirate.holdFire,true);
+ f.session.resolveHyperdriveIntercept=()=>{};assert.equal(f.session.jettisonCargo('gold',3),true);assert.equal(pirate.standingDown,true);assert.equal(f.save.player.cargo.gold,3);
+ assert.deepEqual(Object.values(f.save.world.combatWrecks).map(w=>w.contents[0].quantity),[2,3]);
 });
 
 test('loot target distance matches collection range even for drops from capital ships',()=>{

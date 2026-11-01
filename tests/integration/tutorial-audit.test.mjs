@@ -5,6 +5,8 @@ import {TUTORIAL_STEPS,TUTORIAL_FLIGHT_LESSONS,tutorialPeople,tutorialConversati
 import {DE_CATALOG} from '../../src/game/i18n-de.js';
 import {GameUI} from '../../src/game/ui.js';
 import {hydrateSave} from '../../src/game/save.js';
+import {acceptMission,generateMissionOffers,missionAvailableThroughGate} from '../../src/game/missions.js';
+import {LOCATIONS,MISSION_LOCATION_IDS} from '../../src/game/data.js';
 
 test('every campaign objective, chapter and control lesson has German copy',()=>{for(const step of Object.values(TUTORIAL_STEPS))for(const key of ['objective','detail','chapterTitle'])assert.ok(DE_CATALOG[step[key]],step[key]);for(const lesson of TUTORIAL_FLIGHT_LESSONS)for(const key of ['objective','detail'])assert.ok(DE_CATALOG[lesson[key]],lesson[key]);});
 test('story contacts are present at their actual teaching ports, including optional Paul at Cairn',()=>{const {save,quest}=tutorialFixture('mining-contract');assert.deepEqual(tutorialPeople(save,'vesper').map(p=>p.id),['rin-vek']);assert.equal(tutorialConversation(save,'rin-vek','vesper'),'mining');quest.stepId='rin-cairn';assert.deepEqual(tutorialPeople(save,'cairn').map(p=>p.id),['rin-vek','paul']);assert.equal(tutorialConversation(save,'paul','cairn'),'paul-reunion');quest.stepId='earn-standing';assert.equal(tutorialPeople(save,'vesper').length,0);});
@@ -19,6 +21,33 @@ test('the recorder becomes sealed mission cargo and only Mara consumes it',()=>{
 });
 test('the mission board shows the normal training contract and offers ordinary work during the earning break',()=>{
  const {save,quest,session}=tutorialFixture('mining-contract');save.player.dockedAt='vesper';session.ensureTutorialMiningContract();const ui=Object.create(GameUI.prototype);ui.save=save;ui.dockLocation='vesper';assert.deepEqual(ui.missionBoardSource().map(m=>m.id),['tutorial-vesper-mining']);assert.equal(ui.missionBoardCounts().offers.length,1);assert.equal((ui.renderMissions().match(/data-mission-select=/g)??[]).length,1);quest.stepId='earn-standing';quest.flags.openWorld=true;assert.ok(ui.missionBoardSource().length>1);
+});
+
+test('closed tutorial gate hides outbound offers without removing them or active contracts',()=>{
+ const {save,quest}=tutorialFixture('earn-standing');quest.flags.openWorld=true;save.player.dockedAt='helix';
+ const ui=Object.create(GameUI.prototype);ui.save=save;ui.dockLocation='helix';
+ const offers=save.world.offers.helix;
+ const local={id:'legacy-local',kind:'bounty',origin:'helix',targetZone:'vesper',status:'offered',deposit:0};
+ const outbound={id:'legacy-outbound',kind:'bounty',origin:'helix',targetZone:'argent',status:'offered',deposit:0};
+ const active={...outbound,id:'already-active',status:'active'};
+ offers.push(local,outbound);save.activeMissions.push(active);
+ const before=ui.missionBoardSource('available');assert.ok(before.includes(local));assert.ok(!before.includes(outbound));
+ assert.ok(ui.missionBoardSource('active').includes(active));assert.ok(offers.includes(outbound));
+ assert.equal(acceptMission(save,'helix',outbound.id).ok,false);
+ assert.equal(missionAvailableThroughGate(save,{origin:'helix',destination:'helix',targetZone:'argent'},'helix'),false);
+ quest.flags.gateOpen=true;
+ assert.ok(ui.missionBoardSource('available').includes(outbound));assert.equal(acceptMission(save,'helix',outbound.id).ok,true);
+});
+
+test('new contract boards offer local and outbound work across systems and seeds',()=>{
+ for(const seed of [5,123,73201,88888]){
+  const {save}=tutorialFixture('earn-standing');save.world.seed=seed;
+  for(const id of MISSION_LOCATION_IDS.filter(id=>LOCATIONS[id].services?.missions)){
+   const offers=generateMissionOffers(id,save);const warrants=offers.filter(m=>m.kind==='bounty');
+   assert.ok(warrants.some(m=>LOCATIONS[m.targetZone]?.systemId===LOCATIONS[id].systemId),`${seed} ${id} local`);
+   assert.ok(warrants.some(m=>LOCATIONS[m.targetZone]?.systemId!==LOCATIONS[id].systemId),`${seed} ${id} outbound`);
+  }
+ }
 });
 
 
