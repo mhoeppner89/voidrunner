@@ -26,7 +26,9 @@ const settleWithin = (promise, timeoutMs, fallback, rejectOnTimeout = false) => 
 });
 const nextPaint = () => new Promise((resolve) => {
     const timer=setTimeout(resolve,250);
-    requestAnimationFrame(() => {clearTimeout(timer);resolve();});
+    // A single RAF callback runs before paint; wait for the next one so the
+    // browser can actually present the loading veil before expensive setup.
+    requestAnimationFrame(() => requestAnimationFrame(() => {clearTimeout(timer);resolve();}));
 });
 // Title options must work before the first career save exists. Preferences
 // override the factory defaults (and an older career mirror), while language
@@ -147,118 +149,117 @@ const beginSession = (mode, arena, tutorial = true) => {
     previousSession?.dispose();
     if (mode !== 'observer') ui.hideObserverView();
     ui.clearStatusMessages();
-    const save = arena?.run ? (arena.resume?readArenaRun():newArenaRun(Boolean(arena.hard&&arenaRecord().unlockedHard)))
-        : LANDING_PREVIEW_ID && mode !== 'arena' && mode !== 'observer' ? createNewSave(undefined, { tutorial: false })
-            : mode === 'new' || mode === 'arena' || mode === 'observer' ? createNewSave(DRONE_TEST_MODE ? 4242 : undefined, { tutorial: mode === 'new' && tutorial && !DRONE_TEST_MODE })
-                : loadGame();
-    if (!save) {
-        ui.showToast(t('No autosave was found.'), 'warning');
-        ui.showTitle(false, titleSave());
-        return Promise.resolve(undefined);
-    }
-    // Controls, display, and audio are player preferences rather than
-    // career-specific progress. Apply the latest global record to new,
-    // resumed, and simulator sessions alike.
-    Object.assign(save.settings, titleSettings);
-    // Keep the language mirrors in sync so the next boot and settings UI agree.
-    // The probe/dev key (`__VOID_PRIVATEER_PROBE_LANG__`) is single-shot: it
-    // forces the boot language once, then clears itself — a value left behind
-    // by a dev session used to override the player's saved choice forever.
-    let probeLanguage = null;
-    try {
-        probeLanguage = window.localStorage.getItem('__VOID_PRIVATEER_PROBE_LANG__');
-        if (probeLanguage)
-            window.localStorage.removeItem('__VOID_PRIVATEER_PROBE_LANG__');
-    }
-    catch { /* Storage may be unavailable; use the current language setting. */ }
-    setLanguage(probeLanguage ?? save.settings?.language);
-    if (vesperHoverPreview && mode !== 'arena') {
-        // Keep the visual preview reachable from either title-screen button
-        // without changing the normal career flow when the flag is absent.
-        save.player.dockedAt = 'vesper';
-        save.player.lastDockedAt = 'vesper';
-        save.player.velocity = [0, 0, 0];
-        save.player.throttle = 0;
-    }
-    if (devPreviewLocation && mode !== 'arena') {
-        // Dev-only direct station preview. It is query-gated and never runs
-        // in the normal career flow, but uses the same saved-game dock path.
-        save.player.dockedAt = devPreviewLocation;
-        save.player.lastDockedAt = devPreviewLocation;
-        save.player.systemId = LOCATIONS[devPreviewLocation].systemId;
-        save.player.position = [...LOCATIONS[devPreviewLocation].position];
-        save.player.velocity = [0, 0, 0];
-        save.player.throttle = 0;
-        if (devPreviewShip)
-            save.player.shipId = devPreviewShip;
-    }
-    if (LANDING_PREVIEW_ID && mode !== 'arena' && mode !== 'observer') {
-        const location = LOCATIONS[LANDING_PREVIEW_ID];
-        const berth = landingPreviewBerth;
-        const outwardX = berth.gate[0] - location.position[0];
-        const outwardY = berth.gate[1] - location.position[1];
-        const outwardZ = berth.gate[2] - location.position[2];
-        const outwardLength = Math.hypot(outwardX, outwardY, outwardZ) || 1;
-        const startDistance = stationVisualSurfaceRadius(LANDING_PREVIEW_ID)
-            + (landingPreviewAtBeacon ? 399 : landingPreviewAtClearance ? 199 : 450);
-        const player = save.player;
-        player.systemId = location.systemId;
-        player.dockedAt = undefined;
-        player.lastDockedAt = LANDING_PREVIEW_ID;
-        if (landingPreviewAtBay) {
-            const toGateX = berth.gate[0] - berth.pad[0];
-            const toGateY = berth.gate[1] - berth.pad[1];
-            const toGateZ = berth.gate[2] - berth.pad[2];
-            const toGateLength = Math.hypot(toGateX, toGateY, toGateZ) || 1;
-            const bayStartDistance = berth.captureRadius + 45;
-            player.position = [
-                berth.pad[0] + toGateX / toGateLength * bayStartDistance,
-                berth.pad[1] + toGateY / toGateLength * bayStartDistance,
-                berth.pad[2] + toGateZ / toGateLength * bayStartDistance,
-            ];
-        }
-        else {
-        player.position = [
-                location.position[0] + outwardX / outwardLength * startDistance,
-                location.position[1] + outwardY / outwardLength * startDistance,
-                location.position[2] + outwardZ / outwardLength * startDistance,
-            ];
-        }
-        player.rotation = facingNegativeZ(
-            (landingPreviewAtBay ? berth.pad[0] : berth.gate[0]) - player.position[0],
-            (landingPreviewAtBay ? berth.pad[1] : berth.gate[1]) - player.position[1],
-            (landingPreviewAtBay ? berth.pad[2] : berth.gate[2]) - player.position[2],
-        );
-        const approachX = berth.gate[0] - player.position[0];
-        const approachY = berth.gate[1] - player.position[1];
-        const approachZ = berth.gate[2] - player.position[2];
-        const approachLength = Math.hypot(approachX, approachY, approachZ) || 1;
-        player.velocity = landingPreviewAtClearance
-            ? [approachX / approachLength * 12, approachY / approachLength * 12, approachZ / approachLength * 12]
-            : [0, 0, 0];
-        player.angularVelocity = [0, 0, 0];
-        player.throttle = 0;
-        player.navTargetId = LANDING_PREVIEW_ID;
-        player.currentTargetId = LANDING_PREVIEW_ID;
-    }
-    if (mode === 'arena' || mode === 'observer')
-        save.arena = arena;
-    syncTitleSettings(save.settings);
-    // The combat sim uses the same canonical factory hardpoints as a career.
-    // Its disposable save still keeps the sortie consequence-free, while an
-    // arena run can no longer bypass installed-only weapons through the old
-    // flat equipment list.
-    cachedSave = save;
-    saveGame(save);
-    // Create and resume the audio context inside the original tap/click task;
-    // the heavier game module arrives asynchronously afterwards. This keeps
-    // sound working on mobile browsers without making the title load the full
-    // flight runtime up front.
+    // Resume audio inside the original tap/click task, then paint the loading
+    // veil before generating a new career or its mission offers.
     const audioManager = new AudioManager();
     void audioManager.enable();
     ui.setLoading(true, t(mode === 'arena' ? 'PREPARING FLIGHT' : mode === 'observer' ? 'PREPARING OBSERVER' : 'LOADING CAREER'));
     const starting = (async () => {
         await nextPaint();
+        const save = arena?.run ? (arena.resume?readArenaRun():newArenaRun(Boolean(arena.hard&&arenaRecord().unlockedHard)))
+            : LANDING_PREVIEW_ID && mode !== 'arena' && mode !== 'observer' ? createNewSave(undefined, { tutorial: false })
+                : mode === 'new' || mode === 'arena' || mode === 'observer' ? createNewSave(DRONE_TEST_MODE ? 4242 : undefined, { tutorial: mode === 'new' && tutorial && !DRONE_TEST_MODE })
+                    : loadGame();
+        if (!save) {
+            audioManager.dispose();
+            ui.showToast(t('No autosave was found.'), 'warning');
+            ui.showTitle(false, titleSave());
+            return Promise.resolve(undefined);
+        }
+        // Controls, display, and audio are player preferences rather than
+        // career-specific progress. Apply the latest global record to new,
+        // resumed, and simulator sessions alike.
+        Object.assign(save.settings, titleSettings);
+        // Keep the language mirrors in sync so the next boot and settings UI agree.
+        // The probe/dev key (`__VOID_PRIVATEER_PROBE_LANG__`) is single-shot: it
+        // forces the boot language once, then clears itself — a value left behind
+        // by a dev session used to override the player's saved choice forever.
+        let probeLanguage = null;
+        try {
+            probeLanguage = window.localStorage.getItem('__VOID_PRIVATEER_PROBE_LANG__');
+            if (probeLanguage)
+                window.localStorage.removeItem('__VOID_PRIVATEER_PROBE_LANG__');
+        }
+        catch { /* Storage may be unavailable; use the current language setting. */ }
+        setLanguage(probeLanguage ?? save.settings?.language);
+        if (vesperHoverPreview && mode !== 'arena') {
+            // Keep the visual preview reachable from either title-screen button
+            // without changing the normal career flow when the flag is absent.
+            save.player.dockedAt = 'vesper';
+            save.player.lastDockedAt = 'vesper';
+            save.player.velocity = [0, 0, 0];
+            save.player.throttle = 0;
+        }
+        if (devPreviewLocation && mode !== 'arena') {
+            // Dev-only direct station preview. It is query-gated and never runs
+            // in the normal career flow, but uses the same saved-game dock path.
+            save.player.dockedAt = devPreviewLocation;
+            save.player.lastDockedAt = devPreviewLocation;
+            save.player.systemId = LOCATIONS[devPreviewLocation].systemId;
+            save.player.position = [...LOCATIONS[devPreviewLocation].position];
+            save.player.velocity = [0, 0, 0];
+            save.player.throttle = 0;
+            if (devPreviewShip)
+                save.player.shipId = devPreviewShip;
+        }
+        if (LANDING_PREVIEW_ID && mode !== 'arena' && mode !== 'observer') {
+            const location = LOCATIONS[LANDING_PREVIEW_ID];
+            const berth = landingPreviewBerth;
+            const outwardX = berth.gate[0] - location.position[0];
+            const outwardY = berth.gate[1] - location.position[1];
+            const outwardZ = berth.gate[2] - location.position[2];
+            const outwardLength = Math.hypot(outwardX, outwardY, outwardZ) || 1;
+            const startDistance = stationVisualSurfaceRadius(LANDING_PREVIEW_ID)
+                + (landingPreviewAtBeacon ? 399 : landingPreviewAtClearance ? 199 : 450);
+            const player = save.player;
+            player.systemId = location.systemId;
+            player.dockedAt = undefined;
+            player.lastDockedAt = LANDING_PREVIEW_ID;
+            if (landingPreviewAtBay) {
+                const toGateX = berth.gate[0] - berth.pad[0];
+                const toGateY = berth.gate[1] - berth.pad[1];
+                const toGateZ = berth.gate[2] - berth.pad[2];
+                const toGateLength = Math.hypot(toGateX, toGateY, toGateZ) || 1;
+                const bayStartDistance = berth.captureRadius + 45;
+                player.position = [
+                    berth.pad[0] + toGateX / toGateLength * bayStartDistance,
+                    berth.pad[1] + toGateY / toGateLength * bayStartDistance,
+                    berth.pad[2] + toGateZ / toGateLength * bayStartDistance,
+                ];
+            }
+            else {
+                player.position = [
+                    location.position[0] + outwardX / outwardLength * startDistance,
+                    location.position[1] + outwardY / outwardLength * startDistance,
+                    location.position[2] + outwardZ / outwardLength * startDistance,
+                ];
+            }
+            player.rotation = facingNegativeZ(
+                (landingPreviewAtBay ? berth.pad[0] : berth.gate[0]) - player.position[0],
+                (landingPreviewAtBay ? berth.pad[1] : berth.gate[1]) - player.position[1],
+                (landingPreviewAtBay ? berth.pad[2] : berth.gate[2]) - player.position[2],
+            );
+            const approachX = berth.gate[0] - player.position[0];
+            const approachY = berth.gate[1] - player.position[1];
+            const approachZ = berth.gate[2] - player.position[2];
+            const approachLength = Math.hypot(approachX, approachY, approachZ) || 1;
+            player.velocity = landingPreviewAtClearance
+                ? [approachX / approachLength * 12, approachY / approachLength * 12, approachZ / approachLength * 12]
+                : [0, 0, 0];
+            player.angularVelocity = [0, 0, 0];
+            player.throttle = 0;
+            player.navTargetId = LANDING_PREVIEW_ID;
+            player.currentTargetId = LANDING_PREVIEW_ID;
+        }
+        if (mode === 'arena' || mode === 'observer')
+            save.arena = arena;
+        syncTitleSettings(save.settings);
+        // The combat sim uses the same canonical factory hardpoints as a career.
+        // Its disposable save still keeps the sortie consequence-free, while an
+        // arena run can no longer bypass installed-only weapons through the old
+        // flat equipment list.
+        cachedSave = save;
+        saveGame(save);
         const shipId = SHIP_WARM_ASSETS[save.player.shipId] ? save.player.shipId : 'wayfarer';
         // Asset warm-up is opportunistic. It must not be part of session boot:
         // iOS Safari can leave an explicit image decode pending, and a slow
@@ -268,6 +269,13 @@ const beginSession = (mode, arena, tutorial = true) => {
             ui.preloadSessionAssets(save, { priority: 'high', includeLocation: mode !== 'arena' && mode !== 'observer' }),
         ]);
         const gameModule = await settleWithin(loadGameSession(), 20000, undefined, true);
+        // Build the immutable asteroid surface in small slices while the
+        // loading veil is visible. The renderer and collision code reuse the
+        // exact same cached terrain once the session is constructed.
+        const {prepareAsteroidTerrain} = await import('./game/asteroidTerrain.js');
+        await prepareAsteroidTerrain();
+        const {preparePlanetSurfaceTextures} = await import('./game/render.js');
+        await preparePlanetSurfaceTextures();
         const { GameSession } = gameModule;
         const nextSession = new GameSession(save, ui, () => {
             session = undefined;

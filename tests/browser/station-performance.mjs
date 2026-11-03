@@ -7,15 +7,18 @@ import {isolateBrowserProfiles} from '../helpers/browser-profiles.mjs';
 await isolateBrowserProfiles(import.meta.url,['desktop','android','iphone']);
 const base=process.env.VR_BASE_URL??'http://127.0.0.1:4192';
 const out=`output/station-performance/${process.env.VR_LABEL??'current'}`;await mkdir(out,{recursive:true});
+const graphics=process.env.VR_GPU==='metal'?['--use-gl=angle','--use-angle=metal']:['--use-gl=angle','--use-angle=swiftshader'];
 for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,height:900}}],['android',chromium,devices['Pixel 7 landscape']],['iphone',webkit,devices['iPhone 13 landscape']]]){
  if(!process.env.VR_PROFILES.split(',').includes(name))continue;
- const browser=await engine.launch({headless:true,...(engine===chromium?{executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',args:['--no-sandbox','--disable-gpu-sandbox','--mute-audio','--use-gl=angle','--use-angle=swiftshader']}:{})});
+ const browser=await engine.launch({headless:true,...(engine===chromium?{executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',args:['--no-sandbox','--disable-gpu-sandbox','--mute-audio',...graphics]}:{})});
  try{
   const page=await browser.newPage({...device,serviceWorkers:'block'});page.setDefaultTimeout(120000);const errors=[],warnings=[];
   page.on('pageerror',e=>{errors.push(e.message);console.error(e.message);});page.on('console',m=>{if(m.type()==='error'){errors.push(m.text());console.error(m.text());}else if(m.type()==='warning')warnings.push(m.text());});
   await page.addInitScript(()=>{localStorage.setItem('void-privateer-settings-v1',JSON.stringify({music:0,effects:0}));const A=window.AudioContext??window.webkitAudioContext;if(A)A.prototype.resume=async function(){await this.suspend();};});
+  if(process.env.VR_SEED)await page.addInitScript(seed=>{let n=seed>>>0;Date.now=()=>1760000000000;Math.random=()=>{n^=n<<13;n^=n>>>17;n^=n<<5;return(n>>>0)/4294967296;};},Number(process.env.VR_SEED));
   await page.goto(`${base}/game.html?station-performance`);await page.waitForFunction(()=>window.__VOID_PRIVATEER__?.newGame);
   const cdp=engine===chromium?await page.context().newCDPSession(page):null;
+  if(cdp&&name==='android'&&process.env.VR_THROTTLE_STARTUP)await cdp.send('Emulation.setCPUThrottlingRate',{rate:Number(process.env.VR_CPU_RATE??4)});
   await page.evaluate(async()=>{
    const {SpaceRenderer}=await import('/src/game/render.js'),{ConcourseShip}=await import('/src/game/concourseShip.js'),{StationTransit}=await import('/src/game/stationTransit.js'),{GameSession}=await import('/src/game/game.js'),{GameUI}=await import('/src/game/ui.js');
    window.stationPerf={stage:'startup',samples:{},newPrograms:[],longTasks:[],frames:[],start:performance.now()};
@@ -51,7 +54,7 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
    report.push(await page.evaluate(id=>{const r=__VOID_PRIVATEER__.getRuntime(),v=r.ui.concourseShip;return{id,flight:{memory:r.renderer.renderer.info.memory,programs:r.renderer.renderer.info.programs.length,draw:r.renderer.renderer.info.render},dock:{memory:v.renderer.info.memory,programs:v.renderer.info.programs.length,draw:v.renderer.info.render}};},id));
   }
   if(cdp&&process.env.VR_TRACE){const {profile}=await cdp.send('Profiler.stop');await writeFile(`${out}/${name}.cpuprofile`,JSON.stringify(profile));}
-  const result=await page.evaluate(()=>stationPerf);result.ports=report;result.errors=errors;result.warnings=warnings;
+  const result=await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime().renderer.renderer,gl=r.getContext(),ext=gl.getExtension('WEBGL_debug_renderer_info');stationPerf.graphics={renderer:ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER)};return stationPerf;});result.ports=report;result.errors=errors;result.warnings=warnings;
   const summarize=a=>{a.sort((x,y)=>x-y);return{n:a.length,p50:a[Math.floor(a.length*.5)],p95:a[Math.floor(a.length*.95)],max:a.at(-1),over50:a.filter(x=>x>50).length};};
   const summary=Object.fromEntries(Object.entries(result.samples).filter(([key])=>!key.includes('gl.')).map(([key,a])=>[key,summarize(a)]));
   await writeFile(`${out}/${name}.json`,JSON.stringify(result,null,2));await writeFile(`${out}/${name}-summary.json`,JSON.stringify(summary,null,2));

@@ -129,10 +129,11 @@ test('normal-mapped dock materials keep authored detail and use geometric normal
 test('dock and film outputs reuse one bounded drawing buffer with the same pixel coordinates',()=>{
  for(const touchDevice of [false,true]){
   const v=Object.create(ConcourseShip.prototype),canvas={width:1,height:1,style:{},dataset:{}};let allocations=0;
-  Object.assign(v,{touchDevice,canvas,renderer:{setSize(w,h){allocations++;canvas.width=w;canvas.height=h;}},target:new THREE.WebGLRenderTarget(1,1)});
+  Object.assign(v,{touchDevice,canvas,renderer:{setSize(w,h){allocations++;canvas.width=w;canvas.height=h;}},target:new THREE.WebGLRenderTarget(1,1),finish:{uniforms:{uSceneResolution:{value:new THREE.Vector2()}}}});
   for(const [width,height,scale]of [[458,238,2],[420,270,2],[640,360,1],[458,238,2],[320,480,2],[458,238,2]]){
    v.resizeOutput(width,height,scale);assert.equal(allocations,1,'view switches and rotation retain the default framebuffer');
    assert.equal(v.target.width,width);assert.equal(v.target.height,height);
+   assert.deepEqual(v.finish.uniforms.uSceneResolution.value.toArray(),[width,height],'outlines sample the active viewport after resizing');
    assert.equal(canvas.width,touchDevice?768:960);assert.equal(canvas.height,touchDevice?480:600);
    const offset=Number(canvas.style.transform.match(/-?[\d.]+/)[0]);
    for(const [x,y]of [[0,0],[width*.5,height*.5],[width,height]]){

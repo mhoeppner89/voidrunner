@@ -79,12 +79,36 @@ export async function prepareRenderScene(renderer, scene, camera, target, {timeo
     let programs;
     try {
         renderer.setRenderTarget(target);
-        renderer.compile(scene, camera, lightingScene);
-        programs = [...(renderer.info?.programs ?? [])];
+        const materials = renderer.compile(scene, camera, lightingScene);
+        // Other streamed scenes can be compiling at the same time. Waiting
+        // for every program in the renderer makes an unrelated arrival hold
+        // up this one, and getUniforms() can synchronize with the driver.
+        // Include every variant of the materials just compiled (a material
+        // may have several geometry/lighting programs), while retaining the
+        // old fallback for renderers without Three's material properties.
+        if (materials instanceof Set && renderer.properties?.get) {
+            const relevant = new Set();
+            let complete = true;
+            for (const material of materials) {
+                const state = renderer.properties.get(material);
+                if (state?.programs instanceof Map) for (const program of state.programs.values()) relevant.add(program);
+                else if (state?.currentProgram) relevant.add(state.currentProgram);
+                else { complete = false; break; }
+            }
+            programs = complete ? [...relevant] : [...(renderer.info?.programs ?? [])];
+        } else programs = [...(renderer.info?.programs ?? [])];
     } finally { renderer.setRenderTarget(previous); }
+    const deadline = performance.now() + timeoutMs;
+    // Without KHR_parallel_shader_compile, Three reports programs as ready
+    // immediately even while the driver is still linking them. Querying their
+    // uniforms then blocks the main thread. A GPU fence lets that work finish
+    // asynchronously before the first query, while preserving cancellation.
+    if (renderer.extensions?.has?.('KHR_parallel_shader_compile') === false) {
+        const ready = await waitForRenderWork(renderer, {timeoutMs: Math.max(0, deadline - performance.now()), shouldCancel});
+        if (!ready || shouldCancel()) return false;
+    }
     // Poll program readiness ourselves. Three's compileAsync keeps polling
     // disposed material properties after cancellation or a context reset.
-    const deadline = performance.now() + timeoutMs;
     while (!shouldCancel()) {
         if (programs.every(program => !program.isReady || program.isReady())) {
             let uniformDeadline = performance.now() + 3;

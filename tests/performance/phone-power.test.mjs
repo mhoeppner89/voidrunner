@@ -102,6 +102,37 @@ test('paused and hidden flight does no continuous rendering, redraws once on res
     s.save.player.dockedAt='helix';const dockDraws=s.draws.length;
     s.updateFrame(60100);assert.equal(s.draws.length,dockDraws);
 });
+test('flight preparation does not run combat or submit flight frames under the loading screen',()=>{
+    const s=frameSession();s.flightPrepared=false;let handled=0;
+    s.handleActions=()=>handled++;
+    for(let now=50;now<=5000;now+=50)s.updateFrame(now);
+    assert.equal(s.steps,0,'simulation must wait for flight readiness');
+    assert.equal(s.draws.length,0,'warmup is the only renderer active while loading');
+    assert.equal(handled,0,'flight actions cannot run while loading');
+    assert.equal(s.audio.calls,0,'the flight audio loop waits too');
+    s.flightPrepared=true;s.updateFrame(5017);
+    assert.ok(s.steps<=2,'loading time must not cause a simulation catch-up');
+    assert.equal(s.draws.length,1,'flight starts rendering on the first ready frame');
+});
+test('auto quality reacts to real elapsed time during severe stalls without treating a pause as slow flight',()=>{
+    const s=frameSession();s.save.settings.quality='auto';s.qualityScale=1;s.fpsFrames=0;s.fpsAccumulator=0;
+    s.renderer.setQualityScale=value=>{s.renderer.lastQualityScale=value;};
+    for(const now of [1,501,1001,1501])s.updateFrame(now);
+    assert.ok(s.qualityScale<1,'a 2 fps flight must reduce render load within the first 1.5 s');
+    const beforePause=s.qualityScale;s.ui.isModalOpen=true;
+    for(let now=1601;now<=5001;now+=100)s.updateFrame(now);
+    s.ui.isModalOpen=false;
+    for(let now=5018;now<=6218;now+=17)s.updateFrame(now);
+    assert.ok(s.qualityScale>=beforePause,'time spent in a menu is not counted as slow flight');
+});
+test('observer flight uses the same adaptive quality sampling',()=>{
+    const s=frameSession();s.save.settings.quality='auto';s.qualityScale=1;s.fpsFrames=0;s.arena={observer:true};
+    s.renderer.setQualityScale=value=>{s.renderer.lastQualityScale=value;};
+    s.renderer.setCockpitVisible=()=>{};s.renderer.updateObserverCamera=()=>{};
+    s.updateObserverFocus=()=>[0,0,0];s.observerViewModel=()=>({});s.ui.updateObserverView=()=>{};
+    for(const now of [1,501,1001,1501])GameSession.prototype.syncRender.call(s,.1,now);
+    assert.ok(s.qualityScale<1,'a slow observer view should use the existing auto quality governor');
+});
 test('render scheduling handles jitter and stalls without a burst of queued frames',()=>{
     const budget=new FrameBudget();let frames=0;
     for(let i=0;i<1200;i++)if(budget.take(i*1000/120+Math.sin(i)*0.4,30)!==null)frames++;

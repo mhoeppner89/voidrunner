@@ -84,17 +84,21 @@ function collect(source){
     }).join(';');
     return{meshes,hardware,bounds,materials,slots,signature};
 }
-function geometryFor(triangles,origin,planes=[],size=new THREE.Vector3(1,1,1)){
+function* geometryFor(triangles,origin,planes=[],size=new THREE.Vector3(1,1,1)){
     const length=Math.max(size.x,size.y,size.z),tearScale=Math.min(size.x,size.z)*.004;
     const positions=[],normals=[],uvs=[],colors=[],paintPositions=[],paintNormals=[];
-    for(const t of triangles)for(const v of t.v){
-        const near=Math.min(...planes.map(plane=>Math.abs(distance(v,plane)))),edge=Math.max(0,1-near/(length*.018));
-        const tear=near<length*1e-5?Math.sin((v.p[0]*4.7+v.p[1]*3.3+v.p[2]*4.1)/Math.max(.01,tearScale*30))*tearScale:0;
-        // Matching edge noise crumples the shared tear, while the back plate
-        // sits inside the hull rather than sealing it with a flat painted lid.
-        const recess=t.mat===-1?length*.012:0;
-        positions.push(v.p[0]+tear*.35-v.n[0]*recess-origin.x,v.p[1]+tear*.8-v.n[1]*recess-origin.y,v.p[2]+tear*.45-v.n[2]*recess-origin.z);
-        normals.push(...v.n);paintPositions.push(...(v.pp??v.p));paintNormals.push(...(v.pn??v.n));uvs.push(...v.uv);colors.push(...v.c.map(c=>c*(t.mat>=0?1-edge*.72:1)));
+    let processed=0;
+    for(const t of triangles){
+        for(const v of t.v){
+            const near=Math.min(...planes.map(plane=>Math.abs(distance(v,plane)))),edge=Math.max(0,1-near/(length*.018));
+            const tear=near<length*1e-5?Math.sin((v.p[0]*4.7+v.p[1]*3.3+v.p[2]*4.1)/Math.max(.01,tearScale*30))*tearScale:0;
+            // Matching edge noise crumples the shared tear, while the back plate
+            // sits inside the hull rather than sealing it with a flat painted lid.
+            const recess=t.mat===-1?length*.012:0;
+            positions.push(v.p[0]+tear*.35-v.n[0]*recess-origin.x,v.p[1]+tear*.8-v.n[1]*recess-origin.y,v.p[2]+tear*.45-v.n[2]*recess-origin.z);
+            normals.push(...v.n);paintPositions.push(...(v.pp??v.p));paintNormals.push(...(v.pn??v.n));uvs.push(...v.uv);colors.push(...v.c.map(c=>c*(t.mat>=0?1-edge*.72:1)));
+        }
+        if((++processed&255)===0)yield;
     }
     const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(normals,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));g.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));g.setAttribute('wreckSourcePosition',new THREE.Float32BufferAttribute(paintPositions,3));g.setAttribute('wreckSourceNormal',new THREE.Float32BufferAttribute(paintNormals,3));g.computeBoundingSphere();g.userData.shared=true;return g;
 }
@@ -145,7 +149,7 @@ function* compile(data,owned){
         for(const t of tris){for(const v of t.v)box.expandByPoint(p.fromArray(v.p));if(t.mat!==-1){a.fromArray(t.v[1].p).sub(p.fromArray(t.v[0].p));b.fromArray(t.v[2].p).sub(p);mass+=a.cross(b).length()*.5;}}
         const origin=box.getCenter(new THREE.Vector3()),byMaterial=new Map();
         for(const t of tris){if(!byMaterial.has(t.mat))byMaterial.set(t.mat,[]);byMaterial.get(t.mat).push(t);}
-        const parts=[];for(const [slot,t]of byMaterial){yield;const geometry=geometryFor(t,origin,planes,size);owned.add(geometry);parts.push({slot,geometry});}
+        const parts=[];for(const [slot,t]of byMaterial){yield;const geometry=yield* geometryFor(t,origin,planes,size);owned.add(geometry);parts.push({slot,geometry});}
         yield;const structure=yield* structureFor(tris,origin,size);if(structure){owned.add(structure);parts.push({slot:-2,geometry:structure});}
         sections.push({origin,mass:Math.max(epsilon,mass),radius:box.getSize(new THREE.Vector3()).length()*.5,parts});
     }

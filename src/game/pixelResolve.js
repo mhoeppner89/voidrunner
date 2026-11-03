@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import './illustratedLighting.js';
 // Filter inputs must be finite before interpolation/downsampling. One invalid
 // HDR texel can otherwise poison a whole rectangular glow footprint.
 export const FINITE_COLOUR_GLSL=`vec3 finiteColour(vec3 c){return vec3(
@@ -37,9 +38,8 @@ export function createPixelResolveMaterial({preserveAlpha=false}={}){
    float keep=step(distance*.85,viewDistance(d));
    return mix(centre,finiteColour(texture2D(tScene,uv).rgb),keep);
   }
-  vec3 filteredScene(){
+  vec3 filteredScene(float depth){
    vec3 centre=finiteColour(texture2D(tScene,vUv).rgb);
-   float depth=texture2D(tDepth,vUv).r;
    if(depth>=.9999999)return centre;
    float distance=viewDistance(depth),softness=smoothstep(20000.,80000.,distance);
    if(softness<.001)return centre;
@@ -48,16 +48,35 @@ export function createPixelResolveMaterial({preserveAlpha=false}={}){
     +sceneSample(vUv+vec2(0.,offset.y),centre,distance)+sceneSample(vUv-vec2(0.,offset.y),centre,distance);
    return mix(centre,centre*.5+neighbours*.125,softness);
   }
+  // Use the depth texture already produced by the scene pass. Only geometry
+  // edges are inked, so surface textures, sky, cockpit and HUD stay clean.
+  float illustratedInk(float depth){
+   if(depth>=.9999999)return 0.;
+   float c=viewDistance(depth);
+   vec2 t=1./uResolution;
+   float l=viewDistance(texture2D(tDepth,vUv-vec2(t.x,0.)).r);
+   float r=viewDistance(texture2D(tDepth,vUv+vec2(t.x,0.)).r);
+   float a=viewDistance(texture2D(tDepth,vUv-vec2(0.,t.y)).r);
+   float b=viewDistance(texture2D(tDepth,vUv+vec2(0.,t.y)).r);
+   float depthScale=max(c,1.);
+   float edge=smoothstep(.035,.17,max(max(l-c,r-c),max(a-c,b-c))/depthScale);
+   float bend=max(abs(l+r-2.*c),abs(a+b-2.*c))/depthScale;
+   float crease=smoothstep(.025,.12,bend)*.12;
+   float fade=1.-.88*smoothstep(2400.,12000.,c);
+   return max(edge,crease)*fade;
+  }
   ${NEUTRAL_TONE_GLSL}
   vec3 sRGBTransferOETF(vec3 color){return mix(color*12.92,1.055*pow(max(color,vec3(0.)),vec3(1./2.4))-.055,step(vec3(.0031308),color));}
   void main(){
-   vec3 colour=filteredScene();
+   float depth=texture2D(tDepth,vUv).r;
+   vec3 colour=filteredScene(depth);
    #ifdef PRESERVE_SCENE_ALPHA
    float alpha=texture2D(tScene,vUv).a;
    colour/=max(alpha,.001);
    #endif
    if(uStrength>0.)colour+=finiteColour(texture2D(tBloom,vUv).rgb)*uStrength;
    colour=sRGBTransferOETF(neutralToneMapping(colour));
+   colour*=1.-illustratedInk(depth)*.43;
    #ifdef PRESERVE_SCENE_ALPHA
    gl_FragColor=vec4(colour*alpha,alpha);
    #else

@@ -1,3 +1,15 @@
+## 0.8.2na — Smoother flight and loading
+
+- Prepare asteroid geometry and planet surfaces in responsive loading-time slices without changing their appearance or collision surfaces.
+- Keep flight and combat paused until their scene is ready; adapt flight resolution using actual frame times, including in observer mode.
+- Prepare the correct shaders and buffers for arriving traffic and avoid waiting on unrelated shader work during scene transitions.
+- Split background ship-breakup preparation into smaller tasks and avoid shading hidden voxels when constructing temporary ships.
+
+## 0.8.2mz — Illustrated 3D finish
+
+- Give ships, stations and scenery the selected fine outlines and gently stepped lighting, while preserving cockpit text and painted backgrounds.
+- Reuse the existing scene buffers for the outlines, without adding another geometry render or per-frame material traversal.
+
 ## 0.8.2my — First combat dialogue
 
 - Apply the revised first-pirate encounter, surrender and loot dialogue in German, with a matching English version.

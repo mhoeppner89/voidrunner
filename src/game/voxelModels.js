@@ -143,6 +143,7 @@ export class VoxelGrid {
         const normals = [];
         const colors = [];
         const indices = [];
+        const baseColors = new Map(), base = new THREE.Color();
         const half = unit * 0.5;
         let vertexOffset = 0;
         for (const [key, material] of this.cells) {
@@ -152,12 +153,22 @@ export class VoxelGrid {
             const x = xRaw ?? 0;
             const y = yRaw ?? 0;
             const z = zRaw ?? 0;
-            const base = new THREE.Color(palette[material]);
+            // Interior voxels have no triangles. Test visibility before
+            // allocating a colour and computing their unused surface shade.
+            let visibleFaces = 0;
+            for (let i = 0; i < FACE_DEFS.length; i += 1) {
+                const direction = FACE_DEFS[i].direction;
+                if (!this.get(x + direction[0], y + direction[1], z + direction[2])) visibleFaces |= 1 << i;
+            }
+            if (!visibleFaces) continue;
+            let unshaded = baseColors.get(material);
+            if (!unshaded) { unshaded = new THREE.Color(palette[material]); baseColors.set(material, unshaded); }
+            base.copy(unshaded);
             const shade = (coordinateShade(x, y, z) - 0.5) * (material === 'dark' ? 0.09 : 0.055);
             base.offsetHSL(0, 0, shade);
-            for (const face of FACE_DEFS) {
-                if (this.get(x + face.direction[0], y + face.direction[1], z + face.direction[2]))
-                    continue;
+            for (let i = 0; i < FACE_DEFS.length; i += 1) {
+                if (!(visibleFaces & (1 << i))) continue;
+                const face = FACE_DEFS[i];
                 for (const corner of face.corners) {
                     positions.push(x * unit + corner[0] * half, y * unit + corner[1] * half, z * unit + corner[2] * half);
                     normals.push(face.normal[0], face.normal[1], face.normal[2]);

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>Voidrunner · Pixel grid review</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#080f18;color:#edf1ef;--muted:#a6b6c1;--line:#354a5a;--gold:#f1d086;--cyan:#92dce1}*{box-sizing:border-box}body{margin:0}button,input,a{font:inherit}button{cursor:pointer;color:inherit;background:#132536;border:1px solid var(--line);border-radius:6px;min-height:42px;padding:9px 14px;touch-action:manipulation}button:hover,button:focus-visible{border-color:var(--cyan)}button[aria-pressed=true]{border-color:var(--gold);background:#3a3430;color:var(--gold)}header{padding:22px max(18px,calc((100vw - 1440px)/2));background:#0c1825;border-bottom:1px solid var(--line)}h1{font-size:24px;margin:0 0 7px;letter-spacing:-.4px}p{line-height:1.5}.intro{margin:0;max-width:950px;color:var(--muted);font-size:14px}main{max-width:1480px;margin:auto;padding:18px}nav,.controls,.options{display:flex;gap:7px;flex-wrap:wrap}.scenes{overflow:auto;flex-wrap:nowrap;padding-bottom:12px}.scenes button{white-space:nowrap}.controls{align-items:center;margin:0 0 12px}.group{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.group-label{font-size:12px;color:var(--muted);margin-right:3px}.spacer{flex:1}.viewer{--split:50%;position:relative;overflow:hidden;aspect-ratio:var(--aspect,16/9);background:#030810;border:1px solid var(--line);border-radius:8px;isolation:isolate}.viewer img{display:block;position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}.viewer .before{clip-path:inset(0 calc(100% - var(--split)) 0 0);z-index:2}.divider{position:absolute;left:var(--split);top:0;bottom:0;width:2px;background:var(--gold);z-index:3;pointer-events:none}.label{position:absolute;top:10px;z-index:4;font-size:12px;background:#07131ce8;padding:5px 8px;border-radius:4px;pointer-events:none}.label.before-label{left:10px}.label.after-label{right:10px;color:var(--gold)}.viewer.solo .before,.viewer.solo .divider,.viewer.solo .before-label{display:none}.slider-row{display:flex;align-items:center;gap:10px;margin:10px 0 4px;color:var(--muted);font-size:13px}.slider-row input{flex:1;min-width:30px;accent-color:var(--gold)}.slider-row.solo{visibility:hidden}.details{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:13px}.details p{margin:7px 0}.links{display:flex;gap:18px;align-items:center;flex-wrap:wrap}.links a{color:var(--cyan)}.note{border-top:1px solid var(--line);margin-top:20px;padding-top:14px;color:var(--muted);font-size:13px}.note strong{color:#d9e3e6}.status{min-height:20px;color:var(--muted);font-size:13px}#message{padding:40px 0;color:var(--muted)}.hidden{display:none!important}@media(max-width:700px){header{padding:16px 14px}main{padding:12px}h1{font-size:21px}.intro{font-size:13px}.controls{gap:10px}.group{gap:4px}.group-label{width:100%}.spacer{display:none}button{padding:8px 10px;min-height:40px}.label{font-size:10px;top:5px}.before-label{left:5px}.after-label{right:5px}.details{font-size:12px}.links{gap:12px}}
+.viewer:fullscreen{border:0;border-radius:0;background:#000}.viewer:fullscreen img{object-fit:contain}
+</style></head><body>
+<header><h1>Voidrunner · Pixel grid review</h1><p class="intro">Compare the current game with two shared pixel sizes. The same camera, ships, cockpit and lighting are used for each option.</p></header>
+<main><div id="message">Preparing the comparison…</div><div id="review" class="hidden">
+ <nav class="scenes" aria-label="Scene"></nav>
+ <div class="controls">
+  <div class="group profiles" aria-label="Screen layout"><span class="group-label">Layout</span></div>
+  <div class="group styles" aria-label="Pixel grid"><span class="group-label">Compare with</span></div>
+  <span class="spacer"></span>
+  <button id="compare" aria-pressed="true">Split view</button>
+  <button id="motion" aria-pressed="false" hidden>▶ Motion</button>
+  <button id="fullscreen">Fullscreen</button>
+ </div>
+ <div class="viewer" role="img" aria-label="Pixel grid comparison">
+  <img class="after" alt="Selected shared pixel grid"><img class="before" alt="Current game">
+  <span class="label before-label">Current game</span><span class="label after-label"></span><div class="divider"></div>
+ </div>
+ <div class="slider-row"><span>Current</span><input id="split" aria-label="Move comparison divider" type="range" min="0" max="100" value="50"><span>Selected</span></div>
+ <div class="details"><p id="scene-note"></p><p id="dimensions"></p></div>
+ <div class="links"><a id="original" target="_blank" rel="noopener">Open selected frame ↗</a><a id="baseline" target="_blank" rel="noopener">Open current frame ↗</a></div>
+ <p class="status" role="status"></p>
+ <p class="note"><strong>Review prototype:</strong> the entire captured image—including cockpit art, text and effects—is rasterized to the chosen grid. On the wide phone layout, the width grows to fit the screen while the chosen height stays fixed. Motion is a short recorded camera sweep; its playback rate is not a game performance measurement. No palette reduction or new noise is added. Your career save is not used.</p>
+</div></main>
+<script type="module">
+const $=selector=>document.querySelector(selector);
+try{
+ const manifest=await(await fetch('./manifest.json?revision=pixel-grid-1')).json();
+ const params=new URLSearchParams(location.search);
+ let profile=manifest.profiles.find(p=>p.id===params.get('profile'))??manifest.profiles[0];
+ let scene=manifest.scenes.find(s=>s.id===params.get('scene'))??manifest.scenes[0];
+ let style=manifest.styles.find(s=>s.id===params.get('style')&&s.id!=='current')??manifest.styles.find(s=>s.id==='fine');
+ let split=true,playing=false,frame=0,timer=0,generation=0;
+ const sequences=()=>manifest.captures[profile.id][scene.id].styles;
+ function setImage(frameIndex){
+  const data=sequences(),before=data.current.sequence,after=data[style.id].sequence;
+  $('.before').src=`./${before[frameIndex%before.length]}`;$('.after').src=`./${after[frameIndex%after.length]}`;
+ }
+ function stop(){generation++;playing=false;clearInterval(timer);frame=0;$('#motion').setAttribute('aria-pressed','false');$('#motion').textContent='▶ Motion';}
+ async function start(){
+  if(!scene.motion)return;const myGeneration=++generation;$('.status').textContent='Loading motion frames…';
+  const seq=sequences();await Promise.all([...new Set([...seq.current.sequence,...seq[style.id].sequence])].map(src=>new Promise((resolve,reject)=>{const image=new Image();image.onload=resolve;image.onerror=reject;image.src=`./${src}`;})));
+  if(myGeneration!==generation)return;$('.status').textContent='Recorded camera sweep · 8 frames per second';playing=true;
+  $('#motion').setAttribute('aria-pressed','true');$('#motion').textContent='❚❚ Pause';
+  timer=setInterval(()=>{frame=(frame+1)%manifest.frames;setImage(frame);},1000/manifest.fps);
+ }
+ function render(){
+  stop();$('.status').textContent='';const d=sequences(),candidate=d[style.id];
+  $('.viewer').style.setProperty('--aspect',`${profile.width}/${profile.height}`);
+  $('.after-label').textContent=`Shared grid · ${style.name}`;
+  $('#scene-note').textContent=scene.note;
+  $('#dimensions').textContent=`Current world ${d.current.world.width} × ${d.current.world.height} · shared frame ${candidate.size.width} × ${candidate.size.height}`;
+  $('#original').href=`./${candidate.sequence[0]}`;$('#baseline').href=`./${d.current.sequence[0]}`;
+  $('#motion').hidden=!scene.motion;setImage(0);
+  document.querySelectorAll('[data-scene]').forEach(e=>e.setAttribute('aria-pressed',String(e.dataset.scene===scene.id)));
+  document.querySelectorAll('[data-profile]').forEach(e=>e.setAttribute('aria-pressed',String(e.dataset.profile===profile.id)));
+  document.querySelectorAll('[data-style]').forEach(e=>e.setAttribute('aria-pressed',String(e.dataset.style===style.id)));
+  history.replaceState(null,'',`?scene=${scene.id}&profile=${profile.id}&style=${style.id}`);
+ }
+ for(const item of manifest.scenes){const b=document.createElement('button');b.dataset.scene=item.id;b.textContent=item.name;b.onclick=()=>{scene=item;render();};$('.scenes').append(b);}
+ for(const item of manifest.profiles){if(!manifest.captures[item.id])continue;const b=document.createElement('button');b.dataset.profile=item.id;b.textContent=item.name;b.onclick=()=>{profile=item;render();};$('.profiles').append(b);}
+ if(!manifest.captures[profile.id])profile=manifest.profiles.find(p=>manifest.captures[p.id]);
+ for(const item of manifest.styles.filter(s=>s.id!=='current')){const b=document.createElement('button');b.dataset.style=item.id;b.textContent=item.name;b.onclick=()=>{style=item;render();};$('.styles').append(b);}
+ $('#compare').onclick=()=>{split=!split;$('.viewer').classList.toggle('solo',!split);$('.slider-row').classList.toggle('solo',!split);$('#compare').setAttribute('aria-pressed',String(split));};
+ $('#split').oninput=e=>$('.viewer').style.setProperty('--split',`${e.target.value}%`);
+ $('#motion').onclick=()=>{if(playing){stop();setImage(0);$('.status').textContent='';}else start().catch(()=>{$('.status').textContent='Could not load motion frames.';stop();});};
+ $('#fullscreen').onclick=()=>{if(document.fullscreenElement)document.exitFullscreen();else $('.viewer').requestFullscreen();};
+ render();$('#message').classList.add('hidden');$('#review').classList.remove('hidden');window.reviewReady=true;
+}catch(error){$('#message').textContent=`Could not load the comparison: ${error.message}`;console.error(error);}
+</script></body></html>

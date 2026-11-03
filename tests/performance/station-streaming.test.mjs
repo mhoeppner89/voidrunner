@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import {SpaceRenderer} from '../../src/game/render.js';
 import {prepareRenderScene,configureShaderDiagnostics} from '../../src/game/renderWork.js';
 import {addStationActivity,updateStationActivity} from '../../src/game/stationActivity.js';
+import {applyIndependentPaint} from '../../src/game/independentPaints.js';
+import {stabilizeMaterialNormals} from '../../src/game/materialNormals.js';
 
 test('station film warmup uses the actual target, uploads shared textures once and restores state while awaiting',async()=>{
  const texture=new THREE.Texture(),scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera();
@@ -18,6 +20,29 @@ test('station film warmup uses the actual target, uploads shared textures once a
  ready=true;
  assert.equal(await prepareRenderScene(renderer,scene,camera,shot,{shouldCancel:()=>true}),false);assert.equal(uniforms,1,'cancelled views never touch disposed programs');
  scene.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});texture.dispose();
+});
+
+test('preparing a streamed scene does not wait for unrelated shader programs',async()=>{
+ const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(),material=new THREE.MeshStandardMaterial();
+ scene.add(new THREE.Mesh(new THREE.BoxGeometry(),material));let unrelatedQueries=0,uniforms=0;
+ const needed={isReady:()=>true,getUniforms(){uniforms++;}},alternate={isReady:()=>true,getUniforms(){uniforms++;}};
+ const unrelated={isReady(){unrelatedQueries++;return false;},getUniforms(){throw Error('unrelated shader was queried');}};
+ const renderer={getRenderTarget:()=>null,setRenderTarget(){},compile:()=>new Set([material]),
+  properties:{get:()=>({programs:new Map([['target',needed],['alternate-geometry',alternate]])})},info:{programs:[needed,alternate,unrelated]}};
+ assert.equal(await prepareRenderScene(renderer,scene,camera,{}, {timeoutMs:20}),true);
+ assert.equal(unrelatedQueries,0);assert.equal(uniforms,2,'all geometry variants of a compiled material are prepared');
+ scene.children[0].geometry.dispose();material.dispose();
+});
+
+test('without parallel shader compilation, queued GPU linking finishes without blocking the animation thread',async()=>{
+ const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera();let ready=false,uniforms=0,deleted=0;
+ const gl={SYNC_GPU_COMMANDS_COMPLETE:1,ALREADY_SIGNALED:2,CONDITION_SATISFIED:3,TIMEOUT_EXPIRED:4,WAIT_FAILED:5,
+  fenceSync:()=>({}),flush(){},clientWaitSync:()=>ready?3:4,deleteSync:()=>deleted++};
+ const renderer={getContext:()=>gl,getRenderTarget:()=>null,setRenderTarget(){},compile(){},extensions:{has:()=>false},
+  info:{programs:[{isReady:()=>true,getUniforms(){uniforms++;}}]}};
+ const pending=prepareRenderScene(renderer,scene,camera,{}, {timeoutMs:1000});
+ await Promise.resolve();assert.equal(uniforms,0,'do not synchronously query a still-pending linked shader');
+ ready=true;assert.equal(await pending,true);assert.equal(uniforms,1);assert.equal(deleted,1);
 });
 
 test('flight waits for streamed station assemblies before compiling their shaders',async()=>{
@@ -87,6 +112,10 @@ test('traffic warmup retains voxel fallbacks and one paint representative per ma
  r.glbShipModels=new Map([['demon',template],['lancer',template]]);r.prepareTrafficWarmup(root);
  const owned=[];root.traverse(o=>{if(o.userData.borrowedWarmupTextures)owned.push(o);});const paint=owned.filter(o=>o.name==='traffic-paint-warmup');
  assert.equal(paint.length,6,'hull variants share three paints in authored-tangent and derivative forms');assert.ok(paint.some(m=>m.geometry.attributes.tangent)&&paint.some(m=>!m.geometry.attributes.tangent));assert.ok(root.getObjectByName('voxel-hull'));assert.ok(root.getObjectByName('voxel-glow'));assert.ok(root.getObjectByName('hull-rim'));
+ const live=new THREE.Group(),liveMesh=new THREE.Mesh(geometry,material);live.add(liveMesh);
+ applyIndependentPaint(live,'independent-surveyor','demon');stabilizeMaterialNormals(liveMesh.material);
+ assert.ok(paint.some(m=>m.material.customProgramCacheKey()===liveMesh.material.customProgramCacheKey()),'warmup includes the normal-stabilized shader used by a real painted hull');
+ if(liveMesh.material!==material)liveMesh.material.dispose();
  const count=root.children.length;r.prepareTrafficWarmup(root);assert.equal(root.children.length,count,'repeat preparation is bounded');
  const hulls=owned.filter(m=>m.userData.borrowedWarmupGeometry);assert.equal(hulls.length,1);assert.equal(hulls[0].geometry,geometry,'the real hull uploads without duplicating its buffers');
  let released=0,mapReleased=0;geometry.addEventListener('dispose',()=>released++);map.addEventListener('dispose',()=>mapReleased++);
@@ -101,6 +130,17 @@ test('later hull buffer preparation draws only new off-camera geometry and resto
  r.renderer={getRenderTarget:()=>target,setRenderTarget:t=>target=t,shadowMap:{enabled:true},render(){assert.equal(hull.frustumCulled,false);assert.equal(other.frustumCulled,true);assert.equal(this.shadowMap.enabled,false);assert.equal(target,r.stationWarmupTarget);throw Error('lost context');}};
  assert.throws(()=>r.prepareTrafficBuffers(stage),/lost context/);assert.equal(target,previous);assert.equal(r.renderer.shadowMap.enabled,true);assert.equal(hull.frustumCulled,true);assert.equal(other.frustumCulled,true);
  hull.geometry.dispose();hull.material.dispose();other.geometry.dispose();other.material.dispose();
+});
+
+test('new traffic buffers are actually drawn even when the warmup root is detached',()=>{
+ const r=Object.create(SpaceRenderer.prototype),root=new THREE.Group(),stage=new THREE.Group(),hull=new THREE.Mesh(new THREE.BoxGeometry(),new THREE.MeshBasicMaterial());
+ hull.userData.borrowedWarmupGeometry=true;stage.add(hull);root.add(stage);r.combatWarmupRoot=root;r.scene=new THREE.Scene();r.camera=new THREE.PerspectiveCamera();r.stationWarmupTarget={};
+ let target=null,draws=0;r.renderer={getRenderTarget:()=>target,setRenderTarget:t=>target=t,shadowMap:{enabled:true},render(scene){draws++;assert.equal(root.parent,scene,'the hidden root must participate in the draw');assert.equal(hull.frustumCulled,false);}};
+ r.prepareTrafficBuffers(stage);
+ assert.equal(draws,1);assert.equal(root.parent,null,'the temporary root does not remain in the flight scene');assert.equal(hull.frustumCulled,true);assert.equal(target,null);
+ r.renderer.render=()=>{throw Error('context lost');};assert.throws(()=>r.prepareTrafficBuffers(stage),/context lost/);
+ assert.equal(root.parent,null,'failed warmup also restores the detached root');assert.equal(hull.frustumCulled,true);assert.equal(target,null);
+ hull.geometry.dispose();hull.material.dispose();
 });
 
 test('GPU preparation waits asynchronously for queued work and releases fences on completion, cancellation and timeout',async()=>{
@@ -173,7 +213,7 @@ test('cutscene canvas resize waits for prior GPU work and can be skipped before 
   const v=Object.create(ConcourseShip.prototype);let ready=false,attached=0,animated=0,deleted=0;
   const gl={SYNC_GPU_COMMANDS_COMPLETE:1,ALREADY_SIGNALED:2,CONDITION_SATISFIED:3,WAIT_FAILED:4,
    fenceSync:()=>({}),flush(){},clientWaitSync:()=>ready?2:0,deleteSync:()=>deleted++};
-  Object.assign(v,{host:{},modelBounds:new THREE.Box3(new THREE.Vector3(-1,-1,-1),new THREE.Vector3(1,1,1)),point:new THREE.Vector3(),pivot:new THREE.Group(),scene:new THREE.Scene(),target:{},finish:{uniforms:{uExposure:{value:1}}},renderer:{getContext:()=>gl,shadowMap:{},getRenderTarget:()=>null,setRenderTarget(){},compile(){},info:{programs:[]}},stationView:{scene:new THREE.Scene(),camera:new THREE.PerspectiveCamera(),configure(){}},stop(){},finishAnimation(){},endAtmosphere(){this.transit=undefined;},prepareStation:async()=>true,attach:()=>attached++,animate:async()=>{animated++;return true;}});
+  Object.assign(v,{host:{},exteriorEnvironment:{},modelBounds:new THREE.Box3(new THREE.Vector3(-1,-1,-1),new THREE.Vector3(1,1,1)),point:new THREE.Vector3(),pivot:new THREE.Group(),scene:new THREE.Scene(),target:{},finish:{uniforms:{uExposure:{value:1}}},renderer:{getContext:()=>gl,shadowMap:{},getRenderTarget:()=>null,setRenderTarget(){},compile(){},info:{programs:[]}},stationView:{scene:new THREE.Scene(),camera:new THREE.PerspectiveCamera(),configure(){}},stop(){},finishAnimation(){},endAtmosphere(){this.transit=undefined;},prepareStation:async()=>true,attach:()=>attached++,animate:async()=>{animated++;return true;}});
   const pending=v.playExterior({},'entry','helix',undefined,{},true);await Promise.resolve();await Promise.resolve();
   assert.equal(attached,0,'resizing is not allowed while the preceding frame is pending');
   if(cancel)v.skipAtmosphere();else ready=true;
@@ -185,7 +225,7 @@ test('completed arrival waits for its last GPU frame before restoring the dock c
  const {ConcourseShip}=await import('../../src/game/concourseShip.js'),v=Object.create(ConcourseShip.prototype);
  let ready=true,ended=false,animated=false;
  const gl={SYNC_GPU_COMMANDS_COMPLETE:1,ALREADY_SIGNALED:2,CONDITION_SATISFIED:3,WAIT_FAILED:4,fenceSync:()=>({}),flush(){},clientWaitSync:()=>ready?2:0,deleteSync(){}};
- Object.assign(v,{host:{},modelBounds:new THREE.Box3(new THREE.Vector3(-1,-1,-1),new THREE.Vector3(1,1,1)),point:new THREE.Vector3(),pivot:new THREE.Group(),scene:new THREE.Scene(),target:{},finish:{uniforms:{uExposure:{value:1}}},renderer:{getContext:()=>gl,shadowMap:{},getRenderTarget:()=>null,setRenderTarget(){},compile(){},info:{programs:[]}},stationView:{scene:new THREE.Scene(),camera:new THREE.PerspectiveCamera(),configure(){}},stop(){},finishAnimation(){},endAtmosphere(){if(this.transit)ended=true;this.transit=undefined;},prepareStation:async()=>true,attach(){},animate:async()=>{animated=true;ready=false;return true;}});
+ Object.assign(v,{host:{},exteriorEnvironment:{},modelBounds:new THREE.Box3(new THREE.Vector3(-1,-1,-1),new THREE.Vector3(1,1,1)),point:new THREE.Vector3(),pivot:new THREE.Group(),scene:new THREE.Scene(),target:{},finish:{uniforms:{uExposure:{value:1}}},renderer:{getContext:()=>gl,shadowMap:{},getRenderTarget:()=>null,setRenderTarget(){},compile(){},info:{programs:[]}},stationView:{scene:new THREE.Scene(),camera:new THREE.PerspectiveCamera(),configure(){}},stop(){},finishAnimation(){},endAtmosphere(){if(this.transit)ended=true;this.transit=undefined;},prepareStation:async()=>true,attach(){},animate:async()=>{animated=true;ready=false;return true;}});
  const pending=v.playExterior({},'entry','helix',undefined,{},true);
  while(!animated)await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(ended,false);assert.ok(v.transitPreparing,'skip remains available while finishing the last frame');

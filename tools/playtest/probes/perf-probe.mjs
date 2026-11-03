@@ -3,11 +3,14 @@ import { spawn } from 'node:child_process';
 const ROOT = '/Users/mhoeppner/Desktop/Voidrunner';
 const BASE_URL = process.env.VR_BASE_URL ?? 'http://127.0.0.1:4173/';
 const PORT = 9339;
-const PROFILE = '/tmp/vr-perf-profile';
+// A fresh profile avoids service-worker reloads contaminating measurements.
+const PROFILE = process.env.VR_CHROME_PROFILE ?? `/tmp/vr-perf-${process.pid}-profile`;
 const SCENES = (process.env.VR_PERF_SCENES ?? 'open,asteroid-field,debris-field').split(',');
 const MODES = (process.env.VR_PERF_MODES ?? 'high,auto,low').split(',');
 const CPU_PROFILE = process.env.VR_CPU_PROFILE === '1';
 const RENDER_BREAKDOWN = process.env.VR_RENDER_BREAKDOWN === '1';
+const NATIVE_GPU = process.env.VR_GPU === 'metal';
+const CPU_RATE = Math.max(1, Number(process.env.VR_CPU_RATE) || 1);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 let httpd;
@@ -22,8 +25,7 @@ if (!process.env.VR_BASE_URL) {
 
 const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', [
     '--headless=new', '--mute-audio',
-    '--disable-gpu',
-    '--enable-unsafe-swiftshader',
+    ...(NATIVE_GPU ? ['--use-gl=angle', '--use-angle=metal'] : ['--disable-gpu', '--enable-unsafe-swiftshader']),
     '--no-sandbox',
     '--disable-gpu-sandbox',
     `--remote-debugging-port=${PORT}`,
@@ -147,6 +149,11 @@ try {
     };
     await send('Page.enable');
     await send('Runtime.enable');
+    if (CPU_RATE > 1) await send('Emulation.setCPUThrottlingRate', {rate: CPU_RATE});
+    if (process.env.VR_SEED) {
+        const seed = Number(process.env.VR_SEED) >>> 0;
+        await send('Page.addScriptToEvaluateOnNewDocument', {source: `(() => { let state = ${seed}; Math.random = () => ((state = (Math.imul(state, 1664525) + 1013904223) >>> 0) / 4294967296); })()`});
+    }
     if (CPU_PROFILE) {
         await send('Profiler.enable');
         await send('Profiler.setSamplingInterval', { interval: 100 });
@@ -156,7 +163,9 @@ try {
 
     for (const scene of SCENES) {
         await evaluate(`window.__VOID_PRIVATEER__.startArena(${JSON.stringify(scene)}, '1v3'); true`);
-        await waitFor(`window.__VOID_PRIVATEER__.getRuntime()?.arena?.environment === ${JSON.stringify(scene)}`);
+        // The session exists before flight warmup and the loading veil finish.
+        // Measuring then attributes startup compilation to playable flight.
+        await waitFor(`(() => { const rt = window.__VOID_PRIVATEER__.getRuntime(); return rt?.arena?.environment === ${JSON.stringify(scene)} && rt.flightPrepared && document.querySelector('#loading-screen')?.classList.contains('is-hidden'); })()`, 120000);
         await evaluate(`(() => {
             const save = window.__VOID_PRIVATEER__.getState();
             save.player.armor = 1e9;

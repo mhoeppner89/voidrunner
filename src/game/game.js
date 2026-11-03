@@ -1277,7 +1277,7 @@ export class GameSession {
     claimDisputesTriggered = new Set();
     npcCollisionCooldown = 0;
     targetClipUntil = 0;
-    fpsAccumulator = 0;
+    fpsSampleAt;
     obstacleGrid = null;
     obstacleSegmentGrid = null;
     obstacleGridInstance = undefined;
@@ -1434,6 +1434,7 @@ export class GameSession {
             this.ensureActiveRaceRestored();
         if (!save.player.dockedAt)
             this.updateAssetWarmup(true);
+        if (typeof document !== 'undefined') document.addEventListener?.('visibilitychange', this.onPageVisibilityChange);
         this.frameId = requestAnimationFrame(this.frame);
     }
     initializeFlightRuntime() {
@@ -2703,6 +2704,7 @@ export class GameSession {
         this.pdcAssignments.clear();
         this.pdcDefenseChannels?.clear();
         cancelAnimationFrame(this.frameId);
+        if (typeof document !== 'undefined') document.removeEventListener?.('visibilitychange', this.onPageVisibilityChange);
         this.persistSave();
         this.renderer?.canvas.removeEventListener('pointerdown', this.onSpacePointerDown);
         this.renderer?.canvas.removeEventListener('pointermove', this.onSpacePointerMove);
@@ -2737,11 +2739,33 @@ export class GameSession {
         }
     };
     frameBody = (now) => this.updateFrame(now);
+    resetQualitySample() {
+        this.fpsSampleAt = undefined;
+        this.fpsFrames = 0;
+    }
+    onPageVisibilityChange = () => {
+        this.lastFrame = performance.now();
+        this.simAccumulator = 0;
+        this.renderBudget?.reset();
+        this.resetQualitySample();
+    };
     updateFrame(now) {
         if (typeof document !== 'undefined' && document.hidden) {
             this.lastFrame = now;
             this.simAccumulator = 0;
             this.renderBudget?.reset();
+            this.resetQualitySample();
+            return;
+        }
+        // Session construction schedules the loop before the flight renderer
+        // finishes warming up. Keep the world still and let that preparation
+        // own the GPU until the loading screen can reveal a ready frame.
+        if (this.renderer && this.flightPrepared === false) {
+            this.lastFrame = now;
+            this.simAccumulator = 0;
+            this.renderBudget?.reset();
+            this.resetQualitySample();
+            this.input?.getActions?.(); // discard one-shot presses made while loading
             return;
         }
         let dt = (now - this.lastFrame) / 1000;
@@ -2876,6 +2900,7 @@ export class GameSession {
         }
         musicContext=this.tutorialMusicContext()??musicContext;
         this.audio.update(dt, throttle, flying && this.afterburning, damage, nearbyEnemies, musicContext, this.activeRace?.state==='running'&&this.afterburning?Math.min(1,Math.hypot(...this.save.player.velocity)/Math.max(1,this.playerStats().afterburnSpeed)):0);
+        if (!flying || this.ui.isModalOpen || this.ui.planetTransitOverlay?.dataset.awaitingFlight === 'true') this.resetQualitySample();
         // A renderer prepared behind the initial career gate must stay idle at
         // the dock. It exists solely to make Launch instant, not to burn GPU
         // time underneath opaque station screens.
@@ -14064,6 +14089,7 @@ export class GameSession {
         }
         else if (key === 'quality' && (value === 'auto' || value === 'low' || value === 'high')) {
             this.save.settings.quality = value;
+            this.resetQualitySample();
             // Apply the tier (640/720/1280 base) as well as the scale; 'auto'
             // restores the full resolution and lets the governor manage it.
             this.renderer?.setQualityMode(value);
@@ -14073,6 +14099,7 @@ export class GameSession {
         else if (key === 'powerMode' && ['auto','battery','performance'].includes(value)) {
             this.save.settings.powerMode = value;
             this.renderBudget?.reset();
+            this.resetQualitySample();
         }
         else if (key === 'language' && (value === 'de' || value === 'en')) {
             this.save.settings.language = value;
@@ -14086,6 +14113,33 @@ export class GameSession {
         // persisted above, so the pilot resumes where they were.
         if (key === 'language' && typeof location !== 'undefined')
             location.reload();
+    }
+    sampleFlightQuality(now) {
+        if (!(this.save.settings.quality === 'auto' || this.renderer.isIOS) || this.save.player.dockedAt || this.ui.isModalOpen || this.ui.planetTransitOverlay?.dataset.awaitingFlight === 'true') {
+            this.resetQualitySample();
+            return;
+        }
+        if (!Number.isFinite(now)) return;
+        if (!Number.isFinite(this.fpsSampleAt) || now < this.fpsSampleAt) {
+            this.fpsSampleAt = now;
+            this.fpsFrames = 0;
+            return;
+        }
+        this.fpsFrames += 1;
+        const elapsed = (now - this.fpsSampleAt) / 1000;
+        if (elapsed < 1.2) return;
+        // Render animation dt is intentionally capped after a stall; using it
+        // here hid the true frame rate and delayed recovery in dense scenes.
+        const fps = this.fpsFrames / elapsed;
+        const targetFps = flightFrameRate(this.save.settings.powerMode, this.renderer.touchDevice);
+        const scale = this.qualityScale ?? this.renderer.lastQualityScale ?? 1;
+        if (fps < targetFps * 0.75)
+            this.qualityScale = Math.max(0.5, scale - 0.15);
+        else if (fps > targetFps * 0.93)
+            this.qualityScale = Math.min(1, scale + 0.04);
+        this.renderer.setQualityScale?.(this.qualityScale ?? scale);
+        this.fpsSampleAt = now;
+        this.fpsFrames = 0;
     }
     syncRender(dt, now) {
         if (this.arena?.observer) {
@@ -14101,6 +14155,7 @@ export class GameSession {
             this.renderer.render();
             this.ui.updateObserverView(this.observerViewModel());
             this.renderFrameCount = (this.renderFrameCount ?? 0) + 1;
+            this.sampleFlightQuality(now);
             return;
         }
         const stats = this.playerStats();
@@ -14136,25 +14191,7 @@ export class GameSession {
             this.ui.updateHud(this.buildHudModel());
         }
         if(!this.save.player.dockedAt&&this.ui.planetTransitOverlay?.dataset.awaitingFlight==='true')this.ui.completeDepartureTransit();
-        if (this.save.settings.quality === 'auto' || this.renderer.isIOS) {
-            // Respond fast and deep: a dense debris field can halve a phone's
-            // frame rate in a single step, and the old 2.5s / -0.08 reaction
-            // left a long slideshow before resolution dropped. 1.2s windows,
-            // larger steps, and a 0.5 floor catch the slowdown quickly.
-            this.fpsAccumulator += dt;
-            this.fpsFrames += 1;
-            if (this.fpsAccumulator > 1.2) {
-                const fps = this.fpsFrames / this.fpsAccumulator;
-                const targetFps = flightFrameRate(this.save.settings.powerMode, this.renderer.touchDevice);
-                if (fps < targetFps * 0.75)
-                    this.qualityScale = Math.max(0.5, this.qualityScale - 0.15);
-                else if (fps > targetFps * 0.93)
-                    this.qualityScale = Math.min(1, this.qualityScale + 0.04);
-                this.renderer.setQualityScale(this.qualityScale);
-                this.fpsAccumulator = 0;
-                this.fpsFrames = 0;
-            }
-        }
+        this.sampleFlightQuality(now);
     }
     targetEdge(projection) {
         const width = this.renderer.viewportWidth;

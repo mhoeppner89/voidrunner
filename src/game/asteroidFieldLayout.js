@@ -92,7 +92,8 @@ export function worldToFragment(f, x, y, z) {
 
 const segment = (a, b, radius, natural) => {
     const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
-    return { a, dx, dy, dz, inv: 1 / (dx * dx + dy * dy + dz * dz), radius, natural };
+    return { a, dx, dy, dz, inv: 1 / (dx * dx + dy * dy + dz * dz), radius, natural,
+        minX:Math.min(a[0],b[0]),maxX:Math.max(a[0],b[0]),minY:Math.min(a[1],b[1]),maxY:Math.max(a[1],b[1]),minZ:Math.min(a[2],b[2]),maxZ:Math.max(a[2],b[2]) };
 };
 const bores=SHARDBELT_PASSAGES.flatMap(route=>{
     const p=route.points,extend=(a,b)=>{const d=a.map((v,i)=>v-b[i]),l=Math.hypot(...d);return a.map((v,i)=>v+d[i]/l*220);};
@@ -105,9 +106,17 @@ function distanceToSegment(x, y, z, b) {
     const t = Math.max(0, Math.min(1, (ox * b.dx + oy * b.dy + oz * b.dz) * b.inv));
     return Math.hypot(ox - t * b.dx, oy - t * b.dy, oz - t * b.dz);
 }
+// A segment is wholly inside its AABB. If even one axis is farther away than
+// the current limit, its exact distance cannot improve the answer.
+function segmentOutside(x,y,z,b,limit) {
+    return limit < 0 || x < b.minX-limit || x > b.maxX+limit || y < b.minY-limit || y > b.maxY+limit || z < b.minZ-limit || z > b.maxZ+limit;
+}
 export function passageDistance(x, y, z) {
     let distance = Infinity;
-    for (const bore of bores) distance = Math.min(distance, distanceToSegment(x, y, z, bore) - bore.radius);
+    for (const bore of bores) {
+        if(segmentOutside(x,y,z,bore,distance+bore.radius))continue;
+        distance = Math.min(distance, distanceToSegment(x, y, z, bore) - bore.radius);
+    }
     // Wavy erosion changes the aperture, with a guaranteed ~200 km core.
     distance += rockNoise(x * 1.4, y * 1.4, z * 1.4) * .28;
     return distance;
@@ -116,9 +125,11 @@ const wornIntersection=(a,b,width)=>{
     const blend=Math.max(0,width-Math.abs(a-b));
     return Math.max(a,b)+blend*blend/(4*width);
 };
-export function fragmentDistance(f, x, y, z) {
-    let distance = parentRockDistance(x, y, z);
-    const rough = rockNoise(x, y, z) * .52;
+export function fragmentDistance(f, x, y, z, parentDistance, fractureRoughness) {
+    // Terrain generation samples the same coordinates for every fragment.
+    // Its shared parent-rock values can be supplied without changing the SDF.
+    let distance = parentDistance ?? parentRockDistance(x, y, z);
+    const rough = fractureRoughness ?? rockNoise(x, y, z) * .52;
     // A narrow worn edge suppresses regular sawtooth tessellation where
     // fracture planes meet the crust, without sanding away the large breaks.
     for (const p of f.planes) distance = wornIntersection(distance, x * p[0] + y * p[1] + z * p[2] - p[3] + 34 + rough, 44);
@@ -135,7 +146,13 @@ export function shardbeltSolidDistance(x, y, z) {
     return distance;
 }
 export function shardbeltRaceClear(local, reach) {
-    return raceCorridors.every(b => distanceToSegment(...local, b) > reach + b.radius + 8);
+    const [x,y,z]=local;
+    for(const b of raceCorridors){
+        const limit=reach+b.radius+8;
+        if(segmentOutside(x,y,z,b,limit))continue;
+        if(!(distanceToSegment(x,y,z,b)>limit))return false;
+    }
+    return true;
 }
 
 // A single generator also supplies mining-claim candidates. Re-rolling after

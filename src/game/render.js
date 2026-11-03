@@ -73,6 +73,9 @@ const MOURNING_ROOT_VISIBILITY_RANGE = WRECK_RENDER_DISTANCE + 6000;
 const MOURNING_ROOT_VISIBILITY_RANGE_SQ = MOURNING_ROOT_VISIBILITY_RANGE * MOURNING_ROOT_VISIBILITY_RANGE;
 const HIDDEN_SCALE = [0.0001, 0.0001, 0.0001];
 const SHADER_WARMUP_TIMEOUT_MS = 8000;
+const preparedPlanetTextures=new Map();
+let preparingPlanetTextures;
+const planetTextureKey=(seed,base,accent,size,water)=>`${seed}:${base}:${accent}:${size}:${Boolean(water)}`;
 const IOS_RENDER_WIDTH = 640;
 export const IOS_INITIAL_SCALE = 0.82;
 
@@ -954,6 +957,15 @@ export class SpaceRenderer {
         return texture;
     }
     createPixelPanelTexture(seed, base, accent, kind = 'metal', size = 64, water = false) {
+        if(kind==='planet'){
+            const key=planetTextureKey(seed,base,accent,size,water),prepared=preparedPlanetTextures.get(key);
+            if(prepared){preparedPlanetTextures.delete(key);return this.configurePixelTexture(prepared);}
+        }
+        const work=this.buildPixelPanelTexture(seed,base,accent,kind,size,water);let result;
+        do result=work.next();while(!result.done);
+        return result.value;
+    }
+    *buildPixelPanelTexture(seed, base, accent, kind = 'metal', size = 64, water = false) {
         const canvas = document.createElement('canvas');
         canvas.width = size;
         canvas.height = size;
@@ -964,16 +976,23 @@ export class SpaceRenderer {
         context.fillStyle = cssHex(base);
         context.fillRect(0, 0, size, size);
         const block = kind === 'planet' ? 2 : kind === 'rock' ? 4 : 8;
-        for (let y = 0; y < size; y += block) {
-            for (let x = 0; x < size; x += block) {
-                const noise = (rng() - 0.5) * (kind === 'rock' ? 0.46 : kind === 'planet' ? 0.28 : 0.18);
-                const shade = baseColor.clone().offsetHSL((rng() - 0.5) * 0.018, (rng() - 0.5) * 0.08, noise);
-                if (kind === 'rust' && rng() > 0.72)
-                    shade.lerp(new THREE.Color(0x6f3522), 0.55 + rng() * 0.3);
-                if (kind === 'rock' && rng() > 0.83)
-                    shade.lerp(accentColor, 0.18 + rng() * 0.22);
-                context.fillStyle = `#${shade.getHexString()}`;
-                context.fillRect(x, y, block, block);
+        if(kind==='planet'){
+            // The planet paths below overwrite every pixel. Advance the same
+            // seeded sequence without drawing a quarter-million hidden tiles.
+            const cells=Math.ceil(size/block)**2;
+            for(let i=0;i<cells;i++){rng();rng();rng();if((i&8191)===8191)yield;}
+        } else {
+            for (let y = 0; y < size; y += block) {
+                for (let x = 0; x < size; x += block) {
+                    const noise = (rng() - 0.5) * (kind === 'rock' ? 0.46 : 0.18);
+                    const shade = baseColor.clone().offsetHSL((rng() - 0.5) * 0.018, (rng() - 0.5) * 0.08, noise);
+                    if (kind === 'rust' && rng() > 0.72)
+                        shade.lerp(new THREE.Color(0x6f3522), 0.55 + rng() * 0.3);
+                    if (kind === 'rock' && rng() > 0.83)
+                        shade.lerp(accentColor, 0.18 + rng() * 0.22);
+                    context.fillStyle = `#${shade.getHexString()}`;
+                    context.fillRect(x, y, block, block);
+                }
             }
         }
         if (kind === 'hull' || kind === 'metal' || kind === 'rust') {
@@ -1049,6 +1068,7 @@ export class SpaceRenderer {
                 const sand = new THREE.Color(0xd0bd8a);
                 const scrub = new THREE.Color(0x527e4c);
                 const highland = new THREE.Color(0x8d9c72);
+                const shade = new THREE.Color();
                 const noiseA = makeLattice(6);
                 const noiseB = makeLattice(14);
                 const noiseC = makeLattice(34);
@@ -1078,7 +1098,7 @@ export class SpaceRenderer {
                             // vegetated/rocky patchwork.
                             const t = Math.min(1, (n - nLow) * 2.2 + (nLow - landThreshold) * 4.5);
                             const patch = noiseC((x + 137) / size, (v + 59) / size);
-                            const c = sand.clone()
+                            const c = shade.copy(sand)
                                 .lerp(scrub, Math.min(1, t * 3.2 + patch * 0.5))
                                 .lerp(highland, Math.max(0, t - 0.5) * 1.6 * (0.5 + patch));
                             r = c.r;
@@ -1089,7 +1109,7 @@ export class SpaceRenderer {
                             // Depth-graded ocean: pale shelf at the coast, deep
                             // basins beyond — the sea reads as water, not paint.
                             const d = landThreshold - nLow;
-                            const c = shelf.clone().lerp(ocean, Math.min(1, d * 5)).lerp(abyss, Math.min(1, d * 1.5));
+                            const c = shade.copy(shelf).lerp(ocean, Math.min(1, d * 5)).lerp(abyss, Math.min(1, d * 1.5));
                             r = c.r;
                             g = c.g;
                             b = c.b;
@@ -1107,6 +1127,7 @@ export class SpaceRenderer {
                         pixels[idx + 2] = b * 255;
                         pixels[idx + 3] = 255;
                     }
+                    if((y&3)===3)yield;
                 }
                 context.putImageData(image, 0, 0);
                 // Sparse bright storm speckles — small, soft, white; mid-lat.
@@ -1127,15 +1148,20 @@ export class SpaceRenderer {
             const continentCount = water ? 5 + Math.floor(rng() * 4) : 8 + Math.floor(rng() * 6);
             const continents = [];
             for (let i = 0; i < continentCount; i += 1) {
-                continents.push({
+                const continent={
                     cx: rng() * size,
                     cy: 0.14 + rng() * 0.78 * size,
                     rx: water ? 24 + rng() * 46 : 38 + rng() * 78,
                     ry: water ? 12 + rng() * 22 : 18 + rng() * 38,
                     rot: rng() * Math.PI * 2,
                     warmth: 0.32 + rng() * 0.34,
-                });
+                };
+                continent.cosR=Math.cos(continent.rot);continent.sinR=Math.sin(continent.rot);
+                continent.rx2=continent.rx*continent.rx;continent.ry2=continent.ry*continent.ry;
+                continent.verticalReach=Math.hypot(continent.rx*continent.sinR,continent.ry*continent.cosR)+1e-7;
+                continents.push(continent);
             }
+            const landShade=new THREE.Color();
             for (let y = 0; y < size; y += 1) {
                 const lat = (y / size) * 2 - 1;
                 const band = Math.sin(lat * 10 + phaseOffset) * 0.5 + 0.5;
@@ -1155,6 +1181,10 @@ export class SpaceRenderer {
                 // Islands push greener and brighter than the deep ocean so
                 // they read as land, not depth shading.
                 const continentHue = water ? 0.11 : (baseColor.b > baseColor.r ? 0.10 : 0.04);
+                // A rotated ellipse cannot intersect this row beyond its
+                // vertical extent, regardless of its horizontal drift.
+                const rowContinents=continents.filter(c=>Math.abs(y-c.cy)<=c.verticalReach);
+                if(!rowContinents.length){if((y&3)===3)yield;continue;}
                 let lastColor = '';
                 let runStart = -1;
                 const flush = (endX) => {
@@ -1165,21 +1195,21 @@ export class SpaceRenderer {
                 };
                 for (let x = 0; x < size; x += 1) {
                     let bestD = Infinity;
-                    for (const c of continents) {
-                        const cosR = Math.cos(c.rot);
-                        const sinR = Math.sin(c.rot);
+                    for (const c of rowContinents) {
+                        const cosR = c.cosR;
+                        const sinR = c.sinR;
                         const u = (Math.sin(((y * 1.7 + c.cy * 0.4) + (x * 0.04)) / size * Math.PI * 2) + 1) * size * 0.5;
                         const ox = (((u + c.cx) % size) + size) % size - c.cx;
                         const dx_ = y - c.cy;
                         const lx = (x - ox) * cosR - dx_ * sinR;
                         const ly = (x - ox) * sinR + dx_ * cosR;
-                        const d = (lx * lx) / (c.rx * c.rx) + (ly * ly) / (c.ry * c.ry);
+                        const d = (lx * lx) / c.rx2 + (ly * ly) / c.ry2;
                         if (d < bestD)
                             bestD = d;
                     }
                     if (bestD <= 1) {
                         const warmth = 1 - Math.min(1, bestD);
-                        const landShade = baseC.clone().offsetHSL(hueShift + continentHue + band * 0.02, water ? 0.16 : 0.10, (water ? 0.26 : 0.22) + warmth * 0.18);
+                        landShade.copy(baseC).offsetHSL(hueShift + continentHue + band * 0.02, water ? 0.16 : 0.10, (water ? 0.26 : 0.22) + warmth * 0.18);
                         const color = cssHex(landShade.getHex());
                         if (color !== lastColor) {
                             flush(x);
@@ -1194,6 +1224,7 @@ export class SpaceRenderer {
                     }
                 }
                 flush(size);
+                if((y&3)===3)yield;
             }
             // Storm-eye spots (Galilean-style) at varying latitudes; water
             // worlds carry more and bigger cyclones.
@@ -6236,6 +6267,7 @@ export class SpaceRenderer {
                 // cannot introduce its first bufferData call in a visible draw.
                 if (!geometries.has(object.geometry)) {
                     const mesh = new THREE.Mesh(object.geometry, source.clone());
+                    stabilizeMaterialNormals(mesh.material);
                     mesh.name = 'traffic-geometry-warmup';
                     mesh.userData.borrowedWarmupTextures = true;
                     mesh.userData.borrowedWarmupGeometry = true;
@@ -6261,6 +6293,7 @@ export class SpaceRenderer {
                     };
                     if (!signatures.has('base|' + signature)) {
                         const mesh = makeMesh(source.clone());mesh.name = 'traffic-material-warmup';
+                        stabilizeMaterialNormals(mesh.material);
                         root.add(mesh);signatures.add('base|' + signature);
                     }
                     if (!source.map) continue;
@@ -6270,6 +6303,7 @@ export class SpaceRenderer {
                         const group = new THREE.Group(), mesh = makeMesh(source); group.add(mesh);
                         applyWayfarerLivery(group, paint);
                         if (mesh.material === source) { mesh.geometry.dispose(); continue; }
+                        stabilizeMaterialNormals(mesh.material);
                         mesh.name = 'traffic-wayfarer-warmup'; root.add(group); signatures.add(key);
                     }
                     if (!signatures.has('paint|' + signature)) {
@@ -6278,6 +6312,7 @@ export class SpaceRenderer {
                             const group = new THREE.Group(), mesh = makeMesh(source);group.add(mesh);
                             applyIndependentPaint(group, paint, variant);
                             if (mesh.material === source) { mesh.geometry.dispose();continue; }
+                            stabilizeMaterialNormals(mesh.material);
                             mesh.name = 'traffic-paint-warmup';root.add(group);painted = true;
                         }
                         if (painted) signatures.add('paint|' + signature);
@@ -6285,6 +6320,7 @@ export class SpaceRenderer {
                     for (const faction of ['concord', 'alliance', 'pirates', 'neutral']) {
                         const material = source.clone();
                         if (!paintShipMaterial(material, faction, undefined, variant)) { material.dispose();continue; }
+                        stabilizeMaterialNormals(material);
                         const key = material.customProgramCacheKey() + '|' + signature;
                         if (signatures.has(key)) { material.dispose();continue; }
                         const mesh = makeMesh(material);mesh.name = 'traffic-faction-warmup';root.add(mesh);signatures.add(key);
@@ -6321,7 +6357,14 @@ export class SpaceRenderer {
     prepareTrafficBuffers(stage) {
         if (!this.renderer.render || this.disposed || this.contextLost) return;
         const previous=this.renderer.getRenderTarget(),shadows=this.renderer.shadowMap.enabled,culled=[];
+        // The retained representatives are normally detached after startup.
+        // Temporarily put this stage back in the live lighting scene so the
+        // hidden draw actually uploads its newly loaded hull buffers.
+        const root=this.combatWarmupRoot;
+        let ancestor=stage;while(ancestor?.parent&&ancestor!==root)ancestor=ancestor.parent;
+        const attach=Boolean(root&&ancestor===root&&!root.parent);
         try {
+            if(attach)this.scene.add(root);
             // Keep normal world culling. Only the newly loaded, off-camera
             // hull buffers need a hidden draw; do not wake the whole field.
             stage.traverse(mesh=>{if(mesh.userData.borrowedWarmupGeometry){culled.push([mesh,mesh.frustumCulled]);mesh.frustumCulled=false;}});
@@ -6331,6 +6374,7 @@ export class SpaceRenderer {
         } finally {
             this.renderer.setRenderTarget(previous);this.renderer.shadowMap.enabled=shadows;
             for(const [mesh,value]of culled)mesh.frustumCulled=value;
+            if(attach&&root.parent===this.scene)this.scene.remove(root);
         }
     }
     async prepareActiveScene({timeoutMs = SHADER_WARMUP_TIMEOUT_MS, assetTimeoutMs = 8000, prepareNearbyWrecks = false} = {}) {
@@ -6796,6 +6840,31 @@ export class SpaceRenderer {
         this.renderer.dispose();
         this.renderer.domElement.remove();
     }
+}
+
+// Generate the two fixed planet surfaces in short loading-time slices. The
+// next renderer consumes the prepared textures and owns/disposes them normally.
+export async function preparePlanetSurfaceTextures() {
+    const specs=[['vesper-surface',0xa85f36,0xd78a54,false],['azure-surface',0x1e5d8f,0x79c8ea,true]];
+    if(specs.every(([seed,base,accent,water])=>preparedPlanetTextures.has(planetTextureKey(seed,base,accent,1024,water))))return;
+    if(preparingPlanetTextures)return preparingPlanetTextures;
+    const task=(async()=>{
+        const owner=Object.create(SpaceRenderer.prototype);owner.pixelTextures=new Set();
+        for(const [seed,base,accent,water] of specs){
+            const key=planetTextureKey(seed,base,accent,1024,water);
+            if(preparedPlanetTextures.has(key))continue;
+            const work=owner.buildPixelPanelTexture(seed,base,accent,'planet',1024,water);let deadline=performance.now()+8;
+            for(;;){
+                const result=work.next();
+                if(result.done){preparedPlanetTextures.set(key,result.value);break;}
+                // Use a normal task boundary so the browser can paint the
+                // loading screen between slices, even on Chromium.
+                if(performance.now()>=deadline){await new Promise(resolve=>setTimeout(resolve,0));deadline=performance.now()+8;}
+            }
+        }
+    })();
+    preparingPlanetTextures=task;
+    try{return await task;}finally{if(preparingPlanetTextures===task)preparingPlanetTextures=undefined;}
 }
 
 function droneDockRotation(normal,forward=[0,0,-1]) {

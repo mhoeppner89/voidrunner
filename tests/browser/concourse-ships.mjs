@@ -61,12 +61,17 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
   const rgb=[102,153,204],pixels=new Float32Array(8*4*4),plate=new Uint8Array([...rgb,255]);
   for(let y=0;y<4;y++)for(let x=0;x<4;x++){const i=(y*8+x)*4;for(let k=0;k<3;k++){const c=rgb[k]/255,linear=c<=.04045?c/12.92:((c+.055)/1.055)**2.4;pixels[i+k]=-Math.log(1-linear)/1.1;}pixels[i+3]=1;}
   const scene=new THREE.DataTexture(pixels,8,4,THREE.RGBAFormat,THREE.FloatType),backdrop=new THREE.DataTexture(plate,1,1);scene.needsUpdate=backdrop.needsUpdate=true;
-  const finish=createConcourseFinish();finish.uniforms.tScene.value=scene;finish.uniforms.tBackdrop.value=backdrop;finish.uniforms.uHasBackdrop.value=1;
+  const finish=createConcourseFinish();finish.uniforms.tScene.value=scene;finish.uniforms.tBackdrop.value=backdrop;finish.uniforms.uHasBackdrop.value=1;finish.uniforms.uSceneResolution.value.set(8,4);
   const quad=new THREE.Mesh(new THREE.PlaneGeometry(2,2),finish);r.render(quad,new THREE.Camera());const data=new Uint8Array(8*4*4);r.getContext().readPixels(0,0,8,4,r.getContext().RGBA,r.getContext().UNSIGNED_BYTE,data);
-  let mismatch=0,changedColour=0;for(let y=0;y<4;y++)for(let x=0;x<4;x++)for(let k=0;k<3;k++){if(Math.abs(data[(y*8+x)*4+k]-data[(y*8+x+4)*4+k])>1)mismatch++;}
-  for(let i=0;i<data.length;i++)if(i%4!==3&&Math.abs(data[i]-rgb[i%4])>1)changedColour++;
-  const sample=[...data.slice(0,4)];quad.geometry.dispose();finish.dispose();scene.dispose();backdrop.dispose();r.dispose();return{mismatch,changedColour,sample};
- });assert.equal(shaderPixels.mismatch,0,'ship and backdrop use the identical final shader');assert.equal(shaderPixels.changedColour,0,'the final composite preserves source colours without tint, dithering or palette reduction');assert.ok(shaderPixels.sample[0]>70&&shaderPixels.sample[2]>170,'fixture must actually render');
+  let mismatch=0,changedColour=0,outlined=0;
+  for(let y=0;y<4;y++)for(let x=0;x<8;x++)for(let k=0;k<3;k++){
+   const value=data[(y*8+x)*4+k];
+   if(x<3&&Math.abs(value-data[(y*8+x+4)*4+k])>1)mismatch++;
+   if(x!==3&&Math.abs(value-rgb[k])>1)changedColour++;
+   if(x===3&&value<rgb[k]-5)outlined++;
+  }
+  const sample=[...data.slice(0,4)];quad.geometry.dispose();finish.dispose();scene.dispose();backdrop.dispose();r.dispose();return{mismatch,changedColour,outlined,sample};
+ });assert.equal(shaderPixels.mismatch,0,'ship interiors and backdrop keep the same colours');assert.equal(shaderPixels.changedColour,0,'the final composite preserves unoutlined colours without tint, dithering or palette reduction');assert.ok(shaderPixels.outlined>0,'ship silhouette receives the approved contour');assert.ok(shaderPixels.sample[0]>70&&shaderPixels.sample[2]>170,'fixture must actually render');
  assert.equal(await page.locator('.concourse-hover-ship').evaluate(e=>e.tagName),'BUTTON');assert.equal(await page.locator('.concourse-hover-preview img').count(),0);
  await page.screenshot({path:`${out}/${name}-helix-wayfarer.png`});
  const shadow=await page.evaluate(()=>{const v=__VOID_PRIVATEER__.getRuntime().ui.concourseShip;v.stop();const backdrop=v.finish.uniforms.uHasBackdrop.value;v.finish.uniforms.uHasBackdrop.value=0;v.model.visible=false;const reflect=v.reflection.plane.visible;v.reflection.plane.visible=false;v.renderer.shadowMap.needsUpdate=false;v.render();const gl=v.renderer.getContext(),bytes=new Uint8Array(v.canvas.width*v.canvas.height*4);gl.readPixels(0,0,v.canvas.width,v.canvas.height,gl.RGBA,gl.UNSIGNED_BYTE,bytes);let pixels=0;for(let i=3;i<bytes.length;i+=4)if(bytes[i]>10)pixels++;v.model.visible=true;v.finish.uniforms.uHasBackdrop.value=backdrop;v.reflection.plane.visible=reflect;v.reflection.dirty=true;v.resume();return pixels;});assert.ok(shadow>100,`cast shadow visible: ${shadow}`);
@@ -103,9 +108,20 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
   await page.evaluate(id=>{const r=__VOID_PRIVATEER__.getRuntime();r.save.player.dockedAt=id;r.save.player.shipId='wayfarer';r.ui.showDock(r.save,id);},id);await ready();await page.waitForTimeout(350); // let the action-label reveal finish
   const fit=await page.locator('.concourse-hover-ship').evaluate(e=>{const b=e.getBoundingClientRect();return{x:b.x,y:b.y,w:b.width,h:b.height,viewport:[innerWidth,innerHeight],visible:b.x>=-1&&b.right<=innerWidth+1&&b.y>=45&&b.bottom<=innerHeight+1};});if(!fit.visible){await page.screenshot({path:`${out}/${name}-${id}-failure.png`});console.log(await page.evaluate(()=>{const v=__VOID_PRIVATEER__.getRuntime().ui.concourseShip;return {location:v.location,zoom:v.camera.zoom,size:[v.cssWidth,v.cssHeight],origin:[v.originX,v.originY],bounds:v.restBounds,pivot:v.pivot.position,host:v.host.getBoundingClientRect().toJSON(),parent:v.host.parentElement.getBoundingClientRect().toJSON(),background:document.querySelector('.dock-backdrop img').getBoundingClientRect().toJSON()};}));}assert.ok(fit.visible,`${name}/${id} ship on screen ${JSON.stringify(fit)}`);
   const lighting=await page.evaluate(()=>{const v=__VOID_PRIVATEER__.getRuntime().ui.concourseShip;return{scale:v.profile.scale,key:v.sun.color.getHex(),environment:v.scene.environmentIntensity,backdrop:!!v.backdropKey,reflection:v.reflection.plane.visible,opacity:v.reflection.material.uniforms.uOpacity.value,zoom:v.camera.zoom};});assert.ok(lighting.backdrop,'use the actual room for reflections');assert.equal(lighting.reflection,id!=='vesper');
-  const placement=await page.evaluate(()=>{const u=__VOID_PRIVATEER__.getRuntime().ui,v=u.concourseShip,device=innerWidth<=900?'phone':'desktop',expected=v.profile.placements[device],s=document.querySelector('.station-scene').getBoundingClientRect(),r=v.host.getBoundingClientRect();return{expected,sceneSize:{x:s.width,y:s.height},actual:{ship:{x:(r.left+r.width/2-s.left)/s.width,y:(r.top+r.height/2-s.top)/s.height,zoom:v.camera.zoom},buttons:Object.fromEntries([...document.querySelectorAll('.scene-pointers .scene-pointer')].map(e=>{const key=['services','market','bar','den'].find(k=>e.classList.contains('concourse-pointer-'+k)),b=e.getBoundingClientRect();const style=getComputedStyle(e);return[key,{x:parseFloat(style.left)/s.width,y:parseFloat(style.top)/s.height}];}))}};});
+  const placement=await page.evaluate(()=>{const u=__VOID_PRIVATEER__.getRuntime().ui,v=u.concourseShip,device=innerWidth<=900?'phone':'desktop',expected=v.profile.placements[device],s=document.querySelector('.station-scene').getBoundingClientRect(),r=v.host.getBoundingClientRect(),ship=document.querySelector('.concourse-hover-ship').getBoundingClientRect();return{expected,sceneSize:{x:s.width,y:s.height},shipBounds:{x:ship.left-s.left,y:ship.top-s.top,w:ship.width,h:ship.height},actual:{ship:{x:(r.left+r.width/2-s.left)/s.width,y:(r.top+r.height/2-s.top)/s.height,zoom:v.camera.zoom},buttons:Object.fromEntries([...document.querySelectorAll('.scene-pointers .scene-pointer')].map(e=>{const key=['services','market','bar','den'].find(k=>e.classList.contains('concourse-pointer-'+k)),b=e.getBoundingClientRect();const style=getComputedStyle(e);return[key,{x:parseFloat(style.left)/s.width,y:parseFloat(style.top)/s.height,w:b.width,h:b.height}];}))}};});
   for(const axis of ['x','y'])assert.ok(Math.abs(placement.actual.ship[axis]-placement.expected.ship[axis])*placement.sceneSize[axis]<.6,`${id} approved ship ${axis}: ${JSON.stringify(placement)}`);assert.equal(placement.actual.ship.zoom,placement.expected.ship.zoom);
-  for(const[key,p]of Object.entries(placement.actual.buttons))for(const axis of ['x','y'])assert.ok(Math.abs(p[axis]-placement.expected.buttons[key][axis])*placement.sceneSize[axis]<.6,`${id}/${key} approved ${axis}: ${JSON.stringify(placement)}`);
+  for(const[key,p]of Object.entries(placement.actual.buttons)){
+   const {x:w,y:h}=placement.sceneSize,anchor=placement.expected.buttons[key],x=p.x*w,y=p.y*h;
+   assert.ok(x>=0&&y>=0&&x+p.w<=w+1&&y+p.h<=h+1,`${id}/${key} remains inside the scene`);
+   if(Math.abs(x-anchor.x*w)>.6||Math.abs(y-anchor.y*h)>.6){
+    // The layout fits controls around the moving ship and other buttons. An
+    // authored anchor may move only when that original spot is obstructed.
+    const desired={x:anchor.x*w,y:anchor.y*h,w:p.w,h:p.h};
+    const blockers=[placement.shipBounds,...Object.entries(placement.actual.buttons).filter(([other])=>other!==key).map(([,q])=>({x:q.x*w,y:q.y*h,w:q.w,h:q.h}))];
+    const overlaps=(a,b)=>a.x<b.x+b.w+16&&a.x+a.w+16>b.x&&a.y<b.y+b.h+16&&a.y+a.h+16>b.y;
+    assert.ok(blockers.some(b=>overlaps(desired,b)),`${id}/${key} moved away from an unobstructed approved anchor: ${JSON.stringify(placement)}`);
+   }
+  }
   await clearPointers(id);await checkMotion(id,'wayfarer');await page.screenshot({path:`${out}/${name}-${id}.png`});locationReport.push({id,...fit,...lighting});
  }
  await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();r.save.player.dockedAt='helix';r.ui.showDock(r.save,'helix');});await ready();

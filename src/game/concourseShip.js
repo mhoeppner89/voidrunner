@@ -191,6 +191,7 @@ export class ConcourseShip {
   const capacityWidth=Math.max(width,this.touchDevice?768:960),capacityHeight=Math.max(height,this.touchDevice?480:600);
   if(this.canvas.width!==capacityWidth||this.canvas.height!==capacityHeight)this.renderer.setSize(capacityWidth,capacityHeight,false);
   this.target.setSize(width,height);
+  this.finish.uniforms.uSceneResolution.value.set(width,height);
   this.canvas.style.width=`${capacityWidth*scale}px`;this.canvas.style.height=`${capacityHeight*scale}px`;
   this.canvas.style.transform=`translateY(${(height-capacityHeight)*scale}px)`;this.canvas.dataset.pixelScale=String(scale);
  }

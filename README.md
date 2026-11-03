@@ -1,6 +1,8 @@
 # Voidrunner
 
-A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2my**.
+A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2na**.
+
+Flight and combat wait for their scene to finish loading. Asteroid terrain, planet surfaces and ship-breakup geometry are prepared in short slices, and arriving ships warm up their actual shaders and buffers before appearing. Automatic flight quality responds to real frame times, including in observer mode.
 
 Phone flight uses the on-screen joystick; older tilt-steering preferences migrate to the joystick automatically.
 
@@ -70,7 +72,7 @@ Selected targets keep their original colours. Asteroid surfaces stay natural aft
 
 Landing and departure sound follows the actual animation: engine passes, planetary air, hangar room tone, lift-off spool, landing gear and contact. Skipping or hiding a film stops its sound. The isolated landing review has an optional Sound checkbox, off by default. Mining drones retain their hidden render resources between deliveries, avoiding repeated shader compilation.
 
-The pixel finish preserves original artwork colours. Ordered dithering, sprite palette conversion, monitor colour filters and stacked location-art colour adjustments are removed. Landing backgrounds and ships share one crisp pixel grid, with no smoothing or palette reduction; instruments retain readable native text. Original artwork is decoded directly, without a second converted bitmap.
+The illustrated finish adds fine depth-based outlines and gently stepped direct lighting to 3D models. It reuses the scene's existing render targets and retains the original paint colours, cockpit artwork and readable instrument text. Landing backgrounds and ships share a crisp pixel grid; there is no added dithering or palette reduction.
 
 Landed ships use the approved editor angles, scales and separate desktop/phone placements for all 17 painted platforms, with matching lighting and reflected room colours. The painted backdrop, ship, shadow and reflection are combined before one shared pixel shader. Ships enter from outside the screen, settle into the authored position, then fly completely off-screen on departure at constant model scale. Shadows track each rendered frame, soften and fade with height, and stay inside the painted pad. Polished decks receive a subtle ship reflection; dry pads stay matte. Run `node tests/browser/concourse-shadows.mjs` for pad clipping, height and motion checks on desktop/iPhone. Run `npm run test:browser:concourse` for muted desktop/iPhone checks of every playable hull and port. Planetary departure uses a separate front-quarter tracking shot, with the planet receding behind the engines as the ship climbs into space. Generate an isolated replay page for all ports, hulls and paints with `node tools/playtest/planet-transitions.mjs`; it keeps save writes in memory.
 
