@@ -118,6 +118,45 @@ for (const [name, occlusion, strength] of [['default', {}, 1], ['authored streng
  }finally{globalThis.createImageBitmap=previous;}
 });
 
+test('a wreck batch decodes identical images once and retains independent texture state', async () => {
+    const previous = globalThis.createImageBitmap;
+    let decodes = 0;
+    globalThis.createImageBitmap = async () => ({width: 2, height: 2, id: ++decodes});
+    try {
+        const buffer = fixture({texture: {}, occlusion: {}}).buffer;
+        const batch = new Map();
+        const pair = await Promise.all([buildGlbScene(buffer, batch), buildGlbScene(buffer, batch)]);
+        const [first, second] = pair.map(root => root.children[0].children[0].material);
+        assert.equal(decodes, 1);
+        assert.notEqual(first.map, second.map);
+        assert.equal(first.map.source, second.map.source);
+        assert.equal(second.map.colorSpace, THREE.SRGBColorSpace);
+        assert.equal(second.aoMap.colorSpace, THREE.NoColorSpace);
+        first.map.wrapS = THREE.ClampToEdgeWrapping;
+        first.map.dispose();
+        assert.equal(second.map.wrapS, THREE.RepeatWrapping);
+        const distinct = buffer.slice(0);
+        new Uint8Array(distinct)[distinct.byteLength - 1] = 1;
+        const other = await buildGlbScene(distinct, batch);
+        assert.notEqual(other.children[0].children[0].material.map.source, second.map.source, 'equal byte lengths can belong to different images');
+        const fresh = await buildGlbScene(buffer, new Map());
+        assert.notEqual(fresh.children[0].children[0].material.map.source, second.map.source, 'a later session owns its own image batch');
+        assert.equal(decodes, 3);
+    } finally { globalThis.createImageBitmap = previous; }
+});
+
+test('a failed image decode can be retried in its original batch', async () => {
+    const previous = globalThis.createImageBitmap;
+    const buffer = fixture({texture: {}}).buffer, batch = new Map();
+    try {
+        globalThis.createImageBitmap = async () => { throw new Error('decode failed'); };
+        await assert.rejects(buildGlbScene(buffer, batch));
+        globalThis.createImageBitmap = async () => ({width: 2, height: 2});
+        const root = await buildGlbScene(buffer, batch);
+        assert.equal(root.children[0].children[0].material.map.image.width, 2);
+    } finally { globalThis.createImageBitmap = previous; }
+});
+
 test('GLB contact shading decodes normalized byte colours without changing hull paint',async()=>{
  const root=await buildGlbScene(fixture({colors:true,overlay:true}).buffer),mesh=root.children[0].children[0],color=mesh.geometry.attributes.color;
  assert.equal(mesh.material.vertexColors,true);assert.equal(color.array.constructor,Uint8Array);assert.equal(color.normalized,true);assert.ok(Math.abs(color.getY(0)-128/255)<1e-8);assert.equal(color.getZ(0),0);assert.equal(color.getX(2),1);

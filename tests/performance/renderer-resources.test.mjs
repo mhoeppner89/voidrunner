@@ -74,6 +74,52 @@ test('debris compaction preserves edge objects, restores visibility and refreshe
     b.mesh.getMatrixAt(0, m); assert.equal(m.elements[14], -10);
 });
 
+test('salvage batches draw and pick only the current hull and breach plate for each visible node', () => {
+    const r = fieldRenderer();
+    r.wreckNodes = [[0, 0, -20], [40, 0, -20], [80000, 0, -20]].map((position, index) => ({
+        id: String(index), position, rotation: [0, 0, 0], shape: 2, salvage: 'scrap', radius: 2, remaining: 1,
+    }));
+    Object.assign(r, {
+        wreckBatches: [], wreckRenderEntries: [], wreckNodeMeshes: new Map(), instanceRoots: new Map(),
+        activeInstanceId: 'mourning-line', asteroidMeshes: [], shipMeshes: new Map(), locationMeshes: new Map(), pickupMeshes: new Map(),
+        renderer: { domElement: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 }) } },
+        pointer: new THREE.Vector2(), raycaster: new THREE.Raycaster(),
+        createPixelPanelTexture: () => new THREE.Texture(), simplifyAppleMaterial() {},
+    });
+    r.createWreckNodes();
+    const intact = r.wreckBatches.find(batch => !batch.damaged);
+    assert.equal(intact.mesh.count, 2);
+    const [target, neighbor, distant] = r.wreckNodes;
+    target.remaining = 0;
+    for (let face = 0; face < 6; face++) {
+        target.salvageImpactLocal = [0, 0, 0];
+        target.salvageImpactLocal[face >> 1] = face % 2 === 0 ? 1 : -1;
+        r.updateWreckNodeInstances(1 / 60);
+        const damaged = r.wreckBatches.find(batch => batch.face === face);
+        assert.equal(damaged.mesh.count, 1);
+        assert.equal(damaged.plate.count, 1);
+        assert.equal(r.wreckBatches.filter(batch => batch.mesh.visible).length, 2);
+        assert.equal(intact.mesh.count, 1);
+        assert.equal(intact.mesh.userData.nodeIndices[0], 1);
+        for (const node of [target, neighbor]) {
+            r.camera.lookAt(...node.position);
+            r.camera.updateMatrixWorld();
+            assert.deepEqual(r.pickTarget(50, 50), { kind: 'wreck', id: node.id });
+        }
+    }
+    r.camera.position.x = 80000;
+    r.selectedWreckId = target.id;
+    r.updateWreckNodeInstances(0);
+    assert.equal(intact.mesh.count, 1);
+    assert.equal(intact.entries[0].node, distant);
+    assert.equal(r.wreckBatches.find(batch => batch.face === 5).entries[0].node, target);
+    const rotation = target.rotation.slice();
+    r.selectedWreckId = undefined;
+    r.updateWreckNodeInstances(1 / 60);
+    assert.deepEqual(target.rotation, rotation);
+    assert.equal(r.wreckBatches.filter(batch => batch.plate?.visible).length, 0);
+});
+
 test('compacted asteroids retain raycast identity and natural colors when selected or scanned', () => {
     const r = fieldRenderer();
     const nodes = [piece([0, 0, -10]), piece([100, 0, 0])];

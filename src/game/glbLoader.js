@@ -31,6 +31,27 @@ const loadViaImage = (blob) => new Promise((resolve, reject) => {
     image.src = url;
 });
 
+// The wreck variants carry identical embedded maps. Share their immutable
+// pixels, while keeping each material's texture settings and disposal separate.
+// The cache belongs to one batch of models and is released when it finishes.
+function decodeImageSource(bytes, mime, batch) {
+    const decode = () => decodeImage(bytes, mime).then(bitmap => new THREE.Source(bitmap));
+    if (!batch) return decode();
+    const key = `${mime}:${bytes.length}`;
+    const bucket = batch.get(key) ?? [];
+    for (const entry of bucket) {
+        let i = 0;
+        while (i < bytes.length && entry.bytes[i] === bytes[i]) i++;
+        if (i === bytes.length) return entry.source;
+    }
+    // Copy the compressed image alone so a small map cannot retain a whole GLB.
+    const entry = { bytes: bytes.slice(), source: decode() };
+    bucket.push(entry);
+    batch.set(key, bucket);
+    entry.source.catch(() => { bucket.splice(bucket.indexOf(entry), 1); });
+    return entry.source;
+}
+
 const parseContainer = (arrayBuffer) => {
     const view = new DataView(arrayBuffer);
     if (view.getUint32(0, true) !== 0x46546c67)
@@ -54,34 +75,34 @@ const parseContainer = (arrayBuffer) => {
 
 // Build a THREE.Group from a GLB buffer. Textures are decoded asynchronously
 // first (createImageBitmap), then geometry/materials are built synchronously.
-export async function loadGlb(url) {
+export async function loadGlb(url, imageBatch) {
     const response = await fetch(url);
     if (!response.ok)
         throw new Error(`GLB ${url}: HTTP ${response.status}`);
     const arrayBuffer = await response.arrayBuffer();
-    return buildGlbScene(arrayBuffer);
+    return buildGlbScene(arrayBuffer, imageBatch);
 }
 
-export async function buildGlbScene(arrayBuffer) {
+export async function buildGlbScene(arrayBuffer, imageBatch) {
     const { json, bin } = parseContainer(arrayBuffer);
     const dataView = new DataView(bin.buffer, bin.byteOffset, bin.byteLength);
 
     // Decode embedded textures first: every material slot is a separate image
     // in these models (base color, metallic-roughness).
-    const bitmaps = [];
+    const sources = [];
     for (const image of json.images ?? []) {
         const bufferView = json.bufferViews[image.bufferView];
         const bytes = bin.subarray(bufferView.byteOffset, bufferView.byteOffset + bufferView.byteLength);
-        const bitmap = await decodeImage(bytes, image.mimeType ?? 'image/png');
-        bitmaps.push(bitmap);
+        sources.push(await decodeImageSource(bytes, image.mimeType ?? 'image/png', imageBatch));
     }
     const wrapping = (value) => value === 33071 ? THREE.ClampToEdgeWrapping : value === 33648 ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping;
-    const textureDefs = json.textures ?? bitmaps.map((_, source) => ({ source }));
+    const textureDefs = json.textures ?? sources.map((_, source) => ({ source }));
     const textures = textureDefs.map((definition, index) => {
-        const bitmap = bitmaps[definition.source ?? index];
-        if (!bitmap)
+        const source = sources[definition.source ?? index];
+        if (!source)
             return undefined;
-        const texture = new THREE.Texture(bitmap);
+        const texture = new THREE.Texture();
+        texture.source = source;
         // Keep painted panel detail legible at grazing angles. Three.js clamps
         // this request to the device's supported anisotropy level.
         texture.anisotropy = 8;

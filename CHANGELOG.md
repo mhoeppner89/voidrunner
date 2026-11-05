@@ -1,3 +1,10 @@
+## 0.8.2nc — Faster asteroid and wreck fields
+
+- Reuse rock noise and smooth surface normals when generating Shardbelt terrain. Check only nearby craters while preserving the original vertex and collision buffers.
+- Refresh only the drifting Mourning Line collision entries. Reject distant debris before building its triangle search tree.
+- Draw just the current damage state of each salvage chunk and keep its touch target attached as it breaks apart.
+- Decode identical embedded wreck textures once per group of models. On the nine graveyard models this removes 25 duplicate image decodes.
+
 ## 0.8.2nb — Phone flight performance
 
 - Cull off-screen Shardbelt rocks between shadow updates and combine the crossed glow planes of each laser. Keep all casters when refreshing shadows.

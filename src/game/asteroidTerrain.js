@@ -33,6 +33,7 @@ function* smoothRockNormals(geometry,fragment) {
     }
     const positions=[],normals=[],colors=[],uvs=[],indices=[],cache=new Map(),limit=Math.cos(70*Math.PI/180);
     const smoothNormals=new Float32Array(position.count*3),sampled=new Uint8Array(position.count),fractureVertices=new Uint8Array(position.count);
+    const smoothIndices=new Uint32Array(position.count);
     const onFracture=id=>{
         if(!fractureVertices[id]){
             const [x,y,z]=worldToFragment(fragment,position.getX(id),position.getY(id),position.getZ(id)),rough=rockNoise(x,y,z)*.52;
@@ -51,17 +52,27 @@ function* smoothRockNormals(geometry,fragment) {
         normal.fromArray(smoothNormals,id*3);
     };
     for(let corner=0;corner<index.length;corner++){
-        const id=index[corner],face=corner-corner%3;normal.set(0,0,0);let crease=false;
-        for(const other of adjacent[id]){
-            const f=other-other%3;
-            if(faces[face]*faces[f]+faces[face+1]*faces[f+1]+faces[face+2]*faces[f+2]<limit){crease=true;continue;}
-            normal.x+=faces[f]*weights[other];normal.y+=faces[f+1]*weights[other];normal.z+=faces[f+2]*weights[other];
+        const id=index[corner],face=corner-corner%3;
+        // Away from a fracture every corner uses the same gradient normal.
+        // Reuse that output vertex directly; only a fracture can split it.
+        let next=smoothIndices[id]-1, key;
+        if(next<0){
+            if(onFracture(id)){
+                normal.set(0,0,0);let crease=false;
+                for(const other of adjacent[id]){
+                    const f=other-other%3;
+                    if(faces[face]*faces[f]+faces[face+1]*faces[f+1]+faces[face+2]*faces[f+2]<limit){crease=true;continue;}
+                    normal.x+=faces[f]*weights[other];normal.y+=faces[f+1]*weights[other];normal.z+=faces[f+2]*weights[other];
+                }
+                if(crease)normal.normalize();else smoothNormal(id);
+                key=id+':'+Math.round(normal.x*1e5)+':'+Math.round(normal.y*1e5)+':'+Math.round(normal.z*1e5);
+                next=cache.get(key);
+            }else{smoothNormal(id);next=undefined;}
         }
-        if(crease&&onFracture(id))normal.normalize();else smoothNormal(id);
-        const key=id+':'+Math.round(normal.x*1e5)+':'+Math.round(normal.y*1e5)+':'+Math.round(normal.z*1e5);
-        let next=cache.get(key);
         if(next===undefined){
-            next=positions.length/3;cache.set(key,next);positions.push(position.getX(id),position.getY(id),position.getZ(id));
+            next=positions.length/3;
+            if(key===undefined)smoothIndices[id]=next+1;else cache.set(key,next);
+            positions.push(position.getX(id),position.getY(id),position.getZ(id));
             normals.push(normal.x,normal.y,normal.z);colors.push(color.getX(id),color.getY(id),color.getZ(id));uvs.push(uv.getX(id),uv.getY(id));
         }
         indices.push(next);
@@ -88,7 +99,8 @@ function* buildAsteroidTerrain() {
     for(let z=0;z<nz;z++)for(let y=0;y<ny;y++){
         for(let x=0;x<nx;x++){
             const i=at(x,y,z),px=min[0]+x*STEP,py=min[1]+y*STEP,pz=min[2]+z*STEP;
-            parentSamples[i]=parentRockDistance(px,py,pz);roughSamples[i]=rockNoise(px,py,pz)*.52;
+            const noise=rockNoise(px,py,pz);
+            parentSamples[i]=parentRockDistance(px,py,pz,noise);roughSamples[i]=noise*.52;
         }
         if((y&3)===3)yield;
     }

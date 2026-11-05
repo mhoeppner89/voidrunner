@@ -49,15 +49,30 @@ export const SHARDBELT_CRATERS = Object.freeze([
     return Object.freeze({center:Object.freeze([p[0]+nx/nl*radius*lift,p[1]+ny/nl*radius*lift,p[2]+nz/nl*radius*lift]),
         radius,stretch,roughness:4+index%4*2});
 }));
-export function parentSkinDistance(x, y, z) {
+// The normals and the terrain grid sample the craters hundreds of thousands
+// of times. Keep their authored order in each X slab so overlapping bowl and
+// rim calculations still run in exactly the same order.
+const craterSlabWidth = 192, craterSlabs = new Map();
+for (const crater of SHARDBELT_CRATERS) {
+    const extent = (crater.radius + 100) / crater.stretch + 1e-6;
+    const first = Math.floor((crater.center[0] - extent) / craterSlabWidth);
+    const last = Math.floor((crater.center[0] + extent) / craterSlabWidth);
+    for (let i = first; i <= last; i++) {
+        if (!craterSlabs.has(i)) craterSlabs.set(i, []);
+        craterSlabs.get(i).push(crater);
+    }
+}
+export function parentSkinDistance(x, y, z, noise = rockNoise(x,y,z)) {
     const r = SHARDBELT_PARENT_RADII;
     return (Math.hypot(x / r[0], y / r[1], z / r[2]) - 1) * 950
         + 42 * stoneNoise(x*.0017+29,y*.0017-12,z*.0017+71)
-        + rockNoise(x, y, z);
+        + noise;
 }
-export function parentRockDistance(x, y, z) {
-    let skin=parentSkinDistance(x,y,z),bowls=-Infinity;
-    for(const crater of SHARDBELT_CRATERS){
+export function parentRockDistance(x, y, z, noise = rockNoise(x,y,z)) {
+    let skin=parentSkinDistance(x,y,z,noise),bowls=-Infinity;
+    const candidates = craterSlabs.get(Math.floor(x / craterSlabWidth));
+    if (!candidates) return skin;
+    for(const crater of candidates){
         const dx=(x-crater.center[0])*crater.stretch,dy=y-crater.center[1],dz=(z-crater.center[2])/crater.stretch;
         const reach=crater.radius+100;
         if(Math.abs(dx)>reach||Math.abs(dy)>reach||Math.abs(dz)>reach)continue;
@@ -128,8 +143,9 @@ const wornIntersection=(a,b,width)=>{
 export function fragmentDistance(f, x, y, z, parentDistance, fractureRoughness) {
     // Terrain generation samples the same coordinates for every fragment.
     // Its shared parent-rock values can be supplied without changing the SDF.
-    let distance = parentDistance ?? parentRockDistance(x, y, z);
-    const rough = fractureRoughness ?? rockNoise(x, y, z) * .52;
+    const noise = parentDistance == null || fractureRoughness == null ? rockNoise(x,y,z) : undefined;
+    let distance = parentDistance ?? parentRockDistance(x, y, z, noise);
+    const rough = fractureRoughness ?? noise * .52;
     // A narrow worn edge suppresses regular sawtooth tessellation where
     // fracture planes meet the crust, without sanding away the large breaks.
     for (const p of f.planes) distance = wornIntersection(distance, x * p[0] + y * p[1] + z * p[2] - p[3] + 34 + rough, 44);

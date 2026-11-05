@@ -12043,6 +12043,29 @@ export class GameSession {
             box: { hx, hy, hz, qx: q.x, qy: q.y, qz: q.z, qw: q.w },
         };
     }
+    graveyardPieceObstacle(piece) {
+        const [hx, hy, hz] = piece.halfExtents;
+        const q = (this.tmpFieldQuaternion ??= new THREE.Quaternion()).setFromEuler((this.tmpFieldEuler ??= new THREE.Euler()).set(...piece.rotation, 'XYZ'));
+        const analyticalShape = piece.kind === 'ring' || piece.kind === 'engine' ? piece.kind : undefined;
+        const collisionMesh = graveyardCollisionMesh(piece);
+        const obstacle = {
+            id: piece.id,
+            x: piece.position[0],
+            y: piece.position[1],
+            z: piece.position[2],
+            radius: collisionMesh.radius,
+            maxReach: collisionMesh.radius,
+            losRadius: collisionMesh.radius,
+            collisionRadius: collisionMesh.radius,
+            shape: analyticalShape ?? 'debris-mesh',
+            scale: piece.scale,
+            box: { hx, hy, hz, qx: q.x, qy: q.y, qz: q.z, qw: q.w },
+        };
+        obstacle.meshVerts = collisionMesh.verts;
+        obstacle.meshIndices = collisionMesh.indices;
+        obstacle.minReach = collisionMesh.minReach;
+        return obstacle;
+    }
     activeFieldObstacles(instanceId = this.activeInstanceId) {
         const derelicts=[];
         for(const entry of this.renderer?.derelictCollisionObstacles?.values()??[])if(entry.systemId===this.save.player.systemId)derelicts.push(...entry.obstacles);
@@ -12055,28 +12078,8 @@ export class GameSession {
         if (regionalField)
             return [...this.asteroidFieldObstacles(regionalField),...derelicts];
         if (instanceId === 'mourning-line') {
-            const obstacles = this.graveyard.filter((piece) => piece.collidable !== false).map((piece) => {
-                const [hx, hy, hz] = piece.halfExtents;
-                const q = (this.tmpFieldQuaternion ??= new THREE.Quaternion()).setFromEuler((this.tmpFieldEuler ??= new THREE.Euler()).set(...piece.rotation, 'XYZ'));
-                const analyticalShape = piece.kind === 'ring' || piece.kind === 'engine' ? piece.kind : undefined;
-                const collisionMesh = graveyardCollisionMesh(piece);
-                const obstacle = {
-                    id: piece.id,
-                    x: piece.position[0],
-                    y: piece.position[1],
-                    z: piece.position[2],
-                    radius: collisionMesh.radius,
-                    losRadius: collisionMesh.radius,
-                    collisionRadius: collisionMesh.radius,
-                    shape: analyticalShape ?? 'debris-mesh',
-                    scale: piece.scale,
-                    box: { hx, hy, hz, qx: q.x, qy: q.y, qz: q.z, qw: q.w },
-                };
-                obstacle.meshVerts = collisionMesh.verts;
-                obstacle.meshIndices = collisionMesh.indices;
-                obstacle.minReach = collisionMesh.minReach;
-                return obstacle;
-            });
+            const obstacles = this.graveyard.filter(piece => piece.collidable !== false)
+                .map(piece => this.graveyardPieceObstacle(piece));
             for (const collider of GRAVEYARD_MODEL_COLLIDERS) {
                 const [hx, hy, hz] = collider.halfExtents;
                 const [qx, qy, qz, qw] = collider.quaternion;
@@ -12090,6 +12093,7 @@ export class GameSession {
                     radius: collider.collisionRadius,
                     losRadius: collider.collisionRadius,
                     collisionRadius: collider.collisionRadius,
+                    maxReach: collider.collisionRadius,
                     shape: 'wreck-mesh',
                     meshVerts: collider.meshVerts,
                     meshIndices: collider.meshIndices,
@@ -12112,6 +12116,7 @@ export class GameSession {
                     radius: collisionMesh.radius,
                     losRadius: collisionMesh.radius,
                     collisionRadius: collisionMesh.radius,
+                    maxReach: collisionMesh.radius,
                     shape: 'wreck-node-mesh',
                     meshVerts: collisionMesh.verts,
                     meshIndices: collisionMesh.indices,
@@ -12470,33 +12475,41 @@ export class GameSession {
 
         const size = this.obstacleCellSize;
         const systemId = this.save.player?.systemId;
-        // The Shardbelt's terrain tiles and fixed deposits never drift. Keep
-        // their buckets and refresh only moving deposits on the usual cadence.
-        // Explicit invalidation, replacing the field or adding/removing a
-        // derelict still rebuilds the entire index.
-        const drift = this.shardbeltGridDrift;
-        if (sameField && drift && drift.nodes === this.asteroids && drift.count === this.asteroids.length
+        // Only loose deposits and drifting debris move after generation. Explicit
+        // invalidation (including damaged salvage) still rebuilds every bucket.
+        const shardbelt = this.activeInstanceId === 'shardbelt';
+        const mourning = this.activeInstanceId === 'mourning-line';
+        const nodes = shardbelt ? this.asteroids : mourning ? this.graveyard : undefined;
+        const wreckNodes = mourning ? this.wreckNodes : undefined;
+        const drift = this.fieldGridDrift;
+        if (sameField && drift && drift.nodes === nodes && drift.count === nodes.length
+            && drift.wreckNodes === wreckNodes && drift.wreckCount === wreckNodes?.length
             && drift.size === size && drift.systemId === systemId && Number.isFinite(this.obstacleGridBuiltAt)) {
-            this.refreshShardbeltGrid(drift.entries, size);
+            this.refreshDriftingObstacles(drift, size);
             this.obstacleGridBuiltAt = now;
             return;
         }
         const grid = new Map();
         const segmentGrid = new Map();
         const obstacles = this.activeFieldObstacles();
-        const shardbelt = this.activeInstanceId === 'shardbelt' && this.asteroids
-            && this.activeFieldObstacles === GameSession.prototype.activeFieldObstacles;
-        this.shardbeltGridDrift = shardbelt
-            ? { nodes: this.asteroids, count: this.asteroids.length, size, systemId, entries: [], maxReach: 0 } : null;
+        const canRefresh = nodes && this.activeFieldObstacles === GameSession.prototype.activeFieldObstacles;
+        this.fieldGridDrift = canRefresh ? {
+            nodes, count: nodes.length, wreckNodes, wreckCount: wreckNodes?.length, size, systemId,
+            makeObstacle: shardbelt ? this.asteroidFieldObstacle : this.graveyardPieceObstacle,
+            entries: [], maxReach: 0,
+        } : null;
+        // activeFieldObstacles emits the field's collidable pieces first,
+        // followed by fixed terrain, wreck sections and salvage contacts.
+        const sources = canRefresh && mourning ? nodes.filter(piece => piece.collidable !== false) : nodes;
         for (let order = 0; order < obstacles.length; order++) {
             const obstacle = obstacles[order];
-            if (shardbelt) {
+            if (canRefresh) {
                 obstacle._gridOrder = order;
                 // The collision mesh of a loose deposit can extend past its
                 // authored steering radius. Terrain and derelict radii already
                 // enclose their vertices. Keep an enclosing field-wide bound.
                 const reach = Math.max(obstacle.radius, obstacle.maxReach ?? obstacle.losRadius);
-                this.shardbeltGridDrift.maxReach = Math.max(this.shardbeltGridDrift.maxReach, reach);
+                this.fieldGridDrift.maxReach = Math.max(this.fieldGridDrift.maxReach, reach);
             }
             // Keep the center-cell index for physical collision and steering
             // queries. Their box padding already accounts for obstacle radius,
@@ -12515,11 +12528,11 @@ export class GameSession {
             // storm along weapon lines through the dense wreck field. Boxes use
             // their full corner reach so rotated rocks never let a beam slip
             // past a visible corner.
-            const movingNode = shardbelt && this.asteroids[order]?.moving ? this.asteroids[order] : undefined;
+            const movingNode = canRefresh && sources[order]?.moving ? sources[order] : undefined;
             const keys = movingNode ? [] : undefined;
             addObstacleToSegmentGrid(segmentGrid, obstacle, size, this.cellKey, keys);
             if (movingNode)
-                this.shardbeltGridDrift.entries.push({ node: movingNode, obstacle, centerKey, keys });
+                this.fieldGridDrift.entries.push({ node: movingNode, obstacle, centerKey, keys });
         }
         this.obstacleGrid = grid;
         this.obstacleBoxIndex = indexObstacleCells(grid, size);
@@ -12528,11 +12541,11 @@ export class GameSession {
         this.obstacleGridRevision = revision;
         this.obstacleGridBuiltAt = now;
     }
-    refreshShardbeltGrid(entries, size) {
+    refreshDriftingObstacles(drift, size) {
         let centerCellsChanged = false;
-        for (const entry of entries) {
+        for (const entry of drift.entries) {
             const before = entry.obstacle;
-            const after = this.asteroidFieldObstacle(entry.node);
+            const after = drift.makeObstacle.call(this, entry.node);
             after._gridOrder = before._gridOrder;
             // Keep previously returned snapshots valid for pilots that hold
             // their local obstacle list until their next planning tick.
@@ -12565,7 +12578,7 @@ export class GameSession {
         const {x, y, z} = position;
         if (this.activeInstanceId === 'shardbelt' && this.forEachObstacleInBox === GameSession.prototype.forEachObstacleInBox) {
             this.ensureObstacleGrid();
-            const drift = this.shardbeltGridDrift;
+            const drift = this.fieldGridDrift;
             if (drift) {
                 const size = this.obstacleCellSize, reach = drift.maxReach + hullReach + 0.01;
                 visitObstacleCells(this.obstacleBoxIndex, Math.floor((x-margin)/size), Math.floor((y-margin)/size),
@@ -12851,7 +12864,7 @@ export class GameSession {
             let obstacleReach = MAX_FIELD_OBSTACLE_RADIUS;
             if (this.activeInstanceId === 'shardbelt' && this.forEachObstacleInBox === GameSession.prototype.forEachObstacleInBox) {
                 this.ensureObstacleGrid();
-                obstacleReach = Math.min(obstacleReach, this.shardbeltGridDrift?.maxReach ?? obstacleReach);
+                obstacleReach = Math.min(obstacleReach, this.fieldGridDrift?.maxReach ?? obstacleReach);
             }
             const margin = range + lookahead + obstacleReach;
             this.forEachObstacleInBox(px - margin, py - margin, pz - margin, px + margin, py + margin, pz + margin, accumulate);

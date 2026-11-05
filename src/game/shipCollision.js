@@ -144,14 +144,24 @@ export function shipVsBox(position,q,variant,scale,obstacle,out,stats){
 }
 export function shipVsMesh(position,q,variant,scale,obstacle,out,stats){
     const v=obstacle.meshVerts,indices=obstacle.meshIndices;if(!v||!indices)return false;
-    const profile=SHIP_COLLIDERS[variant]??SHIP_COLLIDERS.kestrel,tree=prepareSurfaceMeshIndex(v,indices),b=obstacle.box;
+    const profile=SHIP_COLLIDERS[variant]??SHIP_COLLIDERS.kestrel,b=obstacle.box;
+    // Field geometry already knows its farthest vertex. Most neighbouring
+    // rocks never need a triangle tree. Allow for the Float32 vertex write
+    // performed after the baker measured the radius at full precision.
+    let tree, meshReach;
+    if (obstacle.maxReach !== undefined) meshReach = obstacle.maxReach * 1.0000001;
+    else {
+        tree = prepareSurfaceMeshIndex(v,indices);
+        meshReach = tree.radius;
+    }
     const dx=position.x-obstacle.x,dy=position.y-obstacle.y,dz=position.z-obstacle.z;
-    const radius=tree.radius+profile.contactRadius*scale+1e-5;
+    const radius=meshReach+profile.contactRadius*scale+1e-5;
     if(dx*dx+dy*dy+dz*dz>radius*radius){
         if(stats)stats.meshRejects=(stats.meshRejects??0)+1;
         return embeddedMeshContact(position,q,variant,scale,obstacle,out,stats);
     }
-    rotate(position.x-obstacle.x,position.y-obstacle.y,position.z-obstacle.z,-b.qx,-b.qy,-b.qz,b.qw,rotated);
+    tree ??= prepareSurfaceMeshIndex(v,indices);
+    rotate(dx,dy,dz,-b.qx,-b.qy,-b.qz,b.qw,rotated);
     const lx=rotated.x,ly=rotated.y,lz=rotated.z;
     // Most grid neighbours are far outside the hull. Reject them before building
     // relative transforms; use the mesh's actual bounds, not its visual radius.

@@ -71,7 +71,6 @@ export const WRECK_RENDER_DISTANCE = 40000;
 const WRECK_RENDER_DISTANCE_SQ = WRECK_RENDER_DISTANCE * WRECK_RENDER_DISTANCE;
 const MOURNING_ROOT_VISIBILITY_RANGE = WRECK_RENDER_DISTANCE + 6000;
 const MOURNING_ROOT_VISIBILITY_RANGE_SQ = MOURNING_ROOT_VISIBILITY_RANGE * MOURNING_ROOT_VISIBILITY_RANGE;
-const HIDDEN_SCALE = [0.0001, 0.0001, 0.0001];
 const SHADER_WARMUP_TIMEOUT_MS = 8000;
 const preparedPlanetTextures=new Map();
 let preparingPlanetTextures;
@@ -294,6 +293,7 @@ export class SpaceRenderer {
     viewProjection = new THREE.Matrix4();
     viewSphere = new THREE.Sphere();
     wreckBatches = [];
+    wreckRenderEntries = [];
     wreckNodeMeshes = new Map();
     effects = [];
     cockpit = new THREE.Group();
@@ -2752,9 +2752,10 @@ export class SpaceRenderer {
         if (this.graveyardModelLoading || this.graveyardModelMeshes.length)
             return this.graveyardModelLoading;
         const files = [...new Set(GRAVEYARD_MODEL_WRECKS.map((entry) => entry.file))];
+        const imageBatch = new Map();
         this.graveyardModelLoading = Promise.all(files.map(async (file) => {
             try {
-                return [file, await loadGlb(file)];
+                return [file, await loadGlb(file, imageBatch)];
             }
             catch (error) {
                 console.warn(`Graveyard wreck ${file} failed to load.`, error);
@@ -2850,6 +2851,7 @@ export class SpaceRenderer {
         }
     }
     createWreckNodes() {
+        this.tmpWreckColor ??= new THREE.Color();
         // Salvage nodes are solid chunks of the wreck, not wireframe markers: a
         // handful of irregular geometries and a value tint read as debris worth
         // extracting rather than "yellow lines forming a shape".
@@ -2919,26 +2921,30 @@ export class SpaceRenderer {
         const loosePlate=new THREE.ExtrudeGeometry(plateShape,{depth:.055,bevelEnabled:false});
         groups.forEach((entries, key) => {
             const [geometryIndex, tier] = key.split(':');
+            const variants = [];
+            for (const entry of entries) {
+                entry.variants = variants;
+                this.wreckRenderEntries.push(entry);
+            }
           for(const face of [-1,0,1,2,3,4,5]){
             const damaged=face>=0;
             const mesh = new THREE.InstancedMesh(damaged?getDamagedWreckNodeGeometry(Number(geometryIndex),face):geometries[Number(geometryIndex)], damaged?damagedMaterials[tier]:(tier === 'tech' ? techMaterial : bulkMaterial), entries.length);
-            const white=this.tmpWreckColor??=new THREE.Color();
-            for(let i=0;i<entries.length;i++)mesh.setColorAt(i,white.setRGB(1,1,1));
-            mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+            mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(entries.length * 3), 3).setUsage(THREE.DynamicDrawUsage);
             mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
             mesh.frustumCulled = false;
             mesh.name = `wreck-nodes-${key}`;
             mesh.userData.targetKind = 'wreck';
-            mesh.userData.nodeIndices = entries.map((entry) => entry.nodeIndex);
+            mesh.userData.nodeIndices = [];
             root?.add(mesh);
-            const batchEntries=entries.map(entry=>({...entry}));
             let plate;
             if(damaged){
                 plate=new THREE.InstancedMesh(loosePlate,tier==='tech'?techMaterial:bulkMaterial,entries.length);
                 plate.instanceMatrix.setUsage(THREE.DynamicDrawUsage);plate.frustumCulled=false;
                 plate.name='opened-wreck-loose-plate';root?.add(plate);
             }
-            this.wreckBatches.push({ mesh, entries:batchEntries, damaged, face, plate });
+            const batch = { mesh, entries: [], damaged, face, plate };
+            variants.push(batch); // intact, then the six possible impact faces
+            this.wreckBatches.push(batch);
             if(!damaged)entries.forEach((entry) => this.wreckNodeMeshes.set(entry.node.id, mesh));
           }
         });
@@ -2995,66 +3001,75 @@ export class SpaceRenderer {
     updateWreckNodeInstances(dt = 0) {
         const cam = this.camera.position;
         for (const batch of this.wreckBatches) {
-            let matrixStart = Infinity, matrixEnd = 0;
-            let colorStart = Infinity, colorEnd = 0;
-            let visibleCount=0;
-            batch.entries.forEach((entry, index) => {
-                const node = entry.node;
-                const dx = node.position[0] - cam.x;
-                const dy = node.position[1] - cam.y;
-                const dz = node.position[2] - cam.z;
-                const culled = dx * dx + dy * dy + dz * dz > WRECK_RENDER_DISTANCE_SQ && node.id !== this.selectedWreckId;
-                const damaged = Boolean(node.salvageDamaged || node.remaining <= 0);
-                const hidden = culled || damaged !== batch.damaged || damaged && salvageImpactFace(node)!==batch.face;
-                if(!hidden)visibleCount++;
-                const stateChanged = entry.hidden !== hidden;
-                const scorched=Boolean(node.salvageScorched || damaged);
-                const colorChanged=entry.scorched!==scorched;
-                if (entry.initialized && !stateChanged && !colorChanged && (hidden || dt <= 0))
-                    return;
-                if(colorChanged){
-                    const shade=scorched ? .73 : 1;
-                    batch.mesh.setColorAt(index,this.tmpWreckColor.setRGB(shade,shade*.98,shade*.95));
-                    entry.scorched=scorched;colorStart=Math.min(colorStart,index*3);colorEnd=(index+1)*3;
+            batch.nextCount = 0;
+            batch.matrixStart = batch.colorStart = Infinity;
+            batch.matrixEnd = batch.colorEnd = 0;
+        }
+        for (const entry of this.wreckRenderEntries) {
+            const node = entry.node;
+            const dx = node.position[0] - cam.x, dy = node.position[1] - cam.y, dz = node.position[2] - cam.z;
+            if (dx * dx + dy * dy + dz * dz > WRECK_RENDER_DISTANCE_SQ && node.id !== this.selectedWreckId) continue;
+            const damaged = Boolean(node.salvageDamaged || node.remaining <= 0);
+            const batch = entry.variants[damaged ? 1 + salvageImpactFace(node) : 0];
+            const index = batch.nextCount++;
+            const reassigned = batch.entries[index] !== entry;
+            if (reassigned) {
+                batch.entries[index] = entry;
+                batch.mesh.userData.nodeIndices[index] = entry.nodeIndex;
+            }
+            const scorched = Boolean(node.salvageScorched || damaged);
+            const colorChanged = reassigned || entry.scorched !== scorched;
+            if (colorChanged) {
+                const shade = scorched ? .73 : 1;
+                batch.mesh.setColorAt(index, this.tmpWreckColor.setRGB(shade, shade * .98, shade * .95));
+                entry.scorched = scorched;
+                batch.colorStart = Math.min(batch.colorStart, index * 3);
+                batch.colorEnd = (index + 1) * 3;
+            }
+            if (dt > 0) {
+                entry.rotation[0] += dt * .22;
+                entry.rotation[1] -= dt * .17;
+            } else if (!colorChanged) continue;
+
+            const scale = wreckNodeVisualScale(node);
+            this.tmpPosition.fromArray(node.position);
+            this.tmpEuler.set(...entry.rotation);
+            this.tmpQuaternion.setFromEuler(this.tmpEuler);
+            this.tmpScale.setScalar(scale);
+            this.tmpMatrix.compose(this.tmpPosition, this.tmpQuaternion, this.tmpScale);
+            batch.mesh.setMatrixAt(index, this.tmpMatrix);
+            if (batch.plate) {
+                const platePosition = this.tmpWreckPlatePosition ??= new THREE.Vector3();
+                const plateRotation = this.tmpWreckPlateRotation ??= new THREE.Quaternion();
+                const plateTilt = this.tmpWreckPlateTilt ??= new THREE.Quaternion().setFromEuler(new THREE.Euler(.28, -.22, .36));
+                const local = node.salvageImpactLocal;
+                if (local) {
+                    const normal = this.tmpWreckPlateNormal ??= new THREE.Vector3();
+                    normal.fromArray(local).normalize();
+                    platePosition.fromArray(local).addScaledVector(normal, .10).multiplyScalar(scale).applyQuaternion(this.tmpQuaternion).add(this.tmpPosition);
+                    plateRotation.setFromUnitVectors(this.tmpWreckPlateAxis ??= new THREE.Vector3(0, 0, 1), normal).premultiply(this.tmpQuaternion).multiply(plateTilt);
+                } else {
+                    platePosition.set(.5, .22, .18).multiplyScalar(scale).applyQuaternion(this.tmpQuaternion).add(this.tmpPosition);
+                    plateRotation.copy(this.tmpQuaternion).multiply(plateTilt);
                 }
-                if (!hidden && dt > 0) {
-                    entry.rotation[0] += dt * 0.22;
-                    entry.rotation[1] -= dt * 0.17;
-                }
-                entry.culled = culled;
-                entry.hidden = hidden;
-                entry.initialized = true;
-                this.tmpPosition.set(...node.position);
-                this.tmpEuler.set(...entry.rotation);
-                this.tmpQuaternion.setFromEuler(this.tmpEuler);
-                this.tmpScale.setScalar(hidden ? HIDDEN_SCALE[0] : wreckNodeVisualScale(node));
-                this.tmpMatrix.compose(this.tmpPosition, this.tmpQuaternion, this.tmpScale);
-                batch.mesh.setMatrixAt(index, this.tmpMatrix);
-                if(batch.plate){
-                    const platePosition=this.tmpWreckPlatePosition??=new THREE.Vector3();
-                    const plateRotation=this.tmpWreckPlateRotation??=new THREE.Quaternion();
-                    const plateTilt=this.tmpWreckPlateTilt??=new THREE.Quaternion().setFromEuler(new THREE.Euler(.28,-.22,.36));
-                    const local=node.salvageImpactLocal;
-                    if(local){
-                        const normal=this.tmpWreckPlateNormal??=new THREE.Vector3();
-                        normal.fromArray(local).normalize();
-                        platePosition.fromArray(local).addScaledVector(normal,.10).multiplyScalar(wreckNodeVisualScale(node)).applyQuaternion(this.tmpQuaternion).add(this.tmpPosition);
-                        plateRotation.setFromUnitVectors(this.tmpWreckPlateAxis??=new THREE.Vector3(0,0,1),normal).premultiply(this.tmpQuaternion).multiply(plateTilt);
-                    }else{
-                        platePosition.set(.5,.22,.18).multiplyScalar(wreckNodeVisualScale(node)).applyQuaternion(this.tmpQuaternion).add(this.tmpPosition);
-                        plateRotation.copy(this.tmpQuaternion).multiply(plateTilt);
-                    }
-                    this.tmpMatrix.compose(platePosition,plateRotation,this.tmpScale);
-                    batch.plate.setMatrixAt(index,this.tmpMatrix);
-                }
-                matrixStart = Math.min(matrixStart, index * 16);
-                matrixEnd = (index + 1) * 16;
-            });
-            markAttributeSpan(batch.mesh.instanceMatrix, matrixStart, matrixEnd);
-            if(batch.plate)markAttributeSpan(batch.plate.instanceMatrix,matrixStart,matrixEnd);
-            if(batch.mesh.instanceColor)markAttributeSpan(batch.mesh.instanceColor,colorStart,colorEnd);
-            batch.mesh.visible=visibleCount>0;
-            if(batch.plate)batch.plate.visible=visibleCount>0;
+                this.tmpMatrix.compose(platePosition, plateRotation, this.tmpScale);
+                batch.plate.setMatrixAt(index, this.tmpMatrix);
+            }
+            batch.matrixStart = Math.min(batch.matrixStart, index * 16);
+            batch.matrixEnd = (index + 1) * 16;
+        }
+        for (const batch of this.wreckBatches) {
+            const { mesh, plate, nextCount, matrixStart, matrixEnd, colorStart, colorEnd } = batch;
+            if (matrixEnd > matrixStart || mesh.count !== nextCount) mesh.boundingSphere = null;
+            mesh.count = batch.entries.length = nextCount;
+            mesh.visible = nextCount > 0;
+            markAttributeSpan(mesh.instanceMatrix, matrixStart, matrixEnd);
+            markAttributeSpan(mesh.instanceColor, colorStart, colorEnd);
+            if (plate) {
+                plate.count = nextCount;
+                plate.visible = mesh.visible;
+                markAttributeSpan(plate.instanceMatrix, matrixStart, matrixEnd);
+            }
         }
     }
     createHyperdriveStreakTexture() {
@@ -5277,8 +5292,9 @@ export class SpaceRenderer {
             for (const { mesh } of this.asteroidMeshes)
                 targets.push(mesh);
         }
-        if (this.activeInstanceId === 'mourning-line')
-            targets.push(...this.wreckBatches.map(({ mesh }) => mesh));
+        if (this.activeInstanceId === 'mourning-line') {
+            for (const { mesh } of this.wreckBatches) if (mesh.visible) targets.push(mesh);
+        }
         targets.push(...[...(this.combatLootMeshes?.values()??[])].filter(m=>m.visible));
         targets.push(...this.pickupMeshes.values());
         const hits = this.raycaster.intersectObjects(targets, true);

@@ -1,5 +1,11 @@
 Original prompt: Review and revise all equipment names for ambiguity and visible tiers.
 
+Follow-up: find additional performance savings and push the verified work to main.
+- Compared 0.8.2nc against the previous package (0.8.2nb). Shardbelt preparation in three alternating fresh contexts per build took 1.29 → 0.99 s on Android Chrome and 1.82 → 1.10 s on iPhone WebKit. All terrain vertex attributes, indices, collision tiles and bounds matched by hash.
+- Updating the Mourning Line collision grid took 0.70 → 0.15 ms in host trials. Across 484 hull checks on three race routes, all positions and velocities matched, including 91 forced impacts.
+- Shared identical image sources within the graveyard model load: 52 → 27 decodes and 41 → 23 GPU textures. Wreck images matched in both phone profiles, after disposing other models and after Chrome's context recovery. The damaged salvage benchmark submitted 4,524 triangles rather than 20,544, with matching visible transforms, colors and target IDs.
+- Android Chrome passed the scan, shooting, loot and stripped-wreck targeting sequence; iPhone WebKit passed wreck interiors, NPC passages and repeated field entry. Reviewed both gameplay screenshots. Packaged 0.8.2nc.
+
 Follow-up: improve game performance substantially, especially on smartphones, without noticeably changing visuals, gameplay, or flight AI.
 - Packed the original six-decimal wreck coordinates and kept each section's farthest point, triangle winding and order. The three-run cold Node benchmark for profile import, world setup and seeded graveyard layout went from 725 ms to 318 ms. Full triangle streams, bounds and debris placements matched the previous package by SHA-256. Every node and leaf order in all 48 unique wreck collision trees also matched.
 - Reused the stationary Shardbelt grid and tightened hull queries; kept off-camera shadow casters while culling unused color draws. An isolated iPhone WebKit comparison measured 180 → 90 draw calls for 30 laser shots and 560 → 163 submitted rocks in a field-center view, with identical framebuffers. Steady cockpit updates in Android Chromium went from 26 DOM writes to zero per refresh. These are emulator and host measurements.
