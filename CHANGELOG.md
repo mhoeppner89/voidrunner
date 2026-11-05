@@ -1,3 +1,9 @@
+## 0.8.2nd — Clearer phone graphics
+
+- Smooth enlarged pixels on ship silhouettes and cockpit artwork. Draw the radar and hull schematics at up to 2× density on touch displays.
+- Recover a little flight detail between resolution steps on High and Auto. Low quality and the fallback for slow frames retain their existing budgets.
+- Display the original painted dock background on phones and draw the ship, shadow and reflection over it. Shipyard and repaint previews also use smooth scaling.
+
 ## 0.8.2nc — Faster asteroid and wreck fields
 
 - Reuse rock noise and smooth surface normals when generating Shardbelt terrain. Check only nearby craters while preserving the original vertex and collision buffers.

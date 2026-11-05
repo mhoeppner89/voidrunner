@@ -473,7 +473,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2nc';
+const GAME_VERSION = '0.8.2nd';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -982,6 +982,7 @@ export class GameUI {
         }
         this.updateOrientationNotice();
         window.addEventListener('resize', () => {
+            this.monitorRatio = monitorRasterRatio();
             this.radarLayoutDirty = true;
             this.cockpitVisibilityDirty = true;
             this.updateOrientationNotice();
@@ -4879,12 +4880,12 @@ export class GameUI {
         if (!canvas)
             return;
         const ctx = canvas.getContext('2d');
-        const ratio = monitorRasterRatio();
+        const ratio = this.monitorRatio ??= monitorRasterRatio();
         const size = (this.hullCanvasSizes ??= new CanvasSizeCache()).get(canvas);
         const cssW = size.width || 150;
         const cssH = size.height || 110;
-        const width = Math.max(60, Math.floor(cssW * ratio));
-        const height = Math.max(60, Math.floor(cssH * ratio));
+        const width = Math.floor(Math.max(60, cssW) * ratio);
+        const height = Math.floor(Math.max(60, cssH) * ratio);
         // Stations/rocks/planets have fixed schematics. Redrawing and uploading
         // their identical canvas at HUD frequency cannot add information.
         if (this.objectOutlineCanvas===canvas && this.objectOutlineKind===kind
@@ -5015,12 +5016,12 @@ export class GameUI {
             return;
         if (this.objectOutlineCanvas===canvas)this.objectOutlineCanvas=undefined;
         const ctx = canvas.getContext('2d');
-        const ratio = monitorRasterRatio();
+        const ratio = this.monitorRatio ??= monitorRasterRatio();
         const size = (this.hullCanvasSizes ??= new CanvasSizeCache()).get(canvas);
         const cssW = size.width || 150;
         const cssH = size.height || 110;
-        const width = Math.max(60, Math.floor(cssW * ratio));
-        const height = Math.max(60, Math.floor(cssH * ratio));
+        const width = Math.floor(Math.max(60, cssW) * ratio);
+        const height = Math.floor(Math.max(60, cssH) * ratio);
         // The own-ship display has a fixed heading. Keep its bitmap until
         // its contents or size change; target outlines still redraw normally.
         const ownDrawKey = canvas === this.ownHullCanvas
@@ -5122,7 +5123,7 @@ export class GameUI {
         if (missileCapacity > 0) {
             // Sized off the canvas, not the hull-cell scale: narrow long hulls
             // (29x44 cells) would shrink the darts to sub-pixel dots.
-            const ms = Math.max(4, Math.min(width, height) * 0.055);
+            const ms = Math.max(4 * ratio, Math.min(width, height) * 0.055);
             const halfW = ms * 0.55;
             const finW = ms * 0.35;
             const tip = -ms * 1.2;
@@ -5154,7 +5155,7 @@ export class GameUI {
                 ctx.stroke();
             };
             const hullHalf = (gridW / 2) * scale;
-            const sideOffset = Math.min(Math.max(hullHalf + ms * 0.9 + 3, ms * 1.4), width / 2 - halfW - finW - 2);
+            const sideOffset = Math.min(Math.max(hullHalf + ms * 0.9 + 3 * ratio, ms * 1.4), width / 2 - halfW - finW - 2 * ratio);
             const leftCount = Math.ceil(missileCapacity / 2);
             const step = ms * 2.35 + ms * 0.8;
             const stackTop = (count) => cy - (count * step - ms * 0.8) / 2;
@@ -5173,7 +5174,7 @@ export class GameUI {
     }
     drawRadar(contacts, rings, searchRings = [], warpCombat = 0.2) {
         const canvas = this.radarContext.canvas;
-        const ratio = monitorRasterRatio();
+        const ratio = this.monitorRatio ??= monitorRasterRatio();
         if (ratio !== this.radarPixelRatio)
             this.radarLayoutDirty = true;
         if (this.radarLayoutDirty || this.radarCssWidth <= 0 || this.radarCssHeight <= 0) {
@@ -5185,8 +5186,8 @@ export class GameUI {
                 this.radarLayoutDirty = false;
             }
         }
-        const width = Math.max(72, Math.floor((this.radarCssWidth || 150) * ratio));
-        const height = Math.max(72, Math.floor((this.radarCssHeight || 150) * ratio));
+        const width = Math.floor(Math.max(72, this.radarCssWidth || 150) * ratio);
+        const height = Math.floor(Math.max(72, this.radarCssHeight || 150) * ratio);
         if (canvas.width !== width || canvas.height !== height) {
             canvas.width = width;
             canvas.height = height;

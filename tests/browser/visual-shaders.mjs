@@ -25,7 +25,16 @@ for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heig
  await page.locator('[data-market-point="equipment"]').click();await page.screenshot({path:`${out}/${name}-equipment.png`});
  const dock=await page.locator('#dock-screen').evaluate(e=>({width:e.clientWidth,scrollWidth:e.scrollWidth,screen:innerWidth,filter:getComputedStyle(document.querySelector('#game-shell')).filter}));assert.ok(dock.scrollWidth<=dock.width+1,JSON.stringify(dock));
  await page.evaluate(async()=>{const r=__VOID_PRIVATEER__.getRuntime();r.ui.hideDock();await r.launch();cancelAnimationFrame(r.frameId);r.save.player.position.splice(0,3,0,90000,0);r.save.player.velocity.fill(0);r.save.player.throttle=0;r.ships=[];r.resetPlayerInterpolation(true);r.syncRender(0,performance.now());r.renderer.render();});
- const sprite=await page.locator('.cockpit-art').evaluate(e=>({insideFinish:!!e.closest('[data-pixel-finish="native"]'),sampling:getComputedStyle(e).imageRendering,finish:getComputedStyle(e.closest('#game-shell')).filter}));assert.ok(sprite.insideFinish&&sprite.finish==='none');assert.equal(sprite.sampling,'pixelated');
+ const sprite=await page.locator('.cockpit-art').evaluate(e=>{
+  const radar=document.querySelector('#radar'), ui=__VOID_PRIVATEER__.getRuntime().ui;
+  return {insideFinish:!!e.closest('[data-pixel-finish="native"]'),sampling:getComputedStyle(e).imageRendering,
+   radarSampling:getComputedStyle(radar).imageRendering,radarWidth:radar.width,radarCssWidth:ui.radarCssWidth,
+   ratio:ui.radarPixelRatio,finish:getComputedStyle(e.closest('#game-shell')).filter};
+ });assert.ok(sprite.insideFinish&&sprite.finish==='none');
+ const sampling=name==='desktop'?'pixelated':'auto';
+ assert.equal(sprite.sampling,sampling);assert.equal(sprite.radarSampling,sampling);
+ assert.equal(sprite.ratio,name==='desktop'?1:2);assert.ok(sprite.radarCssWidth>0);
+ assert.equal(sprite.radarWidth,Math.floor(Math.max(72,sprite.radarCssWidth)*sprite.ratio));
  const hulls=[];
  for(const hull of ['wayfarer','talon','atlas']){
   await page.evaluate(async hull=>{const r=__VOID_PRIVATEER__.getRuntime();r.save.player.shipId=hull;r._statsDirty=true;r.ui.setCockpitShip(hull);r.syncRender(0,performance.now());await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));},hull);
@@ -51,7 +60,7 @@ for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heig
  await page.locator('.cockpit-screen-own').click({position:{x:10,y:10}});await page.locator('[data-ship-section="equipment"]').click();await page.screenshot({path:`${out}/${name}-console.png`});await page.locator('[data-ui-command="close-ship"]').click();
  assert.equal(await page.locator('#void-pixel-finish').count(),0,'no monitor colour filter is installed');
  assert.equal(await page.locator('[data-retro-sprite]').count(),0,'sprites keep their original pixels');
- const resources=await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime().renderer,before={...r.renderer.info.memory};for(let i=0;i<20;i++)r.render();return{before,after:{...r.renderer.info.memory},scale:+r.renderer.domElement.dataset.pixelScale,size:r.renderer.domElement.dataset.renderResolution,phone:!!r.pixelSceneTarget,bloom:!!r.bloomSceneTarget};});assert.deepEqual(resources.after,resources.before);assert.ok(Number.isInteger(resources.scale)&&resources.scale>=1);if(name==='iphone'){assert.ok(resources.phone);assert.ok(!resources.bloom);}
+ const resources=await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime().renderer,before={...r.renderer.info.memory};for(let i=0;i<20;i++)r.render();return{before,after:{...r.renderer.info.memory},scale:+r.renderer.domElement.dataset.pixelScale,sampling:getComputedStyle(r.renderer.domElement).imageRendering,size:r.renderer.domElement.dataset.renderResolution,phone:!!r.pixelSceneTarget,bloom:!!r.bloomSceneTarget};});assert.deepEqual(resources.after,resources.before);assert.ok(resources.scale>=1);assert.equal(resources.sampling,sampling);if(name==='desktop')assert.ok(Number.isInteger(resources.scale));if(name==='iphone'){assert.ok(resources.phone);assert.ok(!resources.bloom);}
  const budget=await page.evaluate(()=>{
   const r=__VOID_PRIVATEER__.getRuntime().renderer,root=document.querySelector('#game-shell'),mode=r.qualityMode,scale=r.lastQualityScale;
   r.setQualityMode('low');r.render();const low={filter:getComputedStyle(root).filter,instrument:getComputedStyle(document.querySelector('.cockpit-screen')).filter};

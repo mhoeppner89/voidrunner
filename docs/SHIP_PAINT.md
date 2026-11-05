@@ -35,7 +35,7 @@ the turntable for inspection, then it resumes smoothly after two seconds; the
 camera keeps a fixed distance. Reduced-motion preferences disable automatic
 turning. Hidden or detached previews do not draw. Both previews share neutral inspection lighting and nearest texture
 magnification. Their linear-HDR final pixel shader is the same as spaceflight,
-with transparent, premultiplied edges over the dock art. Their integer pixel grid follows the viewport; the render target and final
+with transparent, premultiplied edges over the dock art. Desktop uses an integer pixel grid and phone previews use smooth scaling. The render target and final
 quad are reused and released with the preview. No dithering, palette conversion
 or close-range blur is added. Masks
 are cached once per hull/material and remain available across preview reuse.

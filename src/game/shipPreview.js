@@ -53,7 +53,7 @@ export class ShipPreview {
         this.renderer.domElement.className = 'ship-preview-canvas';
         this.renderer.domElement.style.width = '100%';
         this.renderer.domElement.style.height = '100%';
-        this.renderer.domElement.style.imageRendering = 'pixelated';
+        this.renderer.domElement.style.imageRendering = touchDevice ? 'auto' : 'pixelated';
         this.renderer.domElement.setAttribute('aria-hidden', 'true');
         container.appendChild(this.renderer.domElement);
 
@@ -185,12 +185,15 @@ export class ShipPreview {
             return;
         const width = Math.max(1, this.container.clientWidth);
         const height = Math.max(1, this.container.clientHeight);
-        const scale=pixelRenderSize(window.innerWidth,window.innerHeight,this.touchDevice?720:960).scale;
+        const scale=pixelRenderSize(window.innerWidth,window.innerHeight,this.touchDevice?720:960,this.touchDevice).scale;
         if(width===this.cssWidth&&height===this.cssHeight&&scale===this.pixelScale)return;
         this.cssWidth=width;this.cssHeight=height;this.pixelScale=scale;
         const w=Math.ceil(width/scale),h=Math.ceil(height/scale);
         this.renderer.setSize(w,h,false);this.pixelTarget.setSize(w,h);
-        const canvas=this.renderer.domElement;canvas.style.width=`${w*scale}px`;canvas.style.height=`${h*scale}px`;canvas.dataset.pixelScale=String(scale);
+        const canvas=this.renderer.domElement;
+        canvas.style.width=this.touchDevice?'100%':`${w*scale}px`;
+        canvas.style.height=this.touchDevice?'100%':`${h*scale}px`;
+        canvas.dataset.pixelScale=String(scale);
         this.camera.aspect = width / height;
         this.camera.updateProjectionMatrix();
         this.updateCameraFraming();

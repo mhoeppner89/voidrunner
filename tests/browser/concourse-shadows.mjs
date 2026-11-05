@@ -53,10 +53,10 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
    }
    for(let i=1;i<heights.length;i++){assert.ok(heights[i].opacity<heights[i-1].opacity);assert.ok(heights[i].radius>heights[i-1].radius);}assert.equal(heights.at(-1).pixels,0,'no floating shadow once clear of pad');
    const cadence=await page.evaluate(()=>{
-    const v=__VOID_PRIVATEER__.getRuntime().ui.concourseShip,frames=[];v.phase='landing';v.finish.uniforms.uHasBackdrop.value=0;
+    const v=__VOID_PRIVATEER__.getRuntime().ui.concourseShip,frames=[],backdrop=v.finish.uniforms.uHasBackdrop.value;v.phase='landing';v.finish.uniforms.uHasBackdrop.value=0;
     for(let i=0;i<12;i++){v.pivot.visible=true;v.applyPose({x:-.3+i*.05,y:.2+i*.01,z:0,pitch:0,yaw:0,roll:0,scale:1,thrust:0});const before=shadowDraws;v.render();v.pivot.visible=false;v.render();frames.push({...shadowRead(),updates:shadowDraws-before});}
     v.pivot.visible=true;v.applyPose({x:8,y:4,z:8,pitch:0,yaw:0,roll:0,scale:1,thrust:0});const before=shadowDraws;v.render();const distantUpdates=shadowDraws-before;
-    v.finish.uniforms.uHasBackdrop.value=1;v.phase='idle';v.resetPose();v.reflection.plane.visible=v.profile.reflection>0;v.reflection.dirty=true;v.render();return{frames,distantUpdates};
+    v.finish.uniforms.uHasBackdrop.value=backdrop;v.phase='idle';v.resetPose();v.reflection.plane.visible=v.profile.reflection>0;v.reflection.dirty=true;v.render();return{frames,distantUpdates};
    });assert.ok(cadence.frames.every(f=>f.updates===1),'one fresh shadow per visible frame');assert.equal(cadence.distantUpdates,0,'skip distant shadow-map passes');assert.ok(new Set(cadence.frames.map(f=>`${f.cx.toFixed(2)},${f.cy.toFixed(2)}`)).size>=10,'shadow moves every frame');
    motion.push({location,hull,heights,cadence});
   }

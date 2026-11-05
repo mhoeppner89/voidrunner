@@ -411,8 +411,7 @@ export class SpaceRenderer {
         this.renderer.setClearColor(0x0d1a3c, 1);
         this.container.appendChild(this.renderer.domElement);
         this.renderer.domElement.id = 'space-canvas';
-        this.renderer.domElement.classList.add('retro-pixel-canvas');
-        this.renderer.domElement.style.imageRendering = 'pixelated';
+        this.renderer.domElement.classList.toggle('touch-flight-canvas', this.touchDevice || this.isIOS);
         this.renderer.domElement.setAttribute('aria-label', 'Three-dimensional spaceflight view');
         // Keep the far wake readable while letting the closer wreck layers
         // separate from one another through a gentle distance falloff.
@@ -6708,11 +6707,13 @@ export class SpaceRenderer {
             viewportWidth: this.viewportWidth,
         });
         const desiredWidth=Math.max(288,Math.min(this.viewportWidth,baseWidth)*this.lastQualityScale);
-        const {width:renderWidth,height:renderHeight,scale:pixelScale}=pixelRenderSize(this.viewportWidth,this.viewportHeight,desiredWidth);
+        const phone = this.touchDevice || this.isIOS;
+        const recoverDetail = phone && this.qualityMode !== 'low' && this.lastQualityScale >= 0.8;
+        const {width:renderWidth,height:renderHeight,scale:pixelScale}=pixelRenderSize(this.viewportWidth,this.viewportHeight,desiredWidth,recoverDetail);
         const outputChanged=this.renderer.domElement.width!==renderWidth||this.renderer.domElement.height!==renderHeight;
         if(outputChanged)this.renderer.setSize(renderWidth,renderHeight,false);
-        this.renderer.domElement.style.width = `${renderWidth*pixelScale}px`;
-        this.renderer.domElement.style.height = `${renderHeight*pixelScale}px`;
+        this.renderer.domElement.style.width = `${phone ? this.viewportWidth : renderWidth*pixelScale}px`;
+        this.renderer.domElement.style.height = `${phone ? this.viewportHeight : renderHeight*pixelScale}px`;
         this.renderer.domElement.style.maxWidth='none';
         this.renderer.domElement.dataset.pixelScale=String(pixelScale);
         this.renderer.domElement.dataset.renderResolution = `${renderWidth}x${renderHeight}`;

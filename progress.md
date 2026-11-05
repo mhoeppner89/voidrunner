@@ -1,5 +1,10 @@
 Original prompt: Review and revise all equipment names for ambiguity and visible tiers.
 
+Follow-up: review inexpensive visual upgrades and reduce smartphone pixelation.
+- Traced the coarse appearance to nearest-neighbour enlargement of the flight canvas, cockpit plates and ship previews, and a dock background downsampled into the ship buffer. Revised mobile sampling and cockpit instrument density, with bounded flight detail and a separately composited dock painting.
+- In a matched iPhone 13 WebKit flight scene the 3D buffer went from 375×171 to 416×190, with 78 draw calls in both captures. On the Pixel 7 profile the 1,280px dock painting previously passed through a 432×180 buffer. The revised dock releases one GPU texture.
+- In the alternating Pixel 7 SwiftShader check, the median presented interval was 33.4 ms with both finishes. The run included long stalls, so these browser timings do not establish worst-case handset performance. Desktop Chrome, Android Chrome and iPhone WebKit passed the cockpit checks; both phone profiles passed dock, transition and showroom checks. Packaged 0.8.2nd.
+
 Follow-up: find additional performance savings and push the verified work to main.
 - Compared 0.8.2nc against the previous package (0.8.2nb). Shardbelt preparation in three alternating fresh contexts per build took 1.29 → 0.99 s on Android Chrome and 1.82 → 1.10 s on iPhone WebKit. All terrain vertex attributes, indices, collision tiles and bounds matched by hash.
 - Updating the Mourning Line collision grid took 0.70 → 0.15 ms in host trials. Across 484 hull checks on three race routes, all positions and velocities matched, including 91 forced impacts.

@@ -27,14 +27,28 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
     const width=v.sceneViewport.z,height=v.sceneViewport.w;
     const read=()=>{const pixels=new Uint8Array(width*height*4);gl.readPixels(0,0,width,height,gl.RGBA,gl.UNSIGNED_BYTE,pixels);const rect=v.canvas.getBoundingClientRect(),sx=rect.width/v.canvas.width,sy=rect.height/v.canvas.height;return{pixels,rect:{x:rect.left,y:rect.bottom-height*sy,w:width*sx,h:height*sy}};};
     const retained=read(),capacity=[v.canvas.width,v.canvas.height];
+    const plate=v.outputHost.querySelector(':scope > img');
+    let painted;
+    if(plate){
+     let transparentPixels=0,solidPixels=0;
+     for(let i=3;i<retained.pixels.length;i+=4){if(retained.pixels[i]===0)transparentPixels++;else if(retained.pixels[i]===255)solidPixels++;}
+     painted={width:plate.naturalWidth,visible:getComputedStyle(plate).opacity==='1',sampledInWebGL:Boolean(v.finish.uniforms.tBackdrop.value),transparentPixels,solidPixels};
+    }
     try{
      v.resizeOutput=function(w,h,scale){this.renderer.setSize(w,h,false);this.target.setSize(w,h);Object.assign(this.canvas.style,{width:`${w*scale}px`,height:`${h*scale}px`,transform:'none'});};
      v.resize();v.render();const legacy=read();let changed=0,max=0,sum=0;
      for(let i=0;i<legacy.pixels.length;i++){const d=Math.abs(legacy.pixels[i]-retained.pixels[i]);if(d)changed++;max=Math.max(max,d);sum+=d;}
-     return{width,height,capacity,changedChannels:changed,maxDifference:max,meanDifference:sum/legacy.pixels.length,retained:retained.rect,legacy:legacy.rect,canvasDepth:gl.getContextAttributes().depth};
+     return{width,height,capacity,painted,changedChannels:changed,maxDifference:max,meanDifference:sum/legacy.pixels.length,retained:retained.rect,legacy:legacy.rect,canvasDepth:gl.getContextAttributes().depth};
     }finally{v.resizeOutput=resize;v.resize();v.render();}
    });
    assert.equal(report.canvasDepth,false);assert.equal(report.maxDifference,0,`${name}/${scene}: pixel output changed`);for(const key of ['x','y','w','h'])assert.ok(Math.abs(report.retained[key]-report.legacy[key])<.01,`${name}/${scene}: ${key} shifted`);
+   if(scene==='dock'){
+    assert.ok(report.painted?.width>0,'original artwork is decoded');
+    assert.equal(report.painted.visible,name!=='desktop');
+    assert.equal(report.painted.sampledInWebGL,name==='desktop');
+    assert.ok(report.painted.solidPixels>100,'ship and deck are drawn');
+    if(name!=='desktop')assert.ok(report.painted.transparentPixels>report.width*report.height/2,'the dock canvas reveals the native plate behind the ship');
+   }
    await page.screenshot({path:`${out}/${name}-${scene}.png`});reports.push({scene,...report});
    if(scene!=='dock')await page.evaluate(async()=>{const v=__VOID_PRIVATEER__.getRuntime().ui.concourseShip;v.skipAtmosphere();await outputShot;v.stop();});
   }

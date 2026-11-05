@@ -20,11 +20,12 @@ export function createConcourseFinish(){
   }
   void main(){
    vec4 ship=texture2D(tScene,vUv);float alpha=ship.a;
+   bool paintPlate=uConcourse*uHasBackdrop>.5;
+   if(!paintPlate&&alpha<.001){gl_FragColor=vec4(0.);return;}
    vec3 radiance=finiteColour(ship.rgb/max(alpha,.001));
    vec3 colour=srgb(uConcourse>.5?vec3(1.)-exp(-radiance*uExposure):neutralToneMapping(radiance))*alpha;
    if(uConcourse>.5)colour*=1.-shipInk(alpha)*.43;
-   if(uConcourse*uHasBackdrop>.5){vec3 plate=texture2D(tBackdrop,uBackdropUV.xy+vUv*uBackdropUV.zw).rgb;colour+=plate*(1.-alpha);alpha=1.;}
-   if(alpha<.001){gl_FragColor=vec4(0.);return;}
+   if(paintPlate){vec3 plate=texture2D(tBackdrop,uBackdropUV.xy+vUv*uBackdropUV.zw).rgb;colour+=plate*(1.-alpha);alpha=1.;}
    colour/=alpha;
    gl_FragColor=vec4(clamp(colour,0.,1.)*alpha*uFade,alpha);
   }`});

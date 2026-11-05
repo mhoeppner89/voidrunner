@@ -13,8 +13,8 @@ import {CONCOURSE_LAYOUTS} from './concourseLayouts.js';
 import {pixelRenderSize} from './retroDisplay.js';
 import {configureShaderDiagnostics,prepareRenderScene,warmRenderBuffers,waitForRenderWork} from './renderWork.js';
 
-// One bounded renderer, reused between dock screens. Composite the painted
-// plate with the owned hull, exhaust, shadow and floor reflection on one grid.
+// One bounded renderer, reused between dock screens, draws the owned hull,
+// exhaust, shadow and floor reflection over the painted plate.
 export const CONCOURSE_HULL_SCALE={atlas:1.48,mule:1.3,torsas:1.28,andromeda:1.17,astra:1.08,prospector:1.08,speedster:.9};
 const staging=(id,options)=>Object.freeze({key:0xcbdcef,sky:0x809bb8,ground:0x263448,rim:0x82b4df,keyIntensity:2.4,fill:.75,rimIntensity:.45,environment:.7,exposure:1,shadow:.34,reflection:.06,elevation:5,position:[-2,8,-5],rimPosition:[4,3,5],...options,...CONCOURSE_LAYOUTS[id]});
 // Match the light sources and floor finish painted into each individual plate.
@@ -106,6 +106,7 @@ export class ConcourseShip {
   this.canvas.style.visibility='hidden';
   if(this.host!==host){if(this.host)this.resizeObserver.unobserve(this.host);this.host=host;this.resizeObserver.observe(host);}
   this.outputHost=this.transit?host:host.closest('#dock-screen')?.querySelector('.dock-backdrop')??host;
+  this.outputHost.classList.toggle('uses-native-backdrop',this.touchDevice&&this.outputHost!==host);
   this.outputHost.append(this.canvas);this.canvas.classList.toggle('is-concourse-composite',this.outputHost!==host);
   this.button=button;host.classList.toggle('has-model',!!this.model);this.resize();
  }
@@ -179,9 +180,15 @@ export class ConcourseShip {
   // rear hemisphere to avoid an artificial panorama seam on curved metal.
   ctx.drawImage(image,0,0,image.naturalWidth,image.naturalHeight,0,0,64,64);
   ctx.save();ctx.translate(128,0);ctx.scale(-1,1);ctx.drawImage(image,0,0,image.naturalWidth,image.naturalHeight,0,0,64,64);ctx.restore();
-  this.backdropKey=key;this.replaceEnvironment(c);this.backdropTexture?.dispose();
-  this.backdropTexture=new THREE.Texture(image);this.backdropTexture.magFilter=THREE.NearestFilter;this.backdropTexture.minFilter=THREE.NearestFilter;this.backdropTexture.generateMipmaps=false;this.backdropTexture.needsUpdate=true;
-  this.finish.uniforms.tBackdrop.value=this.backdropTexture;this.finish.uniforms.uHasBackdrop.value=1;if(!this.transit&&!this.paused)this.render();
+  this.backdropKey=key;this.replaceEnvironment(c);
+  // The phone compositor already has the full painted plate at the correct
+  // crop. Only the transparent hull and its deck lighting need WebGL pixels.
+  if(!this.touchDevice){
+   this.backdropTexture?.dispose();
+   this.backdropTexture=new THREE.Texture(image);this.backdropTexture.magFilter=THREE.NearestFilter;this.backdropTexture.minFilter=THREE.NearestFilter;this.backdropTexture.generateMipmaps=false;this.backdropTexture.needsUpdate=true;
+   this.finish.uniforms.tBackdrop.value=this.backdropTexture;this.finish.uniforms.uHasBackdrop.value=1;
+  }
+  if(!this.paused)this.render();
  }
  resizeOutput(width,height,scale){
   // Keep the default drawing buffer through dock/film switches. Changing its
@@ -294,7 +301,8 @@ export class ConcourseShip {
   finally{this.pivot.visible=pivotVisible;this.ground.visible=groundVisible;this.reflection.plane.visible=reflectionVisible;}
   this.renderer.setRenderTarget(null);this.renderer.setViewport(0,0,this.sceneViewport.z,this.sceneViewport.w);this.renderer.render(this.quad,this.quadCamera);
   this.canvas.style.visibility='';
-  if(!this.transit&&this.outputHost!==this.host)this.outputHost.classList.toggle('has-concourse-composite',this.finish.uniforms.uHasBackdrop.value>0);this.renderCount=(this.renderCount??0)+1;
+  if(!this.transit&&this.outputHost!==this.host)this.outputHost.classList.toggle('has-concourse-composite',Boolean(this.backdropKey));
+  this.renderCount=(this.renderCount??0)+1;
   if(!this.transit&&this.button&&this.phase!=='takeoff'){
    this.bounds.setFromObject(this.pivot);this.camera.updateMatrixWorld();let x0=1,y0=1,x1=-1,y1=-1;
    for(let i=0;i<8;i++){this.point.set(i&1?this.bounds.max.x:this.bounds.min.x,i&2?this.bounds.max.y:this.bounds.min.y,i&4?this.bounds.max.z:this.bounds.min.z).project(this.camera);x0=Math.min(x0,this.point.x);x1=Math.max(x1,this.point.x);y0=Math.min(y0,this.point.y);y1=Math.max(y1,this.point.y);}
