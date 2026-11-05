@@ -53,7 +53,7 @@ export class ShipPreview {
         this.renderer.domElement.className = 'ship-preview-canvas';
         this.renderer.domElement.style.width = '100%';
         this.renderer.domElement.style.height = '100%';
-        this.renderer.domElement.style.imageRendering = touchDevice ? 'auto' : 'pixelated';
+        this.renderer.domElement.style.imageRendering = 'pixelated';
         this.renderer.domElement.setAttribute('aria-hidden', 'true');
         container.appendChild(this.renderer.domElement);
 

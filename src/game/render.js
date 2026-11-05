@@ -411,7 +411,6 @@ export class SpaceRenderer {
         this.renderer.setClearColor(0x0d1a3c, 1);
         this.container.appendChild(this.renderer.domElement);
         this.renderer.domElement.id = 'space-canvas';
-        this.renderer.domElement.classList.toggle('touch-flight-canvas', this.touchDevice || this.isIOS);
         this.renderer.domElement.setAttribute('aria-label', 'Three-dimensional spaceflight view');
         // Keep the far wake readable while letting the closer wreck layers
         // separate from one another through a gentle distance falloff.

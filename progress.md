@@ -1,5 +1,9 @@
 Original prompt: Review and revise all equipment names for ambiguity and visible tiers.
 
+Follow-up: replace blurry phone smoothing with finer, crisp pixels.
+- Restored crisp scaling for flight, cockpit art and ship canvases. Raised the bounded flight and preview resolution where quality permits while retaining the detailed dock background and denser instrument canvases.
+- The iPhone WebKit comparison renders the same flight scene at 512×233 instead of 416×190, with 78 draw calls in each. Reviewed the comparison and verified the low-quality and slow-frame resolution fallbacks. Focused rendering tests, Android flight and the Android paint-preview check passed. The extra pixels can cost more GPU time on physical phones.
+
 Follow-up: review inexpensive visual upgrades and reduce smartphone pixelation.
 - Traced the coarse appearance to nearest-neighbour enlargement of the flight canvas, cockpit plates and ship previews, and a dock background downsampled into the ship buffer. Revised mobile sampling and cockpit instrument density, with bounded flight detail and a separately composited dock painting.
 - In a matched iPhone 13 WebKit flight scene the 3D buffer went from 375×171 to 416×190, with 78 draw calls in both captures. On the Pixel 7 profile the 1,280px dock painting previously passed through a 432×180 buffer. The revised dock releases one GPU texture.

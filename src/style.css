@@ -17537,7 +17537,6 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 #game-shell .cockpit-screen::before { display:none; }
 #game-shell .hull-outline, #game-shell #radar { image-rendering:pixelated; }
 #space-canvas { filter:none; image-rendering:pixelated; }
-#space-canvas.touch-flight-canvas { image-rendering:auto; }
 
 #game-shell button, #game-shell input, #game-shell select, #game-shell textarea,
 #game-shell .cockpit-screen * { font-family:var(--pixel-font); }
@@ -17554,13 +17553,10 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 #game-shell .cockpit-art,
 #game-shell .cockpit-bezel { image-rendering:pixelated; }
 
-/* The painted plates and fine monitor strokes use fractional display pixels
-   on phones. Let the compositor sample them at the panel's actual scale. */
+/* Preserve fine monitor strokes and painted background detail on phones. */
 @media (pointer:coarse) {
-  #game-shell .cockpit-art, #game-shell .cockpit-bezel,
   #game-shell .hull-outline, #game-shell #radar,
-  .title-screen, .dock-backdrop img,
-  #dock-screen .concourse-ship-canvas, .planet-transit .concourse-ship-canvas {
+  .title-screen, .dock-backdrop img {
     image-rendering:auto;
   }
 }

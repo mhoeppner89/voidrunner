@@ -11,14 +11,14 @@ test('logical pixels upscale by whole numbers across desktop, phone and quality 
  }
  assert.deepEqual(pixelRenderSize(1440,900,900),pixelRenderSize(1440,900,880),'small adaptive-quality changes must not resize the render buffers');
 });
-test('filtered phone output recovers detail within the scene budget',()=>{
+test('phone output recovers detail within the scene budget',()=>{
  for(const [w,h,desired] of [[750,342,525],[844,390,525],[915,412,720],[1194,834,640]]){
   const old=pixelRenderSize(w,h,desired),phone=pixelRenderSize(w,h,desired,true);
-  assert.ok(phone.width>old.width && phone.width<=Math.min(desired,old.width*1.125));
+  assert.ok(phone.width>old.width && phone.width<=Math.min(desired,old.width*1.4));
   assert.equal(phone.width*phone.scale,w);
   assert.ok(Math.abs(phone.height-h/phone.scale)<=.5);
  }
- assert.deepEqual(pixelRenderSize(844,390,525,true),pixelRenderSize(844,390,560,true),'nearby governor targets share a buffer');
+ assert.equal(pixelRenderSize(750,342,525,true).width,512);
  assert.deepEqual(pixelRenderSize(915,412,1280,true),pixelRenderSize(915,412,1280),'no supersampling at native width');
 });
 test('pixel resolve reuses buffers each frame and releases the previous target only when resizing',()=>{

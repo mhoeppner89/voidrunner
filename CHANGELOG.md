@@ -1,3 +1,8 @@
+## 0.8.2ne — Crisper phone graphics
+
+- Draw a finer flight and ship-preview pixel grid when the quality budget allows, and retain crisp edges when enlarging it.
+- Keep the detailed painted dock background and high-density cockpit instruments.
+
 ## 0.8.2nd — Clearer phone graphics
 
 - Smooth enlarged pixels on ship silhouettes and cockpit artwork. Draw the radar and hull schematics at up to 2× density on touch displays.

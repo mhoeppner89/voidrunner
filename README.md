@@ -1,8 +1,8 @@
 # Voidrunner
 
-A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2nd**.
+A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2ne**.
 
-On phones, flight and ship previews use smooth scaling, and the radar and hull schematics draw at up to twice their CSS resolution. High and Auto flight quality can use a little more detail between resolution steps. Low quality and the adaptive fallback keep their existing 3D pixel budgets.
+On phones, flight and ship previews use a finer, crisp pixel grid, and the radar and hull schematics draw at up to twice their CSS resolution. High and Auto flight quality can use more detail between resolution steps. Low quality and the adaptive fallback keep their existing 3D pixel budgets.
 
 Phone flight draws fewer off-screen rocks and submits each laser bolt in three draws. The cockpit updates controls only when their displayed state changes. Shardbelt and Mourning Line collision updates reuse stationary obstacles. Shardbelt terrain builds faster, and wreck collision surfaces load from a smaller, lossless representation. Flight physics, AI update rates and graphics settings are unchanged.
 
