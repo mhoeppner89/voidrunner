@@ -1,3 +1,7 @@
+## 0.8.2nf — Finer docked ships on phones
+
+- Use a modestly finer pixel grid for docked ships and shadows on phone displays where the older grid fell to half resolution.
+
 ## 0.8.2ne — Crisper phone graphics
 
 - Draw a finer flight and ship-preview pixel grid when the quality budget allows, and retain crisp edges when enlarging it.

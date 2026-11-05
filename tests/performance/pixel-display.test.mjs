@@ -20,6 +20,9 @@ test('phone output recovers detail within the scene budget',()=>{
  }
  assert.equal(pixelRenderSize(750,342,525,true).width,512);
  assert.deepEqual(pixelRenderSize(915,412,1280,true),pixelRenderSize(915,412,1280),'no supersampling at native width');
+ const dock=pixelRenderSize(863,360,768,true,1.2);
+ assert.equal(dock.width,512);
+ assert.ok(dock.width<=Math.ceil(863/2)*1.2,'dock detail stays within its smaller pixel budget');
 });
 test('pixel resolve reuses buffers each frame and releases the previous target only when resizing',()=>{
  const r=Object.create(SpaceRenderer.prototype);r.renderer={domElement:{width:640,height:360}};

@@ -1,12 +1,12 @@
 // Phones can recover detail between whole-number resolution steps without
 // rendering the 3D scene at the full hardware pixel ratio.
-export function pixelRenderSize(width,height,desiredWidth,recoverDetail=false){
+export function pixelRenderSize(width,height,desiredWidth,recoverDetail=false,detailLimit=1.4){
     const scale=Math.max(1,Math.ceil(width/Math.max(1,desiredWidth)));
     const baseWidth=Math.ceil(width/scale);
     if(recoverDetail && scale>1){
-        // Limit extra fill to 40% per axis. Round down in blocks so small
+        // Bound extra fill per axis. Round down in blocks so small
         // governor adjustments don't continuously reallocate render targets.
-        const budget=Math.min(desiredWidth,baseWidth*1.4);
+        const budget=Math.min(desiredWidth,baseWidth*detailLimit);
         const renderWidth=Math.floor(budget/16)*16;
         if(renderWidth>baseWidth){
             return {width:renderWidth,height:Math.max(1,Math.round(height*renderWidth/width)),scale:width/renderWidth};

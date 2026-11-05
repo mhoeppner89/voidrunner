@@ -208,7 +208,9 @@ export class ConcourseShip {
   const composite=!this.transit&&this.outputHost!==this.host,output=composite?this.outputHost.getBoundingClientRect():r;
   const maxWidth=this.transit?(this.touchDevice?640:768):(this.touchDevice?768:960),maxHeight=this.transit?480:(this.touchDevice?432:600);
   const desiredWidth=Math.min(maxWidth,output.width*maxHeight/output.height);
-  const {width:w,height:h,scale}=pixelRenderSize(output.width,output.height,desiredWidth);
+  // The native phone backdrop leaves most of this canvas transparent. Spend a
+  // small amount of that saved work on sharper ship and shadow details.
+  const {width:w,height:h,scale}=pixelRenderSize(output.width,output.height,desiredWidth,this.touchDevice&&composite,1.2);
   this.resizeOutput(w,h,scale);
   this.sceneViewport.set(0,0,w,h);this.deck.uniforms.uDeckResolution.value.set(w,h);
   const aspect=width/height;if(this.transit)this.transit.resize(aspect);else{this.camera.left=-4.5*aspect;this.camera.right=4.5*aspect;this.camera.zoom=this.placementZoom??1;this.camera.updateProjectionMatrix();}

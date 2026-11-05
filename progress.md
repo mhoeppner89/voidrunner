@@ -1,5 +1,9 @@
 Original prompt: Review and revise all equipment names for ambiguity and visible tiers.
 
+Follow-up: find another low-cost visual improvement while preserving crisp phone graphics.
+- The docked ship and its shadow now use a modestly finer bounded grid on touch devices when the existing grid would drop to half width. In the matched Pixel 7 scene, 432×180 increased to 512×214. The same 17 draw calls and 14,622 triangles were submitted. SwiftShader GPU medians were 6.18 and 5.99 ms in separate captures, which does not establish performance on physical phones.
+- Reviewed the matched dock comparison. Android and iPhone dock and transition framing checks passed, alongside focused rendering tests.
+
 Follow-up: replace blurry phone smoothing with finer, crisp pixels.
 - Restored crisp scaling for flight, cockpit art and ship canvases. Raised the bounded flight and preview resolution where quality permits while retaining the detailed dock background and denser instrument canvases.
 - The iPhone WebKit comparison renders the same flight scene at 512×233 instead of 416×190, with 78 draw calls in each. Reviewed the comparison and verified the low-quality and slow-frame resolution fallbacks. Focused rendering tests, Android flight and the Android paint-preview check passed. The extra pixels can cost more GPU time on physical phones.
