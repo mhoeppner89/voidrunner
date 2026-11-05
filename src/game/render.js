@@ -1705,7 +1705,6 @@ export class SpaceRenderer {
         byShape.forEach((entries, shape) => {
             const mesh = new THREE.InstancedMesh(geometries[shape % geometries.length], material, entries.length);
             mesh.name = `${id}-terrain-${shape}`;
-            mesh.frustumCulled = false;
             entries.forEach((node, index) => {
                 this.tmpPosition.set(
                     node.position[0] - location.position[0],
@@ -1720,6 +1719,9 @@ export class SpaceRenderer {
                 mesh.setColorAt(index, tint);
             });
             mesh.instanceMatrix.needsUpdate = true;
+            // Every regional rock is static. The batch bounds can be tested
+            // against both the camera and tap rays without ever refitting.
+            mesh.computeBoundingSphere();
             if (mesh.instanceColor)
                 mesh.instanceColor.needsUpdate = true;
             group.add(mesh);
@@ -2496,6 +2498,7 @@ export class SpaceRenderer {
     createHelixStation() {
         const location = LOCATIONS.helix;
         const group = createVoxelStationModel('helix');
+        this.helixRotor = group.getObjectByName('rotor');
         group.position.set(...location.position);
         group.rotation.set(0.18, 0.45, -0.08);
         group.scale.setScalar(10);
@@ -2630,14 +2633,22 @@ export class SpaceRenderer {
             const palette = palettes[kind] ?? palettes.iron;
             let count = 0;
             let matrixStart = Infinity, matrixEnd = 0;
-            let colorStart = Infinity, colorEnd = 0;
+            // All slots in this batch use the same finish. Compaction only
+            // changes their transforms and pick IDs, never their colors.
+            if (batch.renderTint !== palette.base) {
+                color.setHex(palette.base);
+                for (let i = 0; i < entries.length; i++) mesh.setColorAt(i, color);
+                markAttributeSpan(mesh.instanceColor, 0, entries.length * 3);
+                batch.renderTint = palette.base;
+            }
             for (const entry of entries) {
                 const { node } = entry;
-                this.viewSphere.center.set(...node.position);
-                this.viewSphere.radius = batch.originRadius * node.radius * Math.max(
-                    Math.abs(node.scale[0]), Math.abs(node.scale[1]), Math.abs(node.scale[2])) + 1;
-                if (frustum && !frustum.intersectsSphere(this.viewSphere))
-                    continue;
+                if (frustum) {
+                    this.viewSphere.center.fromArray(node.position);
+                    this.viewSphere.radius = entry.cullRadius ??= batch.originRadius * node.radius * Math.max(
+                        Math.abs(node.scale[0]), Math.abs(node.scale[1]), Math.abs(node.scale[2])) + 1;
+                    if (!frustum.intersectsSphere(this.viewSphere)) continue;
+                }
                 const reassigned = batch.renderedEntries[count] !== entry;
                 if (reassigned || node.moving) {
                     this.tmpEuler.set(...node.rotation);
@@ -2649,15 +2660,6 @@ export class SpaceRenderer {
                     matrixStart = Math.min(matrixStart, count * 16);
                     matrixEnd = (count + 1) * 16;
                 }
-                // Targeting and scanning belong on the instruments, not the rock's surface.
-                const tint = palette.base;
-                if (reassigned || entry.renderTint !== tint) {
-                    color.setHex(tint);
-                    mesh.setColorAt(count, color);
-                    colorStart = Math.min(colorStart, count * 3);
-                    colorEnd = (count + 1) * 3;
-                    entry.renderTint = tint;
-                }
                 batch.renderedEntries[count] = entry;
                 mesh.userData.nodeIndices[count] = entry.index;
                 count++;
@@ -2667,7 +2669,6 @@ export class SpaceRenderer {
             mesh.count = count;
             mesh.visible = count > 0;
             markAttributeSpan(mesh.instanceMatrix, matrixStart, matrixEnd);
-            if (mesh.instanceColor) markAttributeSpan(mesh.instanceColor, colorStart, colorEnd);
         }
     }
     createGraveyard() {
@@ -5892,9 +5893,8 @@ export class SpaceRenderer {
         this.pendingWorldVisualDt = (this.pendingWorldVisualDt ?? 0) + dt;
         const shardbeltVisible = Boolean(this.instanceRoots.get('shardbelt')?.visible);
         if (shardbeltVisible) {
-            for (const node of this.asteroids) {
-                if (!node.moving)
-                    continue;
+            this.driftingAsteroids ??= this.asteroids.filter(node => node.moving);
+            for (const node of this.driftingAsteroids) {
                 node.position[0] += node.velocity[0] * dt;
                 node.position[1] += node.velocity[1] * dt;
                 node.position[2] += node.velocity[2] * dt;
@@ -5905,7 +5905,7 @@ export class SpaceRenderer {
                 const dx = node.position[0] - center[0];
                 const dy = node.position[1] - center[1];
                 const dz = node.position[2] - center[2];
-                if (Math.hypot(dx, dy, dz) > LOCATIONS.shardbelt.radius + 55) {
+                if (dx * dx + dy * dy + dz * dz > (LOCATIONS.shardbelt.radius + 55) ** 2) {
                     node.position[0] = center[0] - dx * 0.82;
                     node.position[1] = center[1] - dy * 0.82;
                     node.position[2] = center[2] - dz * 0.82;
@@ -5915,9 +5915,8 @@ export class SpaceRenderer {
         for(const mesh of this.raceBoostMeshes??[])if(mesh.visible){mesh.children[0].rotation.y+=dt;mesh.children[1].rotation.z-=dt*.6;}
         const mourningVisible = Boolean(this.instanceRoots.get('mourning-line')?.visible);
         if (mourningVisible) {
-            for (const piece of this.graveyard) {
-                if (!piece.moving)
-                    continue;
+            this.driftingDebris ??= this.graveyard.filter(piece => piece.moving);
+            for (const piece of this.driftingDebris) {
                 piece.position[0] += piece.drift[0] * dt;
                 piece.position[1] += piece.drift[1] * dt;
                 piece.position[2] += piece.drift[2] * dt;
@@ -5984,11 +5983,8 @@ export class SpaceRenderer {
         }
         const mourningVisible = Boolean(this.instanceRoots.get('mourning-line')?.visible);
         const helix = this.locationMeshes.get('helix');
-        if (helix?.visible) {
-            this.helixRotor ??= helix.getObjectByName('rotor');
-            if (this.helixRotor)
-                this.helixRotor.rotation.x += dt * 0.16;
-        }
+        if (helix?.visible && this.helixRotor)
+            this.helixRotor.rotation.x += dt * 0.16;
         // Race visuals are pooled. The active gate breathes, while a caller's
         // one-shot pulse is represented by a short scale/glow envelope stored
         // in userData (no effect object to clean up after a finish transition).
@@ -6550,14 +6546,16 @@ export class SpaceRenderer {
         if (this.instanceRoots.get('mourning-line')?.visible || this.instanceRoots.get('shardbelt')?.visible) {
             if (this.instanceRoots.get('mourning-line')?.visible)
                 this.updateGraveyardInstances(this.viewFrustum);
-            if (this.instanceRoots.get('shardbelt')?.visible) {
-                // Keep off-camera fragments in the caster batches too, so
-                // turning the camera cannot remove their shadows.
-                this.updateAsteroidInstances();
-            }
             if(this.renderer.shadowMap.enabled&&this.skyTime>=(this.asteroidShadowRefreshAt??0)){
                 this.renderer.shadowMap.needsUpdate=true;this.sunLight.shadow.needsUpdate=true;
                 this.asteroidShadowRefreshAt=this.skyTime+.25;
+            }
+            if (this.instanceRoots.get('shardbelt')?.visible) {
+                // Include off-camera casters in each new shadow map. Between
+                // refreshes, only rocks intersecting the view reach the GPU.
+                const shadow = this.renderer.shadowMap;
+                const refresh = shadow.enabled && (shadow.needsUpdate || shadow.autoUpdate);
+                this.updateAsteroidInstances(refresh ? undefined : this.viewFrustum);
             }
         }
         const volumeActive = !this.isIOS && this.ringVolumeEnabled && this.locationMeshes.get('azure')?.visible

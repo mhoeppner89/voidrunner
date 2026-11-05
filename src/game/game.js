@@ -24,7 +24,7 @@ import {fittedPlayerBerths,fitSessionPlayerBerths} from './shipLanding.js';
 setPlayerBerthResolver(fitSessionPlayerBerths);
 import { stationApproach, reserveStationDock, stationVisualSurfaceRadius, stationSurfaceDistance } from './stationTraffic.js';
 import { SHIP_COLLIDERS, PLAYER_CONTACT_SCALE, segmentShipColliderHit, shipVsStation, shipVsSphere, shipVsObstacle, shipVsShip } from './shipCollision.js';
-import { indexObstacleCells, visitObstacleCells } from './obstacleQueries.js';
+import { addOrderedObstacle, removeObstacleFromCell, addObstacleToSegmentGrid, indexObstacleCells, visitObstacleCells } from './obstacleQueries.js';
 import { segmentMeshHit } from './meshQueries.js';
 import {createMiningContacts,updateMiningContacts} from './miningSurface.js';
 import { DRONE_PORTS } from './droneFlight.js';
@@ -4323,7 +4323,7 @@ export class GameSession {
         else {
             const margin = MAX_FIELD_OBSTACLE_RADIUS + Math.max(...hullExtents);
             const label = this.activeInstanceId === 'shardbelt' ? 'asteroid' : 'wreckage';
-            this.forEachObstacleInBox(position.x - margin, position.y - margin, position.z - margin, position.x + margin, position.y + margin, position.z + margin, (obstacle) => {
+            this.forEachHullObstacle(position, margin, SHIP_COLLIDERS[collisionVariant].contactRadius * this.playerHullScale(), obstacle => {
                 const hit=shipVsObstacle(position,shipQuat,collisionVariant,this.playerHullScale(),obstacle,contact);
                 if (hit)
                     resolveContact(label);
@@ -9365,7 +9365,7 @@ export class GameSession {
                 location.position[0],location.position[1],location.position[2],location.radius*.82,contact)) resolveContact();
         });
         const margin = MAX_FIELD_OBSTACLE_RADIUS + Math.max(hullExtents[0], hullExtents[1], hullExtents[2]);
-        this.forEachObstacleInBox(position.x - margin, position.y - margin, position.z - margin, position.x + margin, position.y + margin, position.z + margin, (obstacle) => {
+        this.forEachHullObstacle(position, margin, SHIP_COLLIDERS[collisionVariant].contactRadius * collisionScale, obstacle => {
             for(let pass=0;pass<(ship.raceHull?3:1);pass++){
                 if(!shipVsObstacle(position,shipQuat,collisionVariant,collisionScale,obstacle,contact))break;
                 resolveContact();
@@ -11878,13 +11878,13 @@ export class GameSession {
         }
         return this._cachedStats;
     }
-    flightLoadScale() {
+    flightLoadScale(knownCargoMass) {
         if(this.save.player.raceReturn)return 1;
         const player = this.save.player;
         const capacity = this.playerStats().cargo;
         if (capacity <= 0)
             return 1;
-        return 1 - 0.10 * clamp(cargoMass(player) / capacity, 0, 1);
+        return 1 - 0.10 * clamp((knownCargoMass ?? cargoMass(player)) / capacity, 0, 1);
     }
     combatCalmFactor() {
         // Ramp from 0 right after a fight back to 1 over COMBAT_CALM_SECONDS.
@@ -12004,42 +12004,44 @@ export class GameSession {
         };
     }
     asteroidFieldObstacles(nodes = []) {
-        return nodes.map((node) => {
-                // The player's hard collision AND line of sight both test the
-                // rock's ACTUAL deformed-icosahedron mesh (obstacle.shape =
-                // 'asteroid', meshVerts/meshIndices from worldData) so a bump
-                // lands on the visible surface from any angle, dents included,
-                // and a beam is blocked only where rock is drawn. The box
-                // survives for spawn clearance, where a conservative corner
-                // reach is intentional.
-                // The bounding sphere remains the spatial-grid/avoidance radius.
-                const hx = node.radius * node.scale[0] * ASTEROID_COLLISION_FACTOR;
-                const hy = node.radius * node.scale[1] * ASTEROID_COLLISION_FACTOR;
-                const hz = node.radius * node.scale[2] * ASTEROID_COLLISION_FACTOR;
-                const collisionMesh = asteroidCollisionMesh(node);
-                const rotation = node.rotation ?? [0, 0, 0];
-                const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rotation[0], rotation[1], rotation[2], 'XYZ'));
-                // Steering/avoidance treats the rock as a sphere of its widest
-                // axis (same reach as the old radius × max-scale), while LOS and
-                // the spatial grid use the full corner reach of the box so a
-                // rotated rock never lets a beam slip past a visible corner.
-                const widest = Math.max(hx, hy, hz);
-                const cornerReach = Math.hypot(hx, hy, hz);
-                return {
-                    id: node.id,
-                    x: node.position[0],
-                    y: node.position[1],
-                    z: node.position[2],
-                    radius: widest,
-                    losRadius: cornerReach,
-                    collisionRadius: widest,
-                    shape: 'asteroid',
-                    meshVerts: collisionMesh.verts,
-                    meshIndices: collisionMesh.indices,
-                    minReach: collisionMesh.minReach,
-                    box: { hx, hy, hz, qx: q.x, qy: q.y, qz: q.z, qw: q.w },
-                };
-        });
+        return nodes.map(node => this.asteroidFieldObstacle(node));
+    }
+    asteroidFieldObstacle(node) {
+        // The player's hard collision AND line of sight both test the
+        // rock's ACTUAL deformed-icosahedron mesh (obstacle.shape =
+        // 'asteroid', meshVerts/meshIndices from worldData) so a bump
+        // lands on the visible surface from any angle, dents included,
+        // and a beam is blocked only where rock is drawn. The box
+        // survives for spawn clearance, where a conservative corner
+        // reach is intentional.
+        // The bounding sphere remains the spatial-grid/avoidance radius.
+        const hx = node.radius * node.scale[0] * ASTEROID_COLLISION_FACTOR;
+        const hy = node.radius * node.scale[1] * ASTEROID_COLLISION_FACTOR;
+        const hz = node.radius * node.scale[2] * ASTEROID_COLLISION_FACTOR;
+        const collisionMesh = asteroidCollisionMesh(node);
+        const rotation = node.rotation ?? [0, 0, 0];
+        const q = (this.tmpFieldQuaternion ??= new THREE.Quaternion()).setFromEuler((this.tmpFieldEuler ??= new THREE.Euler()).set(rotation[0], rotation[1], rotation[2], 'XYZ'));
+        // Steering/avoidance treats the rock as a sphere of its widest
+        // axis (same reach as the old radius × max-scale), while LOS and
+        // the spatial grid use the full corner reach of the box so a
+        // rotated rock never lets a beam slip past a visible corner.
+        const widest = Math.max(hx, hy, hz);
+        const cornerReach = Math.hypot(hx, hy, hz);
+        return {
+            id: node.id,
+            x: node.position[0],
+            y: node.position[1],
+            z: node.position[2],
+            radius: widest,
+            losRadius: cornerReach,
+            collisionRadius: widest,
+            shape: 'asteroid',
+            meshVerts: collisionMesh.verts,
+            meshIndices: collisionMesh.indices,
+            minReach: collisionMesh.minReach,
+            maxReach: collisionMesh.maxReach,
+            box: { hx, hy, hz, qx: q.x, qy: q.y, qz: q.z, qw: q.w },
+        };
     }
     activeFieldObstacles(instanceId = this.activeInstanceId) {
         const derelicts=[];
@@ -12460,14 +12462,42 @@ export class GameSession {
         return Math.max(0, Math.hypot(position.x - tp[0], position.y - tp[1], position.z - tp[2]) - this.targetSurfaceRadius(target));
     }
     ensureObstacleGrid() {
-        // Drifting rocks and wreckage move slowly, so the grid is rebuilt at most
-        // twice a second, or immediately after switching instances.
-        if (this.obstacleGrid && this.obstacleGridInstance === this.activeInstanceId && this.obstacleGridRevision===(this.renderer?.staticObstacleRevision??0) && this.save.world.time - this.obstacleGridBuiltAt < 0.5)
+        const now = this.save.world.time;
+        const revision = this.renderer?.staticObstacleRevision ?? 0;
+        const sameField = this.obstacleGrid && this.obstacleGridInstance === this.activeInstanceId
+            && this.obstacleGridRevision === revision;
+        if (sameField && now - this.obstacleGridBuiltAt < 0.5) return;
+
+        const size = this.obstacleCellSize;
+        const systemId = this.save.player?.systemId;
+        // The Shardbelt's terrain tiles and fixed deposits never drift. Keep
+        // their buckets and refresh only moving deposits on the usual cadence.
+        // Explicit invalidation, replacing the field or adding/removing a
+        // derelict still rebuilds the entire index.
+        const drift = this.shardbeltGridDrift;
+        if (sameField && drift && drift.nodes === this.asteroids && drift.count === this.asteroids.length
+            && drift.size === size && drift.systemId === systemId && Number.isFinite(this.obstacleGridBuiltAt)) {
+            this.refreshShardbeltGrid(drift.entries, size);
+            this.obstacleGridBuiltAt = now;
             return;
+        }
         const grid = new Map();
         const segmentGrid = new Map();
-        const size = this.obstacleCellSize;
-        for (const obstacle of this.activeFieldObstacles()) {
+        const obstacles = this.activeFieldObstacles();
+        const shardbelt = this.activeInstanceId === 'shardbelt' && this.asteroids
+            && this.activeFieldObstacles === GameSession.prototype.activeFieldObstacles;
+        this.shardbeltGridDrift = shardbelt
+            ? { nodes: this.asteroids, count: this.asteroids.length, size, systemId, entries: [], maxReach: 0 } : null;
+        for (let order = 0; order < obstacles.length; order++) {
+            const obstacle = obstacles[order];
+            if (shardbelt) {
+                obstacle._gridOrder = order;
+                // The collision mesh of a loose deposit can extend past its
+                // authored steering radius. Terrain and derelict radii already
+                // enclose their vertices. Keep an enclosing field-wide bound.
+                const reach = Math.max(obstacle.radius, obstacle.maxReach ?? obstacle.losRadius);
+                this.shardbeltGridDrift.maxReach = Math.max(this.shardbeltGridDrift.maxReach, reach);
+            }
             // Keep the center-cell index for physical collision and steering
             // queries. Their box padding already accounts for obstacle radius,
             // and retaining this index keeps manual controls on the old exact
@@ -12485,33 +12515,43 @@ export class GameSession {
             // storm along weapon lines through the dense wreck field. Boxes use
             // their full corner reach so rotated rocks never let a beam slip
             // past a visible corner.
-            const reach = Math.max(obstacle.radius, obstacle.losRadius ?? obstacle.radius);
-            const cx0 = Math.floor((obstacle.x - reach) / size);
-            const cy0 = Math.floor((obstacle.y - reach) / size);
-            const cz0 = Math.floor((obstacle.z - reach) / size);
-            const cx1 = Math.floor((obstacle.x + reach) / size);
-            const cy1 = Math.floor((obstacle.y + reach) / size);
-            const cz1 = Math.floor((obstacle.z + reach) / size);
-            for (let cx = cx0; cx <= cx1; cx += 1) {
-                for (let cy = cy0; cy <= cy1; cy += 1) {
-                    for (let cz = cz0; cz <= cz1; cz += 1) {
-                        const key = this.cellKey(cx, cy, cz);
-                        let bucket = segmentGrid.get(key);
-                        if (!bucket) {
-                            bucket = [];
-                            segmentGrid.set(key, bucket);
-                        }
-                        bucket.push(obstacle);
-                    }
-                }
-            }
+            const movingNode = shardbelt && this.asteroids[order]?.moving ? this.asteroids[order] : undefined;
+            const keys = movingNode ? [] : undefined;
+            addObstacleToSegmentGrid(segmentGrid, obstacle, size, this.cellKey, keys);
+            if (movingNode)
+                this.shardbeltGridDrift.entries.push({ node: movingNode, obstacle, centerKey, keys });
         }
         this.obstacleGrid = grid;
         this.obstacleBoxIndex = indexObstacleCells(grid, size);
         this.obstacleSegmentGrid = segmentGrid;
         this.obstacleGridInstance = this.activeInstanceId;
-        this.obstacleGridRevision=this.renderer?.staticObstacleRevision??0;
-        this.obstacleGridBuiltAt = this.save.world.time;
+        this.obstacleGridRevision = revision;
+        this.obstacleGridBuiltAt = now;
+    }
+    refreshShardbeltGrid(entries, size) {
+        let centerCellsChanged = false;
+        for (const entry of entries) {
+            const before = entry.obstacle;
+            const after = this.asteroidFieldObstacle(entry.node);
+            after._gridOrder = before._gridOrder;
+            // Keep previously returned snapshots valid for pilots that hold
+            // their local obstacle list until their next planning tick.
+            const key = this.cellKey(Math.floor(after.x / size), Math.floor(after.y / size), Math.floor(after.z / size));
+            if (key === entry.centerKey) {
+                const bucket = this.obstacleGrid.get(key);
+                bucket[bucket.indexOf(before)] = after;
+            } else {
+                removeObstacleFromCell(this.obstacleGrid, entry.centerKey, before);
+                addOrderedObstacle(this.obstacleGrid, key, after);
+                entry.centerKey = key;
+                centerCellsChanged = true;
+            }
+            for (const oldKey of entry.keys) removeObstacleFromCell(this.obstacleSegmentGrid, oldKey, before);
+            entry.keys.length = 0;
+            addObstacleToSegmentGrid(this.obstacleSegmentGrid, after, size, this.cellKey, entry.keys, true);
+            entry.obstacle = after;
+        }
+        if (centerCellsChanged) this.obstacleBoxIndex = indexObstacleCells(this.obstacleGrid, size);
     }
     cellKey(cx, cy, cz) {
         // Three 13-bit coordinates fit exactly in a Number (39 bits). The
@@ -12520,6 +12560,21 @@ export class GameSession {
         if (cx < -4096 || cx >= 4096 || cy < -4096 || cy >= 4096 || cz < -4096 || cz >= 4096)
             return `${cx},${cy},${cz}`;
         return (cx + 4096) * 67108864 + (cy + 4096) * 8192 + (cz + 4096);
+    }
+    forEachHullObstacle(position, margin, hullReach, callback) {
+        const {x, y, z} = position;
+        if (this.activeInstanceId === 'shardbelt' && this.forEachObstacleInBox === GameSession.prototype.forEachObstacleInBox) {
+            this.ensureObstacleGrid();
+            const drift = this.shardbeltGridDrift;
+            if (drift) {
+                const size = this.obstacleCellSize, reach = drift.maxReach + hullReach + 0.01;
+                visitObstacleCells(this.obstacleBoxIndex, Math.floor((x-margin)/size), Math.floor((y-margin)/size),
+                    Math.floor((z-margin)/size), Math.floor((x+margin)/size), Math.floor((y+margin)/size),
+                    Math.floor((z+margin)/size), ++this.obstacleQueryStamp, callback, undefined, position, reach);
+                return;
+            }
+        }
+        this.forEachObstacleInBox(x-margin,y-margin,z-margin,x+margin,y+margin,z+margin,callback);
     }
     forEachObstacleInBox(minX, minY, minZ, maxX, maxY, maxZ, callback) {
         this.ensureObstacleGrid();
@@ -12793,7 +12848,12 @@ export class GameSession {
         if (dock)
             accumulate(dock);
         else {
-            const margin = range + lookahead + MAX_FIELD_OBSTACLE_RADIUS;
+            let obstacleReach = MAX_FIELD_OBSTACLE_RADIUS;
+            if (this.activeInstanceId === 'shardbelt' && this.forEachObstacleInBox === GameSession.prototype.forEachObstacleInBox) {
+                this.ensureObstacleGrid();
+                obstacleReach = Math.min(obstacleReach, this.shardbeltGridDrift?.maxReach ?? obstacleReach);
+            }
+            const margin = range + lookahead + obstacleReach;
             this.forEachObstacleInBox(px - margin, py - margin, pz - margin, px + margin, py + margin, pz + margin, accumulate);
         }
         return this.tmpAvoidance.set(ax, ay, az);
@@ -14247,9 +14307,9 @@ export class GameSession {
             const screen = { screenX: projection.x, screenY: projection.y, onScreen: projection.visible && !projection.behind&&!edge, edge };
             if (target.kind === 'ship') {
                 const ship = this.ships.find((entry) => entry.id === target.id);
-                const targetForward = FORWARD.clone().applyQuaternion(quat(ship.rotation, this.tmpRadarInv));
+                const targetForward = this.tmpRadarPos.copy(FORWARD).applyQuaternion(quat(ship.rotation, this.tmpRadarInv));
                 const playerInv = quat(this.save.player.rotation, this.tmpRadarInv).invert();
-                const targetLocal = targetForward.clone().applyQuaternion(playerInv);
+                const targetLocal = targetForward.applyQuaternion(playerInv);
                 const heading = Math.atan2(targetLocal.x, -targetLocal.z);
                 const claimable = ship.surrendered && !ship.claimed && !ship.captured && ship.hull > 0 && (ship.bountyValue > 0 || ship.missionId);
                 const captureAvailable = claimable && distance <= stats.scanRange;
@@ -14456,6 +14516,8 @@ export class GameSession {
             label: this.mugDemandLabel(mug.demand),
             seconds: mug.secondsLeft,
         } : undefined;
+        const cargo = cargoMass(this.save.player);
+        const signatureRange = this.playerPhysicalSignatureRange();
         return {
             speed: this.autopilot ? speed / (HYPERDRIVE_CRUISE_SPEED / HYPERDRIVE_DISPLAY_SPEED) : displaySpeed(speed),
             maxSpeed: this.autopilot ? HYPERDRIVE_DISPLAY_SPEED : this.save.player.raceReturn?displaySpeed(stats.afterburnSpeed):displaySpeed(this.afterburning && speed >= 0.9 * stats.maxSpeed ? stats.afterburnSpeed : stats.maxSpeed),
@@ -14486,23 +14548,7 @@ export class GameSession {
                 current: selectedLauncher.rounds,
                 capacity: selectedLauncher.capacity,
             } : undefined,
-            launcherMagazines: launcherMagazines.map((entry) => ({
-                mountId: entry.mount.id,
-                index: entry.index,
-                id: entry.launcherId,
-                ordnanceId: entry.ordnanceId,
-                current: entry.rounds,
-                capacity: entry.capacity,
-                selected: entry.selected,
-            })),
-            weaponRoster: WEAPON_ORDER.map((id) => ({
-                id,
-                name: t(WEAPONS[id].nameKey),
-                envelope: t(WEAPONS[id].envelopeKey, { range: Math.round(weaponRange(WEAPONS[id])) }),
-                slot: WEAPONS[id].slot,
-                owned: weaponOwned(this.save.player, id),
-            })),
-            cargo: cargoMass(this.save.player),
+            cargo,
             cargoCapacity: stats.cargo,
             credits: this.save.player.credits,
             mode: this.save.player.mode,
@@ -14521,9 +14567,9 @@ export class GameSession {
             // otherwise produce READY and INTERRUPTED on the same card.
             gateArmed: Boolean(this.armedJumpPointId),
             hyperdriveReady: !this.armedJumpPointId && !this.autopilot && this.hyperdriveFx === 'none' && !this.hyperdriveBlockReason(),
-            loadPercent: Math.round((cargoMass(this.save.player) / Math.max(1, stats.cargo)) * 100),
+            loadPercent: Math.round((cargo / Math.max(1, stats.cargo)) * 100),
             // Handling reflects the cargo-load penalty on turn/acceleration.
-            handlingPercent: Math.round(this.flightLoadScale() * 100),
+            handlingPercent: Math.round(this.flightLoadScale(cargo) * 100),
             zone: this.zoneLabel(this.getWorldZone(player)),
             target: hudTarget,
             speaker: this.commsSpeakerHud(),
@@ -14550,8 +14596,8 @@ export class GameSession {
             // beam or hot drive while dark raises SIG without changing ID.
             transponder: this.save.player.transponder !== false,
             broadcasting: this.playerIdentityBroadcasting(),
-            signatureRange: this.playerPhysicalSignatureRange(),
-            signatureBand: signatureBand(this.playerPhysicalSignatureRange(), NPC_SENSOR_RANGE),
+            signatureRange,
+            signatureBand: signatureBand(signatureRange, NPC_SENSOR_RANGE),
             contacts: this.radarContacts(),
             // Active search sweeps (see searchRings): colored rings at
             // last-known-position anchors so a hunt near the pilot shows on the

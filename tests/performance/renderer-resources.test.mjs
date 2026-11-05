@@ -104,6 +104,58 @@ test('compacted asteroids retain raycast identity and natural colors when select
         assert.equal(b.mesh.instanceColor.version, version, 'selection and scanning need no color upload');
     }
 });
+test('cached shadow frames cull rocks but a shadow refresh includes off-camera casters', () => {
+    const r = fieldRenderer(), nodes = [piece([0, 0, -10]), piece([0, 0, 20])];
+    const b = batch(nodes);
+    b.kind = 'iron'; b.entries = nodes.map((node, index) => ({ node: {...node, radius: 1}, index }));
+    b.renderedEntries = []; b.mesh.userData.nodeIndices = [];
+    Object.assign(r, { asteroidMeshes: [b], _asteroidPalettes: {iron: {base: 0xffffff}},
+        isIOS: true, atmosphereShells: [], viewProjection: new THREE.Matrix4(), viewFrustum: new THREE.Frustum(),
+        instanceRoots: new Map([['shardbelt', { visible: true }]]), sunLight: { shadow: {} },
+        renderer: {shadowMap: {enabled: true, autoUpdate: false, needsUpdate: false}},
+        renderPixelScene() {}, skyTime: 5, asteroidShadowRefreshAt: 5.25 });
+    r.render();
+    assert.equal(b.mesh.count, 1);
+    r.skyTime = 5.25; r.render();
+    assert.equal(r.sunLight.shadow.needsUpdate, true);
+    assert.equal(b.mesh.count, 2, 'the rock behind the camera can still cast a shadow');
+    r.renderer.shadowMap.needsUpdate = false; // the driver has consumed the new shadow map
+    r.camera.lookAt(0, 0, 20); r.skyTime += .04; r.render();
+    assert.equal(b.mesh.count, 1); assert.equal(b.mesh.userData.nodeIndices[0], 1);
+});
+
+test('rotated off-center long rocks keep their visible tips when the origin is outside the view', () => {
+    const r = fieldRenderer(), geometry = new THREE.BoxGeometry(12, 2, 3).translate(5, 0, 0);
+    geometry.computeBoundingSphere();
+    const node = {...piece([35, 0, -13]), scale: [5, 1.7, .8], radius: 1, moving: true};
+    const mesh = new THREE.InstancedMesh(geometry, new THREE.MeshBasicMaterial(), 1);
+    mesh.userData.nodeIndices = [];
+    r.asteroidMeshes = [{mesh, entries: [{node, index: 17}], renderedEntries: [], kind: 'iron',
+        originRadius: geometry.boundingSphere.center.length() + geometry.boundingSphere.radius}];
+    r._asteroidPalettes = {iron: {base: 0xffffff}};
+    const view = frustum(r.camera), position = new THREE.Vector3().fromArray(node.position);
+    assert.equal(view.containsPoint(position), false);
+    let visiblePoses = 0;
+    for (let angle = 0; angle < 24; angle++) {
+        node.rotation = [.3, angle * Math.PI / 12, .1];
+        const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(...node.rotation));
+        const expected = new THREE.Matrix4().compose(position, rotation, new THREE.Vector3(...node.scale));
+        r.updateAsteroidInstances(view);
+        const observed = new THREE.Matrix4(); mesh.getMatrixAt(0, observed);
+        let visible = false;
+        for (let i = 0; i < geometry.attributes.position.count; i++) {
+            const local = new THREE.Vector3().fromBufferAttribute(geometry.attributes.position, i);
+            const world = local.clone().applyMatrix4(expected);
+            if (!view.containsPoint(world)) continue;
+            visible = true;
+            assert.equal(mesh.count, 1); assert.equal(mesh.userData.nodeIndices[0], 17);
+            assert.ok(world.distanceTo(local.applyMatrix4(observed)) < .00001);
+        }
+        if (visible) visiblePoses++;
+    }
+    assert.ok(visiblePoses > 2 && visiblePoses < 24);
+});
+
 function model() {
     const source = new THREE.Group();
     source.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial({ map: new THREE.Texture() })));

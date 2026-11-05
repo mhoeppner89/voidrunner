@@ -7,7 +7,7 @@ import {raceBoostLayout} from './raceDynamics.js';
 import { RACE_COURSES } from './racing.js';
 import { GRAVEYARD_COLLISION_PROFILES } from './graveyardCollisionProfiles.js';
 import {prepareSurfaceMeshIndex} from './surfaceMeshCandidates.js';
-import {prepareMeshQueryIndex} from './meshQueries.js';
+import {prepareMeshQueryIndex, visitRayTriangleRanges} from './meshQueries.js';
 import { wreckSectionDelta, GRAVEYARD_MODEL_WRECKS, generateWreckNodes, miningClaimCandidates, miningClaimName } from './missionWorldData.js';
 
 // Keep the historical worldData exports stable for game/render callers while
@@ -133,7 +133,7 @@ export const asteroidCollisionMesh = (node) => {
         const sz = node.radius * node.scale[2];
         const src = base.positions;
         const verts = new Float32Array(src.length);
-        let minReachSq = Infinity;
+        let minReachSq = Infinity, maxReachSq = 0;
         for (let i = 0; i < src.length; i += 3) {
             verts[i] = src[i] * sx;
             verts[i + 1] = src[i + 1] * sy;
@@ -141,11 +141,12 @@ export const asteroidCollisionMesh = (node) => {
             const d = verts[i] * verts[i] + verts[i + 1] * verts[i + 1] + verts[i + 2] * verts[i + 2];
             if (d < minReachSq)
                 minReachSq = d;
+            if (d > maxReachSq) maxReachSq = d;
         }
         // minReach is the rock's INSCRIBED sphere: the closest any surface
         // vertex sits to the center. It is the exact-conservative "inside the
         // rock" envelope for projectile line tests — see segmentMeshHit.
-        node._collisionMesh = { verts, indices: base.indices, minReach: Math.sqrt(minReachSq) };
+        node._collisionMesh = { verts, indices: base.indices, minReach: Math.sqrt(minReachSq), maxReach: Math.sqrt(maxReachSq) };
     }
     return node._collisionMesh;
 };
@@ -249,7 +250,7 @@ const scaledColliderMesh = (profileName, sectionIndex, profile, scale) => {
         vertices[index + 2] = z;
         radiusSq = Math.max(radiusSq, x * x + y * y + z * z);
     }
-    const indices = new Uint16Array(profile.indices);
+    const indices = profile.indices;
     // The carrier retains exact deck skins. Warm their acceleration structures
     // during world loading, rather than on the first close fly-by or shot.
     if(profileName==='carrier'){prepareSurfaceMeshIndex(vertices,indices);prepareMeshQueryIndex(vertices,indices);}
@@ -762,6 +763,31 @@ export const asteroidEnvelopeReach = (node) => {
 // Broad-phase queries use the exact rendered chunk mesh's farthest vertex.
 // Hard collision and weapon hits use the triangles themselves below.
 export const wreckNodeCollisionRadius = (node) => wreckNodeCollisionMesh(node).radius;
+// Only evaluate faces whose bounds meet the ray. Use the original triangle
+// test and thresholds: nearby torn skins matter when placing hangar fittings.
+function wreckWallProbe(profile) {
+    const ray = new THREE.Ray(), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    const hit = new THREE.Vector3(), center = new THREE.Vector3(...profile.center);
+    const {vertices, indices} = profile;
+    return (start, direction, min, max = Infinity, result) => {
+        ray.origin.fromArray(start).sub(center);
+        ray.direction.fromArray(direction);
+        let nearest = max;
+        visitRayTriangleRanges(vertices, indices, ray, max, (first, end) => {
+            for (let i = first; i < end; i += 3) {
+                a.fromArray(vertices, indices[i] * 3); b.fromArray(vertices, indices[i + 1] * 3); c.fromArray(vertices, indices[i + 2] * 3);
+                if (!ray.intersectTriangle(a, b, c, false, hit)) continue;
+                const distance = hit.distanceTo(ray.origin);
+                if (distance > min && distance < nearest) {
+                    nearest = distance;
+                    if (result) result.copy(hit).add(center);
+                }
+            }
+        });
+        return nearest;
+    };
+}
+
 export const generateGraveyardPieces = (seed) => {
     const rng = seededRandom(`${seed}:graveyard-pieces`);
     const center = LOCATIONS['mourning-line'].position;
@@ -1011,19 +1037,8 @@ export const generateGraveyardPieces = (seed) => {
         // from a clearance box. A missing wall means a torn opening: no post
         // is allowed to hang in open space just to complete the frame.
         const profile=GRAVEYARD_COLLISION_PROFILES[wreck.modelKey??wreck.class].find(p=>p.name===bay.sectionName);
-        const ray=new THREE.Ray(),v0=new THREE.Vector3(),v1=new THREE.Vector3(),v2=new THREE.Vector3(),hit=new THREE.Vector3();
-        const surface=(start,direction,max)=>{
-            ray.set(new THREE.Vector3(...start).sub(new THREE.Vector3(...profile.center)),new THREE.Vector3(...direction));
-            let nearest=max,result;
-            for(let i=0;i<profile.indices.length;i+=3) {
-                v0.fromArray(profile.vertices,profile.indices[i]*3);v1.fromArray(profile.vertices,profile.indices[i+1]*3);v2.fromArray(profile.vertices,profile.indices[i+2]*3);
-                if(ray.intersectTriangle(v0,v1,v2,false,hit)) {
-                    const distance=hit.distanceTo(ray.origin);
-                    if(distance<nearest&&distance>.008){nearest=distance;result=hit.clone().add(new THREE.Vector3(...profile.center));}
-                }
-            }
-            return result?.toArray();
-        };
+        const probe = wreckWallProbe(profile), hit = new THREE.Vector3();
+        const surface = (start, direction, max) => probe(start, direction, .008, max, hit) < max ? hit.toArray() : undefined;
         let priorFloor=[];
         for(const [i,fraction]of [-.78,-.26,.26,.78].entries()) {
             const x=bay.center[0]+bay.halfLength*fraction,y=bay.center[1],z=bay.center[2],w=Math.max(3,wreck.scale*.004),floor=[];
@@ -1072,15 +1087,8 @@ export const generateGraveyardPieces = (seed) => {
     for(const wreck of GRAVEYARD_MODEL_WRECKS)for(const [i,profile]of GRAVEYARD_COLLISION_PROFILES[wreck.modelKey??wreck.class].entries()) {
         if(profile.name===wreck.interior?.sectionName)continue;
         const [hx,hy,hz]=profile.halfExtents,centre=profile.center;
-        const ray=new THREE.Ray(),v0=new THREE.Vector3(),v1=new THREE.Vector3(),v2=new THREE.Vector3(),hit=new THREE.Vector3();
-        const wall=(point,direction)=>{
-            ray.set(new THREE.Vector3(...point).sub(new THREE.Vector3(...centre)),new THREE.Vector3(...direction));let nearest=Infinity;
-            for(let j=0;j<profile.indices.length;j+=3) {
-                v0.fromArray(profile.vertices,profile.indices[j]*3);v1.fromArray(profile.vertices,profile.indices[j+1]*3);v2.fromArray(profile.vertices,profile.indices[j+2]*3);
-                if(ray.intersectTriangle(v0,v1,v2,false,hit)){const d=hit.distanceTo(ray.origin);if(d>.002)nearest=Math.min(nearest,d);}
-            }
-            return nearest;
-        };
+        const probe = wreckWallProbe(profile);
+        const wall = (point, direction) => probe(point, direction, .002);
         let fit;
         for(const y of [0,-.25,-.5]) {
             const point=[centre[0],centre[1]+hy*y,centre[2]],h=Math.min(wall(point,[0,1,0]),wall(point,[0,-1,0])),w=Math.min(wall(point,[0,0,1]),wall(point,[0,0,-1]));

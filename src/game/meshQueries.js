@@ -89,6 +89,23 @@ function intersectsBounds(node, sx, sy, sz, dx, dy, dz, limit) {
     return true;
 }
 
+// Wreck interior placement needs the exact Three.js surface point, including
+// its edge handling. Share the broad phase with weapon rays, visiting the
+// surviving ranges in the same order as the original full mesh scan.
+export function visitRayTriangleRanges(vertices, indices, ray, limit, visit) {
+    const tree = meshTree(vertices, indices);
+    const {origin: o, direction: d} = ray;
+    for (let i = 0; i < tree.length;) {
+        const node = tree[i];
+        if (!intersectsBounds(node, o.x, o.y, o.z, d.x, d.y, d.z, limit)) {
+            i = node.skip;
+            continue;
+        }
+        if (node.leaf) visit(node.first, node.end);
+        i++;
+    }
+}
+
 // Allocation-free after cache warm-up: segment/mesh intersection for laser and beam line of sight
 // against asteroids. The rock's deformed-icosahedron collision mesh (shared
 // with the renderer and hard collision) is the exact visible surface, so a

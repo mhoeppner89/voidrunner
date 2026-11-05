@@ -81,6 +81,9 @@ function* buildAsteroidTerrain() {
     const min = [-1512,-1120,-1792], max = [1512,1120,1792];
     const nx = Math.round((max[0]-min[0])/STEP)+1, ny = Math.round((max[1]-min[1])/STEP)+1, nz = Math.round((max[2]-min[2])/STEP)+1;
     const at = (x,y,z) => (z*ny+y)*nx+x, count=nx*ny*nz;
+    const cornerOffsets = corners.map(c => at(c[0], c[1], c[2]));
+    const cornerMasks = corners.map(c => c[0] + 2*c[1] + 4*c[2]);
+    const values = new Float32Array(8);
     const parentSamples=new Float64Array(count),roughSamples=new Float64Array(count);
     for(let z=0;z<nz;z++)for(let y=0;y<ny;y++){
         for(let x=0;x<nx;x++){
@@ -90,17 +93,22 @@ function* buildAsteroidTerrain() {
         if((y&3)===3)yield;
     }
     for (const f of SHARDBELT_FRAGMENTS) {
-        const positions = [], colors = [], uv = [], indices = [], welded = new Map();
+        const positions = [], colors = [], uv = [], indices = [], welded = new Map(), edgeVertices = new Map();
         const samples = new Float32Array(count);
         for(let z=0;z<nz;z++)for(let y=0;y<ny;y++){
             for(let x=0;x<nx;x++)samples[at(x,y,z)] = fragmentDistance(f,min[0]+x*STEP,min[1]+y*STEP,min[2]+z*STEP,parentSamples[at(x,y,z)],roughSamples[at(x,y,z)]);
             if((y&3)===3)yield;
         }
         const vertex = (p) => {
+            // Adjacent tetrahedra interpolate the same lattice edge. Only
+            // its first vertex needs a world transform and a weld-key string.
+            const previous=edgeVertices.get(p.edge);
+            if(previous!==undefined)return previous;
             const w = fragmentToWorld(f,...p), key = w.map(v=>Math.round(v*1e6)).join(':');
             let id = welded.get(key);
-            if(id!==undefined) return id;
+            if(id!==undefined){edgeVertices.set(p.edge,id);return id;}
             id = positions.length/3; welded.set(key,id); positions.push(...w);
+            edgeVertices.set(p.edge,id);
             // Weathered charcoal crust, exposed warm grey stone, mineral seams
             // and sediment bands. Shared source strata align across fractures.
             const crust = THREE.MathUtils.smoothstep(parentSkinDistance(...p),-100,-12);
@@ -120,21 +128,27 @@ function* buildAsteroidTerrain() {
             return id;
         };
         const triangle = (a,b,c,inside) => {
-            const ab=b.map((v,i)=>v-a[i]),ac=c.map((v,i)=>v-a[i]);
-            const n=[ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2],ab[0]*ac[1]-ab[1]*ac[0]];
-            if(Math.hypot(...n)<1e-10)return;
-            if(n.reduce((sum,v,i)=>sum+v*(inside[i]-a[i]),0)>0){const swap=b;b=c;c=swap;}
+            const abx=b[0]-a[0],aby=b[1]-a[1],abz=b[2]-a[2],acx=c[0]-a[0],acy=c[1]-a[1],acz=c[2]-a[2];
+            const nx=aby*acz-abz*acy,ny=abz*acx-abx*acz,nz=abx*acy-aby*acx;
+            if(Math.hypot(nx,ny,nz)<1e-10)return;
+            if(nx*(inside[0]-a[0])+ny*(inside[1]-a[1])+nz*(inside[2]-a[2])>0){const swap=b;b=c;c=swap;}
             const ia=vertex(a),ib=vertex(b),ic=vertex(c); indices.push(ia,ib,ic);
-            const wa=positions.slice(ia*3,ia*3+3),wb=positions.slice(ib*3,ib*3+3),wc=positions.slice(ic*3,ic*3+3);
-            const mid=wa.map((v,i)=>(v+wb[i]+wc[i])/3),key=mid.map(v=>Math.floor(v/TILE)).join(':');
-            const tile=tiles.get(key)??{ triangles:[], min:[Infinity,Infinity,Infinity],max:[-Infinity,-Infinity,-Infinity] };
-            for(const p of [wa,wb,wc]){tile.triangles.push(...p);for(let i=0;i<3;i++){tile.min[i]=Math.min(tile.min[i],p[i]);tile.max[i]=Math.max(tile.max[i],p[i]);}}
-            tiles.set(key,tile);
+            const tileCoord=axis=>Math.floor((positions[ia*3+axis]+positions[ib*3+axis]+positions[ic*3+axis])/3/TILE);
+            const key=tileCoord(0)+':'+tileCoord(1)+':'+tileCoord(2);
+            let tile=tiles.get(key);
+            if(!tile){tile={triangles:[],min:[Infinity,Infinity,Infinity],max:[-Infinity,-Infinity,-Infinity]};tiles.set(key,tile);}
+            for(let k=indices.length-3;k<indices.length;k++)for(let axis=0;axis<3;axis++){
+                const v=positions[indices[k]*3+axis];tile.triangles.push(v);
+                tile.min[axis]=Math.min(tile.min[axis],v);tile.max[axis]=Math.max(tile.max[axis],v);
+            }
         };
         for(let z=0;z<nz-1;z++)for(let y=0;y<ny-1;y++){
           for(let x=0;x<nx-1;x++){
-            const values=corners.map(c=>samples[at(x+c[0],y+c[1],z+c[2])]);
-            if(values.every(v=>v>=0)||values.every(v=>v<0))continue;
+            const base=at(x,y,z),inside=samples[base]<0;
+            let corner=1;
+            while(corner<8 && (samples[base+cornerOffsets[corner]]<0)===inside)corner++;
+            if(corner===8)continue;
+            for(let i=0;i<8;i++)values[i]=samples[base+cornerOffsets[i]];
             const points=corners.map(c=>[min[0]+(x+c[0])*STEP,min[1]+(y+c[1])*STEP,min[2]+(z+c[2])*STEP]);
             for(const tet of tetrahedra){
                 const cuts=[],inside=[];
@@ -142,7 +156,9 @@ function* buildAsteroidTerrain() {
                 if(!inside.length||inside.length===4)continue;
                 const centre=inside[0];
                 for(const [u,v] of edges){const a=tet[u],b=tet[v];if((values[a]<0)===(values[b]<0))continue;
-                    const t=values[a]/(values[a]-values[b]);cuts.push(points[a].map((p,i)=>p+(points[b][i]-p)*t));}
+                    const t=values[a]/(values[a]-values[b]),cut=points[a].map((p,i)=>p+(points[b][i]-p)*t);
+                    cut.edge=(base+Math.min(cornerOffsets[a],cornerOffsets[b]))*8+(cornerMasks[a]^cornerMasks[b]);
+                    cuts.push(cut);}
                 if(cuts.length===3)triangle(cuts[0],cuts[1],cuts[2],centre);
                 else if(cuts.length===4){
                     // Edge order around a 2-in/2-out tetrahedron is 0,1,3,2.

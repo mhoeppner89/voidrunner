@@ -1,3 +1,10 @@
+## 0.8.2nb — Phone flight performance
+
+- Cull off-screen Shardbelt rocks between shadow updates and combine the crossed glow planes of each laser. Keep all casters when refreshing shadows.
+- Update only drifting Shardbelt obstacles in the collision grid and skip cells outside the hull's reach during contact checks. Build the same asteroid terrain with fewer temporary arrays and repeated calculations.
+- Keep the cockpit's touch controls and target drawings current without rewriting unchanged controls or rebuilding ship outlines as they rotate.
+- Pack the wreck collision profiles into 1.58 MB instead of 12.23 MB before HTTP compression. Preserve the exact triangles, bounds, and interior placements while building and searching collision trees more efficiently.
+
 ## 0.8.2na — Smoother flight and loading
 
 - Prepare asteroid geometry and planet surfaces in responsive loading-time slices without changing their appearance or collision surfaces.

@@ -13,9 +13,10 @@ export function prepareSurfaceMeshIndex(vertices, indices) {
     if (tree) return tree;
     const count = indices.length / 3;
     if (!Number.isInteger(count)) throw new RangeError('Triangle index count must be divisible by three.');
-    const order = Array.from({ length: count }, (_, i) => i * 3);
+    const order = new Uint32Array(count);
     const bounds = new Float64Array(count * 6);
     for (let n = 0; n < count; n++) {
+        order[n] = n * 3;
         const out = n * 6;
         bounds[out] = bounds[out + 1] = bounds[out + 2] = Infinity;
         bounds[out + 3] = bounds[out + 4] = bounds[out + 5] = -Infinity;
@@ -29,7 +30,32 @@ export function prepareSurfaceMeshIndex(vertices, indices) {
         }
     }
     const nodes = [];
-    function build(first, end) {
+    // Splitting needs just the median, not a full sort at every level.
+    // Triangle offsets break ties, so both child sets and leaf order match
+    // the original sorted tree even for coincident faces.
+    const compare = [0, 1, 2].map(axis => (a, b) =>
+        (bounds[a * 2 + axis] + bounds[a * 2 + axis + 3])
+        - (bounds[b * 2 + axis] + bounds[b * 2 + axis + 3]) || a - b);
+    function partition(first, end, middle, cmp) {
+        let lo = first, hi = end - 1, budget = 2 * Math.ceil(Math.log2(end - first));
+        while (lo < hi) {
+            // Bound the cost even for adversarially ordered meshes.
+            if (--budget === 0) { order.subarray(lo, hi + 1).sort(cmp); return; }
+            const pivot = order[(lo + hi) >>> 1];
+            let left = lo, right = hi;
+            while (left <= right) {
+                while (cmp(order[left], pivot) < 0) left++;
+                while (cmp(order[right], pivot) > 0) right--;
+                if (left <= right) {
+                    const tmp = order[left]; order[left++] = order[right]; order[right--] = tmp;
+                }
+            }
+            if (middle <= right) hi = right;
+            else if (middle >= left) lo = left;
+            else return;
+        }
+    }
+    function build(first, end, parentAxis) {
         const node = { minX: Infinity, minY: Infinity, minZ: Infinity,
             maxX: -Infinity, maxY: -Infinity, maxZ: -Infinity,
             first, end, leaf: end - first <= LEAF_TRIANGLES, skip: 0 };
@@ -47,12 +73,11 @@ export function prepareSurfaceMeshIndex(vertices, indices) {
             const spans = [node.maxX - node.minX, node.maxY - node.minY, node.maxZ - node.minZ];
             const axis = spans[1] > spans[0] ? (spans[2] > spans[1] ? 2 : 1) : (spans[2] > spans[0] ? 2 : 0);
             // Cold build only: reorder triangle references, never source buffers.
-            const sorted = order.slice(first, end).sort((a, b) =>
-                (bounds[a * 2 + axis] + bounds[a * 2 + axis + 3])
-                - (bounds[b * 2 + axis] + bounds[b * 2 + axis + 3]) || a - b);
-            for (let n = 0; n < sorted.length; n++) order[first + n] = sorted[n];
             const middle = first + Math.floor((end - first) / 2);
-            build(first, middle); build(middle, end);
+            partition(first, end, middle, compare[axis]);
+            build(first, middle, axis); build(middle, end, axis);
+        } else if (parentAxis !== undefined) {
+            order.subarray(first, end).sort(compare[parentAxis]);
         }
         node.skip = nodes.length;
     }
@@ -61,7 +86,7 @@ export function prepareSurfaceMeshIndex(vertices, indices) {
     // An origin-centred sphere permits a cheap world-space miss before any
     // inverse rotation. Include off-centre geometry as well as ordinary rocks.
     const radius=root?Math.hypot(Math.max(Math.abs(root.minX),Math.abs(root.maxX)),Math.max(Math.abs(root.minY),Math.abs(root.maxY)),Math.max(Math.abs(root.minZ),Math.abs(root.maxZ))):0;
-    tree = { nodes, order: Uint32Array.from(order), radius };
+    tree = { nodes, order, radius };
     byIndices.set(indices, tree);
     return tree;
 }

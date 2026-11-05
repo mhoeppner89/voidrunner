@@ -15,8 +15,6 @@
 // renderer's disposeObject skips; release everything through dispose().
 import * as THREE from 'three';
 
-const X_AXIS = new THREE.Vector3(1, 0, 0);
-const Z_AXIS = new THREE.Vector3(0, 0, 1);
 const cssHex = (value) => `#${value.toString(16).padStart(6, '0')}`;
 
 export const LASER_FX_TUNING = {
@@ -157,7 +155,18 @@ export class LaserFx {
             const boltScale = tuning.boltScale ?? 1;
             const coreGeometry = new THREE.CapsuleGeometry(tuning.coreRadius * boltScale, Math.max(0.2, (tuning.coreLength - tuning.coreRadius * 2) * boltScale), 3, 8);
             coreGeometry.userData.shared = true;
-            const glowGeometry = new THREE.PlaneGeometry(1, 1);
+            // The two crossed streaks have identical material and depth.
+            // Put both quads in one mesh, preserving each plane's UVs.
+            const w = tuning.glowWidth * boltScale / 2, l = tuning.glowLength * boltScale / 2;
+            const glowGeometry = new THREE.BufferGeometry();
+            glowGeometry.setAttribute('position', new THREE.Float32BufferAttribute([
+                -w,0,-l, w,0,-l, -w,0,l, w,0,l,
+                0,-w,-l, 0,w,-l, 0,-w,l, 0,w,l,
+            ], 3));
+            glowGeometry.setAttribute('uv', new THREE.Float32BufferAttribute([
+                0,1, 1,1, 0,0, 1,0, 0,1, 1,1, 0,0, 1,0,
+            ], 2));
+            glowGeometry.setIndex([0,2,1, 2,3,1, 4,6,5, 6,7,5]);
             glowGeometry.userData.shared = true;
             this.shared = { coreGeometry, glowGeometry, streak: this.boltStreakTexture(), factions: new Map() };
         }
@@ -180,6 +189,7 @@ export class LaserFx {
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
                 side: THREE.DoubleSide,
+                forceSinglePass: true,
                 fog: false,
                 toneMapped: false,
             });
@@ -194,19 +204,14 @@ export class LaserFx {
                 toneMapped: false,
             });
             headMaterial.userData.shared = true;
-            // Crossed glow planes along the bolt axis: A spans X/Z (normal +Y),
-            // B is A rotated a quarter-turn about the bolt axis (normal ±X), so
-            // at least one plane is face-on from every view angle.
-            const glowQuatA = new THREE.Quaternion().setFromAxisAngle(X_AXIS, -Math.PI / 2);
-            const glowQuatB = new THREE.Quaternion().setFromAxisAngle(Z_AXIS, Math.PI / 2).multiply(glowQuatA);
-            assets = { coreMaterial, glowMaterial, headMaterial, glowQuatA, glowQuatB };
+            assets = { coreMaterial, glowMaterial, headMaterial };
             shared.factions.set(key, assets);
         }
         return assets;
     }
     // A laser bolt: group aligned by the renderer's velocity quaternion (the
     // bolt's local -Z points along travel). Per-bolt allocation is the group,
-    // three meshes and one sprite — no canvases, no compiles.
+    // two meshes and one sprite — no canvases, no compiles.
     boltFor(faction) {
         const tuning = LASER_FX_TUNING;
         const assets = this.factionAssets(faction);
@@ -214,14 +219,7 @@ export class LaserFx {
         const core = new THREE.Mesh(this.sharedAssets().coreGeometry, assets.coreMaterial);
         core.rotation.x = Math.PI / 2;
         group.add(core);
-        const glowA = new THREE.Mesh(this.sharedAssets().glowGeometry, assets.glowMaterial);
-        glowA.scale.set(tuning.glowWidth * tuning.boltScale, tuning.glowLength * tuning.boltScale, 1);
-        glowA.quaternion.copy(assets.glowQuatA);
-        group.add(glowA);
-        const glowB = new THREE.Mesh(this.sharedAssets().glowGeometry, assets.glowMaterial);
-        glowB.scale.set(tuning.glowWidth * tuning.boltScale, tuning.glowLength * tuning.boltScale, 1);
-        glowB.quaternion.copy(assets.glowQuatB);
-        group.add(glowB);
+        group.add(new THREE.Mesh(this.sharedAssets().glowGeometry, assets.glowMaterial));
         const head = new THREE.Sprite(assets.headMaterial);
         head.scale.setScalar(tuning.headSize * tuning.boltScale);
         head.position.z = -(tuning.coreLength * tuning.boltScale / 2);

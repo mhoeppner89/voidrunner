@@ -77,6 +77,17 @@ const loadoutGroupDemand=(loadout,mountId)=>{
 };
 const escapeHtml = (value) => value.replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 const percent = (value, max) => (max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100)));
+// Assigning the same textContent still replaces its text node. Reflected
+// attributes likewise notify the browser even when a monitor hasn't changed.
+const setHudText = (element, value) => {
+    if (element && element.textContent !== value) element.textContent = value;
+};
+const setHudAttribute = (element, name, value) => {
+    if (element && element.getAttribute(name) !== value) element.setAttribute(name, value);
+};
+const setHudTitle = (element, value) => {
+    if (element && element.title !== value) element.title = value;
+};
 const sortieImpactMarkup = (item, before = {}, after = {}) => {
     if (!item || item.category === 'gun' || item.category === 'launcher' || item.category === 'turret')
         return '';
@@ -462,7 +473,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2na';
+const GAME_VERSION = '0.8.2nb';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -957,6 +968,7 @@ export class GameUI {
         this.targetHullCanvas = host.querySelector('#target-hull-outline');
         this.targetLayout = host.querySelector('.screen-target-layout');
         this.targetScreen = host.querySelector('.cockpit-screen-target');
+        this.boostButtons = host.querySelectorAll('.touch-boost');
         this.bindStaticEvents();
         bindEquipmentInventory(this);
         this.syncFullscreenButton();
@@ -4357,6 +4369,7 @@ export class GameUI {
         queue.push({key,quantity,item,commodity:commodity?.id,name:entry.tutorialRecorder?t('Recorder'):commodity?t(commodity.name):equipmentName(item)});
     }
     updateSpacePickup() {
+        if (!this.spacePickupReceipt && !this.spacePickupQueue?.length) return;
         const layout=this.el('.cockpit-screen-own .screen-ship-layout');if(!layout)return;
         const now=this.save?.world.time??0;
         const blocked=this.isModalOpen||this.save?.player.dockedAt;
@@ -4370,7 +4383,7 @@ export class GameUI {
         let panel=this.el('#space-pickup-receipt');
         if(!panel&&visible){panel=document.createElement('div');panel.id='space-pickup-receipt';panel.className='space-pickup-receipt';panel.setAttribute('role','status');panel.setAttribute('aria-live','polite');layout.appendChild(panel);this.elementCache?.delete('#space-pickup-receipt');}
         if(!panel)return;
-        panel.hidden=!visible;
+        if (panel.hidden !== !visible) panel.hidden = !visible;
         if(visible){
             if(!receipt.markup)receipt.markup=`${receipt.item?equipmentIcon(receipt.item):commodityIcon(receipt.commodity)}<b>+${formatNumber(receipt.quantity)}</b><span>${escapeHtml(receipt.name)}</span>`;
             if(panel.receiptMarkup!==receipt.markup){panel.innerHTML=receipt.markup;panel.receiptMarkup=receipt.markup;panel.title=`+${receipt.quantity} ${receipt.name}`;panel.setAttribute('aria-label',panel.title);panel.style?.setProperty('--item-color',EQUIPMENT_RARITIES[receipt.item?.rarity??'common']?.color??'currentColor');}
@@ -4382,11 +4395,7 @@ export class GameUI {
         this.droneHud = this.droneHudSnapshot(model);
         this.setCockpitShip(model.shipId);
         this.updateSpacePickup();
-        const setText = (selector, value) => {
-            const element = this.el(selector);
-            if (element && element.textContent !== value)
-                element.textContent = value;
-        };
+        const setText = (selector, value) => setHudText(this.el(selector), value);
         const setBar = (selector, value) => {
             const element = this.el(selector);
             if (element)
@@ -4395,9 +4404,10 @@ export class GameUI {
         // A fixed label and footprint keep drive activity out of the canopy.
         const card = this.el('#hyperdrive-card');
         if (card) {
-            card.dataset.hyperdriveReady = !model.raceControl&&model.hyperdriveReady ? 'true' : 'false';
-            card.disabled=Boolean(model.raceControl);setText('#hyperdrive-card b',model.raceControl?t(model.raceControl):'HYPERDRIVE');
-            card.setAttribute('aria-label',model.raceControl?t(model.raceControl):t('Hyperdrive: engage jump to nav point'));
+            setHudAttribute(card, 'data-hyperdrive-ready', !model.raceControl && model.hyperdriveReady ? 'true' : 'false');
+            if (card.disabled !== Boolean(model.raceControl)) card.disabled = Boolean(model.raceControl);
+            setText('#hyperdrive-card b', model.raceControl ? t(model.raceControl) : 'HYPERDRIVE');
+            setHudAttribute(card, 'aria-label', model.raceControl ? t(model.raceControl) : t('Hyperdrive: engage jump to nav point'));
         }
         // Monitor tickers: the own-ship flight recorder and the radar sensor
         // log replace the in-flight toast stack. Each shows the newest entry
@@ -4429,7 +4439,7 @@ export class GameUI {
                 line.title = message;
                 line.dataset.summary = entry?.summary ?? '';
             }
-            ticker.dataset.tone = entry?.tone ?? 'info';
+            setHudAttribute(ticker, 'data-tone', entry?.tone ?? 'info');
             ticker.classList.toggle('is-visible', Boolean(entry));
         };
         // Short-lived own-ship notices used to replace the cargo value inside
@@ -4452,8 +4462,7 @@ export class GameUI {
             if(wasHidden!==!model.patrolReply)this.scheduleCommsFit();
             if (model.patrolReply) {
                 const timer = this.el('#patrol-reply-timer');
-                if (timer)
-                    timer.textContent = String(model.patrolReply.seconds);
+                setHudText(timer, String(model.patrolReply.seconds));
             }
         }
         // Weapon readout on the own-ship monitor: mounted gun name and ammo,
@@ -4463,7 +4472,7 @@ export class GameUI {
         if (weaponReadout) {
             const weapon = model.weapon;
             weaponReadout.classList.toggle('is-visible', Boolean(weapon));
-            weaponReadout.dataset.venting = weapon?.venting ? 'true' : 'false';
+            setHudAttribute(weaponReadout, 'data-venting', weapon?.venting ? 'true' : 'false');
             if (weapon) {
                 const groupPrefix = weapon.group ? `${weapon.group==='ALL'?t('FIRE ALL'):weapon.group} · ` : '';
                 const displayName = `${groupPrefix}${weapon.name}`;
@@ -4473,13 +4482,13 @@ export class GameUI {
                     : weapon.recharging ? t('CHARGING') : '⚡');
                 const launcher = model.launcher;
                 setText('#screen-own-launcher', launcher ? `${launcher.displayCode ?? launcher.shortCode} ${launcher.current}/${launcher.capacity}` : '');
-                weaponReadout.title = `${t('Switch fire group — press X or tap')} · ${weapon.fullName ?? weapon.name}${launcher ? ` · ${launcher.name} ${launcher.current}/${launcher.capacity} · ${t('Cycle launcher — press L or tap')}` : ''}`;
+                setHudTitle(weaponReadout, `${t('Switch fire group — press X or tap')} · ${weapon.fullName ?? weapon.name}${launcher ? ` · ${launcher.name} ${launcher.current}/${launcher.capacity} · ${t('Cycle launcher — press L or tap')}` : ''}`);
             }
             else {
                 setText('#screen-own-weapon-name', '');
                 setText('#screen-own-weapon-ammo', '');
                 setText('#screen-own-launcher', '');
-                weaponReadout.title = t('Switch fire group — press X or tap');
+                setHudTitle(weaponReadout, t('Switch fire group — press X or tap'));
             }
         }
         // Race strip: compact circuit telemetry on the own-ship monitor while
@@ -4496,7 +4505,7 @@ export class GameUI {
             const race = model.race;
             const stripLive = Boolean(race) && race.phase !== 'travel';
             raceStrip.classList.toggle('is-visible', stripLive);
-            raceStrip.dataset.phase = race?.phase ?? '';
+            setHudAttribute(raceStrip, 'data-phase', race?.phase ?? '');
             if (stripLive) {
                 const label = this.el('#screen-race-label');
                 const value = this.el('#screen-race-value');
@@ -4507,12 +4516,12 @@ export class GameUI {
                 };
                 if (label && value) {
                     if (race.phase === 'countdown') {
-                        label.textContent = t('{course} · GRID', { course: race.title.toUpperCase() });
-                        value.textContent = t('T-{seconds}', { seconds: race.seconds });
+                        setHudText(label, t('{course} · GRID', { course: race.title.toUpperCase() }));
+                        setHudText(value, t('T-{seconds}', { seconds: race.seconds }));
                     }
                     else if (race.phase === 'finished') {
-                        label.textContent = t('FINISH · {rank}', { rank: race.rankLabel });
-                        value.textContent = race.personalBest ? t('NEW PB · {time}', { time: clock(race.time) }) : clock(race.time);
+                        setHudText(label, t('FINISH · {rank}', { rank: race.rankLabel }));
+                        setHudText(value, race.personalBest ? t('NEW PB · {time}', { time: clock(race.time) }) : clock(race.time));
                     }
                     else {
                         // Running label drops the course title — mid-race the
@@ -4521,16 +4530,16 @@ export class GameUI {
                         const shortcut = race.shortcut
                             ? t('CUT {n}/{total}', { n: race.shortcut.gate, total: race.shortcut.gateCount })
                             : t('GATE {n}/{total}', { n: race.gate, total: race.gateCount });
-                        label.textContent = race.draft > 0.15 ? `${shortcut} · ${t('DRAFT')}` : shortcut;
-                        value.textContent = Number.isFinite(race.splitDelta) && (race.splitAge ?? 99) < 2.2
+                        setHudText(label, race.draft > 0.15 ? `${shortcut} · ${t('DRAFT')}` : shortcut);
+                        setHudText(value, Number.isFinite(race.splitDelta) && (race.splitAge ?? 99) < 2.2
                             ? `${race.rankLabel} · ${t('PB {delta}', { delta: `${race.splitDelta <= 0 ? '−' : '+'}${Math.abs(race.splitDelta).toFixed(1)}` })}`
-                            : `${race.rankLabel} · ~${race.gap>=0?'+':'−'}${Math.abs(race.gap??0).toFixed(1)}s`;
+                            : `${race.rankLabel} · ~${race.gap>=0?'+':'−'}${Math.abs(race.gap??0).toFixed(1)}s`);
                     }
-                    raceStrip.title = `${label.textContent} · ${value.textContent}`;
+                    setHudTitle(raceStrip, `${label.textContent} · ${value.textContent}`);
                 }
             }
             else
-                raceStrip.title = '';
+                setHudTitle(raceStrip, '');
         }
         setText('#hud-zone', model.zone.toUpperCase());
         setText('#hud-mode', model.mode.toUpperCase());
@@ -4539,68 +4548,52 @@ export class GameUI {
         const speedValue = this.el('#screen-own-speed');
         const speedLimit = this.el('#screen-own-max-speed');
         if (speedValue && speedLimit) {
-            speedValue.textContent = String(speed);
-            speedLimit.textContent = `/${maxSpeed}`;
+            setHudText(speedValue, String(speed));
+            setHudText(speedLimit, `/${maxSpeed}`);
             const speedCell = speedValue.parentElement;
             // Four-digit hyperdrive values do not fit beside another
             // four-digit maximum in the narrow physical phone monitor. Keep
             // the live speed full-size there; the equal limit is redundant.
             speedCell?.classList.toggle('is-wide-speed', Math.max(Math.abs(speed), Math.abs(maxSpeed)) >= 1000);
-            speedCell?.setAttribute('aria-label', `${t('SPEED')} ${speed} / ${maxSpeed}`);
-            speedCell?.setAttribute('title', `${t('SPEED')} ${speed} / ${maxSpeed}`);
+            const speedLabel = `${t('SPEED')} ${speed} / ${maxSpeed}`;
+            setHudAttribute(speedCell, 'aria-label', speedLabel);
+            setHudTitle(speedCell, speedLabel);
         }
         const raceDriveLive=model.race?.phase==='running'&&Number.isFinite(model.race.boost);
         const stabilizer=raceDriveLive&&model.race.stabilizerTime>0;
         const driveLabel=stabilizer?t('STABILIZER'):t(model.race?.racingHull?'THRUST':'BOOST');
         setText('#screen-own-fuel-label',raceDriveLive?driveLabel:t('FUEL'));
-        this.el('#screen-own-fuel-label')?.setAttribute('data-short',raceDriveLive?(stabilizer?'STAB':t(model.race?.racingHull?'THRUST':'BOOST')):'FUEL');
+        setHudAttribute(this.el('#screen-own-fuel-label'), 'data-short', raceDriveLive ? (stabilizer ? 'STAB' : driveLabel) : 'FUEL');
         setText('#screen-own-fuel',stabilizer?`${Math.ceil(model.race.stabilizerTime)}s`:Math.round(raceDriveLive?model.race.boost*100:(model.fuel/model.maxFuel)*100).toString());
         const boostValue=this.el('#screen-own-fuel');
-        if(boostValue){boostValue.dataset.boost=stabilizer?'stabilizer':raceDriveLive&&model.race.boostLocked?'recovering':'';boostValue.nextElementSibling.textContent=stabilizer?'':'%';}
+        if (boostValue) {
+            setHudAttribute(boostValue, 'data-boost', stabilizer ? 'stabilizer' : raceDriveLive && model.race.boostLocked ? 'recovering' : '');
+            setHudText(boostValue.nextElementSibling, stabilizer ? '' : '%');
+        }
         const standoff = this.el('#screen-standoff');
         if (standoff) {
             standoff.classList.toggle('is-visible', Boolean(model.standoff));
             if (model.standoff) {
                 const demand = this.el('#screen-standoff-demand');
                 const timer = this.el('#screen-standoff-timer');
-                if (demand)
-                    demand.textContent = model.standoff.kind === 'credits' ? t('PAY {label}', { label: model.standoff.label }) : t('DROP {label}', { label: model.standoff.label });
-                if (timer)
-                    timer.textContent = String(model.standoff.seconds);
-                standoff.title = `${demand?.textContent ?? ''} · ${timer?.textContent ?? ''}`;
+                setHudText(demand, model.standoff.kind === 'credits' ? t('PAY {label}', { label: model.standoff.label }) : t('DROP {label}', { label: model.standoff.label }));
+                setHudText(timer, String(model.standoff.seconds));
+                setHudTitle(standoff, `${demand?.textContent ?? ''} · ${timer?.textContent ?? ''}`);
             }
             else
-                standoff.title = '';
+                setHudTitle(standoff, '');
         }
         this.drawRadar(model.contacts, model.radarRings, model.searchRings, model.radarWarp);
         setBar('#screen-own-shield', percent(model.shield, model.maxShield));
         setBar('#screen-own-energy', percent(model.energy, model.maxEnergy));
         setBar('#screen-own-hull', percent(model.hull, model.maxHull));
-        this.updateTarget(model.target, model.mode, this.droneHud);
+        this.updateTarget(model.target, model.mode, this.droneHud, model);
         this.updateDroneTelemetry(model);
-        const targetReadout = this.el('#screen-target-readout');
-        if (targetReadout) {
-            // Transient monitor alerts win, then the slow-down call for an
-            // approach — the landing/docking prompt lives on the target
-            // monitor's readout, not the radar zone line.
-            targetReadout.classList.toggle('is-alert', Boolean(model.monitorStatus));
-            targetReadout.classList.toggle('is-dock-prompt', Boolean(model.dockPrompt && !model.monitorStatus));
-            if (model.monitorStatus)
-                targetReadout.textContent = model.monitorStatus;
-
-            else if (model.dockPrompt)
-                targetReadout.textContent = model.dockPrompt;
-            if(model.race?.phase==='running'&&!model.monitorStatus){
-                const seconds=Math.floor(model.race.time),delta=model.race.sectorDelta;
-                targetReadout.textContent=`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}${Number.isFinite(delta)?` · Δ ${delta<=0?'−':'+'}${Math.abs(delta).toFixed(1)}s`:''}`;
-                targetReadout.title=t('Race time · Sector gain / loss');
-            }else
-            targetReadout.title = targetReadout.textContent === '—' ? '' : targetReadout.textContent;
-        }
         this.drawHullOutline(this.ownHullCanvas, model.playerVariant ?? 'kestrel', 0, 'rgba(111, 216, 236, 0.9)', false, model.missiles, model.maxMissiles);
         const marker=this.el('#race-flight-vector');
         if(marker){marker.classList.toggle('is-hidden',!model.raceVector);if(model.raceVector){marker.style.left=`${model.raceVector.x}px`;marker.style.top=`${model.raceVector.y}px`;marker.style.transform=`translate(-50%,-50%) rotate(${model.raceVector.angle}deg)`;marker.classList.toggle('is-edge',model.raceVector.edge);}}
-        for(const button of this.root.querySelectorAll('.touch-boost'))button.setAttribute('aria-label',model.raceControl?t('Thrust — hold'):t('Afterburner — hold'));
+        const boostLabel = t(model.raceControl ? 'Thrust — hold' : 'Afterburner — hold');
+        for (const button of this.boostButtons) setHudAttribute(button, 'aria-label', boostLabel);
         const throttleThumb = this.el('[data-touch-throttle-thumb]');
         const throttleFill = this.el('.touch-throttle-fill');
         if (throttleThumb)
@@ -4608,15 +4601,34 @@ export class GameUI {
         if (throttleFill)
             throttleFill.style.height = `${model.throttle * 100}%`;
     }
-    updateTarget(target, mode = this.lastHud?.mode ?? 'combat', drones) {
+    updateTarget(target, mode = this.lastHud?.mode ?? 'combat', drones, model) {
         const contents = this.el('#screen-target-contents');
         if (contents) {
             contents.classList.toggle('is-hidden', !target?.contents);
-            contents.querySelector('b').textContent = target?.contents?.material ?? '';
-            contents.querySelector('span').textContent = target?.contents?.detail ?? '';
+            setHudText(this.el('#screen-target-contents b'), target?.contents?.material ?? '');
+            setHudText(this.el('#screen-target-contents span'), target?.contents?.detail ?? '');
         }
         const capital=Boolean(target?.capitalClass||target?.capitalSubtarget);
-        this.el('#screen-target-readout').classList.toggle('is-capital-warning',capital&&(target.capitalTorpedoWarning||!target.capitalDisarmed&&['CHARGING','SALVO'].includes(target.capitalAttack)));
+        const readout = this.el('#screen-target-readout');
+        readout.classList.toggle('is-capital-warning',capital&&(target.capitalTorpedoWarning||!target.capitalDisarmed&&['CHARGING','SALVO'].includes(target.capitalAttack)));
+        readout.classList.toggle('is-alert', Boolean(model?.monitorStatus));
+        readout.classList.toggle('is-dock-prompt', Boolean(model?.dockPrompt && !model.monitorStatus));
+        // Choose the visible readout before publishing it. An alert or race
+        // clock can own this line for many frames while the target moves.
+        let line = model?.monitorStatus || model?.dockPrompt;
+        const raceClock = model?.race?.phase === 'running' && !model.monitorStatus;
+        if (raceClock) {
+            const seconds = Math.floor(model.race.time), delta = model.race.sectorDelta;
+            line = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2,'0')}${Number.isFinite(delta) ? ` · Δ ${delta <= 0 ? '−' : '+'}${Math.abs(delta).toFixed(1)}s` : ''}`;
+        } else if (!line && capital) {
+            line = target.capitalTorpedoWarning ? t('TORPEDO') : target.capitalDisarmed ? t('DISARMED')
+                : target.capitalAttack === 'CHARGING' ? t('CHARGING') : target.capitalAttack === 'SALVO' ? t('SALVO') : '';
+        } else if (!line) {
+            line = target?.readout ?? '—';
+            if (target?.kind === 'ship') line = line.replace(/\s*·\s*[\d.,]+\s*\/\s*[\d.,]+\s*km\s*$/i, '');
+        }
+        setHudText(readout, line);
+        setHudTitle(readout, raceClock ? t('Race time · Sector gain / loss') : line === '—' ? '' : line);
         const subtarget=this.el('#capital-subtarget');
         subtarget?.classList.toggle('is-hidden',!target?.capitalSubtarget);
         this.targetLayout?.classList.toggle('has-capital-target',capital);
@@ -4630,26 +4642,26 @@ export class GameUI {
                 : ['BAT 1','BAT 2','BAT 3','BAT 4','PDC 1','PDC 2','PDC 3','PDC 4','ENGINE 1','SHIELD 1','SHIELD 2','TORPEDO','ENGINE 2','ENGINE 3'][mount]??t('HULL');
             const selected=Number.isInteger(mount);
             const health=selected?Math.max(0,Math.min(100,Math.ceil(100*(target.capitalSelected??0)/Math.max(1,target.capitalSelectedMax??1)))):undefined;
-            this.el('#capital-subtarget-label').textContent=compact;
-            this.el('#capital-subtarget-health').textContent=selected?(health===0?t('OFF'):health+'%'):'';
+            setHudText(this.el('#capital-subtarget-label'), compact);
+            setHudText(this.el('#capital-subtarget-health'), selected ? (health === 0 ? t('OFF') : health + '%') : '');
             subtarget.classList.toggle('is-disabled-component',health===0);
-            subtarget.title=t('Choose a turret, engine, shield generator or hull');
-            subtarget.setAttribute('aria-label',`${subtarget.title}: ${label}${selected?' '+health+'%':''}`);
+            setHudTitle(subtarget, t('Choose a turret, engine, shield generator or hull'));
+            setHudAttribute(subtarget, 'aria-label', `${subtarget.title}: ${label}${selected?' '+health+'%':''}`);
         }
         const bracket = this.el('#target-bracket');
         const edgePointer = this.el('#target-edge-pointer');
         // The target monitor carries the lock (name, bars, distance) — the old
         // top-right target panel was redundant with it and is gone.
         if (!target) {
-            this.el('#screen-target-distance').textContent = '—';
-            this.el('#screen-target-readout').textContent = '—';
+            setHudText(this.el('#screen-target-distance'), '—');
             this.setTargetScreenValue(undefined);
             this.updateWeaponButtons(undefined, mode, drones);
-            this.targetLayout?.classList.remove('is-clip-flash');
-            bracket?.classList.add('is-hidden');
-            bracket?.classList.remove('is-hostile', 'is-surrendered');
-            edgePointer?.classList.add('is-hidden');
-            edgePointer?.classList.remove('is-hostile', 'is-surrendered');
+            this.targetLayout?.classList.toggle('is-clip-flash', false);
+            for (const marker of [bracket, edgePointer]) {
+                marker?.classList.toggle('is-hidden', true);
+                marker?.classList.toggle('is-hostile', false);
+                marker?.classList.toggle('is-surrendered', false);
+            }
             return;
         }
         const hostile = target.kind === 'ship' && target.hostile;
@@ -4659,32 +4671,28 @@ export class GameUI {
         bracket?.classList.toggle('is-surrendered', surrendered && !hostile);
         edgePointer?.classList.toggle('is-hostile', hostile);
         edgePointer?.classList.toggle('is-surrendered', surrendered && !hostile);
-        this.el('#screen-target-distance').textContent = `${formatNumber(target.distance)} km`;
-        this.el('#screen-target-readout').textContent = capital ? (target.capitalTorpedoWarning?t('TORPEDO'):target.capitalDisarmed?t('DISARMED'):target.capitalAttack==='CHARGING'?t('CHARGING'):target.capitalAttack==='SALVO'?t('SALVO'):'') : target.kind === 'ship' ? (target.readout ?? '—').replace(/\s*·\s*[\d.,]+\s*\/\s*[\d.,]+\s*km\s*$/i, '') : target.readout ?? '—';
-        this.el('#screen-target-readout').title = target.readout ?? '';
+        setHudText(this.el('#screen-target-distance'), `${formatNumber(target.distance)} km`);
         this.setTargetScreenValue(target);
         this.updateWeaponButtons(target, mode, drones);
         // A clipped NPC flashes its outline on the target monitor for a beat.
         this.targetLayout?.classList.toggle('is-clip-flash', Boolean(target.clipFlash));
         if (bracket && target.onScreen && target.screenX !== undefined && target.screenY !== undefined) {
             bracket.style.transform = `translate(${target.screenX}px, ${target.screenY}px)`;
-            bracket.classList.remove('is-hidden');
+            bracket.classList.toggle('is-hidden', false);
         }
         else {
-            bracket?.classList.add('is-hidden');
+            bracket?.classList.toggle('is-hidden', true);
         }
         if (target.edge && edgePointer) {
             edgePointer.style.transform = `translate(${target.edge.x}px, ${target.edge.y}px)`;
-            const arm = edgePointer.querySelector('i');
+            const arm = this.el('#target-edge-pointer i');
             if (arm)
                 arm.style.transform = `rotate(${target.edge.angleDeg}deg)`;
-            const label = edgePointer.querySelector('span');
-            if (label)
-                label.textContent = `${Math.round(target.distance)} km`;
-            edgePointer.classList.remove('is-hidden');
+            setHudText(this.el('#target-edge-pointer span'), `${Math.round(target.distance)} km`);
+            edgePointer.classList.toggle('is-hidden', false);
         }
         else {
-            edgePointer?.classList.add('is-hidden');
+            edgePointer?.classList.toggle('is-hidden', true);
         }
     }
     updateDroneTelemetry(model) {
@@ -4705,7 +4713,7 @@ export class GameUI {
             setText('#screen-drone-state', drones.phase === 'idle' && !drones.action?.ok ? drones.action?.label || t('READY TO MINE') : t(drones.phase === 'running' ? 'MINING' : drones.phase === 'recalling' ? 'RETURNING TO BAY' : 'READY TO MINE'));
             setText('#screen-drone-cargo', t('HOLD {cargo}/{capacity}', { cargo: Math.round(model.cargo ?? 0), capacity: model.cargoCapacity ?? '—' }));
             setText('#screen-drone-losses', '');
-            this.el('#screen-drone-telemetry').title = `${t('DRONE BAYS')} · M: ${t('MINING')} · P: PDC\n${drones.readout ?? ''}\n${t('Inbound cargo reserves hold space until delivery.')}`;
+            setHudTitle(this.el('#screen-drone-telemetry'), `${t('DRONE BAYS')} · M: ${t('MINING')} · P: PDC\n${drones.readout ?? ''}\n${t('Inbound cargo reserves hold space until delivery.')}`);
         }
         let operational = 0, pdcBays = 0;
         for (const bay of bays) {
@@ -4849,14 +4857,14 @@ export class GameUI {
         this.targetLayout?.classList.toggle('no-bars', !isShip);
         if (!target) {
             setText('#screen-target-name', t('NO LOCK'));
-            this.el('#screen-target-name').title = '';
+            setHudTitle(this.el('#screen-target-name'), '');
             setBar('#screen-target-shield', 0);
             setBar('#screen-target-hull', 0);
             clearHull();
             return;
         }
         setText('#screen-target-name', target.name.toUpperCase());
-        this.el('#screen-target-name').title = target.name;
+        setHudTitle(this.el('#screen-target-name'), target.name);
         setBar('#screen-target-shield', percent(target.shield ?? 0, target.maxShield ?? 0));
         setBar('#screen-target-hull', percent(target.hull ?? 0, target.maxHull ?? 0));
         this.targetOutlineBlank=false;
@@ -5046,22 +5054,41 @@ export class GameUI {
         ctx.lineWidth = Math.max(1, ratio);
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
-        const trace = contours => {
-            ctx.beginPath();
-            for (const { points, closed } of contours) {
-                points.forEach(([x,z], i) => i ? ctx.lineTo(mapX(x),mapZ(z)) : ctx.moveTo(mapX(x),mapZ(z)));
-                if (closed) ctx.closePath();
-            }
-        };
         if (profile.contours) {
-            trace(profile.contours);
-            ctx.fill('evenodd');
-            ctx.stroke();
+            // Heading changes in a dogfight, but the ship's vector geometry
+            // only changes when the hull or the monitor dimensions change.
+            const trace = (path, contours) => {
+                for (const { points, closed } of contours) {
+                    points.forEach(([x,z], i) => i ? path.lineTo(mapX(x),mapZ(z)) : path.moveTo(mapX(x),mapZ(z)));
+                    if (closed) path.closePath();
+                }
+            };
+            const cache = this.hullPaths ??= new WeakMap();
+            let paths = cache.get(canvas);
+            if (typeof Path2D === 'function' && (paths?.profile !== profile || paths.width !== width || paths.height !== height)) {
+                paths = {profile, width, height, outline: new Path2D(), details: new Path2D()};
+                trace(paths.outline, profile.contours);
+                trace(paths.details, profile.details ?? []);
+                cache.set(canvas, paths);
+            }
+            if (paths) {
+                ctx.fill(paths.outline, 'evenodd');
+                ctx.stroke(paths.outline);
+            } else {
+                ctx.beginPath();
+                trace(ctx, profile.contours);
+                ctx.fill('evenodd');
+                ctx.stroke();
+            }
             if (profile.details?.length) {
                 ctx.globalAlpha = 0.65;
                 ctx.lineWidth = Math.max(0.8, ratio * 0.7);
-                trace(profile.details);
-                ctx.stroke();
+                if (paths) ctx.stroke(paths.details);
+                else {
+                    ctx.beginPath();
+                    trace(ctx, profile.details);
+                    ctx.stroke();
+                }
                 ctx.globalAlpha = 1;
             }
         } else {
@@ -5073,8 +5100,11 @@ export class GameUI {
             ctx.stroke();
         }
         // Nose chevron marking the ship's forward (-Z) direction.
-        const frontCells = profile.cells.filter((cell) => cell[1] === profile.minZ);
-        const noseX = profile.contours ? centerX : frontCells.length ? frontCells.reduce((sum, cell) => sum + cell[0], 0) / frontCells.length : 0;
+        let noseX = centerX;
+        if (!profile.contours) {
+            const frontCells = profile.cells.filter((cell) => cell[1] === profile.minZ);
+            noseX = frontCells.length ? frontCells.reduce((sum, cell) => sum + cell[0], 0) / frontCells.length : 0;
+        }
         const noseY = mapZ(profile.minZ) - scale * 0.6;
         ctx.fillStyle = hostile ? 'rgba(255, 92, 84, 0.95)' : accent;
         ctx.beginPath();
@@ -6425,7 +6455,12 @@ export class GameUI {
         // sim must freeze (the frame loop drops the accumulator for any open
         // modal), so a pilot can't drift into a wall or a pirate's guns while
         // the game is waiting for the phone to be flipped.
-        return Boolean(this.adventure) || !this.root.querySelector('#map-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#ship-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#pause-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#arena-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#chat-panel')?.classList.contains('is-hidden') || !this.root.querySelector('#rotate-notice')?.classList.contains('is-hidden');
+        if (this.adventure) return true;
+        // These shells survive panel content changes. Read the live classes,
+        // as a modal can open in the middle of a multi-step flight frame.
+        this.modalPanels ??= ['#map-panel', '#ship-panel', '#pause-panel', '#arena-panel', '#chat-panel', '#rotate-notice']
+            .map(selector => this.root.querySelector(selector));
+        return this.modalPanels.some(panel => !panel?.classList.contains('is-hidden'));
     }
     get isTitleVisible() {
         return this.titleVisible;

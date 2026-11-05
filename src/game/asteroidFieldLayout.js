@@ -111,15 +111,15 @@ function distanceToSegment(x, y, z, b) {
 function segmentOutside(x,y,z,b,limit) {
     return limit < 0 || x < b.minX-limit || x > b.maxX+limit || y < b.minY-limit || y > b.maxY+limit || z < b.minZ-limit || z > b.maxZ+limit;
 }
-export function passageDistance(x, y, z) {
-    let distance = Infinity;
+export function passageDistance(x, y, z, upperBound = Infinity) {
+    const erosion = rockNoise(x * 1.4, y * 1.4, z * 1.4) * .28;
+    let distance = upperBound - erosion;
     for (const bore of bores) {
         if(segmentOutside(x,y,z,bore,distance+bore.radius))continue;
         distance = Math.min(distance, distanceToSegment(x, y, z, bore) - bore.radius);
     }
     // Wavy erosion changes the aperture, with a guaranteed ~200 km core.
-    distance += rockNoise(x * 1.4, y * 1.4, z * 1.4) * .28;
-    return distance;
+    return distance + erosion;
 }
 const wornIntersection=(a,b,width)=>{
     const blend=Math.max(0,width-Math.abs(a-b));
@@ -135,7 +135,9 @@ export function fragmentDistance(f, x, y, z, parentDistance, fractureRoughness) 
     for (const p of f.planes) distance = wornIntersection(distance, x * p[0] + y * p[1] + z * p[2] - p[3] + 34 + rough, 44);
     if (distance > 90) return distance;
     const w = fragmentToWorld(f, x, y, z);
-    return wornIntersection(distance, -passageDistance(...w), 24);
+    // A tunnel farther away than this cannot reach the 24 km blend band.
+    // The extra kilometre also keeps rounding at the bound out of the blend.
+    return wornIntersection(distance, -passageDistance(w[0], w[1], w[2], 25 - distance), 24);
 }
 export function shardbeltSolidDistance(x, y, z) {
     let distance = Infinity;
