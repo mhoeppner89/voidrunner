@@ -4,7 +4,7 @@ import {fleetPaintPath,resolveFleetPaint} from './fleetPaintCatalog.js';
 import {warmCustomPaint} from './customShipPaint.js';
 import {normalizePaintDesign} from './paintDesign.js';
 import * as THREE from 'three';
-import { createVoxelShipModel, paletteForFaction } from './voxelModels.js';
+import {t} from './i18n.js';
 import { loadGlb } from './glbLoader.js';
 import { GLB_SHIP_CONFIG } from './render.js';
 import { FrameBudget } from './frameBudget.js';
@@ -25,7 +25,7 @@ export const previewCameraDistance = (radius, fov, aspect) => {
 // A lightweight turntable renderer for the selected showroom hull. The old
 // card grid created several small WebGL contexts; the broker now keeps one
 // large preview alive and disposes it when the market re-renders or the player
-// launches. A voxel hull renders immediately, then the flight GLB swaps in.
+// launches. The selected flight model is shown once it has loaded.
 export class ShipPreview {
     constructor(container, variant, options={}) {
         this.container = container;
@@ -69,15 +69,11 @@ export class ShipPreview {
         this.createLighting();
         this.scene.environment = this.createEnvironment();
 
-        // The voxel hull is an instant placeholder: it keeps the card from
-        // flashing empty while the GLB fetch is in flight, exactly like the
-        // flight scene's voxel-until-GLB path.
-        const placeholder = createVoxelShipModel(variant, paletteForFaction('player'));
+        this.status=document.createElement('div');
+        this.status.className='ship-preview-status';this.status.setAttribute('role','status');
+        this.status.textContent=t('Loading ship preview…');container.appendChild(this.status);
         this.pivot = new THREE.Group();
-        this.model = placeholder.group;
-        this.pivot.add(this.model);
         this.scene.add(this.pivot);
-        this.frameModel();
 
         // Swap in the real hull once it loads; it carries the same baked yaw +
         // scale the flight scene uses, so the showroom matches the ship you fly.
@@ -87,10 +83,10 @@ export class ShipPreview {
                     disposeObject(glb);
                 return;
             }
-            if (!glb)
-                return; // load failed; keep the voxel placeholder
-            this.pivot.remove(this.model);
-            disposeObject(this.model);
+            if (!glb) {
+                this.status.textContent=t('Ship preview unavailable');
+                return;
+            }
             this.model = glb;
             this.model.traverse(n=>{if(!n.isMesh)return;for(const m of Array.isArray(n.material)?n.material:[n.material]){
                 stabilizeMaterialNormals(m);
@@ -98,8 +94,12 @@ export class ShipPreview {
             }});
             this.pivot.add(glb);
             this.frameModel();
+            this.status.remove();
             this.dirty=true;
             if(this.paintPreview)void this.setPaint(this.options.paint??'original');
+        }).catch(error=>{
+            console.warn('Ship preview could not be loaded.',error);
+            if(!this.disposed)this.status.textContent=t('Ship preview unavailable');
         });
 
         this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -211,7 +211,7 @@ export class ShipPreview {
     attach(container){
         if(this.container!==container){
             this.resizeObserver.unobserve(this.container);this.visibilityObserver?.unobserve(this.container);
-            this.container=container;container.append(this.renderer.domElement);
+            this.container=container;container.append(this.renderer.domElement);if(!this.model&&this.status)container.append(this.status);
             this.turntable=!this.paintPreview||container.hasAttribute('data-repaint-preview');
             this.drag=null;
             this.resizeObserver.observe(container);this.visibilityObserver?.observe(container);this.visible=true;
@@ -222,7 +222,7 @@ export class ShipPreview {
         if (this.disposed)
             return;
         if (this.visible && !document.hidden && this.container.isConnected) {
-            const rotating=this.turntable&&!this.motionQuery.matches&&!this.drag&&now>=(this.rotateAfter??0);
+            const rotating=Boolean(this.model)&&this.turntable&&!this.motionQuery.matches&&!this.drag&&now>=(this.rotateAfter??0);
             if(this.dirty||rotating){const dt=this.frameBudget.take(now,30);if(dt!==null){
                 if(rotating)this.pivot.rotation.y+=dt*.5;
                 this.render();this.dirty=false;
@@ -254,6 +254,7 @@ export class ShipPreview {
         // preview immediately protects the long-lived concourse/flight views.
         this.renderer.forceContextLoss?.();
         this.renderer.domElement.remove();
+        this.status?.remove();
     }
 }
 // Load one GLB hull for the showroom, baking in the same per-variant yaw and

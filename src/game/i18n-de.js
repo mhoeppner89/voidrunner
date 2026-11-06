@@ -25,6 +25,7 @@ import {EQUIPMENT_NAMING} from './equipmentNaming.js';
 // Player address is informal "du" throughout, matching the frontier voice of
 // the English lines. Values are plain text — never HTML.
 export const DE_CATALOG = {
+    'Inversion applies to the joystick, keyboard and controller.': 'Die Umkehrung gilt für Joystick, Tastatur und Controller.',
     'A versatile armed transport with two drone bays, mining capability and a defensive turret. Larger hold and better protection than the Hestia.': 'Ein vielseitiger bewaffneter Transporter mit zwei Drohnenbuchten, Abbaumöglichkeit und einem Abwehrturm. Mehr Frachtraum und besserer Schutz als die Hestia.',
     'JANUS · FRIGATE': 'JANUS · FREGATTE',
     'MINERVA · CRUISER': 'MINERVA · KREUZER',
@@ -551,6 +552,8 @@ export const DE_CATALOG = {
     'EVENT LOG': 'LOGBUCH',
 
     'LOADING CAREER': 'KARRIERE WIRD GELADEN',
+    'Loading ship preview…': 'Schiffsvorschau wird geladen…',
+    'Ship preview unavailable': 'Schiffsvorschau nicht verfügbar',
     'PREPARING FLIGHT': 'FLUG WIRD VORBEREITET',
     'Flight systems could not be loaded. Reload and try again.': 'Die Flugsysteme konnten nicht geladen werden. Lade die Seite neu und versuche es noch einmal.',
     'The game could not start. Check your connection and reload the page.': 'Das Spiel konnte nicht starten. Prüfe deine Internetverbindung und lade die Seite neu.',
@@ -1427,8 +1430,8 @@ export const DE_CATALOG = {
     'Tilt': 'Neigung',
     'Stick': "Joystick",
     'Sensitivity': 'Empfindlichkeit',
-    'Invert pitch': 'Nickachse umkehren',
-    'Invert yaw': 'Gierachse umkehren',
+    'Invert pitch': 'Oben/unten umkehren',
+    'Invert yaw': 'Links/rechts umkehren',
     'ENABLE': 'AKTIVIEREN',
     'AUDIO': 'AUDIO',
     'Music': 'Musik',

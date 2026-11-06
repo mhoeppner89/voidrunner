@@ -20,6 +20,7 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
    await page.waitForFunction(id=>__VOID_PRIVATEER__.getRuntime().ui.concourseShip?.loadedShipId===id,hull);await ready();
    await page.evaluate(async location=>{const r=__VOID_PRIVATEER__.getRuntime();await r.launch();const {LOCATIONS}=await import('/src/game/data.js');r.renderer.setSystem(LOCATIONS[location].systemId);await Promise.all(r.renderer.worldTextureLoads??[]);r.dockAt(location,true);},location);
    await page.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime().ui.concourseShip?.phase==='entry');
+   assert.ok(await page.evaluate(()=>{const v=__VOID_PRIVATEER__.getRuntime().ui.concourseShip;v.render();return v.quad.material===v.transitFinish&&v.transitFinish.uniforms.tDepth.value===v.target.depthTexture;}),'exterior uses the flight finish and scene depth');
    assert.equal(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().save.player.dockedAt),location);
    assert.ok(await page.locator('.scene-pointers').evaluate(e=>e.inert));
    for(const t of [.18,.58,.86]){

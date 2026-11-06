@@ -47,12 +47,17 @@ for(const [name,engine,device,invitePaul] of profiles){
   });await page.screenshot({path:`${output}/${name}-drone-switch.png`});
   const survey=await page.evaluate(async()=>{
    const r=__VOID_PRIVATEER__.getRuntime(),c=tutorialCheck,fit=r.save.player.outfitting.loadouts[r.save.player.shipId],miners=fit.droneBays[0].unitIds.filter(Boolean);if(!r.setDroneBayMode(fit.droneBays[0].bayId,'pdc').ok)throw Error('PDC fitting failed');c.step('survey-graveyard');if(!miners.every(id=>r.save.player.droneFleet.lockerIds.includes(id)))throw Error('Mining drones lost');await r.launch();cancelAnimationFrame(r.frameId);
+   const T=await import('/vendor/three.module.min.js'),p=r.save.player,unit=p.droneFleet.unitsById[p.outfitting.loadouts[p.shipId].droneBays[0].unitIds[0]],inv=new T.Quaternion().fromArray(p.rotation).invert();p.velocity.fill(0);p.angularVelocity?.fill(0);
+   if(!unit||unit.type!=='pdc')throw Error('PDC drone missing');let highest=-Infinity;
+   for(let i=0;i<180;i++){r.save.world.time+=1/60;r.updatePdcDrones(1/60);const rel=new T.Vector3().fromArray(unit.position).sub(new T.Vector3().fromArray(p.position)).applyQuaternion(inv);highest=Math.max(highest,rel.y);if(i%20===0)c.paint();}
+   if(highest>=0||unit.state!=='escorting')throw Error(`PDC crossed the cockpit on launch: ${highest}, ${unit.state}`);
    r.save.player.position.splice(0,3,...tutorialLocations['mourning-line'].position);r.updateActiveInstance(true);r.save.player.velocity.fill(0);
    for(let i=0;i<3;i++){const marker=r.tutorialFieldTarget();r.save.player.position.splice(0,3,...marker.position);r.updateActiveInstance(true);r.updateTutorialCampaignRuntime();}c.step('rescue-paul');const paul=r.ships.find(s=>s.storyPersonId==='paul'&&s.hull>0);if(paul.hullId!=='torsas')throw Error('Paul has wrong hull');
    r.damageShip(paul,100000,'pirate',paul.position);if(paul.hull!==1||!paul.poweredDown)throw Error('Paul protection missing');
    for(const enemy of r.ships.filter(s=>s.tutorialEncounter==='rescue'))r.damageShip(enemy,100000,'player',enemy.position);r.updateTutorialCampaignRuntime();c.step('talk-paul');r.ui.openStoryAdventure('Paul','Thank you','ally','tutorial-paul-rescue');c.finish();c.step('survey-carrier');
    for(let i=0;i<2;i++){const marker=r.tutorialFieldTarget();r.save.player.position.splice(0,3,...marker.position);r.updateActiveInstance(true);r.updateTutorialCampaignRuntime();}c.step('carrier-wait');r.save.world.time+=11;r.updateTutorialCampaignRuntime();c.step('hide-patrol');c.paint();return {paulHull:paul.hull,patrol:r.ships.filter(s=>s.tutorialPatrol&&s.hull>0).length,minersInCargo:miners.length};
   });await page.screenshot({path:`${output}/${name}-carrier-patrol.png`});
+  if(process.env.VR_TUTORIAL_FLIGHT_ONLY){assert.deepEqual(errors,[]);console.log(name,'mining fight and PDC survey launch passed');continue;}
   const hiding=await page.evaluate(async()=>{
    const r=__VOID_PRIVATEER__.getRuntime(),c=tutorialCheck,T=await import('/vendor/three.module.min.js'),{tutorialWreckPoint}=await import('/src/game/tutorialRuntime.js');const goal=r.ensureTutorialHidePosition()??tutorialWreckPoint('concord-carrier-wreck',true),p=r.save.player;
    // Check the real collision proxies and real occlusion; no mocked sight checks.

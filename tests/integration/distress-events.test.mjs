@@ -77,6 +77,29 @@ function atEvent(s) {
     return active;
 }
 
+test('losing the ship closes an ambush and allows a later distress call',()=>{
+ const s=make();s.save.world.distress.nextAt=100;s.beginDistressPickup();
+ const active=s.save.world.distress.active;active.variant='trap';active.phase='involved';
+ s.save.player.currentTargetId=active.id;s.save.player.lastDockedAt='helix';
+ s.recallPdcDrones=()=>{};s.hasDeployedPdcDrones=()=>false;
+ s.renderer.setSystem=()=>{};s.renderer.setCockpitVisible=()=>{};
+ s.audio.setStationMode=()=>{};s.ui.hideHud=()=>{};s.ui.showDock=()=>{};s.ui.showToast=()=>{};
+ s.recoverPlayer();
+ assert.equal(s.save.world.distress.active,null);assert.equal(s.distressWaypoint(),undefined);
+ assert.equal(s.save.player.currentTargetId,undefined);assert.equal(s.save.world.distress.history[0].outcome,'lost');
+ assert.ok(s.save.world.distress.nextAt>s.save.world.time);
+ s.save.player.dockedAt=undefined;s.save.world.time=s.save.world.distress.nextAt;
+ assert.equal(s.distressPickupDue(),true);
+});
+
+test('an old tow save clears a stranded call without erasing later calls',()=>{
+ const s=make();s.save.world.distress.nextAt=100;s.beginDistressPickup();
+ s.save.player.dockedAt='helix';s.save.world.sortieHistory=[{completedAt:101,events:[{kind:'finished-loss',at:101}]}];
+ s.save.world.time=101;s.initializeDistress();assert.equal(s.save.world.distress.active,null);
+ s.save.player.dockedAt=undefined;s.save.world.distress.nextAt=102;s.save.world.time=102;s.beginDistressPickup();
+ const later=s.save.world.distress.active;s.save.player.dockedAt='helix';s.initializeDistress();assert.equal(s.save.world.distress.active.id,later.id);
+});
+
 test('eight authored variants, two setups each, and an 85/15 genuine/trap split', () => {
     assert.equal(DISTRESS_VARIANTS.length, 8);
     assert.deepEqual([...DISTRESS_VARIANT_IDS], ['convoy', 'wreck', 'trap', 'fuel', 'disabled', 'debris', 'jettison', 'dispute']);

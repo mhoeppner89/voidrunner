@@ -1,5 +1,21 @@
 Original prompt: Review and revise all equipment names for ambiguity and visible tiers.
 
+Follow-up: address new-player tutorial and interface feedback; sound design is deferred.
+- Moved steering and vibration settings to Controls, clarified inversion and applied it to all steering inputs; fixed reduced-damage preferences before a career starts. Added launch and combat target instructions, put drive messages on the target monitor, replaced native inventory tabs, added a proportional pixel face for prose and menus, and slowed/skippable landing.
+- Focused input, tutorial, inventory, landing and HUD checks passed. Muted desktop, Android and iPhone browser checks verified title preferences, inventory tabs, a real blocked jump and both arrival skip paths; inspected the phone and desktop screenshots. Packaged 0.8.2nj. Physical-phone testing and the deferred sound overhaul remain open.
+
+Follow-up: stop the drone crossing the cockpit and improve the first pirate duel.
+- Corrected PDC launch and escort anchors and hid own drones inside the cockpit camera envelope. NPCs now plan avoidance in career combat; removed the invisible proximity push and gave real NPC impacts a size-weighted recoil.
+- Forty-five focused drone, combat, collision and rendering tests passed, including a simulated 60-second tutorial duel. Muted desktop and Android browser runs passed the mining fight and PDC launch. A broader run hit a frigate beam-cover test that also fails on the committed game, and the full tutorial browser script later expected earn-standing while the current story was still at mara-debrief. Packaged 0.8.2ni.
+
+Follow-up: stop showing legacy voxel hulls while shipyard models load.
+- Use a localized loading message until the actual hull is ready, with a visible failure state and cleanup when switching screens. Muted desktop/Android/iPhone checks passed with delayed and failed model loads; desktop/Android shipyard and repaint checks passed. Inspected the phone loading screenshot. Packaged 0.8.2nh.
+
+Follow-up: clear distress calls after player loss and align exterior films with flight rendering.
+- Recovery now archives the encounter, removes its marker and schedules the next call. Old docked saves with a recorded loss after the call are repaired on load; later calls are retained.
+- Station and planet exterior films use the same depth-aware flight finish and quality-dependent pixel sizing, with shader preparation before playback. Docked artwork keeps its established finish.
+- All 66 distress checks and 47 focused rendering/transition checks passed. A muted Android career ambush verified the actual death, tow, cleared waypoint and next-call schedule. Muted desktop and iPhone planet and station films passed, including skip/refusal and recovery; iPhone screenshots were inspected. Packaged 0.8.2ng. Physical-phone performance remains unmeasured.
+
 Follow-up: find another low-cost visual improvement while preserving crisp phone graphics.
 - The docked ship and its shadow now use a modestly finer bounded grid on touch devices when the existing grid would drop to half width. In the matched Pixel 7 scene, 432×180 increased to 512×214. The same 17 draw calls and 14,622 triangles were submitted. SwiftShader GPU medians were 6.18 and 5.99 ms in separate captures, which does not establish performance on physical phones.
 - Reviewed the matched dock comparison. Android and iPhone dock and transition framing checks passed, alongside focused rendering tests.

@@ -350,7 +350,7 @@ const assignSetting = (settings, key, value) => {
     else if (key === 'steering') {
         settings.steering = 'stick';
     }
-    else if (key === 'tiltInvertPitch' || key === 'tiltInvertYaw' || key === 'flightAssist' || key === 'aimAssist' || key === 'vibration' || key === 'easyMode') {
+    else if (key === 'tiltInvertPitch' || key === 'tiltInvertYaw' || key === 'flightAssist' || key === 'aimAssist' || key === 'vibration' || key === 'reducedDamageEffects' || key === 'easyMode') {
         settings[key] = Boolean(value);
     }
     else if (key === 'quality' && (value === 'auto' || value === 'low' || value === 'high')) {
@@ -367,6 +367,7 @@ const assignSetting = (settings, key, value) => {
 const actions = {
     cinematicSound: (...args) => session?.audio?.cinematicSound(...args),
     stationTransitData: id => session?.stationTransitData(id),
+    flightPresentation: () => ({qualityMode:session?.save.settings.quality??'auto',qualityScale:session?.renderer?.lastQualityScale??1}),
     planetSurface: id => session?.renderer?.worldSurfaceMaterials?.get(id)?.map,
     startNew: tutorial => beginSession('new', undefined, tutorial !== false),
     resume: () => beginSession('resume'),

@@ -1,3 +1,22 @@
+## 0.8.2nj — Tutorial feedback
+
+- Clarify launch and target selection, show hyperdrive messages on the target monitor, and group steering options under Controls.
+- Replace the phone inventory tab popup with styled buttons, improve text spacing, and slow and allow skipping the landing animation.
+
+## 0.8.2ni — Tutorial flight
+
+- Keep escort drones on their launch side and out of the cockpit camera.
+- Give career pilots earlier collision-avoidance steering and resolve ship contact only when hulls touch.
+
+## 0.8.2nh — Shipyard previews
+
+- Show a loading message until the selected ship's detailed model is ready, and explain if it cannot be loaded.
+
+## 0.8.2ng — Distress recovery and exterior films
+
+- Close the current distress encounter when a destroyed ship is recovered, freeing its map marker and future event slot. Repair older tow saves when the recorded sortie identifies the loss.
+- Render station and planet exterior films with the flight finish and matching quality-dependent pixel grid.
+
 ## 0.8.2nf — Finer docked ships on phones
 
 - Use a modestly finer pixel grid for docked ships and shadows on phone displays where the older grid fell to half resolution.

@@ -791,12 +791,8 @@ const SHIP_AVOID_STEER = 1.8;
 const SHIP_AVOID_BUFFER = 12;
 const SHIP_AVOID_MAX_HORIZON = 8;
 const SHIP_AVOID_MAX_RANGE = 960;
-// NPCs need more room to avoid one another than they need to avoid the player:
-// the visual hulls are wider than the old flat 20-unit threshold, and several
-// NPCs can commit to the same attack lane at once. This only affects the
-// The observer can spread opposing staged formations more decisively, while
-// the normal game keeps its established tactical steering. The clearance shell
-// below protects NPC pairs in both contexts without changing weapons or skills.
+// NPCs need enough time and room to steer clear of each other's visible hulls.
+// Physical contact is handled separately by the fitted hull colliders.
 const NPC_SHIP_AVOID_BUFFER = 24;
 const NPC_SHIP_AVOID_HORIZON = 6.5;
 const NPC_SHIP_AVOID_RANGE = 320;
@@ -5246,8 +5242,8 @@ export class GameSession {
         const omega = this.pdcOmega.set(angular?.[0] ?? 0, angular?.[1] ?? 0, angular?.[2] ?? 0).applyQuaternion(q);
         const turret = TURRET_LAYOUTS[player.shipId]?.[0];
         const hull = HULL_FLIGHT_STATS[playerShipVariant(player.shipId)]?.hullHalfExtents;
-        // Mirror the deck turret across the belly, retaining its fore/aft station.
-        const escortY = -(turret?.side ?? 1) * ((hull?.[1] ?? 3) + DRONE_TYPES.pdc.escortDistance);
+        // Keep a lone escort on the side where its bay opens, so it never
+        // crosses the invisible player hull immediately after deployment.
         const escortZ = (turret?.position[2] ?? 0) * (hull?.[2] ?? 6);
         const count = context.unitIds.length;
         const orbitRate = 2 * Math.PI / DRONE_TYPES.pdc.escortOrbitSeconds;
@@ -5256,9 +5252,11 @@ export class GameSession {
                 const anchor = end === 0 ? anchors.launch : end === 1 ? anchors.dock : anchors.escort;
                 const offset = this.pdcVector.fromArray(anchors.mount);
                 if(end===1&&anchors.dockPose){anchor.rotation??=[0,0,0,1];(this.droneDockQuaternion??=new THREE.Quaternion()).fromArray(anchors.dockPose.rotation).premultiply(q).toArray(anchor.rotation);}
-                offset.y += end === 0 ? -3.5 : end === 1 ? 0 : -DRONE_TYPES.pdc.escortDistance;
+                const baySide = anchors.mount[1] > 0 ? 1 : -1;
+                offset.y += end === 0 ? baySide * 3.5 : end === 1 ? 0 : baySide * DRONE_TYPES.pdc.escortDistance;
                 const orbitVelocity = this.pdcOrbitVelocity.set(0, 0, 0);
                 if (end === 2 && anchors.escortIndex >= 0) {
+                    const escortY = baySide * ((hull?.[1] ?? 3) + DRONE_TYPES.pdc.escortDistance);
                     offset.set(0, escortY, escortZ);
                     if (count > 1) {
                         // Local XY is perpendicular to the ship's fore/aft Z axis.
@@ -9402,7 +9400,7 @@ export class GameSession {
         // closing velocity along the normal (a stationary freighter struck by
         // a fast fighter still takes the ram), and `sign` flips the normal for
         // the far side so each ship's recoil points away from the other.
-        const apply = (posArr, velArr, otherVel, vol, otherVol, sign) => {
+        const apply = (posArr, velArr, otherVel, vol, otherVol, sign, weighted = false) => {
             // Degenerate contacts (deep spawn overlaps, zero normals) used to
             // write NaN straight into live tuples and kill the sim.
             if (!Number.isFinite(contact.x) || !Number.isFinite(contact.y) || !Number.isFinite(contact.z) || !Number.isFinite(contact.push))
@@ -9423,62 +9421,14 @@ export class GameSession {
             const rvz = vz - otherVel[2];
             const inward = -(rvx * nx + rvy * ny + rvz * nz);
             if (inward > 0) {
-                velArr[0] += nx * inward * 1.5;
-                velArr[1] += ny * inward * 1.5;
-                velArr[2] += nz * inward * 1.5;
+                // NPC impacts exchange momentum according to hull size, with
+                // a small bounce. The player's established response is unchanged.
+                const recoil = inward * (weighted ? 1.2 * share : 1.5);
+                velArr[0] += nx * recoil;
+                velArr[1] += ny * recoil;
+                velArr[2] += nz * recoil;
             }
             return inward + Math.hypot(rvx, rvy, rvz) * 0.16;
-        };
-        // Keep NPCs from entering the physical collision envelope in the first
-        // place. The steering pass above normally does this, but two ships can
-        // turn toward the same target between prediction samples. A small,
-        // damage-free traffic bubble catches that last frame without changing
-        // the weapon model or pilot skill: if the actual hull test did not hit
-        // yet, gently separate the ships and let them continue their attack.
-        const softlySeparateNpcPair = (aPos, aVel, bPos, bVel, aRadius, bRadius, aVol, bVol) => {
-            const dx = aPos[0] - bPos[0];
-            const dy = aPos[1] - bPos[1];
-            const dz = aPos[2] - bPos[2];
-            const distSq = dx * dx + dy * dy + dz * dz;
-            const reach = aRadius + bRadius;
-            const clearance = reach + NPC_SHIP_AVOID_BUFFER;
-            if (distSq >= clearance * clearance)
-                return false;
-            const dist = Math.sqrt(distSq);
-            let nx = dist > 1e-4 ? dx / dist : 1;
-            let ny = dist > 1e-4 ? dy / dist : 0;
-            let nz = dist > 1e-4 ? dz / dist : 0;
-            if (dist <= 1e-4) {
-                const rvx = aVel[0] - bVel[0];
-                const rvy = aVel[1] - bVel[1];
-                const rvz = aVel[2] - bVel[2];
-                const relativeSpeed = Math.hypot(rvx, rvy, rvz);
-                if (relativeSpeed > 1e-4) {
-                    nx = rvx / relativeSpeed;
-                    ny = rvy / relativeSpeed;
-                    nz = rvz / relativeSpeed;
-                }
-            }
-            const shareA = bVol / (aVol + bVol);
-            const shareB = aVol / (aVol + bVol);
-            const correction = clearance - dist;
-            aPos[0] += nx * correction * shareA;
-            aPos[1] += ny * correction * shareA;
-            aPos[2] += nz * correction * shareA;
-            bPos[0] -= nx * correction * shareB;
-            bPos[1] -= ny * correction * shareB;
-            bPos[2] -= nz * correction * shareB;
-            const relativeClosing = (aVel[0] - bVel[0]) * nx + (aVel[1] - bVel[1]) * ny + (aVel[2] - bVel[2]) * nz;
-            if (relativeClosing < 0) {
-                const impulse = -relativeClosing * 1.05;
-                aVel[0] += nx * impulse * shareA;
-                aVel[1] += ny * impulse * shareA;
-                aVel[2] += nz * impulse * shareA;
-                bVel[0] -= nx * impulse * shareB;
-                bVel[1] -= ny * impulse * shareB;
-                bVel[2] -= nz * impulse * shareB;
-            }
-            return true;
         };
         const ships = this.ships;
         for (let i = 0; i < ships.length; i += 1) {
@@ -9540,9 +9490,7 @@ export class GameSession {
                 const dz = ship.position[2] - other.position[2];
                 const distanceSq = dx * dx + dy * dy + dz * dz;
                 const hardReach = shipRadius + otherRadius;
-                const clearance = hardReach + NPC_SHIP_AVOID_BUFFER;
                 const hardCandidate = distanceSq < hardReach * hardReach;
-                const softCandidate = distanceSq < clearance * clearance;
                 let collided = false;
                 if (hardCandidate) {
                     shipPos.fromArray(ship.position);
@@ -9556,18 +9504,14 @@ export class GameSession {
                     const ov = other.velocity;
                     const shipVel0 = [sv[0], sv[1], sv[2]];
                     const otherVel0 = [ov[0], ov[1], ov[2]];
-                    const shipImpact = apply(ship.position, ship.velocity, otherVel0, shipVolume, otherVolume, 1);
-                    const otherImpact = apply(other.position, other.velocity, shipVel0, otherVolume, shipVolume, -1);
+                    const shipImpact = apply(ship.position, ship.velocity, otherVel0, shipVolume, otherVolume, 1, true);
+                    const otherImpact = apply(other.position, other.velocity, shipVel0, otherVolume, shipVolume, -1, true);
                     const shipDmg = npcShipCollisionDamage(shipImpact, ship, other);
                     const otherDmg = npcShipCollisionDamage(otherImpact, other, ship);
                     if (shipDmg > 0)
                         this.damageShip(ship, shipDmg, other.id, tuple(otherPos));
                     if (otherDmg > 0)
                         this.damageShip(other, otherDmg, ship.id, tuple(shipPos));
-                }
-                else if (softCandidate && softlySeparateNpcPair(ship.position, ship.velocity, other.position, other.velocity, shipRadius, otherRadius, shipVolume, otherVolume)) {
-                    // The next pair in this row must see the corrected centre.
-                    shipPos.set(ship.position[0], ship.position[1], ship.position[2]);
                 }
             }
         }
@@ -10751,6 +10695,10 @@ export class GameSession {
             this.restartArena();
             return;
         }
+        // A tow ends the current distress encounter, including its map
+        // contact, so it cannot occupy the single event slot indefinitely.
+        if (this.save.world.distress?.active)
+            this.abandonDistress(this.save.world.distress.active, 'lost');
         if (isTutorialGuided(this.save)) {
             const dock = this.save.player.lastDockedAt;
             const location = LOCATIONS[dock] ?? LOCATIONS.helix;
@@ -12704,11 +12652,10 @@ export class GameSession {
         const vy = velocity.y;
         const vz = velocity.z;
         const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
-        const observer = Boolean(this.arena?.observer);
         let selfShip;
         let actualSelfRadius = selfRadius;
-        // Only observer NPC pairs use the actual self hull or its faction.
-        if (observer && shipId) {
+        // All NPCs need their own hull size to plan a safe pass in time.
+        if (shipId) {
             for (let i = 0; i < this.ships.length; i += 1) {
                 const candidate = this.ships[i];
                 if (candidate.id === shipId) {
@@ -12749,8 +12696,7 @@ export class GameSession {
                 const extents = this.npcHullExtents(other);
                 otherRadius = Math.max(extents[0], extents[1], extents[2]);
             }
-            const sameFaction = selfShip?.faction && other.faction && selfShip.faction === other.faction;
-            const npcPair = i >= 0 && Boolean(observer && selfShip && !sameFaction);
+            const npcPair = i >= 0 && Boolean(selfShip);
             const largeHullContact = (npcPair ? actualSelfRadius : selfRadius) > SHIP_AVOID_SEPARATION * 2 || otherRadius > SHIP_AVOID_SEPARATION * 2;
             const separation = npcPair
                 ? Math.max(SHIP_AVOID_SEPARATION, actualSelfRadius + otherRadius + NPC_SHIP_AVOID_BUFFER)

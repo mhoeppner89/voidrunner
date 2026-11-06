@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v632-0-8-2nf-dock-detail';
+const CACHE = 'voidrunner-v636-0-8-2nj-tutorial-feedback';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -35,6 +35,7 @@ const CORE_ASSETS = [
   './src/game/interfaceTerms.js',
   './src/game/transitAudio.js',
   './assets/fonts/void-vga.ttf',
+  './assets/fonts/void-vga-text.ttf',
   './vendor/three.module.min.js',
   './vendor/three.core.min.js',
   './src/game/adventureDialogues.js',

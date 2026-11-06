@@ -36,6 +36,15 @@ test('docked roles switch directly between mining, PDC and repair using owned ca
  assert.ok(session.setDroneBayMode(current.bayId,'mining').ok);assert.deepEqual(p.outfitting.loadouts[p.shipId].droneBays[0].unitIds,miners,'selecting an empty bay’s current role loads available stock');
 });
 
+test('the tutorial PDC launches from its bay to the same side of the ship',()=>{
+ const {session:r,save}=tutorialFixture('survey-graveyard');stock(r);const p=save.player,f=p.droneFleet;
+ const bay=p.outfitting.loadouts[p.shipId].droneBays[0];assert.ok(r.setDroneBayMode(bay.bayId,'pdc').ok);
+ const id=p.outfitting.loadouts[p.shipId].droneBays[0].unitIds[0];
+ p.dockedAt=undefined;p.position=[0,0,0];p.velocity=[0,0,0];p.rotation=[0,0,0,1];
+ for(let i=0;i<180;i++){save.world.time+=1/60;r.updatePdcDrones(1/60);assert.ok(f.unitsById[id].position[1]<0,`drone crossed the cockpit at step ${i}`);}
+ assert.equal(f.unitsById[id].state,'escorting');assert.equal(f.unitsById[id].portStage,null);
+});
+
 test('a mining-to-PDC switch returns the ore payload, then PDC-to-repair switches automatically in flight',()=>{
  const {session:r,save}=tutorialFixture('earn-standing');stock(r);const p=save.player,node=r.asteroids[0];
  p.dockedAt=undefined;p.position=[...node.position];p.position[2]+=asteroidCollisionRadius(node)+35;p.velocity.fill(0);p.throttle=0;p.currentTargetId=node.id;node.scanned=true;r.activeInstanceId='shardbelt';

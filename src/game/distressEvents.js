@@ -162,6 +162,11 @@ export const DistressMethods = {
     initializeDistress() {
         if (this.arena) return;
         const data = normalizeDistress(this.save.world);
+        // Repair old saves that were towed home while an encounter remained
+        // active. Only use a recorded loss from after this signal began.
+        const lastSortie=this.save.world.sortieHistory?.at(-1);
+        if(this.save.player.dockedAt&&data.active&&lastSortie?.completedAt>=data.active.createdAt&&lastSortie.events?.some(event=>event.kind==='finished-loss'||event.kind==='finished-tutorial-recovery'))
+            disposeEncounter(this,data.active,{outcome:'lost'});
         if (!data.active && data.nextAt <= 0) {
             const rng = seededRandom(`${this.save.world.seed}:distress:first:${Math.floor(nowOf(this))}`);
             data.nextAt = nowOf(this) + DISTRESS_FIRST_MIN + rng() * (DISTRESS_FIRST_MAX - DISTRESS_FIRST_MIN);

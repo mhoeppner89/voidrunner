@@ -3909,13 +3909,11 @@ export class SpaceRenderer {
                 root.quaternion.slerp(this.dronePrevRotation, 1 - alpha);
             }
             const working = unit.type === 'mining' && unit.state === 'mining';
-            const returning = unit.state === 'returning' || unit.state === 'docking';
             // The exterior hull is omitted in cockpit view. Hide our own close
             // bay traffic inside that otherwise invisible hull/camera envelope.
             // External review cameras and NPC drones must remain visible.
             const ownDrone = !unit.ownerId || unit.ownerId === 'player';
             root.visible = !(player && this.cockpit?.visible && ownDrone
-                && (returning || unit.state === 'launching' || unit.portStage === 'launch')
                 && root.position.distanceToSquared(this.camera.position) < 36);
             this.updateMiningDebris(root, working, now / 9);
             this.updateRepairSparks(root, unit.repairing === true, now / 9);

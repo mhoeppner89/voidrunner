@@ -2,8 +2,9 @@ import {stabilizeMaterialNormals as stabilizeConcourseNormals} from './materialN
 import {SPACE_EXPOSURE,createSpaceEnvironment} from './spaceLighting.js';
 import * as THREE from 'three';
 import {loadPreviewGlb,disposeObject} from './shipPreview.js';
-import {GLB_SHIP_CONFIG,stationOccupantScale} from './render.js';
+import {GLB_SHIP_CONFIG,stationOccupantScale,renderBaseWidth,isAppleTouchDevice} from './render.js';
 import {createConcourseFinish} from './concourseFinish.js';
+import {createPixelResolveMaterial,bindPixelResolve} from './pixelResolve.js';
 import {FrameBudget} from './frameBudget.js';
 import {PlanetTransit} from './planetTransit.js';
 import {StationTransit} from './stationTransit.js';
@@ -86,6 +87,8 @@ export class ConcourseShip {
   this.finish=createConcourseFinish();this.deck=new ConcourseDeck(this.finish.uniforms.uBackdropUV);this.deck.clipShadow(this.ground.material);
   this.reflection=new ConcourseReflection(this.deck.uniforms);this.scene.add(this.reflection.plane);
   this.target=new THREE.WebGLRenderTarget(1,1,{depthBuffer:true,stencilBuffer:false,type:THREE.HalfFloatType});
+  this.target.depthTexture=new THREE.DepthTexture(1,1,THREE.UnsignedIntType);
+  this.transitFinish=createPixelResolveMaterial();
   this.finish.uniforms.tScene.value=this.target.texture;
   this.quad=new THREE.Mesh(new THREE.PlaneGeometry(2,2),this.finish);this.quadCamera=new THREE.Camera();
   this.sceneViewport=new THREE.Vector4();this.budget=new FrameBudget();this.bounds=new THREE.Box3();this.point=new THREE.Vector3();this.phase='idle';this.elapsed=0;this.glows=[];this.generation=0;this.paused=true;
@@ -206,11 +209,13 @@ export class ConcourseShip {
   if(!this.host?.isConnected||this.disposed||!this.host.clientWidth||!this.host.clientHeight||(this.transit&&window.innerHeight>window.innerWidth))return;
   const width=Math.max(1,this.host.clientWidth),height=Math.max(1,this.host.clientHeight),r=this.host.getBoundingClientRect(),parent=this.host.parentElement.getBoundingClientRect();
   const composite=!this.transit&&this.outputHost!==this.host,output=composite?this.outputHost.getBoundingClientRect():r;
-  const maxWidth=this.transit?(this.touchDevice?640:768):(this.touchDevice?768:960),maxHeight=this.transit?480:(this.touchDevice?432:600);
-  const desiredWidth=Math.min(maxWidth,output.width*maxHeight/output.height);
+  const isIOS=isAppleTouchDevice(),qualityMode=this.flightPresentation?.qualityMode??'auto',qualityScale=this.flightPresentation?.qualityScale??1;
+  const maxWidth=this.transit?renderBaseWidth({qualityMode,isIOS,touchDevice:this.touchDevice,viewportWidth:output.width}):(this.touchDevice?768:960),maxHeight=this.touchDevice?432:600;
+  const desiredWidth=this.transit?Math.max(288,Math.min(output.width,maxWidth)*qualityScale):Math.min(maxWidth,output.width*maxHeight/output.height);
   // The native phone backdrop leaves most of this canvas transparent. Spend a
   // small amount of that saved work on sharper ship and shadow details.
-  const {width:w,height:h,scale}=pixelRenderSize(output.width,output.height,desiredWidth,this.touchDevice&&composite,1.2);
+  const recover=this.transit?(this.touchDevice||isIOS)&&qualityMode!=='low'&&qualityScale>=.8:this.touchDevice&&composite;
+  const {width:w,height:h,scale}=pixelRenderSize(output.width,output.height,desiredWidth,recover,this.transit?1.4:1.2);
   this.resizeOutput(w,h,scale);
   this.sceneViewport.set(0,0,w,h);this.deck.uniforms.uDeckResolution.value.set(w,h);
   const aspect=width/height;if(this.transit)this.transit.resize(aspect);else{this.camera.left=-4.5*aspect;this.camera.right=4.5*aspect;this.camera.zoom=this.placementZoom??1;this.camera.updateProjectionMatrix();}
@@ -301,6 +306,8 @@ export class ConcourseShip {
   this.target.viewport.copy(this.sceneViewport);this.renderer.setRenderTarget(this.target);
   try{this.renderer.render(view.scene,this.transit?view.camera:this.renderCamera);}
   finally{this.pivot.visible=pivotVisible;this.ground.visible=groundVisible;this.reflection.plane.visible=reflectionVisible;}
+  if(this.transit){bindPixelResolve(this.transitFinish,this.target.texture,this.target,view.camera,SPACE_EXPOSURE);this.transitFinish.uniforms.uFade.value=this.finish.uniforms.uFade.value;}
+  this.quad.material=this.transit?this.transitFinish:this.finish;
   this.renderer.setRenderTarget(null);this.renderer.setViewport(0,0,this.sceneViewport.z,this.sceneViewport.w);this.renderer.render(this.quad,this.quadCamera);
   this.canvas.style.visibility='';
   if(!this.transit&&this.outputHost!==this.host)this.outputHost.classList.toggle('has-concourse-composite',Boolean(this.backdropKey));
@@ -348,6 +355,13 @@ export class ConcourseShip {
    await prepareRenderScene(this.renderer,shot.scene,shot.camera,this.target,{shouldCancel:()=>this.disposed||this.contextLost||this.transitGeneration!==generation||preparing.skipped});
    if(this.disposed||this.contextLost||this.transitGeneration!==generation)return false;
    if(preparing.skipped){completed=true;return true;}
+   if(this.transitFinish&&this.quad){
+    const previous=this.quad.material;this.quad.material=this.transitFinish;
+    try{await prepareRenderScene(this.renderer,this.quad,this.quadCamera,null,{shouldCancel:()=>this.disposed||this.contextLost||this.transitGeneration!==generation||preparing.skipped});}
+    finally{this.quad.material=previous;}
+    if(this.disposed||this.contextLost||this.transitGeneration!==generation)return false;
+    if(preparing.skipped){completed=true;return true;}
+   }
    this.transitWarmupTarget??=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType});
    warmRenderBuffers(this.renderer,shot.scene,shot.camera,this.transitWarmupTarget);
    await waitForRenderWork(this.renderer,{shouldCancel:()=>this.disposed||this.contextLost||this.transitGeneration!==generation||preparing.skipped});
@@ -379,6 +393,7 @@ export class ConcourseShip {
   }
  }
  skipAtmosphere(){if(this.transit){if(this.transitPreparing)this.transitPreparing.skipped=true;this.stop();this.finishAnimation(true);}}
+ skipLanding(){if(!this.transit&&this.phase==='landing'){this.resetPose();this.finish.uniforms.uFade.value=1;this.render();this.finishAnimation(true);}}
  animate(phase,canStart){this.finishAnimation(false);this.phase=phase;this.phaseStart=undefined;this.elapsed=0;this.canStart=canStart;if(!this.transit){this.waitingArrival=false;this.reflection.dirty=true;this.renderer.shadowMap.needsUpdate=true;}const pose=this.transit?this.transit.update(0):concoursePose(phase,0,0,this.flightPath);this.applyPose(pose);this.finish.uniforms.uFade.value=pose.fade??1;this.render();this.resume();return new Promise(resolve=>{this.animationResolve=resolve;});}
  finishAnimation(result){this.stopAnimationSound();const resolve=this.animationResolve;this.animationResolve=undefined;if(resolve)resolve(result);this.phase='idle';this.phaseStart=undefined;}
  resume(){this.paused=false;if(this.disposed||this.contextLost||document.hidden||this.raf)return;
@@ -396,7 +411,7 @@ export class ConcourseShip {
   const dt=this.budget.take(now,fps);if(dt!==null){
    if(this.phaseStart===undefined&&(!this.canStart||this.canStart()))this.phaseStart=now;
    if(this.phaseStart!==undefined)this.elapsed+=dt*1000;
-   const duration=this.transit?.duration??(this.phase==='takeoff'?1650:1450),t=this.reducedMotion?1:Math.min(1,this.elapsed/duration);
+   const duration=this.transit?.duration??(this.phase==='takeoff'?1650:2600),t=this.reducedMotion?1:Math.min(1,this.elapsed/duration);
    const pose=this.transit?this.transit.update(t):concoursePose(this.phase,t,this.reducedMotion?0:now/1000,this.flightPath);this.applyPose(pose);this.finish.uniforms.uFade.value=pose.fade??1;
    if(this.phase!=='idle'&&this.phaseStart!==undefined&&t<1){
     const kind=this.transit?(this.transit===this.stationView?'station':'planet'):(this.soundEnvironment==='planet'?'planet-pad':'station-pad');
@@ -409,6 +424,6 @@ export class ConcourseShip {
   }this.raf=requestAnimationFrame(this.tick);
  };
  dispose(){if(this.disposed)return;this.disposed=true;this.pause();this.outputHost?.classList.remove('has-concourse-composite');this.generation++;this.resizeObserver.disconnect();if(this.resizeFrame)cancelAnimationFrame(this.resizeFrame);window.removeEventListener('resize',this.onViewportResize);window.visualViewport?.removeEventListener('resize',this.onViewportResize);document.removeEventListener('visibilitychange',this.onVisibility);this.motionQuery.removeEventListener('change',this.onMotion);this.canvas.removeEventListener('webglcontextlost',this.onLost);this.canvas.removeEventListener('webglcontextrestored',this.onRestored);
-  this.atmosphereView?.dispose();this.stationView?.dispose();this.exteriorEnvironment?.dispose();this.transitWarmupTarget?.dispose();this.reflection.dispose();for(const glow of this.glows)glow.material.dispose();if(this.model)disposeObject(this.model);this.ground.geometry.dispose();this.ground.material.dispose();this.sun.shadow.map?.dispose();this.scene.environment?.dispose();this.exhaustTexture?.dispose();this.backdropTexture?.dispose();this.target.dispose();this.finish.dispose();this.quad.geometry.dispose();this.renderer.dispose();this.canvas.remove();
+  this.atmosphereView?.dispose();this.stationView?.dispose();this.exteriorEnvironment?.dispose();this.transitWarmupTarget?.dispose();this.reflection.dispose();for(const glow of this.glows)glow.material.dispose();if(this.model)disposeObject(this.model);this.ground.geometry.dispose();this.ground.material.dispose();this.sun.shadow.map?.dispose();this.scene.environment?.dispose();this.exhaustTexture?.dispose();this.backdropTexture?.dispose();this.target.dispose();this.finish.dispose();this.transitFinish.dispose();this.quad.geometry.dispose();this.renderer.dispose();this.canvas.remove();
  }
 }

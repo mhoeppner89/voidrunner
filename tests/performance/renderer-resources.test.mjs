@@ -374,6 +374,15 @@ test('mining delivery cycles retain hidden drone buffers and shader references u
  unit.state='stowed';player.outfitting.loadouts.wayfarer.droneBays[0].unitIds=[];r.syncDrones(fleet,undefined,1,player);assert.equal(disposed,1);assert.equal(r.droneVisuals.miner,undefined,'uninstalled stock must not retain GPU resources');
 });
 
+test('only the player’s close drone is hidden from the cockpit camera',()=>{
+ const r=renderer();r.droneVisuals={};r.droneSyncRevision=0;r.dynamicRoot=new THREE.Group();r.camera=new THREE.PerspectiveCamera();r.cockpit=new THREE.Group();r.dronePrevPosition=new THREE.Vector3();r.dronePrevRotation=new THREE.Quaternion();
+ r.createDroneVisual=unit=>({root:new THREE.Group(),beam:new THREE.Group(),engine:new THREE.Group(),lamp:new THREE.Mesh(),type:unit.type,glow:.2});r.updateMiningDebris=r.updateRepairSparks=()=>{};
+ const own={id:'own',type:'pdc',hull:10,state:'escorting',position:[0,0,-2]},other={...own,id:'other',ownerId:'ship-1'},fleet={unitsById:{own,other}},player={shipId:'wayfarer'};
+ r.syncDrones(fleet,undefined,1,player);assert.equal(r.droneVisuals.own.root.visible,false);assert.equal(r.droneVisuals.other.root.visible,true);
+ own.position=[0,0,-8];r.syncDrones(fleet,undefined,1,player);assert.equal(r.droneVisuals.own.root.visible,true);
+ own.position=[0,0,-2];r.cockpit.visible=false;r.syncDrones(fleet,undefined,1,player);assert.equal(r.droneVisuals.own.root.visible,true);
+});
+
 test('environment shader preparation restores hidden regions and shadow settings',async()=>{
  const r=renderer(),region=new THREE.Group(),scene=new THREE.Scene(),originalTarget={};region.visible=false;scene.add(region);const calls=[];let target=originalTarget;
  Object.assign(r,{scene,camera:new THREE.PerspectiveCamera(),instanceRoots:new Map([['shardbelt',region]]),sunLight:{castShadow:false},isIOS:false,bloomSceneTarget:{},bloomEnabled:()=>true,prepareCombatWarmup:()=>new THREE.Group(),renderer:{shadowMap:{enabled:false,type:THREE.PCFShadowMap},getRenderTarget:()=>target,setRenderTarget:t=>{target=t;},compileAsync:async()=>{calls.push({region:region.visible,shadow:r.renderer.shadowMap.enabled,type:r.renderer.shadowMap.type});}}});

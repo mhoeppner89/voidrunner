@@ -304,6 +304,18 @@ test('joystick axes honor the pitch and yaw inversion options', () => {
     input.dispose();
 });
 
+test('inversion applies to keyboard and gamepad steering too', () => {
+    gamepads = [];
+    const input = createInput(new FakeRoot());
+    input.configureTilt({tiltInvertPitch:true,tiltInvertYaw:true});
+    emitKey('KeyW');emitKey('KeyD');
+    assert.equal(input.getActions().pitch,1);assert.equal(input.getActions().yaw,-1);
+    emitKey('KeyW','keyup');emitKey('KeyD','keyup');
+    gamepads=[makePad({axes:[.6,-.7,0,0]})];
+    assert.equal(input.getActions().pitch,.7);assert.equal(input.getActions().yaw,-.6);
+    input.dispose();gamepads=[];
+});
+
 test('blur clears held and pending input state', () => {
     const controls = makeTouchRoot();
     const input = createInput(controls.root);

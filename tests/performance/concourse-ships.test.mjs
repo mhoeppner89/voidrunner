@@ -98,6 +98,12 @@ test('pausing the concourse stops its frame loop and cancels its animation callb
  finally{if(old===undefined)delete globalThis.cancelAnimationFrame;else globalThis.cancelAnimationFrame=old;}
 });
 
+test('skipping the pad landing settles the ship and completes its arrival',()=>{
+ const view=Object.create(ConcourseShip.prototype);let reset=0,drawn=0,result;
+ Object.assign(view,{phase:'landing',finish:{uniforms:{uFade:{value:.2}}},resetPose(){reset++;},render(){drawn++;},animationResolve(value){result=value;}});
+ view.skipLanding();assert.equal(reset,1);assert.equal(drawn,1);assert.equal(view.finish.uniforms.uFade.value,1);assert.equal(view.phase,'idle');assert.equal(result,true);
+});
+
 test('painted pad masks cover every port and remain convex with a feathered inside edge',()=>{
  assert.deepEqual(Object.keys(CONCOURSE_PADS).sort(),[...DOCK_LOCATION_IDS].sort());
  const uv={value:new THREE.Vector4()},deck=new ConcourseDeck(uv),edges=deck.uniforms.uDeckEdges.value;

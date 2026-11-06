@@ -473,7 +473,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2nf';
+const GAME_VERSION = '0.8.2nj';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -2098,6 +2098,7 @@ export class GameUI {
         this.cancelVesperLaunchTransition();
         this.cancelPlanetTransit();
         this.concourseAtmosphereArrival=arrival&&['planet','station'].includes(LOCATIONS[locationId]?.kind);
+        this.skipDockArrival=false;
         // A new or resumed docked career starts with the ship already parked.
         this.concourseArrivalPending=Boolean(arrival);
         this.concourseModelResolved?.(false);
@@ -2191,12 +2192,13 @@ export class GameUI {
     }
     async playPlanetTransit(direction,locationId,canStart) {
         if(!['planet','station'].includes(LOCATIONS[locationId]?.kind)||!this.concourseShip?.model||this.concourseShip.contextLost||this.concourseShip.reducedMotion)return true;
+        this.concourseShip.flightPresentation=this.actions?.flightPresentation?.();
         this.cancelPlanetTransit();
         const overlay=document.createElement('div');overlay.className='planet-transit';overlay.dataset.direction=direction;overlay.dataset.location=locationId;overlay.dataset.kind=LOCATIONS[locationId].kind;
         overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label',LOCATIONS[locationId].name);
         const stage=document.createElement('div');stage.className='planet-transit-stage';overlay.append(stage);
         const skip=document.createElement('button');skip.className='planet-transit-skip';skip.textContent='»';skip.setAttribute('aria-label',t('Skip cinematic'));overlay.append(skip);
-        const skipShot=()=>this.concourseShip?.skipAtmosphere();
+        const skipShot=()=>{if(direction==='entry')this.skipDockArrival=true;this.concourseShip?.skipAtmosphere();};
         skip.addEventListener('click',skipShot);
         const key=e=>{if(!['Escape','Enter',' ','Tab'].includes(e.key))return;e.preventDefault();e.stopImmediatePropagation();if(e.key==='Tab')skip.focus({preventScroll:true});else skipShot();};
         document.addEventListener('keydown',key,true);
@@ -2241,7 +2243,7 @@ export class GameUI {
         try {
             const {ConcourseShip}=await (this.concourseModulePromise??=import('./concourseShip.js'));
             if(generation!==this.concourseGeneration||!host.isConnected)return;
-            this.concourseShip??=new ConcourseShip();this.concourseShip.onAnimationSound=this.actions?.cinematicSound;this.concourseShip.soundEnvironment=LOCATIONS[this.dockLocation].kind;this.concourseShip.waitingArrival=Boolean(arrival);this.concourseShip.attach(host,button);
+            this.concourseShip??=new ConcourseShip();this.concourseShip.flightPresentation=this.actions?.flightPresentation?.();this.concourseShip.onAnimationSound=this.actions?.cinematicSound;this.concourseShip.soundEnvironment=LOCATIONS[this.dockLocation].kind;this.concourseShip.waitingArrival=Boolean(arrival);this.concourseShip.attach(host,button);
             const player=this.save.player,id=this.getVesperShipId();
             const options={paint:player.shipPaints?.[id]??'original',fit:player.outfitting?.loadouts?.[id],fleet:player.droneFleet};
             const ready=await settleWarmupPromise(this.concourseShip.configure(id,SHIPS[id].variant,options,this.dockLocation),false,15000);
@@ -2256,11 +2258,14 @@ export class GameUI {
                     await this.playPlanetTransit('entry',this.dockLocation,canStart);
                     if(generation!==this.concourseGeneration||!host.isConnected)return;
                 }
-                if(!this.concourseShip.contextLost){
+                if(!this.concourseShip.contextLost&&!this.skipDockArrival){
+                    const skip=document.createElement('button');skip.type='button';skip.className='planet-transit-skip concourse-landing-skip';skip.textContent='»';skip.setAttribute('aria-label',t('Skip cinematic'));scene.append(skip);
+                    const skipLanding=()=>this.concourseShip?.skipLanding();skip.addEventListener('click',skipLanding);
+                    const onKey=e=>{if(['Escape','Enter',' '].includes(e.key)){e.preventDefault();skipLanding();}};document.addEventListener('keydown',onKey,true);
                     const landing=this.concourseShip.animate('landing',canStart);
                     this.el('#dock-screen').classList.remove('is-arrival-covered');
-                    await landing;
-                }
+                    try{await landing;}finally{document.removeEventListener('keydown',onKey,true);skip.remove();}
+                }else if(this.skipDockArrival){this.concourseShip.resetPose();this.concourseShip.resume();}
             }else this.concourseShip.resume();
         }catch(error){resolveModel?.(false);console.warn('Docked ship view could not be prepared.',error);}
         if(generation!==this.concourseGeneration||!host.isConnected)return;
@@ -4612,12 +4617,14 @@ export class GameUI {
         const capital=Boolean(target?.capitalClass||target?.capitalSubtarget);
         const readout = this.el('#screen-target-readout');
         readout.classList.toggle('is-capital-warning',capital&&(target.capitalTorpedoWarning||!target.capitalDisarmed&&['CHARGING','SALVO'].includes(target.capitalAttack)));
+        const driveNotice = !model?.monitorStatus && model?.hyperdriveStatus;
         readout.classList.toggle('is-alert', Boolean(model?.monitorStatus));
-        readout.classList.toggle('is-dock-prompt', Boolean(model?.dockPrompt && !model.monitorStatus));
+        readout.classList.toggle('is-hyperdrive-status', Boolean(driveNotice));
+        readout.classList.toggle('is-dock-prompt', Boolean(model?.dockPrompt && !model.monitorStatus && !driveNotice));
         // Choose the visible readout before publishing it. An alert or race
         // clock can own this line for many frames while the target moves.
-        let line = model?.monitorStatus || model?.dockPrompt;
-        const raceClock = model?.race?.phase === 'running' && !model.monitorStatus;
+        let line = model?.monitorStatus || driveNotice || model?.dockPrompt;
+        const raceClock = model?.race?.phase === 'running' && !model.monitorStatus && !driveNotice;
         if (raceClock) {
             const seconds = Math.floor(model.race.time), delta = model.race.sectorDelta;
             line = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2,'0')}${Number.isFinite(delta) ? ` · Δ ${delta <= 0 ? '−' : '+'}${Math.abs(delta).toFixed(1)}s` : ''}`;
@@ -5991,7 +5998,7 @@ export class GameUI {
     // screens — one source of truth for the toggles and sliders.
     settingsTabs() {
         const current=this.settingsTab??'flight';
-        return `<nav class="settings-tabs" role="tablist" aria-label="${t('Options')}">${[['flight','FLIGHT'],['audio','AUDIO'],['display','DISPLAY'],['controls','Controls']].map(([id,label])=>`<button type="button" id="settings-${id}-tab" role="tab" aria-controls="settings-${id}-pane" data-ui-command="settings-tab" data-settings-tab="${id}" aria-selected="${id===current}">${t(label)}</button>`).join('')}</nav>`;
+        return `<nav class="settings-tabs" role="tablist" aria-label="${t('Options')}">${[['flight','FLIGHT'],['controls','Controls'],['audio','AUDIO'],['display','DISPLAY']].map(([id,label])=>`<button type="button" id="settings-${id}-tab" role="tab" aria-controls="settings-${id}-pane" data-ui-command="settings-tab" data-settings-tab="${id}" aria-selected="${id===current}">${t(label)}</button>`).join('')}</nav>`;
     }
     syncSettingsTabs() {
         const panel=this.root.querySelector('#pause-panel');
@@ -6002,10 +6009,10 @@ export class GameUI {
         const selected=this.settingsTab??'flight';
         return `
         <div class="settings-content">
-        <div class="settings-pane" id="settings-flight-pane" data-settings-pane="flight" role="tabpanel" aria-labelledby="settings-flight-tab" ${selected==='flight'?'':'hidden'}><div class="pause-grid"><section><label><span>${t('Flight assist')}</span><input type="checkbox" data-setting="flightAssist" ${settings.flightAssist ? 'checked' : ''}></label><label><span>${t('Aim assistance')}</span><input type="checkbox" data-setting="aimAssist" ${settings.aimAssist ? 'checked' : ''}></label><label><span>${t('Touch scale')}</span><input type="range" min="0.8" max="1.3" step="0.05" value="${settings.touchScale}" data-setting="touchScale"></label><label><span>${t('Easy mode · 50% damage taken')}</span><input type="checkbox" data-setting="easyMode" ${settings.easyMode ? 'checked' : ''}></label></section><section><label><span>${t('Invert pitch')}</span><input type="checkbox" data-setting="tiltInvertPitch" ${settings.tiltInvertPitch ? 'checked' : ''}></label><label><span>${t('Invert yaw')}</span><input type="checkbox" data-setting="tiltInvertYaw" ${settings.tiltInvertYaw ? 'checked' : ''}></label></section></div></div>
-        <div class="settings-pane" id="settings-audio-pane" data-settings-pane="audio" role="tabpanel" aria-labelledby="settings-audio-tab" ${selected==='audio'?'':'hidden'}><div class="pause-grid"><section><label><span>${t('Music')}</span><input type="range" min="0" max="1" step="0.05" value="${settings.music}" data-setting="music"></label><label><span>${t('Effects')}</span><input type="range" min="0" max="1" step="0.05" value="${settings.effects}" data-setting="effects"></label><label><span>${t('Haptics')}</span><input type="checkbox" data-setting="vibration" ${settings.vibration ? 'checked' : ''}></label></section></div></div>
+        <div class="settings-pane" id="settings-flight-pane" data-settings-pane="flight" role="tabpanel" aria-labelledby="settings-flight-tab" ${selected==='flight'?'':'hidden'}><div class="pause-grid"><section><label><span>${t('Flight assist')}</span><input type="checkbox" data-setting="flightAssist" ${settings.flightAssist ? 'checked' : ''}></label><label><span>${t('Aim assistance')}</span><input type="checkbox" data-setting="aimAssist" ${settings.aimAssist ? 'checked' : ''}></label><label><span>${t('Easy mode · 50% damage taken')}</span><input type="checkbox" data-setting="easyMode" ${settings.easyMode ? 'checked' : ''}></label></section></div></div>
+        <div class="settings-pane" id="settings-audio-pane" data-settings-pane="audio" role="tabpanel" aria-labelledby="settings-audio-tab" ${selected==='audio'?'':'hidden'}><div class="pause-grid"><section><label><span>${t('Music')}</span><input type="range" min="0" max="1" step="0.05" value="${settings.music}" data-setting="music"></label><label><span>${t('Effects')}</span><input type="range" min="0" max="1" step="0.05" value="${settings.effects}" data-setting="effects"></label></section></div></div>
         <div class="settings-pane" id="settings-display-pane" data-settings-pane="display" role="tabpanel" aria-labelledby="settings-display-tab" ${selected==='display'?'':'hidden'}><div class="pause-grid"><section><label><span>${t('Power use')}</span><select data-setting="powerMode"><option value="auto" ${!settings.powerMode || settings.powerMode === 'auto' ? 'selected' : ''}>${t('Automatic')}</option><option value="battery" ${settings.powerMode === 'battery' ? 'selected' : ''}>${t('Battery saving · 30 FPS')}</option><option value="performance" ${settings.powerMode === 'performance' ? 'selected' : ''}>${t('Smoother motion · 60 FPS')}</option></select></label><label><span>${t('Reduced damage effects')}</span><input type="checkbox" data-setting="reducedDamageEffects" ${settings.reducedDamageEffects ? 'checked' : ''}></label><label><span>${t('Fullscreen')}</span><button type="button" class="fullscreen-switch" data-ui-command="toggle-fullscreen" role="switch" aria-label="${t('Toggle fullscreen')}" aria-checked="false">⛶</button></label></section><section><label><span>${t('Language')}</span><select data-setting="language"><option value="de" ${settings.language !== 'en' ? 'selected' : ''}>Deutsch</option><option value="en" ${settings.language === 'en' ? 'selected' : ''}>English</option></select></label></section></div></div>
-        <div class="settings-pane" id="settings-controls-pane" data-settings-pane="controls" role="tabpanel" aria-labelledby="settings-controls-tab" ${selected==='controls'?'':'hidden'}><section class="controls-reference"><details class="ui-details"><summary>${t('KEYBOARD / CONTROLLER')}</summary><p>${t('W/S pitch · A/D yaw · Q/E roll · R/F throttle · Shift afterburn · Space fire · X fire group · L launcher · hold M secondary tool / tap missile or capture · T target · C mode · N nav · J hyperdrive · K map · B transponder')}</p><p>${t('Gamepad: left stick steer · right stick roll/throttle · RT fire · hold RB secondary tool / tap missile or capture · LB afterburn · face buttons target/mode/fire group/hyperdrive · left stick click transponder · D-pad launcher/capture/hostile/nav.')}</p></details></section></div>
+        <div class="settings-pane" id="settings-controls-pane" data-settings-pane="controls" role="tabpanel" aria-labelledby="settings-controls-tab" ${selected==='controls'?'':'hidden'}><div class="pause-grid"><section><label><span>${t('Haptics')}</span><input type="checkbox" data-setting="vibration" ${settings.vibration ? 'checked' : ''}></label><label><span>${t('Touch scale')}</span><input type="range" min="0.8" max="1.3" step="0.05" value="${settings.touchScale}" data-setting="touchScale"></label><label><span>${t('Invert pitch')}</span><input type="checkbox" data-setting="tiltInvertPitch" ${settings.tiltInvertPitch ? 'checked' : ''}></label><label><span>${t('Invert yaw')}</span><input type="checkbox" data-setting="tiltInvertYaw" ${settings.tiltInvertYaw ? 'checked' : ''}></label><p class="settings-help">${t('Inversion applies to the joystick, keyboard and controller.')}</p></section></div><section class="controls-reference"><details class="ui-details"><summary>${t('KEYBOARD / CONTROLLER')}</summary><p>${t('W/S pitch · A/D yaw · Q/E roll · R/F throttle · Shift afterburn · Space fire · X fire group · L launcher · hold M secondary tool / tap missile or capture · T target · C mode · N nav · J hyperdrive · K map · B transponder')}</p><p>${t('Gamepad: left stick steer · right stick roll/throttle · RT fire · hold RB secondary tool / tap missile or capture · LB afterburn · face buttons target/mode/fire group/hyperdrive · left stick click transponder · D-pad launcher/capture/hostile/nav.')}</p></details></section></div>
         </div>`;
     }
     showPause() {

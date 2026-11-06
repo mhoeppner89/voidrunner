@@ -1,4 +1,5 @@
 @font-face { font-family:"Void VGA"; src:url("../assets/fonts/void-vga.ttf") format("truetype"); font-display:swap; font-style:normal; font-weight:400 900; }
+@font-face { font-family:"Void VGA Text"; src:url("../assets/fonts/void-vga-text.ttf") format("truetype"); font-display:swap; font-style:normal; font-weight:400 900; }
 :root {
   --speaker-yellow: #ffd24a;
   --console-brass: #a58b58;
@@ -1848,6 +1849,18 @@ button.compact {
   height: 100%;
 }
 
+.ship-preview-status {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 0.5rem;
+  color: var(--void-gold);
+  font-size: clamp(0.7rem, 1.5vw, 1rem);
+  text-align: center;
+  pointer-events: none;
+}
+
 .ship-card dd .stat-delta {
   margin-left: 0.3rem;
   font-family:var(--pixel-font);
@@ -3427,6 +3440,23 @@ html[lang="de"] .comms-bar.story::after {
   color: #e28874;
   text-shadow: 0 0 6px rgba(226, 136, 116, 0.5);
 }
+
+.screen-target-readout.is-hyperdrive-status {
+  height:auto; min-height:24%; padding:2px 5px;
+  white-space:normal; overflow-wrap:anywhere; line-height:1.12;
+}
+
+.adventure-speech, .bar-dialogue p, .bar-dialogue-card p,
+.landing-dialogue p, .inventory-hint, .settings-pane label span {
+  font-family:"Void VGA Text", var(--pixel-font);
+  letter-spacing:0;
+}
+#pause-panel :is(h2,button,label,summary,p),
+.equipment-inventory :is(button,select,p,h2,h3,dt,dd,span,b,small),
+#dock-screen :is(h1,h2,h3,h4,p,.scene-pointer b,.scene-pointer small) {
+  font-family:"Void VGA Text", var(--pixel-font);
+}
+.settings-help { margin:8px 0 0; color:var(--void-muted); font-size:12px; line-height:1.3; }
 
 /* Scanned contents have their own space so status alerts and claims cannot hide them. */
 #game-shell .screen-target-contents {
@@ -16389,6 +16419,13 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 
 }
 
+#game-shell .cockpit-screen-target .screen-target-readout.is-hyperdrive-status,
+#game-shell .cockpit-screen-target:not(.has-capital-target) .screen-target-readout.is-hyperdrive-status {
+  flex:0 0 auto; height:auto; min-height:24%; padding:1px 4px;
+  white-space:normal; overflow-wrap:anywhere; line-height:1; color:var(--void-gold);
+}
+#game-shell .cockpit-screen-target:has(.is-hyperdrive-status) .screen-target-layout { flex:1 1 0; min-height:0; }
+
 /* Loot and equipment: rarity edges, focused details, independent scrolling. */
 .equipment-inventory {
   height:100%; min-height:0; display:flex; flex-direction:column;
@@ -16420,7 +16457,9 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 .inventory-stock { min-width:0; min-height:0; display:flex; flex-direction:column; }
 .inventory-stock nav { display:flex; gap:6px; flex-shrink:0; margin-bottom:10px; }
 .inventory-stock nav > select:last-child { margin-left:auto; max-width:120px; }
-.inventory-tab-buttons { display:flex; gap:4px; }
+.inventory-tab-buttons { display:flex; gap:4px; scrollbar-width:thin; scrollbar-color:var(--void-muted) transparent; }
+.inventory-tab-buttons::-webkit-scrollbar { height:3px; }
+.inventory-tab-buttons::-webkit-scrollbar-thumb { background:var(--void-muted); }
 .inventory-tab-select { display:none; }
 .equipment-inventory select { white-space:nowrap; overflow-wrap:normal; }
 .inventory-stock-body { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(270px,34%); gap:12px; overflow:hidden; }
@@ -16469,8 +16508,9 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 #market-point-content:has(.equipment-inventory) { height:100%; overflow:hidden; }
 #ship-panel > .equipment-inventory { height:100%; max-height:100dvh; }
 @media(max-width:1150px) {
-  .inventory-tab-select { display:block; width:175px; max-width:100%; }
-  .inventory-tab-buttons { display:none; }
+  .inventory-tab-select { display:none; }
+  .inventory-tab-buttons { display:flex; overflow-x:auto; min-width:0; flex:1; }
+  .inventory-tab-buttons button { flex:0 0 auto; white-space:nowrap; }
 }
 @media(max-height:500px),(max-width:800px) {
   .equipment-inventory { padding:8px; }
@@ -16483,8 +16523,8 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   .inventory-mount { padding:6px 8px !important; font-size:12px !important; }
   .inventory-mount b { font-size:12px; }
   .inventory-stock nav { margin-bottom:6px; }
-  .inventory-tab-select { display:block; width:175px; max-width:100%; }
-  .inventory-tab-buttons { display:none; }
+  .inventory-tab-select { display:none; }
+  .inventory-tab-buttons { display:flex; overflow-x:auto; min-width:0; flex:1; }
   .inventory-stock-body { display:block; }
   .inventory-items { height:100%; grid-template-columns:repeat(auto-fill,minmax(205px,1fr)); }
   .inventory-empty { display:none; }

@@ -1,6 +1,6 @@
 # Voidrunner
 
-A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2nf**.
+A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2nj**.
 
 On phones, flight and ship previews use a finer, crisp pixel grid, and the radar and hull schematics draw at up to twice their CSS resolution. High and Auto flight quality can use more detail between resolution steps. Low quality and the adaptive fallback keep their existing 3D pixel budgets.
 

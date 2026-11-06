@@ -22,6 +22,7 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
    // Docking may recall an automatically deployed defence drone first.
    await page.waitForFunction(id=>__VOID_PRIVATEER__.getRuntime().save.player.dockedAt===id,id);
    await page.waitForFunction(id=>{const v=__VOID_PRIVATEER__.getRuntime().ui.concourseShip;return v?.transit?.model?.name===`cinematic-station-${id}`&&v.phase==='entry';},id);
+   assert.ok(await page.evaluate(()=>{const v=__VOID_PRIVATEER__.getRuntime().ui.concourseShip;v.render();return v.quad.material===v.transitFinish&&v.transitFinish.uniforms.tDepth.value===v.target.depthTexture;}),'exterior uses the flight finish and scene depth');
    assert.ok(await page.locator('.scene-pointers').evaluate(e=>e.inert));
    const scenery=await page.evaluate(async id=>{
     const r=__VOID_PRIVATEER__.getRuntime(),shot=r.ui.concourseShip.transit,{STATION_OCCUPANTS}=await import('/src/game/stationOccupants.js');

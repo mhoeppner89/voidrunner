@@ -24,11 +24,11 @@ export const NEUTRAL_TONE_GLSL=`
 export function createPixelResolveMaterial({preserveAlpha=false}={}){
  return new THREE.ShaderMaterial({
   defines:preserveAlpha?{PRESERVE_SCENE_ALPHA:1}:{},
-  uniforms:{tScene:{value:null},tDepth:{value:null},tBloom:{value:null},uStrength:{value:0},uExposure:{value:1.18},uResolution:{value:new THREE.Vector2(1,1)},uNearFar:{value:new THREE.Vector2(.5,1e8)}},
+  uniforms:{tScene:{value:null},tDepth:{value:null},tBloom:{value:null},uStrength:{value:0},uExposure:{value:1.18},uFade:{value:1},uResolution:{value:new THREE.Vector2(1,1)},uNearFar:{value:new THREE.Vector2(.5,1e8)}},
   vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}',
   fragmentShader:`
   uniform sampler2D tScene,tDepth,tBloom;
-  uniform float uStrength,uExposure;
+  uniform float uStrength,uExposure,uFade;
   uniform vec2 uResolution,uNearFar;
   varying vec2 vUv;
   ${FINITE_COLOUR_GLSL}
@@ -78,9 +78,9 @@ export function createPixelResolveMaterial({preserveAlpha=false}={}){
    colour=sRGBTransferOETF(neutralToneMapping(colour));
    colour*=1.-illustratedInk(depth)*.43;
    #ifdef PRESERVE_SCENE_ALPHA
-   gl_FragColor=vec4(colour*alpha,alpha);
+   gl_FragColor=vec4(colour*alpha*uFade,alpha);
    #else
-   gl_FragColor=vec4(colour,1.);
+   gl_FragColor=vec4(colour*uFade,1.);
    #endif
   }`,
   depthTest:false,depthWrite:false,toneMapped:false,

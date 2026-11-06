@@ -17,7 +17,7 @@ export const ADVENTURE_DIALOGUES={
         parents:{text:pair("Noch nichts Sicheres. Ich prüfe ein paar alte Vermisstenlisten. Erst sorgen wir dafür, dass du mit der Wanderer fliegen und Geld verdienen kannst. Wird Zeit, dass du selbstständig wirst!","Nothing certain yet. I am checking some old missing-person records. First, let us make sure you can fly and earn a living with the Wanderer. Time you learned to stand on your own!"),returnTo:'trade'},
     }},
     'cargo-ready':{start:'launch',nodes:{
-        launch:{text:pair('Die Ladung ist an Bord. Geh zurück zur DOCKHALLE und wähle dort dein Schiff zum Start. Ich treffe dich draußen.','The cargo is aboard. Return to the DOCK HALL and select your ship to launch. I will meet you outside.'),choices:[end("Okay, ich mache mich startklar.","Okay, I will get ready to launch.")]},
+        launch:{text:pair('Die Ladung ist an Bord. Geh zurück zur DOCKHALLE und tippe dort auf dein Schiff, um zu starten. Ich treffe dich draußen.','The cargo is aboard. Return to the DOCK HALL and tap or click your ship to launch. I will meet you outside.'),choices:[end("Okay, ich mache mich startklar.","Okay, I will get ready to launch.")]},
     }},
     'reactor-ready':{start:'bar',nodes:{
         bar:{text:pair("Der Reaktor läuft, gut gemacht. Komm zu mir in die Bar; ich habe einen Auftrag für uns.","The reactor is running. Well done. Come meet me in the bar; I have a job for us."),choices:[end('Bis gleich.','See you there.')]},
@@ -48,7 +48,8 @@ export const ADVENTURE_DIALOGUES={
     }},
     combat:{start:'scrapper',nodes:{
         scrapper:{text:pair("Nur ein Pirat in einer rostigen Balor - davon lassen wir uns nicht einschüchtern. Das Universum kann gefährlich sein, aber das schaffst du. Bleib in Bewegung und richte dein Visier auf den Gegner. Die Schilde fangen einige Treffer ab; danach wird die Hülle beschädigt. Viele Piraten ergeben sich dann oft oder versuchen abzuhauen.","Just one pirate in a rusty Balor — we will not let that intimidate us. The universe can be dangerous, but you can handle this. Keep moving and bring the enemy into your sights. The shields absorb a few hits; after that, the hull takes damage. Many pirates will surrender or try to run once that happens."),next:'weapons'},
-        weapons:{text:pair('Feuere am Computer mit der Leertaste, am Smartphone mit der Feuertaste rechts. Lass den Abzug los, wenn deine Energie knapp wird.','Fire with Space on desktop, or the fire button on the right of your phone screen. Release the trigger when your energy runs low.'),next:'wing'},
+        weapons:{text:pair('Feuere am Computer mit der Leertaste, am Smartphone mit der Feuertaste rechts. Lass den Abzug los, wenn deine Energie knapp wird.','Fire with Space on desktop, or the fire button on the right of your phone screen. Release the trigger when your energy runs low.'),next:'targeting'},
+        targeting:{text:pair('Der Pirat ist schon angewählt. Um ein anderes Schiff auszuwählen, tippe es im Sichtfeld an oder wechsle die Ziele mit dem rechten Monitor. Dort siehst du auch seine Schilde und seine Hülle.','The pirate is already selected. To select another ship, tap or click it in view, or cycle targets with the right monitor. Its shields and hull appear there too.'),next:'wing'},
         wing:{text:pair("Ich geb dir Deckung und bleibe in der Nähe. Mit Y oder meiner Anzeige oben rechts wechselst du meine Befehle.","I will cover you and stay close. Press Y or tap my display at the top right to change my orders."),choices:[end('Los geht’s.','Let’s do this.')]},
     }},
     surrender:{start:'stop',nodes:{
