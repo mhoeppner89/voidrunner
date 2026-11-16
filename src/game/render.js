@@ -5,7 +5,6 @@ import {pixelRenderSize} from './retroDisplay.js';
 import { createAsteroidTerrain } from './asteroidTerrain.js';
 import {createAsteroidFragmentMaterials, ASTEROID_FINISH_PALETTES,configureAsteroidShadows} from './asteroidMaterials.js';
 import {createLootVisualResources,createLootVisual,setLootVisualRarity,disposeLootVisualResources} from './lootVisuals.js';
-import {SHIELD_ACTIVATION_WINDOW} from './weaponDamage.js';
 import {FLEET_EQUIPMENT,equipmentHullId,droneDock} from './fleetEquipmentData.js';
 import {applyFleetPaint} from './fleetPaint.js';
 import {applyIndependentPaint} from './independentPaints.js';
@@ -485,6 +484,10 @@ export class SpaceRenderer {
         this.preloadGlbShips(initialShipVariants);
     }
     setShellStyle(name, value) {
+        // Fixed pixel readouts must not bank/resample during steering. The
+        // painted cockpit owns their stable transform; avoid cascading these
+        // inherited variables through the entire HUD every flying frame.
+        if (this.shell?.dataset.cockpitPaint && (name === '--cockpit-shift-x' || name === '--cockpit-shift-y' || name === '--cockpit-roll' || name === '--cockpit-zoom')) return;
         if (!this.shell || this.shellStyleValues.get(name) === value)
             return;
         this.shellStyleValues.set(name, value);
@@ -5554,7 +5557,7 @@ export class SpaceRenderer {
         field.userData.actor = actor;
         field.userData.player = player;
         field.userData.remaining = remaining;
-        field.userData.duration = SHIELD_ACTIVATION_WINDOW;
+        field.userData.duration = .25; // Visual hit flash only; damage has no timing window.
         // An ellipsoid enclosing the box corners follows the ship's orientation.
         field.scale.set(extents[0] * 1.8, extents[1] * 1.8, extents[2] * 1.8);
         const slot = field.visible ? (field.userData.hitCursor ?? 0) % 4 : 0;

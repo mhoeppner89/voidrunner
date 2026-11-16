@@ -15,7 +15,7 @@ function frameSession(touch=true,powerMode='auto') {
     const s=Object.create(GameSession.prototype);s.save=createNewSave(41);s.save.player.dockedAt=undefined;s.save.settings.powerMode=powerMode;
     s.lastFrame=0;s.simAccumulator=0;s.ships=[];s.deathTimer=0;
     s.ui={isModalOpen:false};s.renderer={touchDevice:touch,renderRevision:0};
-    s.input={getActions(){return {};}};s.refreshStoryLine=()=>{};s.updateTutorialRadio=()=>{};
+    s.input={setGamepadBlocked(blocked){this.gamepadBlocked=blocked;},getActions(){return {};}};s.refreshStoryLine=()=>{};s.updateTutorialRadio=()=>{};
     s.handleActions=()=>{};s.playerStats=()=>({hull:185,afterburnSpeed:100});s.currentNavLocationIds=()=>[];
     s.hyperdriveFxState=()=>({fx:'idle',progress:0});s.lastHudUpdate=Infinity;
     for(const method of ['setHyperdriveFx','updateCamera','setDamageWarning','syncShips','syncProjectiles','syncPickups','render'])s.renderer[method]=()=>{};
@@ -185,4 +185,22 @@ test('constant engine settings stop adding duplicate audio automation, changes s
     a.stationMode=true;a.currentContext='station';a.update(1/60,0.8,true,0,0,'open');
     const stopped=calls;assert.ok(stopped>15);
     a.stationMode=false;a.currentContext='open';a.update(1/60,0.8,true,0,0,'open');assert.ok(calls>stopped);
+});
+
+
+test('controller menus suppress flight commands and disconnect pauses before simulation',()=>{
+    const s=frameSession();
+    s.ui.isModalOpen=true;s.updateFrame(17);
+    assert.equal(s.input.gamepadBlocked,true);assert.equal(s.steps,0);
+    s.ui.isModalOpen=false;s.ui.controller={blocksFlight:true};s.updateFrame(34);
+    assert.equal(s.input.gamepadBlocked,true);
+    s.ui.controller.blocksFlight=false;s.updateFrame(51);
+    assert.equal(s.input.gamepadBlocked,false);
+    const steps=s.steps;let notices=0;
+    s.ui.showPause=()=>{s.ui.isModalOpen=true;};s.ui.showToast=()=>notices++;
+    s.input.getActions=()=>({controllerDisconnected:true});s.updateFrame(68);
+    assert.equal(s.ui.isModalOpen,true);assert.equal(s.steps,steps);assert.equal(notices,1);
+    s.ui.isModalOpen=false;s.openShipMenu=()=>{s.ui.isModalOpen=true;};
+    s.input.getActions=()=>({shipMenu:true});s.updateFrame(85);
+    assert.equal(s.ui.isModalOpen,true);assert.equal(s.steps,steps);
 });

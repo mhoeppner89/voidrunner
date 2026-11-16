@@ -11,8 +11,8 @@ import { stationApproach, reserveStationDock, updateStationDock } from './statio
 //      are transient per-ship state — ships are never persisted.
 //   3. Interaction (this module) — what happens when tasks collide: a hunt
 //      task that closes on the player rolls a mug standoff before opening
-//      fire, and patrols flag dark smugglers. Combat/search still preempt the
-//      task (a ship that is fighting or sweeping is not ticking its task).
+//      fire, and patrols flag dark smugglers. Civilian escape preempts combat;
+//      combat/search otherwise preempt the working task.
 //   4. Behavior (game.js) — how the ship moves this frame: updateAttackAI,
 //      updateSearchAI, and updateTravelAI are pure movement primitives fed by
 //      the layers above. updateTravelAI no longer re-rolls destinations by
@@ -26,6 +26,7 @@ import { COMMODITIES, LOCATIONS, activityLocationIdsForSystem, dockLocationIdsFo
 import { deliverCargo } from './economy.js';
 import { pick, randomBetween, seededRandom } from './random.js';
 import { continueShieldRecovery } from './combatRecovery.js';
+import { continueTerrainManeuver } from './terrainManeuvers.js';
 
 // How close a ship must be to its waypoint before the task advances (matches
 // updateTravelAI's arrival distance).
@@ -195,9 +196,8 @@ export const createSmuggleTask = (ship, session, port) => {
 // ---------------------------------------------------------------------------
 // Dispatch ladder
 // ---------------------------------------------------------------------------
-// The per-ship AI entry point, called from updateShips. Preserves the exact
-// branch order of the old flat dispatch (patrol-engage → search → attack →
-// travel) and slots the task and interaction layers into the travel path.
+// The per-ship AI entry point, called from updateShips. Civilian flight comes
+// before combat; working tasks otherwise yield to searches and engagements.
 export function updateShipAI(session, ship, dt) {
     if (updateStationDock(session, ship, dt)) return;
     // A captured hull and a powered-down surrender are inert: no task, no
@@ -220,7 +220,23 @@ export function updateShipAI(session, ship, dt) {
     // firing-quality track; otherwise it follows its fixed intelligence point.
     session.updateSensorAwareness?.(ship, dt);
 
+    // A working freighter must choose escape before self-defence resolves a
+    // target and sends it into fighter attack passes. Authored encounters and
+    // surrender/arrest decisions retain their own movement rules.
+    if (isAmbientCivilian(session, ship)) {
+        const threat = huntedBy(session, ship) ?? null;
+        // Hostility records the attack/reputation consequence; it must not
+        // make a rescued freighter turn back and hunt the player afterwards.
+        ship.targetId = undefined;
+        if (!updateCivilianEscape(session, ship, dt, threat)) {
+            tickTask(ship, session, threat);
+            if (!updateStationDock(session, ship, dt)) session.updateTravelAI(ship, dt);
+        }
+        return;
+    }
+
     if (continueShieldRecovery(session, ship, dt)) return;
+    if (continueTerrainManeuver(session, ship, dt)) return;
 
     // Search/inspection runs before live target resolution. That prevents the
     // unconditional player target from leaking the current position into a
@@ -294,13 +310,11 @@ export function updateShipAI(session, ship, dt) {
 // gunfire. Uses the existing openMug machinery, so an empty/broke target makes
 // them break off, compliance ends it, and a shot resolves it — no new states.
 const tryEmergentMug = (session, ship) => {
-    if (!session.emergentMugs || session.arena || !ship.mugCapable || ship.mug || ship.search)
+    if (!session.emergentMugs || session.arena || ship.mug || ship.search || (!ship.mugCapable && !ship.pendingMugLeaderId))
         return false;
     if (ship.targetId !== 'player')
         return false;
     if (dist2(ship.position, session.save.player.position) > MUG_EMERGE_RANGE * MUG_EMERGE_RANGE)
-        return false;
-    if (session.save.world.time < (ship.nextMugAt ?? 0))
         return false;
     // No mugging what you cannot see — a dark pilot gets searched, not shaken
     // down.
@@ -320,9 +334,11 @@ const tryEmergentMug = (session, ship) => {
         }
         return false;
     }
-    if (ship.aiRng() >= MUG_CHANCE)
+    // This is an opening decision for this encounter. Once the pirate has
+    // chosen violence, a missed shot or another pass does not reopen talks.
+    ship.mugCapable = false;
+    if (ship.lastCombatShotAt !== undefined || ship.combatThreatId === 'player' || ship.aiRng() >= MUG_CHANCE)
         return false;
-    ship.nextMugAt = session.save.world.time + 40 + ship.aiRng() * 40;
     session.openMug(ship, []);
     return true;
 };
@@ -330,7 +346,7 @@ const tryEmergentMug = (session, ship) => {
 // ---------------------------------------------------------------------------
 // Task state machines
 // ---------------------------------------------------------------------------
-export function tickTask(ship, session) {
+export function tickTask(ship, session, knownThreat) {
     const task = ship.task;
     if (!task)
         return;
@@ -338,18 +354,31 @@ export function tickTask(ship, session) {
     // actively hunted by a hostile (trader/miner bolt for open space instead
     // of holding course while shot at — the pirate's pursuit is a chase), or
     // a smuggler being chased by an arresting patrol.
-    const hunted = huntedBy(session, ship) || (ship.arrestedBy ? session.ships.find((entry) => entry.id === ship.arrestedBy && entry.hull > 0) : undefined);
+    const hunted = knownThreat === undefined
+        ? huntedBy(session, ship) || (ship.arrestedBy ? session.ships.find((entry) => entry.id === ship.arrestedBy && entry.hull > 0) : undefined)
+        : knownThreat;
     if ((ship.fleeing || hunted) && task.kind !== 'flee') {
-        ship.task = { kind: 'flee', prior: task, awayFrom: [...ship.position] };
-        fleeTick(ship, session, ship.task);
+        ship.task = { kind: 'flee', prior: task, priorDestination: ship.destination,
+            awayFrom: [...ship.position], destination: [...ship.position], clearAt: 0,
+            civilian: knownThreat !== undefined };
+        if (hunted) {
+            ship.task.clearAt = session.save.world.time + 4;
+            ship.task.threatId = hunted === session.save.player ? 'player' : hunted.id;
+        }
+        fleeTick(ship, session, ship.task, hunted);
         return;
     }
     if (task.kind === 'flee') {
-        if (ship.fleeing || hunted) {
-            fleeTick(ship, session, task);
+        if (hunted) {
+            task.clearAt = session.save.world.time + 4;
+            task.threatId = hunted === session.save.player ? 'player' : hunted.id;
+        }
+        if (ship.fleeing || hunted || task.civilian && session.save.world.time < task.clearAt) {
+            fleeTick(ship, session, task, hunted);
         }
         else {
             ship.task = task.prior ?? { kind: 'trade', phase: 'leg', origin: undefined, port: undefined, dwellUntil: 0, dwellPoint: undefined };
+            ship.destination = task.priorDestination;
         }
         return;
     }
@@ -553,21 +582,22 @@ const huntTick = (ship, session, task) => {
 // Flee the fight: run from the arresting patrol, the nearest hostile (else
 // the player), always outward — the despawn bubble culls the ship as the
 // pilot's hyperdrive hop to another port.
-const fleeTick = (ship, session, task) => {
+const fleeTick = (ship, session, task, activeThreat) => {
     const hunter = ship.arrestedBy ? session.ships.find((entry) => entry.id === ship.arrestedBy && entry.hull > 0) : undefined;
-    const threat = hunter ?? nearestThreat(session, ship);
-    const awayFrom = threat ? threat.position : session.save.player.position;
-    task.awayFrom = [...awayFrom];
+    const threat = activeThreat || hunter || (!task.civilian && nearestThreat(session, ship));
+    const awayFrom = threat ? threat.position : task.civilian ? task.awayFrom : session.save.player.position;
+    for (let i = 0; i < 3; i++) task.awayFrom[i] = awayFrom[i];
     const position = ship.position;
-    const dx = position[0] - awayFrom[0];
+    let dx = position[0] - awayFrom[0];
     const dy = position[1] - awayFrom[1];
     const dz = position[2] - awayFrom[2];
+    if (dx * dx + dy * dy + dz * dz < 0.01) dx = 1;
     const length = Math.hypot(dx, dy, dz) || 1;
-    ship.destination = [
-        position[0] + (dx / length) * FLEE_RUN_DISTANCE,
-        position[1] + (dy / length) * FLEE_RUN_DISTANCE,
-        position[2] + (dz / length) * FLEE_RUN_DISTANCE,
-    ];
+    const destination = task.destination ??= [0, 0, 0];
+    destination[0] = position[0] + (dx / length) * FLEE_RUN_DISTANCE;
+    destination[1] = position[1] + (dy / length) * FLEE_RUN_DISTANCE;
+    destination[2] = position[2] + (dz / length) * FLEE_RUN_DISTANCE;
+    ship.destination = destination;
 };
 const nearestThreat = (session, ship) => {
     let best;
@@ -586,17 +616,43 @@ const nearestThreat = (session, ship) => {
 // How close an actively hunting hostile must be before its civilian mark
 // bolts (trader/miner flight — see tickTask).
 const CIVILIAN_FLEE_RANGE = 420;
+const isAmbientCivilian = (session, ship) => {
+    return !(session.arena || ship.race || ship.tutorialCompanion || ship.tutorialEncounter
+        || ship.storyPersonId || ship.explorationGroup || ship.distressActor || ship.authorizedTarget
+        || ship.surrendered || ship.fleeing || ship.standingDown || ship.arrestedBy
+        || (ship.role !== 'trader' && ship.role !== 'miner') || !ship.task);
+};
+const updateCivilianEscape = (session, ship, dt, threat) => {
+    if (!threat && !ship.task.civilian) return false;
+    tickTask(ship, session, threat ?? null);
+    if (ship.task.kind !== 'flee') return false;
+    ship.targetId = undefined;
+    ship.pursuitHoldFire = false;
+    if (ship.combatPlan?.recovery) ship.combatPlan.recovery.active = false;
+    session.updateTravelAI(ship, dt);
+    return true;
+};
 // A trader or miner that is another ship's current target (a hostile hunting
 // it, not the player) runs instead of holding course.
 const huntedBy = (session, ship) => {
     if (ship.role !== 'trader' && ship.role !== 'miner')
         return undefined;
-    const rangeSq = CIVILIAN_FLEE_RANGE * CIVILIAN_FLEE_RANGE;
+    const recentThreat = session.save.world.time < (ship.combatThreatUntil ?? -Infinity) ? ship.combatThreatId : undefined;
+    const player = session.save.player;
+    // Once hit, keep escaping while that player remains nearby. Missed shots
+    // or the short damage-memory timeout must not turn the freighter around.
+    const escapingPlayer = ship.task?.civilian && ship.task.threatId === 'player';
+    if ((recentThreat === 'player' || escapingPlayer) && player.hull > 0 && !player.dockedAt
+        && dist2(player.position, ship.position) < THREAT_SEEK_RANGE * THREAT_SEEK_RANGE)
+        return player;
+    let nearest;
+    let rangeSq = CIVILIAN_FLEE_RANGE * CIVILIAN_FLEE_RANGE;
     for (const other of session.ships) {
-        if (other === ship || other.hull <= 0 || !other.hostile || other.targetId !== ship.id)
+        if (other === ship || other.hull <= 0 || other.surrendered || other.captured || other.poweredDown || other.standingDown
+            || (other.id !== recentThreat && (!(other.hostile || other.faction === 'pirates') || other.targetId !== ship.id)))
             continue;
-        if (dist2(other.position, ship.position) < rangeSq)
-            return other;
+        const distance = dist2(other.position, ship.position);
+        if (distance < rangeSq) { nearest = other; rangeSq = distance; }
     }
-    return undefined;
+    return nearest;
 };

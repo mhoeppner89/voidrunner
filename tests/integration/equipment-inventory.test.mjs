@@ -35,7 +35,7 @@ test('gun and launcher replacements share a seat; ammo persists with stable moun
 test('rare stats used in flight match the recovered item; common migration preserves baseline',()=>{
  const p=make().player,item=createEquipmentRecord('gauss-cannon',{tier:3,rarity:'rare',affixes:['efficient','rapid'],location:{kind:'station',stationId:'helix'}});p.inventory.items[item.id]=item;refreshInventoryProjection(p);
  assert.ok(equipmentAction(p,'install',{id:item.id,mountId:'wayfarer-weapon-0'}).ok);const w=weaponForOutfit(item.id);assert.ok(w.damageFlat>weaponForOutfit('gauss-cannon').damageFlat);assert.ok(w.cooldown<1.1);assert.equal(weaponForOutfit(item.id),w,'resolved flight object is cached');assert.ok(w.energyCost>0);
- const stats=getEffectiveShipStats(p);assert.equal(stats.energyCapacity,60);assert.equal(stats.reactorOutput,8.8);assert.ok(Math.abs(stats.overTierLoad-1.2)<1e-9);
+ const stats=getEffectiveShipStats(p);assert.equal(stats.energyCapacity,60);assert.equal(stats.reactorOutput,2.5);assert.ok(Math.abs(stats.overTierLoad-7.5)<1e-9);
 });
 test('station storage is local, cargo is mass-limited, sales are atomic and bundled parts cannot be sold',()=>{
  const p=make().player,b=equipmentAction(p,'buy',{baseId:'gauss-cannon'});assert.ok(b.ok);assert.ok(equipmentAction(p,'carry',{id:b.id}).ok);assert.equal(cargoMass(p),6);assert.ok(equipmentAction(p,'store',{id:b.id}).ok);
@@ -125,15 +125,15 @@ test('multiple launchers spend one energy charge per canister and cannot overdra
  p.energy=60;s.save.world.time=100;s.fireMissile();assert.equal(s.projectiles.length,20);assert.equal(p.energy,18);
 });
 
-test('pulse tiers replace reinforced variants without changing tier-II NPC firepower',async()=>{
+test('pulse tiers replace reinforced variants with shared player and NPC firepower',async()=>{
  const {WEAPONS,WEAPON_ORDER}=await import('../../src/game/weapons.js'),{equipmentName,resolveEquipmentDefinition,modifiedWeapon}=await import('../../src/game/equipmentCatalog.js'),{setLanguage,getLanguage}=await import('../../src/game/i18n.js');
  assert(!Object.hasOwn(BASE_OUTFIT_ITEMS,'pulse-mk2'));assert(!WEAPON_ORDER.includes('pulse-mk2'));
- const previous=getLanguage();try{setLanguage('de');for(const [tier,damage,energy]of [[1,9.2,3.2],[2,10.8,3.6],[3,12.4,4]]){
+ const previous=getLanguage();try{setLanguage('de');for(const [tier,damage,energy]of [[1,12,3.2],[2,12*27/23,3.6],[3,12*31/23,4]]){
   const item=resolveEquipmentDefinition(BASE_OUTFIT_ITEMS['pulse-cannon'],{id:'probe',baseId:'pulse-cannon',tier,rarity:'common',affixes:[]}),weapon=modifiedWeapon(WEAPONS.pulse,item);
   assert(Math.abs(weapon.damageFlat-damage)<1e-8);assert(Math.abs(weapon.energyCost-energy)<1e-8);assert.equal(weapon.cooldown,.17);assert.equal(weapon.range,450);assert.equal(equipmentName(item),'Pulslaser\u00a0'+['I','II','III'][tier-1]);
  }}finally{setLanguage(previous);}
  const ship={hullId:'lancer',position:[0,0,0],pilot:{tier:'veteran'}};ship.combatFit=createEnemyLoadout(ship,0);
- assert.equal(ship.combatFit.guns[0],'pulse-cannon-t2');assert.equal(ship.combatFit.weapons[0],'pulse');assert(Math.abs(ship.combatFit.weaponDefinitions[0].damageFlat-10.8)<1e-8);
+ assert.equal(ship.combatFit.guns[0],'pulse-cannon-t2');assert.equal(ship.combatFit.weapons[0],'pulse');assert(Math.abs(ship.combatFit.weaponDefinitions[0].damageFlat-12*27/23)<1e-8);
  const session={save:make(),arena:false,careerRegionAt:()=>({danger:.5})};equipCareerItems(session,ship);
  const pulse=ship.equipmentRecords.find(({item})=>item.baseId==='pulse-cannon').item;assert.equal(pulse.tier,2,'low-danger career does not discard the NPC weapon tier');
 });

@@ -32,7 +32,7 @@ function firingSample(tier,id,range,count=2000){
 }
 test('real beam rays miss occasionally, with novice < veteran < ace accuracy',()=>{
  const hits=tiers.map(tier=>firingSample(tier,'beam',250));
- assert.ok(hits[0]>.6&&hits[0]<.95,`novice ${hits[0]}`);assert.ok(hits[1]>hits[0]+.08&&hits[1]<1,`veteran ${hits[1]}`);assert.ok(hits[2]>hits[1]&&hits[2]>.98&&hits[2]<1,`ace ${hits[2]}`);
+ assert.ok(hits[0]>.15&&hits[0]<.6,`novice ${hits[0]}`);assert.ok(hits[1]>hits[0]+.08&&hits[1]<1,`veteran ${hits[1]}`);assert.ok(hits[2]>hits[1]&&hits[2]>.98&&hits[2]<1,`ace ${hits[2]}`);
  console.log('Beam 250 km hit fractions:',hits);
 });
 test('Magrail accuracy falls with range, while novices miss regularly and trained pilots improve',()=>{
@@ -41,17 +41,19 @@ test('Magrail accuracy falls with range, while novices miss regularly and traine
  for(let i=0;i<3;i++)assert.ok(far[i]<near[i],`${tiers[i]} ${near[i]} -> ${far[i]}`);
  assert.ok(far[0]<far[1]&&far[1]<far[2]);console.log('Magrail 100/550 km hit fractions:',{near,far});
 });
-test('pulse and Ripper get short speculative bursts without bending rounds into the wider trigger cone',()=>{
- for(const tier of tiers)for(const id of ['pulse','pulse-mk2','ripper']){
-  const p=pilot(tier),w=WEAPONS[id],angle=id==='ripper'?8.5:6.5;
-  assert.equal(npcTriggerReady(p,w,Math.cos((angle+1.5)*DEG),0),false);
+test('ranging salvos start during a turn but never bend rounds into the wider trigger cone',()=>{
+ const angles={pulse:16,'pulse-mk2':16,ripper:18,ion:12,gauss:7,mortar:9,pdc:12};
+ for(const tier of tiers)for(const [id,angle] of Object.entries(angles)){
+  const p=pilot(tier),w=WEAPONS[id];
+  assert.equal(npcTriggerReady(p,w,Math.cos((angle+8)*DEG),0),false);
   assert.equal(npcTriggerReady(p,w,Math.cos(angle*DEG),.2),true);
   const out=new THREE.Vector3();p.aiRng=()=>0;
-  assert.ok(npcShotDirection(p,w,direction(angle),out,.2,100));assert.ok(out.angleTo(direction(0))<1*DEG,'speculative barrel stays forward');
-  assert.equal(npcTriggerReady(p,w,Math.cos(angle*DEG),.6),false);assert.equal(npcShotDirection(p,w,direction(angle),out,.6,100),false);
-  p.gunBurstPauseUntil=2;assert.equal(npcTriggerReady(p,w,1,.7),false);
+  assert.ok(npcShotDirection(p,w,direction(angle),out,.2,100));assert.ok(out.angleTo(direction(0))<1*DEG,'the ranging round stays along the physical barrel');
+  assert.equal(npcTriggerReady(p,w,Math.cos(angle*DEG),1.2),false);assert.equal(npcShotDirection(p,w,direction(angle),out,1.2,100),false,'holding an off-target bearing does not restart fire forever');
+  p.gunBurstPauseUntil=2;assert.equal(npcTriggerReady(p,w,1,1.3),false);
  }
- for(const id of ['ion','gauss','mortar']){const p=pilot('ace'),w=WEAPONS[id];npcTriggerReady(p,w,Math.cos(8*DEG),0);assert.equal(npcTriggerReady(p,w,Math.cos(6.5*DEG),.2),false);}
+ const p=pilot('ace');npcTriggerReady(p,WEAPONS.beam,Math.cos(20*DEG),0);
+ assert.equal(npcTriggerReady(p,WEAPONS.beam,Math.cos(15*DEG),.2),false,'beam acquisition stays unchanged');
 });
 test('target changes and lost alignment cannot keep a speculative burst alive',()=>{
  const p=pilot('ace'),w=WEAPONS.pulse;npcTriggerReady(p,w,1,0);assert.equal(npcTriggerReady(p,w,Math.cos(6.5*DEG),.1),true);
@@ -84,7 +86,7 @@ test('observed turn compensation reduces curved-path lead error, remains bounded
 test('ace pointing error changes over time without changing the requested firing solution',()=>{
  const p={...pilot('ace'),targetId:'other'},lead=direction(0),a=new THREE.Vector3(),b=new THREE.Vector3();p.aiRng=()=>0;
  npcShotDirection(p,WEAPONS.pulse,lead,a,0,250);npcShotDirection(p,WEAPONS.pulse,lead,b,1,250);
- assert.ok(a.angleTo(b)>.02*DEG);assert.ok(a.angleTo(lead)<.3*DEG&&b.angleTo(lead)<.3*DEG);assert.deepEqual(lead.toArray(),[0,0,-1]);
+ assert.ok(a.angleTo(b)>.02*DEG);assert.ok(a.angleTo(lead)<.4*DEG&&b.angleTo(lead)<.4*DEG);assert.deepEqual(lead.toArray(),[0,0,-1]);
 });
 
 test('NPC PDC and laser turret fire both improve with pilot skill',()=>{

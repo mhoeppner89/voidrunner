@@ -9,6 +9,10 @@ import { AMMO_CAPACITY, AMMO_UNIT_COST, WEAPON_ORDER, WEAPONS, launcherMagazineE
 // The total contribution stays below twice the strongest individual effect.
 export const stackedBonus = values => values.filter(v=>v>0).sort((a,b)=>b-a).reduce((sum,v,i)=>sum+v*2**-i,0);
 export const stackedMultiplier = values => Math.max(.2,1+stackedBonus(values.map(v=>v-1))-stackedBonus(values.map(v=>1-v)));
+export function higherTierLoadFraction(itemTier,hullTier){
+    const gap=Math.max(0,(itemTier??1)-(hullTier??1));
+    return .125*gap*(gap+1);
+}
 export const getEffectiveShipStats = (player) => {
     const base = SHIPS[player.shipId];
     if (!base)
@@ -41,9 +45,16 @@ export const getEffectiveShipStats = (player) => {
     const equipmentMass=installed.reduce((n,id)=>n+(OUTFIT_ITEMS[id]?.mass??0),0);
     // Normal equipment is an upgrade; fitting technology above the hull's tier
     // instead places a visible, cumulative load on its power distribution.
-    const overTierLevels=installed.reduce((sum,id)=>sum+Math.max(0,(OUTFIT_ITEMS[id]?.tier??1)-(base.tier??1)),0);
+    let overTierLevels=0,overTierPenalty=0;
+    for(const id of installed){
+        const gap=Math.max(0,(OUTFIT_ITEMS[id]?.tier??1)-(base.tier??1));
+        overTierLevels+=gap;
+        // One tier too high costs 25% of the hull's base output; two cost
+        // 75%. Each fitted item adds its load, including oversized reactors.
+        overTierPenalty+=higherTierLoadFraction(OUTFIT_ITEMS[id]?.tier,base.tier);
+    }
     const grossOutput=base.reactorOutput*product('outputMultiplier');
-    const reactorOutput=Math.max(base.reactorOutput*.35, grossOutput-base.reactorOutput*.06*overTierLevels);
+    const reactorOutput=Math.max(base.reactorOutput*.1, grossOutput-base.reactorOutput*overTierPenalty);
     const overTierLoad=grossOutput-reactorOutput;
     const handling=1;
     return {

@@ -267,7 +267,7 @@ diffuseColor.rgb+=mineral*vec3(.026,.019,.009);`);
 // A terrain tile's bounding sphere contains empty tunnel space. Navigation
 // probes the visible surface instead, with five hull-width rays. Scratch is
 // private to the pilot/session and reused after its first planning call.
-export function terrainFlightDistance(obstacle, position, direction, reach, limit, scratch) {
+export function terrainFlightDistance(obstacle, position, direction, reach, limit, scratch, forwardReach=0) {
     const ox=position.x-obstacle.x,oy=position.y-obstacle.y,oz=position.z-obstacle.z;
     const along=Math.max(0,Math.min(limit,-(ox*direction.x+oy*direction.y+oz*direction.z)));
     const dx=ox+direction.x*along,dy=oy+direction.y*along,dz=oz+direction.z*along;
@@ -277,7 +277,7 @@ export function terrainFlightDistance(obstacle, position, direction, reach, limi
     const side=scratch.terrainSide.set(direction.z,0,-direction.x).normalize();
     if(side.lengthSq()<.01)side.set(1,0,0);
     const up=scratch.terrainUp.crossVectors(direction,side).normalize();
-    let best=limit;
+    let best=limit+forwardReach;
     for(let i=0;i<5;i++){
         const start=scratch.terrainStart.copy(position);
         if(i>0)start.addScaledVector(i<3?side:up,i%2===0?-reach:reach);
@@ -285,5 +285,7 @@ export function terrainFlightDistance(obstacle, position, direction, reach, limi
         const hit=segmentMeshHit(start,scratch.terrainEnd,obstacle);
         if(hit!==undefined)best*=hit;
     }
-    return best;
+    // Rays start at the hull centre. Reserve its forward reach as well as
+    // the lateral offsets, so braking finishes before the nose hits the face.
+    return Math.min(limit,Math.max(0,best-forwardReach));
 }

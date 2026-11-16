@@ -26,7 +26,7 @@ test('run rewards and fitted summaries use the same quality colors and retain se
 });
 test('launcher rewards use a free shared bay before replacing a forward gun',()=>{
  const s=ready(),fit=s.player.outfitting.loadouts[s.player.shipId];fit.guns[1]=null;
- const free=runRewardPlan(s,'torpedo-launcher');assert.deepEqual(free.changes.map(({index,old,other})=>({index,old,other})),[{index:1,old:null,other:null}]);
+ const free=runRewardPlan(s,'torpedo-launcher');assert.deepEqual(free.changes.map(({index,old,other})=>({index,old,other})),[{index:1,old:null,other:null},{index:2,old:null,other:null}]);
  assert.deepEqual(free.replaced,[]);assert.equal(fit.guns[0],'pulse-cannon');
  s.arenaRun.wave=1;s.arenaRun.offers=['torpedo-launcher'];assert.equal(chooseRunReward(s,'torpedo-launcher'),true);
  const installed=s.player.outfitting.loadouts[s.player.shipId];assert.equal(installed.launchers[1],'torpedo-launcher');assert.equal(installed.guns[0],'pulse-cannon');

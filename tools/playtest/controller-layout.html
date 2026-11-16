@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Voidrunner · Controller layout</title>
+<style>
+  :root { color-scheme:dark; font:15px/1.45 system-ui,sans-serif; background:#071320; color:#eee9da; --gold:#edc66d; --line:#344c60; --muted:#a8bdca; }
+  * { box-sizing:border-box; }
+  [hidden] { display:none; }
+  body { margin:0 auto; padding:24px; max-width:1150px; }
+  h1 { font-size:24px; margin:0 0 6px; } h2 { font-size:17px; margin:0 0 12px; }
+  p { margin:6px 0 16px; } small,.hint { color:var(--muted); }
+  main { display:grid; grid-template-columns:minmax(300px, .9fr) minmax(360px,1.1fr); gap:20px; align-items:start; }
+  section { border:1px solid var(--line); border-radius:10px; padding:18px; background:#0d1f2d; }
+  .preview { position:sticky; top:16px; } .stack { display:grid; gap:16px; }
+  button,select,input { font:inherit; } button,select { border:1px solid #597185; border-radius:6px; background:#152f43; color:inherit; min-height:40px; padding:8px 12px; cursor:pointer; }
+  button:hover { border-color:var(--gold); } button:focus-visible,select:focus-visible,input:focus-visible { outline:3px solid var(--gold); outline-offset:2px; }
+  button.primary,[aria-selected="true"] { background:var(--gold); color:#071320; border-color:var(--gold); }
+  button:disabled { opacity:.45; cursor:default; } .toolbar { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+  .toolbar > * { flex:1; } label { display:block; } select { width:100%; }
+  #connection { color:#9de7d3; min-height:44px; overflow-wrap:anywhere; }
+  svg { display:block; width:100%; margin:10px 0; overflow:visible; }
+  .case { fill:#12283a; stroke:#617b90; stroke-width:2; }
+  .pad-button rect,.pad-button circle { fill:#213d51; stroke:#8298a8; stroke-width:1.5; }
+  .pad-button text { fill:#e7edf0; font:11px system-ui,sans-serif; text-anchor:middle; dominant-baseline:middle; pointer-events:none; }
+  .pad-button.down rect,.pad-button.down circle { fill:var(--gold); stroke:#fff1bb; stroke-width:3; }
+  .pad-button.down text { fill:#071320; font-weight:700; }
+  .stick-well { fill:#06111d; stroke:#4d697e; stroke-width:1.5; } .stick-dot { fill:#84d8e5; pointer-events:none; }
+  #last-button { color:var(--gold); font-size:19px; min-height:30px; } #axes { color:var(--muted); font:12px/1.5 ui-monospace,monospace; white-space:pre-wrap; }
+  #feedback { min-height:50px; padding:10px; border:1px solid var(--line); border-radius:5px; }
+  #message { min-height:44px; margin:10px 0 0; color:var(--gold); }
+  .tabs { display:flex; gap:8px; margin-bottom:12px; } .tabs button { flex:1; }
+  .mapping { display:grid; grid-template-columns:minmax(0,1fr) minmax(125px,155px) 34px; gap:8px; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); }
+  .mapping:last-child { border:0; } .mapping b { display:block; font-size:14px; } .mapping small { display:block; font-size:12px; }
+  .mapping .clear { padding:0; min-height:34px; }
+  .mapping.waiting { background:#3d361d; outline:2px solid var(--gold); outline-offset:4px; }
+  .mapping.active { background:#174a43; }
+  .mapping.conflict .bind { border-color:#f39c8d; }
+  #conflicts { color:#ffb7a6; font-size:13px; margin-top:12px; white-space:pre-line; }
+  #save-status { font-size:12px; color:var(--muted); } details { margin-top:12px; } summary { cursor:pointer; }
+  textarea { width:100%; height:220px; margin-top:10px; background:#06111d; color:inherit; border:1px solid var(--line); font:12px/1.4 ui-monospace,monospace; }
+  @media(max-width:760px) { body { padding:14px; } main { grid-template-columns:1fr; } .preview { position:static; } svg { max-height:210px; } }
+  @media(max-width:400px) { .mapping { grid-template-columns:minmax(0,1fr) 120px 28px; gap:5px; } section { padding:12px; } }
+</style>
+<h1>Controller layout</h1>
+<p class="hint">Click an action, release the buttons, then press the button you want to use. Try your layout and export it when you’re happy. The sticks stay unchanged.</p>
+<main>
+  <div class="stack preview">
+    <section aria-label="Live controller feedback">
+      <h2>Live feedback</h2>
+      <div id="connection" role="status">Connect your controller and press a button.</div>
+      <label id="pad-picker" hidden>Controller <select id="pads"></select></label>
+      <svg id="controller" viewBox="0 0 440 225" role="img" aria-label="Controller buttons light up as you press them">
+        <path class="case" d="M92 47 Q60 44 48 76 L20 181 Q17 211 43 216 Q60 221 82 189 L110 162 L330 162 L358 189 Q380 221 397 216 Q423 211 420 181 L392 76 Q380 44 348 47 Z"/>
+        <circle class="stick-well" cx="112" cy="105" r="28"/>
+        <circle class="stick-well" cx="280" cy="167" r="26"/>
+        <g id="pad-buttons"></g>
+        <circle class="stick-dot" id="left-stick" cx="112" cy="105" r="6"/>
+        <circle class="stick-dot" id="right-stick" cx="280" cy="167" r="6"/>
+      </svg>
+      <div id="last-button" role="status">No button pressed yet</div>
+      <div id="axes">Left stick: steer · Right stick: roll / throttle</div>
+      <div id="feedback" aria-live="polite">Press a button to see its assigned action.</div>
+      <p class="hint"><small>L3/R3 are stick clicks; their button assignments can change. Stick movement is fixed. Xbox and PlayStation labels are shown together.</small></p>
+    </section>
+    <section>
+      <h2>Save your layout</h2>
+      <div class="toolbar"><button class="primary" id="export">Export JSON</button><button id="import">Import JSON</button></div>
+      <div class="toolbar"><button id="reset">Current game layout</button><button id="clear-all">Clear buttons</button></div>
+      <input id="import-file" type="file" accept="application/json,.json" hidden>
+      <div id="save-status">Changes save locally in this browser.</div>
+      <div id="message" role="status"></div>
+      <details><summary>View / copy JSON</summary><textarea id="json" readonly aria-label="Exported controller layout JSON"></textarea></details>
+      <small>This page only designs the layout. Export the JSON and send it back so I can apply your choices to the game.</small>
+    </section>
+  </div>
+  <section>
+    <div class="tabs" role="tablist" aria-label="Button context"><button role="tab" id="flight-tab" aria-selected="true" aria-controls="mappings" data-context="flight">Flight</button><button role="tab" id="menus-tab" aria-selected="false" aria-controls="mappings" data-context="menus">Menus</button></div>
+    <p class="hint" id="context-help">Click a button label to assign it. × leaves an action unassigned. Esc cancels assignment.</p>
+    <div id="mappings" role="tabpanel" aria-labelledby="flight-tab"></div>
+    <div id="conflicts" role="status"></div>
+  </section>
+</main>
+<script>
+(() => {
+  'use strict';
+  const KEY='voidrunner-controller-layout-editor-v1';
+  const LABELS=['A / ✕','B / ○','X / □','Y / △','LB / L1','RB / R1','LT / L2','RT / R2','View / Share','Menu / Options','L3','R3','D-pad ↑','D-pad ↓','D-pad ←','D-pad →','Home / PS'];
+  const ACTIONS={
+    flight:[
+      ['fire','Primary fire','Hold',0],
+      ['secondary','Missile / capture / mining drones','Depends on the selected target',2],
+      ['afterburner','Boost / afterburner','Hold',7],
+      ['targetNext','Cycle target','Press',1],
+      ['targetNearestHostile','Nearest hostile','Press',13],
+      ['weaponCycle','Cycle fire group','Press',6],
+      ['launcherCycle','Cycle launcher','Press',4],
+      ['autopilot','Hyperdrive','Press',3],
+      ['shipMenu','Ship / cargo menu','Press',12],
+      ['map','Navigation map','Press',8],
+      ['pause','Pause','Press',9],
+      ['navNext','Cycle navigation destination','Press',15],
+      ['wingOrder','Cycle wing order','Press',5],
+      ['transponder','Toggle transponder','Optional · also in ship menu',14],
+      ['rollLeft','Roll left','Optional · hold · right stick already rolls',null],
+      ['rollRight','Roll right','Optional · hold · right stick already rolls',null],
+      ['jettison','Drop cargo','Optional · also in ship menu',null],
+    ],
+    menus:[
+      ['confirm','Confirm / select','Press',0],['back','Back / close','Press',1],
+      ['nextControl','Next control','Press',2],['previousTab','Previous tab','Press',4],['nextTab','Next tab','Press',5],
+      ['up','Navigate up','Press / repeat',12],['down','Navigate down','Press / repeat',13],
+      ['left','Navigate left / decrease','Press / repeat',14],['right','Navigate right / increase','Press / repeat',15],
+      ['scrollUp','Scroll up','Hold · right stick also scrolls',6],['scrollDown','Scroll down','Hold · right stick also scrolls',7],
+      ['pauseBack','Pause / resume / close','Press',9],
+    ],
+  };
+  const $=id=>document.getElementById(id), label=index=>index===null?'Unassigned':LABELS[index]??`Button ${index}`;
+  const defaults=()=>Object.fromEntries(Object.entries(ACTIONS).map(([context,actions])=>[context,Object.fromEntries(actions.map(([id,,,button])=>[id,button]))]));
+  let bindings=defaults(),context='flight',listening=null,ready=false,selectedPad=null,lastIdentity='',lastMapping='',lastButton='',previous=[],padSignature='',connected=false,lastAt=0,apiError='';
+  const rows=new Map(),lights=new Map();
+  function validate(value){
+    if(value?.format!=='voidrunner-controller-layout'||value.version!==1||!value.bindings)throw Error('This is not a supported controller layout.');
+    const result=defaults();
+    for(const [group,actions] of Object.entries(ACTIONS)){
+      if(!value.bindings[group]||typeof value.bindings[group]!=='object')throw Error(`Missing ${group} bindings.`);
+      for(const [id] of actions){
+        const button=value.bindings[group][id];
+        if(button!==null&&(!Number.isInteger(button)||button<0||button>63))throw Error(`Invalid button for ${id}.`);
+        result[group][id]=button;
+      }
+    }
+    return result;
+  }
+  function exportData(){return {format:'voidrunner-controller-layout',version:1,controller:lastIdentity||null,browserMapping:lastMapping||null,sticks:{left:{x:'yaw',y:'pitch'},right:{x:'roll',y:'throttle'},unchanged:true},secondary:{context:'missile / capture / mining drones'},bindings};}
+  function message(text){$('message').textContent=text;}
+  function save(){
+    const json=JSON.stringify(exportData(),null,2);$('json').value=json;
+    try{localStorage.setItem(KEY,json);$('save-status').textContent='Saved in this browser.';}
+    catch{$('save-status').textContent='Browser storage unavailable. Use Export JSON to keep your changes.';}
+    conflicts();
+  }
+  function conflicts(){
+    const groups=new Map();
+    for(const [id] of ACTIONS[context]){
+      const button=bindings[context][id];if(button===null)continue;
+      if(!groups.has(button))groups.set(button,[]);groups.get(button).push(id);
+    }
+    const duplicates=[...groups].filter(([,ids])=>ids.length>1);
+    for(const [id,row] of rows)row.classList.toggle('conflict',duplicates.some(([,ids])=>ids.includes(id)));
+    $('conflicts').textContent=duplicates.map(([button,ids])=>`${label(button)} has ${ids.length} actions: ${ids.map(id=>ACTIONS[context].find(a=>a[0]===id)[1]).join(', ')}.`).join('\n');
+    if(duplicates.length)$('conflicts').textContent+='\nThese will activate together. Sharing a button between Flight and Menus is fine.';
+  }
+  function cancel(text='Assignment cancelled.'){
+    listening=null;ready=false;
+    for(const [id,row] of rows){row.classList.remove('waiting');const bind=row.querySelector('.bind');bind.textContent=label(bindings[context][id]);bind.setAttribute('aria-label',`${ACTIONS[context].find(a=>a[0]===id)[1]}: ${bind.textContent}. Assign button.`);}
+    if(text)message(text);
+  }
+  function render(){
+    $('mappings').replaceChildren();rows.clear();
+    $('mappings').setAttribute('aria-labelledby',`${context}-tab`);
+    for(const [id,name,hint] of ACTIONS[context]){
+      const row=document.createElement('div');row.className='mapping';row.dataset.action=id;
+      const description=document.createElement('div'),title=document.createElement('b'),detail=document.createElement('small');
+      title.textContent=name;detail.textContent=hint;description.append(title,detail);
+      const bind=document.createElement('button');bind.className='bind';bind.textContent=label(bindings[context][id]);bind.setAttribute('aria-label',`${name}: ${bind.textContent}. Assign button.`);
+      bind.onclick=()=>{
+        cancel('');listening=id;ready=false;row.classList.add('waiting');bind.textContent='Press a button…';
+        message(`Assign ${name}: release all buttons, then press your choice. Esc cancels.`);
+      };
+      const clear=document.createElement('button');clear.className='clear';clear.textContent='×';clear.setAttribute('aria-label',`Clear ${name}`);
+      clear.onclick=()=>{cancel('');bindings[context][id]=null;render();save();message(`${name} is unassigned.`);};
+      row.append(description,bind,clear);$('mappings').append(row);rows.set(id,row);
+    }
+    conflicts();
+  }
+  function buttonGraphic(index,x,y,width=0){
+    const ns='http://www.w3.org/2000/svg',g=document.createElementNS(ns,'g'),shape=document.createElementNS(ns,width?'rect':'circle'),text=document.createElementNS(ns,'text');
+    g.classList.add('pad-button');g.dataset.button=index;
+    if(width){shape.setAttribute('x',x-width/2);shape.setAttribute('y',y-11);shape.setAttribute('width',width);shape.setAttribute('height',22);shape.setAttribute('rx',5);}
+    else{shape.setAttribute('cx',x);shape.setAttribute('cy',y);shape.setAttribute('r',index===10||index===11?16:14);}
+    text.setAttribute('x',x);text.setAttribute('y',index===10||index===11?y+36:y);text.textContent=({0:'A / ✕',1:'B / ○',2:'X / □',3:'Y / △',4:'LB / L1',5:'RB / R1',6:'LT / L2',7:'RT / R2',8:'View',9:'Menu',10:'L3',11:'R3',12:'↑',13:'↓',14:'←',15:'→',16:'Home'})[index];
+    const title=document.createElementNS(ns,'title');title.textContent=`${label(index)} · button ${index}`;
+    g.append(title,shape,text);$('pad-buttons').append(g);lights.set(index,g);
+  }
+  [[6,98,14,70],[7,342,14,70],[4,98,41,70],[5,342,41,70],[0,338,124],[1,365,97],[2,311,97],[3,338,70],[8,195,87,38],[9,245,87,38],[10,112,105],[11,280,167],[12,174,134],[13,174,186],[14,148,160],[15,200,160],[16,220,121,42]].forEach(args=>buttonGraphic(...args));
+  function padList(){try{apiError='';return Array.from(navigator.getGamepads?.()??[]).filter(pad=>pad?.connected);}catch(error){apiError=`Controller access unavailable: ${error.message}. Open this page on localhost in Chrome.`;return [];}}
+  function tick(now){
+    requestAnimationFrame(tick);if(document.hidden||now-lastAt<30)return;lastAt=now;
+    const pads=padList(),signature=pads.map(p=>`${p.index}:${p.id}`).join('|');
+    if(signature!==padSignature){
+      padSignature=signature;$('pads').replaceChildren();
+      for(const pad of pads){const option=document.createElement('option');option.value=pad.index;option.textContent=pad.id;$('pads').append(option);}
+      $('pad-picker').hidden=pads.length<2;
+    }
+    const pad=pads.find(p=>p.index===selectedPad)??pads[0];
+    if(!pad){
+      if(connected){cancel('Controller disconnected. Reconnect it to continue.');render();}
+      connected=false;selectedPad=null;previous=[];
+      for(const light of lights.values())light.classList.remove('down');for(const row of rows.values())row.classList.remove('active');
+      $('left-stick').setAttribute('transform','translate(0 0)');$('right-stick').setAttribute('transform','translate(0 0)');
+      if(!signature)$('connection').textContent=apiError||(navigator.getGamepads?'Connect your controller and press a button.':'This browser has no controller API. Try Chrome on localhost.');
+      return;
+    }
+    if(!connected||selectedPad!==pad.index||lastIdentity!==pad.id){
+      connected=true;selectedPad=pad.index;lastIdentity=pad.id;lastMapping=pad.mapping;previous=[];ready=false;
+      $('pads').value=String(pad.index);$('connection').textContent=pad.id;
+      if(pad.mapping!=='standard')$('connection').textContent+=' · Raw button numbers (browser has no standard mapping)';
+    }
+    const values=Array.from(pad.buttons,button=>Math.max(0,Math.min(1,Number(button.value)||(button.pressed?1:0))));
+    const down=values.map((value,index)=>Boolean(pad.buttons[index]?.pressed||value>.5));
+    const edges=down.flatMap((pressed,index)=>pressed&&!previous[index]?[index]:[]);
+    if(listening){
+      if(!down.some(Boolean))ready=true;
+      if(ready&&edges.length===1){const id=listening;bindings[context][id]=edges[0];cancel('');render();save();message(`${ACTIONS[context].find(a=>a[0]===id)[1]} → ${label(edges[0])}.`);}
+      else if(ready&&edges.length>1){ready=false;message('Press one button at a time. Release them and try again.');}
+    }
+    for(const [index,light] of lights)light.classList.toggle('down',Boolean(down[index]));
+    for(const [id,row] of rows)row.classList.toggle('active',bindings[context][id]!==null&&Boolean(down[bindings[context][id]]));
+    const axis=index=>Number.isFinite(Number(pad.axes[index]))?Math.max(-1,Math.min(1,Number(pad.axes[index]))):0;
+    $('left-stick').setAttribute('transform',`translate(${axis(0)*19} ${axis(1)*19})`);$('right-stick').setAttribute('transform',`translate(${axis(2)*18} ${axis(3)*18})`);
+    $('axes').textContent=`Left stick: steer       ${axis(0).toFixed(2)} / ${axis(1).toFixed(2)}\nRight: roll / throttle   ${axis(2).toFixed(2)} / ${axis(3).toFixed(2)}`;
+    if(edges.length){lastButton=edges.map(index=>`${label(index)} · #${index}`).join(' + ');$('last-button').textContent=lastButton;}
+    const active=ACTIONS[context].filter(([id])=>bindings[context][id]!==null&&down[bindings[context][id]]).map(([,name,hint])=>`${name} (${hint})`);
+    const feedback=active.length?active.join(' · '):down.some(Boolean)?'No action assigned to this button in this context.':'Release complete · press a button to test.';
+    if($('feedback').textContent!==feedback)$('feedback').textContent=feedback;
+    previous=down;
+  }
+  $('pads').onchange=()=>{selectedPad=Number($('pads').value);connected=false;cancel('Controller changed.');render();};
+  document.querySelectorAll('[data-context]').forEach(button=>button.onclick=()=>{
+    cancel('');context=button.dataset.context;
+    document.querySelectorAll('[data-context]').forEach(tab=>tab.setAttribute('aria-selected',String(tab===button)));render();
+  });
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&listening){event.preventDefault();cancel();render();}});
+  window.addEventListener('blur',()=>{if(listening){cancel('Assignment cancelled while this page was unfocused.');render();}previous=[];});
+  $('reset').onclick=()=>{cancel('');bindings=defaults();render();save();message('Restored the current game button layout.');};
+  $('clear-all').onclick=()=>{cancel('');for(const group of Object.values(bindings))for(const id of Object.keys(group))group[id]=null;render();save();message('All buttons cleared. Sticks remain unchanged.');};
+  $('export').onclick=()=>{
+    const url=URL.createObjectURL(new Blob([JSON.stringify(exportData(),null,2)],{type:'application/json'}));
+    const link=document.createElement('a');link.href=url;link.download='voidrunner-controller-layout.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    message('Exported voidrunner-controller-layout.json. Send this file back when ready.');
+  };
+  $('import').onclick=()=>$('import-file').click();
+  $('import-file').onchange=async()=>{
+    const file=$('import-file').files[0];if(!file)return;
+    try{const result=validate(JSON.parse(await file.text()));cancel('');bindings=result;render();save();message('Layout imported.');}
+    catch(error){message(`Import failed: ${error.message}`);}
+    $('import-file').value='';
+  };
+  try{const stored=localStorage.getItem(KEY);if(stored)bindings=validate(JSON.parse(stored));}catch{message('Could not restore a saved layout. Starting with current bindings.');}
+  render();save();requestAnimationFrame(tick);
+})();
+</script>
+</html>

@@ -58,7 +58,7 @@ for(const [name,engine,device] of profiles){
    await page.evaluate(()=>document.fonts.ready);
    const warmed=await page.evaluate(async()=>{const ui=__VOID_PRIVATEER__.getRuntime().ui,urls=[...ui.warmImageSlots.get('flight-core')];await Promise.all(urls.map(url=>ui.warmImageRecords.get(url).promise));return urls.map(url=>{const r=ui.warmImageRecords.get(url);return{ready:r.ready,original:r.image.src===new URL(url,document.baseURI).href,src:r.image.src};});});
    assert.ok(warmed.every(image=>image.ready&&image.original),'Original flight sprites must decode before launch: '+JSON.stringify(warmed));
-   assert.ok(await page.evaluate(()=>[...document.fonts].some(f=>f.family==='Void VGA'&&f.status==='loaded')),'Bundled bitmap font must load online and offline');
+   assert.ok(await page.evaluate(()=>[...document.fonts].some(f=>f.family==='Void VGA Text'&&f.status==='loaded')),'Current bundled text font must load online and offline');
    return page.evaluate(()=>[...document.querySelectorAll('#dock-screen img')].filter(i=>i.getClientRects().length).map(i=>({src:i.dataset.retroSource??i.getAttribute('src'),width:i.naturalWidth,height:i.naturalHeight})));
   };
   const online=await imagesReady();await page.screenshot({path:`${out}/${name}-online-helix.png`});
@@ -69,7 +69,7 @@ for(const [name,engine,device] of profiles){
   const recovered=await page.evaluate(async()=>{const start=performance.now(),response=await fetch('src/game/game.js');return{ok:response.ok,elapsed:performance.now()-start,text:(await response.text()).slice(0,80)};});
   origin.stallGameModule(false);assert.ok(recovered.ok&&recovered.elapsed<10000&&recovered.text.includes('import'),JSON.stringify(recovered));
   const chapterCount=await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().tutorialSummary().chapterCount);assert.equal(chapterCount,6);
-  await page.waitForFunction(async name=>{if(!(await caches.keys()).includes(name))return false;const c=await caches.open(name);return(await Promise.all(['art/locations/simplified/helix-hd-v1.webp','art/portraits/simplified/rin-vek-hd-v1.webp','assets/models/ships/wayfarer.glb','assets/fonts/void-vga.ttf','src/game/retroDisplay.js','src/game/pixelResolve.js','src/game/illustratedLighting.js'].map(p=>c.match(new URL(p,document.baseURI))))).every(Boolean);},currentCache);
+  await page.waitForFunction(async name=>{if(!(await caches.keys()).includes(name))return false;const c=await caches.open(name);return(await Promise.all(['art/locations/simplified/helix-hd-v1.webp','art/portraits/simplified/rin-vek-hd-v1.webp','assets/models/ships/wayfarer.glb','assets/fonts/void-vga-text.ttf','assets/cockpits/wayfarer-paint-atlas-v2.png','assets/cockpits/wayfarer-hand-pitch-v4.png','assets/cockpits/wayfarer-stick-base-v1.png','src/game/cockpitArtwork.js','src/game/retroDisplay.js','src/game/pixelResolve.js','src/game/illustratedLighting.js'].map(p=>c.match(new URL(p,document.baseURI))))).every(Boolean);},currentCache);
   // Cache a real report, then prove an unvisited report is not the game.
   phase='report navigation';await page.goto(`${origin.url}/${out}/report-fixture.html`);await page.locator('h1').filter({hasText:'Cached QA report'}).waitFor();
   await page.waitForFunction(async name=>Boolean(await(await caches.open(name)).match(location.href)),currentCache);

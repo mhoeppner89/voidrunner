@@ -38,7 +38,7 @@ test('laser tracking misses small distant targets while close supporting fire ga
  function probe(distance){const s=session(),p=s.save.player;p.outfitting.loadouts.wayfarer.turrets=['tracking-turret'];const target={id:'target',hostile:true,hull:100,position:[0,-distance,0],velocity:[0,0,0]};s.ships=[target];s.getTargetRef=()=>({kind:'ship',id:'target'});let shots=0,hits=0,damage=0;
   s.fireBeam=(owner,w,start,direction)=>{shots++;const delta=new THREE.Vector3(...target.position).sub(start);const off=delta.addScaledVector(direction,-delta.dot(direction)).length();if(off<1.5){hits++;damage+=w.damageFlat;}};
   for(let i=0;i<1800;i++){s.save.world.time=i/60;p.energy=100;s.updateTurrets(p,'player',1/60);}return {shots,hits,dps:damage/30};}
- const near=probe(50),far=probe(299);assert.ok(near.dps>4);assert.ok(far.hits>0&&far.hits<far.shots*.8);console.log('Laser small-target tracking:',{near,far});
+ const near=probe(50),far=probe(299);assert.ok(near.dps>2);assert.ok(near.dps>far.dps*1.5);assert.ok(far.hits>0&&far.hits<far.shots*.8);console.log('Laser small-target tracking:',{near,far});
 });
 
 test('Vanguard side mounts and Lancer belly mount cover their outward hemisphere only',async()=>{

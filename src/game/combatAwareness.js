@@ -6,6 +6,65 @@ import {combatTargetEligible} from './combatTargeting.js';
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const FORWARD=new THREE.Vector3(0,0,-1);
 
+// A lone pilot faces overlapping attack runs, not every opponent firing
+// continuously. Rebuild the small local group at 4 Hz; all gun and missile
+// paths share the same decision. No changes to rounds already in flight.
+function playerAttackGroup(session, now) {
+ const g=session.playerAttackGroup??={next:-Infinity,members:[],lead:undefined,leadUntil:0};
+ if(now>=g.sampleAt&&now<g.next&&(!g.lead||combatTargetEligible(g.lead)&&g.lead.targetId==='player'))return g;
+ g.sampleAt=now;g.next=now+.25;g.members.length=0;g.allies=1;
+ const player=session.save.player;
+ let best,bestScore=Infinity;
+ for(const actor of session.ships){
+  if(actor.targetId!=='player'||!combatTargetEligible(actor)||actor.capitalClass||actor.fleeing||actor.patrolMemoryActive||actor.recoveryTargetHidden||actor.combatPlan?.recovery?.active)continue;
+  const x=player.position[0]-actor.position[0],y=player.position[1]-actor.position[1],z=player.position[2]-actor.position[2],distance=Math.hypot(x,y,z);
+  if(distance>900)continue;
+  g.members.push(actor);
+  const [qx,qy,qz,qw]=actor.rotation;
+  const facing=(-2*(qx*qz+qw*qy)*x-2*(qy*qz-qw*qx)*y-(1-2*(qx*qx+qy*qy))*z)/Math.max(1,distance);
+  const score=distance/Math.max(30,actor.speed)+(1-facing)*3+(actor.combatIntent==='evade'?4:0);
+  if(score<bestScore){best=actor;bestScore=score;}
+ }
+ if(!g.members.includes(g.lead)||now>=g.leadUntil||g.lead?.combatIntent==='evade'){
+  g.lead=best;g.leadUntil=now+1.5;
+ }
+ for(const ally of session.ships){
+  if(ally.hostile||ally.faction==='pirates'||!combatTargetEligible(ally)||ally.fleeing||!ally.targetId)continue;
+  if(g.members.some(enemy=>enemy.id===ally.targetId)){
+   const x=ally.position[0]-player.position[0],y=ally.position[1]-player.position[1],z=ally.position[2]-player.position[2];
+   if(x*x+y*y+z*z<900*900)g.allies++;
+  }
+ }
+ return g;
+}
+
+export function npcPlayerAttackWindow(session,ship,targetId=ship.targetId) {
+ if(targetId!=='player'||session.arena?.observer||ship.capitalClass||ship.tutorialEnemy||ship.tutorialCompanion)return true;
+ const now=session.save.world.time,g=playerAttackGroup(session,now);
+ const rank=g.members.indexOf(ship);
+ if(g.members.length<=g.allies||rank<0||g.lead===ship){ship.supportAlignedAt=undefined;return true;}
+ // Supporting pilots take short firing passes between their approaches.
+ // Different phases let the player respond to pressure without a safe pause
+ // in which every enemy is artificially forbidden from attacking.
+ const phase=(now+(rank+1)*1.1)%3.2;
+ // An ally creates more openings, but a 2v3 remains paced while outnumbered.
+ const passDuration=Math.min(2,1.15+(g.allies-1)*.4);
+ if(phase>=passDuration){ship.supportAlignedAt=undefined;return false;}
+ const p=session.save.player,x=p.position[0]-ship.position[0],y=p.position[1]-ship.position[1],z=p.position[2]-ship.position[2];
+ const distance=Math.max(1,Math.hypot(x,y,z));
+ const vx=p.velocity[0],vy=p.velocity[1],vz=p.velocity[2],radial=(vx*x+vy*y+vz*z)/distance;
+ const transverse=Math.sqrt(Math.max(0,vx*vx+vy*vy+vz*vz-radial*radial));
+ if(transverse>20&&transverse/distance>.12){
+  const [qx,qy,qz,qw]=ship.rotation;
+  const facing=(-2*(qx*qz+qw*qy)*x-2*(qy*qz-qw*qx)*y-(1-2*(qx*qx+qy*qy))*z)/distance;
+  if(facing<.94){ship.supportAlignedAt=undefined;return false;}
+  ship.supportAlignedAt??=now;
+  return now-ship.supportAlignedAt>=(ship.pilot?.tier==='ace'?.22:.38);
+ }
+ ship.supportAlignedAt=undefined;
+ return true;
+}
+
 // Visible attackers only. Keep the small working set and vectors between scans;
 // a pilot does not learn about hidden ships, their controls or their equipment.
 function awareness(session,ship,now){

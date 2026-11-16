@@ -77,7 +77,7 @@ test('beam assist snaps within its cone and respects range and the assist settin
  assert.ok(Object.values(fit.fireGroups.assignments).every(g=>g==='A'));
  for(const [i,m] of HULL_HARDPOINTS.wayfarer.guns.entries())if(fit.guns[i])assert.ok(itemFitsMount(OUTFIT_ITEMS[fit.guns[i]],m));
 });
-test('holding beam fire produces separate pulses, with lower peak damage and better energy efficiency than accurate pulse shots',()=>{
+test('beam keeps its pulse timing and capacitor cost while accurate physical shots offer more damage',()=>{
  const s=session(),fit=loadoutFor(s.save.player);fit.guns=['beam-emitter',null];
  for(const m of HULL_HARDPOINTS.wayfarer.guns)fit.fireGroups.assignments[m.id]='A';fit.fireGroups.activeGroup='A';s.save.player.outfitting.loadouts.wayfarer=fit;
  const shots=[];s.fireBeam=()=>shots.push(s.save.world.time);
@@ -87,7 +87,7 @@ test('holding beam fire produces separate pulses, with lower peak damage and bet
  s.save.world.time=3;s.save.player.energy=WEAPONS.beam.energyCost-.01;s.fireMountedPlayerGuns();assert.equal(shots.length,5);
  const b=WEAPONS.beam,p=WEAPONS.pulse,damage=p.damageFlat;
  assert.ok(b.damageFlat/b.cooldown<damage/p.cooldown);
- assert.ok(b.damageFlat/b.energyCost>damage/p.energyCost);
+ assert.ok(damage/p.energyCost>b.damageFlat/b.energyCost*1.2,'landed physical shots repay their harder aim');
 });
 test('beam damages the first hull only, respects obstacles and has bounded reusable visuals',()=>{
  const s=session();const a={id:'a',role:'pirate',position:[0,0,-80],rotation:[0,0,0,1],hull:100},b={...a,id:'b',position:[0,0,-150]};s.ships=[a,b];
@@ -145,4 +145,26 @@ test('novices lock slowly and every subsequent missile requires a fresh warned l
   launches.forEach((time,i)=>assert.ok(time-warnings[i]>=(tier==='novice'?2.6:1.1)));
   assert.equal(ship.combatFit.missiles,0);
  }
+});
+
+test('a wingmate holds guns and a locked missile while the pilot or a friendly hull crosses its nose',()=>{
+ const s=session(),wing=s.spawnShip('patrol',[0,0,0],undefined,undefined,{tier:'veteran'});
+ const enemy=s.spawnShip('pirate',[0,0,-240]),ally=s.spawnShip('patrol',[150,0,-120]);
+ const fit=wing.combatFit,forward=new THREE.Vector3(0,0,-1),target=new THREE.Vector3(...enemy.position);
+ wing.hostile=false;wing.rotation=[0,0,0,1];wing.targetId=enemy.id;wing.combatWeaponIndex=0;
+ fit.guns=['beam-emitter'];fit.gunIndices=[0];fit.fireAt=[0];fit.racks=[{launcher:'seeker',missiles:1}];fit.launchAt=0;
+ let beams=0;s.fireBeam=()=>{beams++;};
+ s.save.player.position=[0,0,-60];
+ for(let tick=0;tick<240;tick++){
+  s.save.world.time=tick/60;s.updateNpcOrdnance(wing,target,1/60);
+  if(tick===180)s.fireNpcGun(wing,forward);
+ }
+ assert.ok(fit.lock>=2.5);assert.equal(fit.racks[0].missiles,1);
+ assert.equal(beams,0,'guns also withhold fire through the pilot');
+ s.save.player.position[0]=80;ally.position[0]=0;
+ s.updateNpcOrdnance(wing,target,1/60);s.fireNpcGun(wing,forward);
+ assert.equal(s.projectiles.length,0);assert.equal(beams,0);
+ ally.position[0]=150;
+ s.updateNpcOrdnance(wing,target,1/60);s.fireNpcGun(wing,forward);
+ assert.equal(s.projectiles.filter(p=>p.kind==='missile').length,1);assert.equal(beams,1);
 });

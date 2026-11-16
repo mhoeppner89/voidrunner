@@ -1,7 +1,7 @@
 import {normalizeEquipmentInventory} from './equipmentInventory.js';
 import {equipFrigate} from './capitalCombat.js';
 import * as THREE from 'three';
-import {RUN_WAVES,DECISION_WAVES,runEnemyFit,writeArenaRun,recordArenaRun,recoverRun,runOffers,runHullOffers,refreshRunHullOffers,refreshRunRewardOffers,runWingmanOffers,refreshRunWingmanOffers,hireRunWingman,chooseRunReward,fitRunItem,changeRunHull,wingmanOrder} from './arenaRun.js';
+import {RUN_WAVES,DECISION_WAVES,runEnemyFit,writeArenaRun,recordArenaRun,recoverRun,runOffers,runHullOffers,refreshRunHullOffers,refreshRunRewardOffers,runWingmanOffers,refreshRunWingmanOffers,hireRunWingman,skipRunReward,chooseRunReward,fitRunItem,changeRunHull,wingmanOrder} from './arenaRun.js';
 // One wing doctrine for the whole game: the range gates, the pilot's-mark
 // preference, self-defence and hysteresis all live in wingOrders.js, so the
 // arena wing and the campaign companion can differ only in how they fly.
@@ -74,6 +74,7 @@ export const ArenaRunMethods={
   if(r.phase!=='prepare')return;
   if(action==='reward'&&!r.rewardChosen&&r.offers.includes(value))r.selectedReward=value;
   if((action==='accept'||action==='equip')&&!chooseRunReward(this.save,r.selectedReward))return;
+  if(action==='skip'&&!skipRunReward(this.save))return;
   if(action==='hull'){
    if(changeRunHull(this.save,value)){this.ui.setCockpitShip?.(this.save.player.shipId);this.ui.runFitNotice='';}
    else this.ui.runFitNotice=t('That hull cannot take your forward guns. Choose another.');
@@ -314,6 +315,10 @@ export const ArenaRunMethods={
   // mount, so an Arena Run Concord Blade is the same Blade the career spawns.
   ship.combatFit=createEnemyLoadout(ship,index,runEnemyFit(spec));
   ship.combatFit.missiles=spec.missiles??0;
+  // The per-rack firing path must respect the announced wave stock too.
+  // Leaving factory-full racks here silently restored ammunition on update.
+  let rounds=ship.combatFit.missiles;
+  for(const rack of ship.combatFit.racks??[]){rack.missiles=Math.min(rounds,rack.missiles);rounds-=rack.missiles;}
   ship.energy=ship.combatFit.stats.energyCapacity;
   ship.rotation=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),origin.clone().sub(point).normalize()).toArray();
   if(!this.ships.some(s=>s.id===this.save.player.currentTargetId&&s.hull>0))this.selectTarget('ship',ship.id);
@@ -332,7 +337,10 @@ export const ArenaRunMethods={
   // hired veteran actually draw fire instead of the pilot tanking every shot.
   for(const ship of this.ships)if(ship.arenaRunEnemy){ship.fleeing=false;ship.holdFire=false;const alive=ship.targetId==='player'?this.save.player.hull>0:this.livingWingmanId(ship.targetId);if(!alive)ship.targetId=this.arenaThreatTarget(ship);}
   while(r.nextEnemy<wave.enemies.length&&elapsed>=wave.enemies[r.nextEnemy].delay){if(!this.spawnRunEnemy(wave.enemies[r.nextEnemy],r.nextEnemy))break;r.nextEnemy++;}
-  const next=wave.enemies[r.nextEnemy];if(next&&r.warned!==r.nextEnemy&&elapsed>=next.delay-4){r.warned=r.nextEnemy;r.entry=this.runEntryPosition(r.nextEnemy);this.ui.pushEvent(t('Reinforcement ahead in four seconds.'),'warning',4000);}
+  const next=wave.enemies[r.nextEnemy];if(next&&r.warned!==r.nextEnemy&&elapsed>=next.delay-4){
+   r.warned=r.nextEnemy;r.entry=this.runEntryPosition(r.nextEnemy);const seconds=Math.ceil(next.delay-elapsed);
+   this.ui.pushEvent(seconds>1?t('Reinforcement ahead in {seconds} seconds.',{seconds}):t('Reinforcement approaching ahead.'),'warning',4000);
+  }
   if(r.entry&&next&&this.renderer.camera){this.runMarkerVector??=new THREE.Vector3();this.runMarkerVector.fromArray(r.entry).project(this.renderer.camera);this.ui.setRunInbound?.({x:this.runMarkerVector.x,y:this.runMarkerVector.y,behind:this.runMarkerVector.z>1,seconds:Math.max(0,Math.ceil(next.delay-elapsed))});}
   if(this.save.player.hull<=0)return;
   this.syncRunWingmen();

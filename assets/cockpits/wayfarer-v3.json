@@ -1,0 +1,25 @@
+{
+  "version": 3,
+  "shell": "/assets/cockpits/wayfarer-paint-atlas-v2.png",
+  "width": 1851,
+  "height": 850,
+  "monitors": {
+    "own": {"x": 417,"y": 629,"width": 315,"height": 175},
+    "radar": {"x": 802,"y": 628,"width": 265,"height": 176},
+    "target": {"x": 1138,"y": 628,"width": 297,"height": 177}
+  },
+  "housingTop": 584,
+  "hand": "/assets/cockpits/wayfarer-hand-v2.png",
+  "handStrip": {
+    "path": "/assets/cockpits/wayfarer-hand-pitch-v3.png",
+    "width": 2172,
+    "height": 724,
+    "frameWidth": 724,
+    "renderWidth": 240,
+    "frames": [
+      {"x": 0,"pivot": [455,568]},
+      {"x": 724,"pivot": [459,568]},
+      {"x": 1448,"pivot": [456,570]}
+    ]
+  }
+}

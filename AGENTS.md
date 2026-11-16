@@ -33,6 +33,17 @@
 - The sim runs on a fixed 60Hz accumulator (`SIM_STEP = 1/60`, max 6 steps/frame, `simAccumulator` zeroed while paused/docked). `updateSimulation(STEP, actions)` is the only time the world advances; the renderer interpolates via `prevPosition`/`prevRotation` slots (zero-allocation Float64Arrays, snapshot at the start of each step). Keep the slots out of the save: `saveGame` strips them.
 - **Edge actions (hyperdrive toggle, target cycle, missile, scan) must run exactly once per frame in the frame loop — never per sim step.** A multi-step frame double-fires them (toggle engaged + instantly disengaged the hyperdrive) and a zero-step frame (120Hz display) drops them entirely. Axis actions (pitch/yaw/roll/fire) stay per-step. `handleActions` lives in `frame()`, not `updateSimulation()`.
 
+## Approved starter cockpit (cockpitArtwork.js)
+
+- The user approved the complete frame and navy/white hand from cockpit review 04 and requested live integration. The starter `wayfarer` now uses `PaintedCockpit` in `cockpitArtwork.js`; other hulls retain their existing plates. This supersedes the earlier code-drawn-only direction for the starter hull.
+- Render the complete approved frame as one image. Live monitor rectangles follow the actual transparent apertures. Never cut its beams/bezels into independently rebuilt parts or restore the flat filler panels.
+- The hand uses three pitch views, one common scale and source shaft anchors aligned to a fixed pivot. Yaw rotates around that pivot. Never translate the base or crop the extended sleeve into view. Three images (frame, hand, fixed base) are decoded; the frame is static and flight updates only change a quantised hand transform/pose. Keep layout reads and alpha-map construction out of the frame loop.
+- The joystick base is a separate transparent sprite behind the hand; its source socket anchor must match the fixed shaft pivot. Never rotate or translate the base with steering.
+- Mobile controls retain the approved visible sizes and positions; transparent hit extensions enlarge afterburner above/left and launcher selection left. Throttle art is half-width inside the original drag area. Enable the existing `data-origin=touch` mode so initial contact is neutral. The animated hand stays visible on desktop/controllers; right controls and throttle are mobile only.
+- Live glass underlaps the measured transparent openings; the whole frame is above it. Keep this cockpit stationary during flight (no inherited shift/roll/zoom), and confine hand painting to its small `contain:strict` layer. Monitor canvas backing dimensions must match their actual CSS dimensions, with no independent per-axis minimums or transformed bounding-box sizing.
+- Runtime CSS is scoped to `#game-shell[data-cockpit-paint]`. Deactivation restores inline geometry, touch origin and inert state for other hulls. Canopy cracks use the frame's inverse alpha mask, and HUD-marker visibility samples cached alpha plus monitor/control bounds.
+- `node tests/browser/cockpit-kit.mjs` now verifies the approved art in live career flight on desktop, Android, iPhone and a small phone. `tests/browser/cockpit-layout.mjs` covers the isolated review. The earlier `cockpitKit*.js`/`cockpitScene.js`/`pixel3d.js` experiment remains for authoring/unit tests but is no longer loaded by the live UI.
+
 ## Theme / CSS rules
 
 - style.css has a SINGLE `:root` palette block at the top (base + `--void-*` + `--retro-*` tokens, effective values only). Never add a second `:root` block mid-file — the old "VOIDRUNNER STYLE LOCK" block silently shadowed the top tokens with its navy values; the effective palette IS the navy one (`--void-navy` bg, `--void-gold` accents). New colors go into that one block as tokens; dead tokens get deleted, not kept.
@@ -55,5 +66,6 @@
 
 - No floating HUD cards over the 3D view: all telemetry (SPD/THR/FUEL/MSL/HOLD/LOAD/HND/CR, shields/armor/hull) lives on the cockpit monitors. The bottom-left/right cards were scrapped for good.
 - Touch pads are contextual: asteroid → yellow MINE + SCAN, wreck → teal SALVAGE + SCAN, else FIRE/MISSILE; the second pad runs a scan on deposits.
-- Phones: tilt-only steering (joystick removed), hyperdrive engages by tapping the target monitor when a location is locked (hint reads "ACTIVATE HYPERDRIVE"), pause/fullscreen buttons top-left, thrust is a drag slider.
+- The flight stick is always present on every device (Wing Commander 2 style: the pilot's gloved left hand on the stick, bottom-left, moving with every input source). Tilt may return later only as an option. Hyperdrive engages by tapping the target monitor when a location is locked (hint reads "ACTIVATE HYPERDRIVE"), pause/fullscreen buttons top-left, thrust is a drag lever.
+- The starter cockpit uses the approved full frame and anchored hand strip; other hulls keep their current art. Preserve the approved control layout and generous invisible touch areas.
 - Docking/landing is automatic when slow and close (no button); AI fights WW2-style with strafing runs, and encounters never stack on an active one.

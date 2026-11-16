@@ -1,3 +1,152 @@
+## 0.8.2oi — Painted joystick base
+
+- Replace the code-drawn starter joystick mount with a transparent navy/ivory gimbal sprite, matched to the hand and cockpit. Align its socket to the existing shaft pivot and keep it stationary beneath every hand pose.
+- Preload/cache the third cockpit asset, retain the small isolated paint layer, and reuse cached alpha for target visibility. Update the isolated artwork review to use the same sprite and anchor.
+
+## 0.8.2oh — Cockpit alignment and rendering cost
+
+- Fit live glass to the measured source openings, remove inherited extra bezels, and draw the intact frame above the glass to hide edge seams. Preserve the approved monitor and control arrangement.
+- Size radar and hull bitmaps to their actual, untransformed display dimensions; remove independent minimum-size clamps that distorted drawings on small screens. Keep the painted cockpit stationary during steering to avoid fractional resampling.
+- Confine animated hand painting to a small isolated layer, retain a separately composited static frame and monitors, and avoid unused per-frame cockpit motion style updates. Keep other hulls' existing motion and damage feedback.
+
+## 0.8.2og — Approved starter cockpit in live flight
+
+- Integrate the complete approved Wayfarer cockpit frame and navy/white three-pose hand into career and Arena flight. Preserve the fixed stick base and extended sleeve; live monitor contents fit the actual painted apertures.
+- Retain the approved mobile control layout, expanded afterburner/launcher hit areas, neutral-on-touch steering and half-width throttle art. Keep the animated hand on desktop/controllers and match the upper controls to the cockpit finish.
+- Preload the two cockpit images, cache the canopy visibility map, preserve glass damage masking, and restore the existing layout when switching hulls. Remove the old procedural cockpit renderer from the live UI dependency graph.
+
+## 0.8.2of — Controller setup in the game
+
+- Add flight/menu button assignment, clearing, live testing, cancellation and restore-default controls under Options → Controls. Occupied buttons swap actions, while Confirm and Back always remain assigned. Keep the approved defaults and fixed stick axes.
+- Save validated bindings as global preferences shared by new/resumed careers. Menu navigation uses the current bindings immediately; binding capture and return to flight require released buttons to prevent stray actions.
+- Handle disconnects, focus loss, closed settings, extra controller buttons and stale stored fields safely. Localized labels display the current mappings rather than fixed default hints.
+
+## 0.8.2oe — Automatic activity context only
+
+- Remove the manual combat/mining/salvage switch from keyboard/touch/controller input, action handling, setup-page mappings and DE/EN control hints. The C key no longer changes activity or clears the target.
+- Keep context selection automatic when targeting ships, asteroids and wrecks. Existing saves and older controller-layout exports remain compatible; obsolete mapping fields are ignored.
+
+## 0.8.2od — User-approved controller buttons
+
+- Apply the exported flight and menu bindings as the single default; stick movement stays unchanged. Keep the activity switch and both roll buttons unassigned, as requested in the export.
+- Centralize the accepted bindings, update DE/EN references and align the setup page's reset defaults. Explain the old activity switch as an optional manual override: selecting a target already sets combat/mining/salvage automatically.
+
+## 0.8.2oc — Controller rumble
+
+- Connect vibration to the controller actuator, with a legacy single-motor fallback and existing phone feedback. Add short firing/launch cues and stronger damage/collision pulses; coalesce rapid shots and give impacts priority.
+- Stop vibration on pause, docking, disconnect, focus loss, hiding the page and disabling the option. Touch-button feedback now obeys the same setting.
+- Add a controller vibration test under Controls, with messages for disabled feedback, missing controllers, unsupported browsers and rejected requests.
+
+## 0.8.2ob — One familiar controller layout
+
+- Keep a single flight layout and remove the alternate-stick option and saved preference. Retain deadzone, sensitivity and inversion adjustments.
+- Put primary and secondary fire on RT/R2 and LT/L2, roll on the bumpers and boost on L3. Keep left-stick steering, right-stick roll/throttle and the usual menu confirm/back buttons. Transponder control remains in the ship console.
+- Update English and German control references and migrate saved alternate layouts to the single layout.
+
+## 0.8.2oa — Controller flight and menus
+
+- Add controller navigation to the title, settings, concourse, dialogue, map, ship console and Arena menus. Include visible focus, spatial and sequential navigation, tab switching, scrolling and direct slider/selector adjustment.
+- Keep standard flight bindings, add ship-console access on D-pad up and slowing down on LT. Add persisted deadzone, sensitivity and two stick layouts alongside existing inversion options.
+- Pause when the active controller disconnects. Require neutral controls after connection, menus, focus loss and device replacement so held buttons cannot become shots or missile launches. Retain keyboard/touch fallback.
+- Poll menu input at 30 Hz, with no menu-control/layout scans during normal flight. Include both controller modules in the offline shell and invalidate the service-worker cache.
+
+## 0.8.2ny — Arena progression and earlier NPC salvos
+
+- Increase pressure in waves 9–24 with coordinated groups of two or three veteran/ace pilots, shorter reinforcement gaps and more fighter escorts. Preserve the opening eight waves, ship/weapon stats, no-surrender rules and final frigate encounter.
+- Match equipment draws to the current hull: tierII with occasional tierIII on tierII ships, and tierIII on tierIII ships. Persist deterministic tier/quality records, upgrade old pending low-tier offers and retain paired rewards, full new magazines and next-draw skip bonuses.
+- Let physical NPC guns fire bounded ranging salvos earlier during a turn, without increasing aim correction or bending rounds to the target. Preserve beam behavior, normal weapon cadence, energy limits and friendly-fire/cover checks.
+- Apply each Arena enemy's announced missile stock to its actual racks; factory magazines can no longer silently replace a wave's ammo limit. Reinforcement notices use their actual countdown.
+
+## 0.8.2nx — Reward accurate projectile fire
+
+- Keep every beam specification unchanged. Raise shared projectile gun impact: pulse9.2→12, gauss27.2→44.8, scatter4→5.6 per pellet, ion4→4.8, plasma56→80 direct and16.8→22.4 splash, forward PDC0.64→0.96. Keep fire cadence, energy costs, projectile speeds, ranges and counts.
+- Apply the same registry/outfit damage to players and NPCs. Slightly widen physical NPC projectile dispersion by skill; preserve beam accuracy, firing windows, tracking and ordinary landed-hit damage.
+- Update equipment stat text in English/German and verify beam behavior, shared owner/mode damage, energy limits, equipment progression, first-pirate surrender and Arena rewards.
+
+## 0.8.2nw — Fewer NPC collision mistakes
+
+- Reduce the frequency, duration and strength of deliberate pilot lapses. Cancel and suppress them near cover, including box-shaped debris; preserve skill and temperament differences in open space.
+- Make intentional cover scrapes substantially rarer, lower their damage budget and double the cooldown after a scrape.
+- Reserve forward hull clearance in high-speed terrain safety probes. Taper this extra precaution during slow escapes and retain existing route choices, flight physics, top speeds and planning frequency.
+- Verify shared career/Arena flight, generated-field movement/contact behavior, ordinary combat and racing.
+
+## 0.8.2nv — Consistent combat flight in fields
+
+- Remove Arena's continuously perfect player tracking and skipped search behavior. Career and playable Arena combat now share visibility, last-known-position search and reacquisition.
+- Stop updating the last-seen player position behind solid cover. Preserve Arena's initial announced contact, no surrender and authored wave rules.
+- Probe short hull-clear shoulder routes around isolated oversized terrain bounds when normal routing is poor. Keep dense-field avoidance unchanged after stress testing exposed unsafe shortcuts.
+- Verify matching full-dispatch career/Arena flight across lost contact and reacquisition, plus generated-field collision and timing comparisons.
+
+## 0.8.2nu — Shared player and NPC weapons
+
+- Remove player-owned and playable-Arena damage multipliers. Publish the former player impact directly in the common weapon registry; the same hit now deals the same damage for every owner and mode.
+- Keep the player's current beam damage, projectile behavior, energy costs and fire cadence. Equipment screens show the shared values directly; salvage and interception retain their former impact.
+- Tune NPC difficulty through physical shot dispersion, tracking error and beam aim slips. Novices are less reliable, veterans maintain useful precision, and aces are accurate but fallible. No damage reduction on a hit that lands.
+
+## 0.8.2nt — Arena pressure and reward choices
+
+- Restore NPC weapon impact in playable Arena sessions to match the player's restored damage scale, making veteran opponents more threatening. Career and observer tuning retain their existing damage rules.
+- Grant two copies of every chosen gun, launcher and turret. Fit compatible copies together and store the rest; new launcher copies start loaded, while repeatedly refitting a spent launcher cannot generate ammunition.
+- Add Skip draw: repair 50% of maximum hull and refill missiles, then improve the next round's equipment choices by one rarity step. Preserve the bonus and generated equipment across reloads; refuse a skip that would strand an unarmed opening.
+- Reject rewards with no compatible mount and keep a hull-damage gun when fitting ion weapons.
+
+## 0.8.2ns — Straightforward shield damage
+
+- Remove the timed shield activation discount: clustered hits, simultaneous guns and separate attackers now apply their full damage.
+- Preserve outnumbered combat through overlapping attack passes. An allied wingmate widens support firing windows while a 2v3 still retains pacing help; equal numbers restore ordinary combat.
+- Keep the shield hit flash as visual feedback and remove the obsolete activation state from gameplay and balance tools.
+
+## 0.8.2nr — Faster player kills
+
+- Restore player-owned weapon hits against ships to twice their reduced damage, shortening sustained-fire kills while preserving NPC attack damage and player survival time.
+- Apply the correction to guns, beams, missiles, splash and persistent weapon damage; keep collision, salvage and interception damage unchanged.
+- Show the restored player damage in equipment comparisons and arena rewards.
+
+## 0.8.2nq — Distinct pilot temperaments
+
+- Timid pilots break earlier, protect their shields sooner and prefer nearby cover. Keep their chosen distance inside their effective firing range so caution does not prevent attacks.
+- Aggressive pilots press tighter intercepts, commit longer to affordable shots and return sooner from breaks. Flamboyant pilots favour rolling defenses, vertical approaches and expressive but bounded flight paths; steady pilots favour compact, reliable maneuvers.
+- Match pressure mistakes to temperament: hesitation, fixation, late braking or overcorrection. Skill still determines the main frequency and recovery differences.
+- Preserve hull handling, real damage, clearance checks, recovery limits and sampled planning. Add physical-flight and same-hull temperament comparisons alongside muted browser checks.
+
+## 0.8.2np — Piloting mistakes and calculated scrapes
+
+- Add occasional late turns, overcorrections and late braking under combat pressure. Novices make more mistakes and recover slower; aces still have rare lapses. Errors use ordinary flight controls and yield to collision avoidance.
+- Let healthy, experienced pilots accept a shallow rock or debris scrape when it breaks a pursuer's firing line. Forecast hull contact and shield cost, retain real damage, and stop the attempt after contact or a change in course.
+- Keep risky passes brief and separated by a long cooldown. Stations, other ships, damaged hulls, timid pilots and scripted tutorial actors retain their existing safety behavior.
+- Reuse pilot state and cached obstacles; sample judgment decisions instead of adding per-frame random steering.
+
+## 0.8.2no — Situational open-space and terrain flying
+
+- Add short scissors against closing rear fire, high yo-yos to avoid overrunning a turning target, and lead cuts into an observed turn. Respect hull handling, firing commitments and close-pass separation.
+- Add asteroid shoulder wraps, wreck-edge pop-outs and hull-checked gap crossings. Use nearby geometry, finite turning/stopping room, short commitments and repeat cooldowns; collision avoidance retains final authority.
+- Continue a brief cover maneuver using the last observed target position, then reacquire or search. Offensive turrets and drones respect lost contact while missile defense remains active.
+- Reuse cached obstacles and maneuver state with terrain decisions sampled at 4 Hz. Keep player flight physics, weapon damage and firing cadence unchanged.
+
+## 0.8.2nn — Varied maneuvers and longer fights
+
+- Choose short defensive breaks, rolling escapes, climbing turns, oblique approaches, drift passes and boosted reversals from the actual combat situation and hull handling. Bound maneuver duration, avoid immediate repeats and cancel unsafe paths.
+- Halve ship weapon damage while preserving firing cadence, interception and salvage pace. Reduce shield recharge after combat hits, restoring normal recovery after twelve seconds without another hit; capital passive recovery scales with damage.
+- Stagger supporting attacks against a lone player and require supporting pilots to reacquire evasive crossing flight. Guns, launchers, offensive turrets and combat drones share the rule; defensive missile interception stays available.
+- Paired moving-duel simulations measured median kill time of 20.3 → 40.6 seconds. Three-attacker stationary-player survival rose from 12.1 → 27.8 seconds, with larger gains from evasive flight. Six-pilot simulation cost remained within measurement noise.
+
+## 0.8.2nm — Decisive engagements and civilian escapes
+
+- Keep useful combat locks through small distance changes so pilots can finish their turns and settle precision shots; closer threats, incoming fire and defeated targets still prompt a switch.
+- Ambient haulers and miners escape attacks and return to their work once safe, while authored combatants retain their mission behavior.
+- Reuse each pilot's target vectors instead of allocating new snapshots every simulation step.
+
+## 0.8.2nl — NPC flight and fire discipline
+
+- Predict crossing, head-on and overtaking paths to steer clear before impact.
+- Allied guns and missile launchers hold fire when the player or a friendly hull crosses their firing lane.
+- Pirates commit to their encounter opening instead of repeatedly rolling new cargo demands during combat.
+
+## 0.8.2nk — Interface text and sorting
+
+- Use the better-spaced pixel font throughout menus and screens while retaining the cockpit instrument font.
+- Replace the equipment sorting popup with a styled, keyboard-accessible menu.
+
 ## 0.8.2nj — Tutorial feedback
 
 - Clarify launch and target selection, show hyperdrive messages on the target monitor, and group steering options under Controls.

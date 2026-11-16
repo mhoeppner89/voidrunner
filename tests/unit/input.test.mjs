@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { InputManager } from '../../src/game/input.js';
+import { rebindController } from '../../src/game/controllerBindings.js';
 
 class FakeEventTarget {
     constructor() {
@@ -200,7 +201,7 @@ test('keyboard axes, holds, edge actions, and browser-default prevention', () =>
 
     const edges = [
         ['KeyX', 'weaponCycle'], ['KeyL', 'launcherCycle'], ['KeyY', 'wingOrder'], ['KeyT', 'targetNext'], ['KeyH', 'targetNearestHostile'],
-        ['KeyC', 'cycleMode'], ['KeyN', 'navNext'], ['KeyJ', 'autopilot'], ['KeyB', 'transponder'],
+        ['KeyN', 'navNext'], ['KeyJ', 'autopilot'], ['KeyB', 'transponder'],
         ['KeyG', 'jettison'], ['Escape', 'pause'], ['KeyK', 'map'],
     ];
     for (const [code, action] of edges) {
@@ -218,6 +219,14 @@ test('keyboard axes, holds, edge actions, and browser-default prevention', () =>
     assert.equal(emitKey('KeyJ').defaultPrevented, false, 'navigation edge does not steal browser shortcuts');
     emitKey('KeyJ', 'keyup');
     input.dispose();
+});
+
+test('C no longer exposes a manual activity action',()=>{
+    const input=createInput(new FakeRoot());
+    emitKey('KeyC');const actions=input.getActions();
+    assert.equal(Object.hasOwn(actions,'cycleMode'),false);
+    assert.equal(actions.targetNext,false);assert.equal(actions.fire,false);
+    emitKey('KeyC','keyup');input.dispose();
 });
 
 test('touch holds, touch edges, throttle slider, joystick, and vibration', () => {
@@ -311,8 +320,9 @@ test('inversion applies to keyboard and gamepad steering too', () => {
     emitKey('KeyW');emitKey('KeyD');
     assert.equal(input.getActions().pitch,1);assert.equal(input.getActions().yaw,-1);
     emitKey('KeyW','keyup');emitKey('KeyD','keyup');
+    gamepads=[makePad()]; input.getActions();
     gamepads=[makePad({axes:[.6,-.7,0,0]})];
-    assert.equal(input.getActions().pitch,.7);assert.equal(input.getActions().yaw,-.6);
+    assert.equal(input.getActions().pitch,(.7-.13)/.87);assert.equal(input.getActions().yaw,-(.6-.13)/.87);
     input.dispose();gamepads=[];
 });
 
@@ -341,31 +351,33 @@ test('blur clears held and pending input state', () => {
 
 test('gamepad axes, deadzones, held buttons, and edge buttons', () => {
     const input = createInput(new FakeRoot());
+    gamepads = [makePad()]; input.getActions();
     gamepads = [null, makePad({
         axes: [0.12, -0.12, 0.13, -1],
-        pressed: [0, 1, 2, 3, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+        pressed: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
     })];
     const first = input.getActions();
     assert.equal(input.usingGamepad, true);
     assert.equal(first.yaw, 0, 'sub-deadzone yaw is neutral');
     assert.equal(first.pitch, 0, 'sub-deadzone pitch is neutral');
-    assert.equal(first.roll, 0.13, 'the deadzone boundary remains active');
+    assert.equal(first.roll, 0, 'button roll is unbound; the stick deadzone remains neutral');
     assert.equal(first.throttleDelta, 0.42);
     assert.equal(first.fire, true);
     assert.equal(first.missile, true);
     assert.equal(first.weaponCycle, true);
     assert.equal(first.launcherCycle, true);
-    assert.equal(first.wingOrder, true, 'stick click orders the wing');
+    assert.equal(first.wingOrder, true, 'right bumper orders the wing');
     assert.equal(first.targetNext, true);
-    assert.equal(first.cycleMode, true);
+    assert.equal(Object.hasOwn(first,'cycleMode'),false,'manual context action was removed');
     assert.equal(first.autopilot, true);
-    assert.equal(first.transponder, true);
-    assert.equal(first.capture, true);
+    assert.equal(first.transponder, true, 'D-pad left toggles the transponder');
+    assert.equal(first.afterburner, true, 'right trigger boosts');
+    assert.equal(first.shipMenu, true);
     assert.equal(first.targetNearestHostile, true);
     assert.equal(first.navNext, true);
     assert.equal(first.pause, true);
     assert.equal(first.map, true);
-    assert.equal(first.utility, true, 'button 5 is also the utility hold');
+    assert.equal(first.utility, true, 'X is the contextual secondary button');
     assert.equal(input.getActions().missile, false, 'gamepad missile is an edge');
     assert.equal(input.getActions().fire, true, 'gamepad fire is held');
 
@@ -375,10 +387,109 @@ test('gamepad axes, deadzones, held buttons, and edge buttons', () => {
     gamepads = [];
     assert.equal(input.getActions().fire, false);
     assert.equal(input.usingGamepad, false);
-    gamepads = [makePad({ pressed: [5] })];
-    assert.equal(input.getActions().missile, true, 'disconnect clears the edge latch');
+    gamepads = [makePad({ pressed: [2] })];
+    assert.equal(input.getActions().missile, false, 'reconnection requires release before flight commands');
+    gamepads = [makePad()]; input.getActions();
+    gamepads = [makePad({pressed:[2]})];
+    assert.equal(input.getActions().missile, true);
     input.dispose();
     gamepads = [];
+});
+
+test('haptic setting applies to touch buttons and rumble stops on input handoff',()=>{
+    const {root,fire}=makeTouchRoot();
+    const input=createInput(root);vibrationCalls.length=0;
+    input.configureGamepad({vibration:false});fire.emit('pointerdown',event());
+    assert.equal(vibrationCalls.length,0);fire.emit('pointerup',event());
+    let stopped=0;input.haptics={stop(){stopped++;}};
+    input.setGamepadBlocked(true);assert.equal(stopped,1);
+    input.setGamepadBlocked(true);assert.equal(stopped,1);
+    input.onBlur();assert.equal(stopped,2);
+    gamepads=[makePad()];input.getActions();const before=stopped;
+    gamepads=[];input.getActions();assert.equal(stopped,before+1);
+    input.dispose();gamepads=[];
+});
+
+test('the approved export maps every physical flight button and leaves stick clicks unbound',()=>{
+    const input=createInput(new FakeRoot());gamepads=[makePad()];input.getActions();
+    const expected=[[0,'fire'],[1,'targetNext'],[2,'missile'],[3,'autopilot'],[4,'launcherCycle'],[5,'wingOrder'],[6,'weaponCycle'],[7,'afterburner'],[8,'map'],[9,'pause'],[12,'shipMenu'],[13,'targetNearestHostile'],[14,'transponder'],[15,'navNext']];
+    for(const [button,action] of expected){
+        gamepads=[makePad()];input.getActions();gamepads=[makePad({pressed:[button]})];
+        const actions=input.getActions();
+        for(const [,other] of expected)assert.equal(actions[other],other===action,`${button}: ${other}`);
+        assert.equal(Object.hasOwn(actions,'cycleMode'),false);assert.equal(actions.roll,0);
+        assert.equal(actions.utility,button===2);
+    }
+    for(const button of [10,11]){
+        gamepads=[makePad()];input.getActions();gamepads=[makePad({pressed:[button]})];
+        const actions=input.getActions();for(const [,action] of expected)assert.equal(actions[action],false,`stick click ${button} is unbound`);
+    }
+    gamepads=[makePad({axes:[0,0,.13,1]})];
+    const actions=input.getActions();assert.equal(actions.roll,0);assert.equal(actions.throttleDelta,-.42);
+    gamepads=[makePad({axes:[0,0,0,-1]})];assert.equal(input.getActions().throttleDelta,.42);
+    input.dispose();gamepads=[];
+});
+
+test('gamepad settings, menu handoff, disconnect, and fallback are safe', () => {
+    const input = createInput(new FakeRoot());
+    gamepads = [makePad()]; input.getActions();
+    input.configureGamepad({controllerDeadzone:.2,controllerSensitivity:1.5,controllerLayout:'roll'});
+    gamepads = [makePad({axes:[.6,-1,-.4,0],pressed:[2]})];
+    let actions = input.getActions();
+    assert.ok(Math.abs(actions.yaw-.75)<1e-9, 'old alternate-layout settings are ignored');
+    assert.ok(Math.abs(actions.roll+.375)<1e-9);
+    assert.equal(actions.pitch,-1);
+    assert.equal(actions.throttleDelta,0, 'secondary does not alter throttle');
+    assert.equal(actions.utility,true);
+    input.setGamepadBlocked(true);
+    gamepads = [makePad({pressed:[2,0,1]})];
+    assert.equal(input.getActions().fire,false);
+    input.setGamepadBlocked(false);
+    actions=input.getActions();
+    assert.equal(actions.missile,false);assert.equal(actions.targetNext,false);
+    gamepads=[makePad()];input.getActions();
+    gamepads=[makePad({pressed:[0]})];assert.equal(input.getActions().fire,true);
+    gamepads=[];assert.equal(input.getActions().controllerDisconnected,true);
+    assert.equal(input.getActions().controllerDisconnected,false);
+    emitKey('KeyD');assert.equal(input.getActions().yaw,1);emitKey('KeyD','keyup');
+    gamepads=[makePad()];input.getActions();
+    gamepads=[makePad({pressed:[0]})];input.getActions();
+    emitKey('KeyD');input.getActions();emitKey('KeyD','keyup');
+    // A held pad still supplies input; a neutral pad yields to keyboard/touch.
+    gamepads=[makePad()];emitKey('KeyD');input.getActions();emitKey('KeyD','keyup');
+    gamepads=[];assert.equal(input.getActions().controllerDisconnected,false);
+    input.dispose();
+});
+
+test('custom flight bindings apply with release protection and support extra buttons',()=>{
+    const input=createInput(new FakeRoot());gamepads=[makePad()];input.getActions();
+    const custom=rebindController(undefined,'flight','fire',42).bindings;
+    input.configureGamepad({controllerBindings:custom});
+    const pad=makePad();pad.buttons=Array.from({length:64},(_,i)=>({pressed:i===42}));gamepads=[pad];
+    assert.equal(input.getActions().fire,false,'a held newly assigned button must be released');
+    pad.buttons[42].pressed=false;input.getActions();pad.buttons[42].pressed=true;
+    assert.equal(input.getActions().fire,true);
+    pad.buttons[42].pressed=false;pad.buttons[0].pressed=true;
+    assert.equal(input.getActions().fire,false,'old primary button no longer fires');
+    input.dispose();gamepads=[];
+});
+
+test('sparse gamepad lists, API denial, analog buttons, and active pad replacement', () => {
+    const input = createInput(new FakeRoot());
+    const original = navigatorFake.getGamepads;
+    try {
+        const pad = {...makePad(), index:1, id:'first'};
+        navigatorFake.getGamepads = () => ({1:pad,length:2});
+        input.getActions();
+        pad.buttons[0]={value:1,pressed:false};
+        assert.equal(input.getActions().fire,true);
+        const replacement = {...makePad(),index:0,id:'second'};
+        navigatorFake.getGamepads = () => [replacement];
+        assert.equal(input.getActions().controllerDisconnected,true,'losing active pad pauses even with another pad connected');
+        assert.equal(input.getActions().controllerDisconnected,false);
+        navigatorFake.getGamepads = () => { throw new Error('SecurityError'); };
+        assert.doesNotThrow(()=>input.getActions());
+    } finally {navigatorFake.getGamepads=original;input.dispose();gamepads=[];}
 });
 
 test('a connected gamepad without axes or buttons fails safely', () => {

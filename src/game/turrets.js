@@ -12,6 +12,7 @@ import {relativeIntercept} from './weaponFlight.js';
 import {TURRET_CLEARANCE} from './turretClearance.js';
 import {getPdcDefenseChannel,PDC_RECOVERY_SECONDS} from './pdcFireControl.js';
 import {npcGunneryProfile,npcAimErrorFactor} from './npcGunnery.js';
+import {npcPlayerAttackWindow} from './combatAwareness.js';
 const laser=TRACKING_LASER;
 export const PDC_TURRET=Object.freeze({...WEAPONS.pdc,damageFlat:2.2*WEAPON_DAMAGE_SCALE,shotInterval:.14,burstPause:2,interceptInterval:PDC_RECOVERY_SECONDS});
 // The Concord frigate is designed to suppress fighters. Its ship-target PDC
@@ -65,7 +66,7 @@ export function shipBlocksRay(session,actor,ownerId,target,point,state) {
     return session.ships.some(other=>other!==actor && other.id!==ownerId && other!==target && other.hull>0 && blocks(other.position,Math.max(...session.npcHullExtents(other))));
 }
 function selectedHostile(session,actor,ownerId,player) {
-    if(actor.patrolMemoryActive || actor.fleeing || actor.holdFire || actor.pursuitHoldFire || actor.combatPlan?.recovery?.active || (player && actor.mode!=='combat'))return;
+    if(actor.patrolMemoryActive || actor.recoveryTargetHidden || actor.terrainManeuver?.active&&actor.terrainManeuver.targetHidden || actor.fleeing || actor.holdFire || actor.pursuitHoldFire || actor.combatPlan?.recovery?.active || (player && actor.mode!=='combat'))return;
     const ref=player?session.getTargetRef():{kind:'ship',id:actor.targetId};
     if(!player && actor.targetId==='player' && actor.hostile && session.save.player.hull>0)return session.save.player;
     if(ref?.kind==='ship')return session.ships.find(s=>s.id===ref.id && combatTargetEligible(s) && (player?s.hostile:session.projectileCanHitShip({ownerId,faction:actor.faction,targetId:actor.targetId},s)));
@@ -149,7 +150,7 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
                 // Ship bursts also leave the energy for one missile intercept.
                 const reserve=Math.max(12,stats.energyCapacity*0.25)+(pdc&&!intercept?interceptWeapon.interceptEnergy:0);
                 if(actor.energy<reserve+cost)state.status='TURRETS WAITING FOR ENERGY';
-                else if((intercept||now>=state.acquireAt) && state.direction.dot(desired)>Math.cos(0.001) && now>=(intercept?state.interceptAt:state.fireAt) && !session.lineBlocked(state.position,point,ownerId) && !shipBlocksRay(session,actor,ownerId,target,point,state) && spendEnergy(actor,cost)) {
+                else if((intercept||now>=state.acquireAt) && state.direction.dot(desired)>Math.cos(0.001) && now>=(intercept?state.interceptAt:state.fireAt) && (intercept||player||target!==session.save.player||npcPlayerAttackWindow(session,actor,'player')) && !session.lineBlocked(state.position,point,ownerId) && !shipBlocksRay(session,actor,ownerId,target,point,state) && spendEnergy(actor,cost)) {
                     const color=player?0xdce9ff:0xff8a5b;
                     state.muzzle.copy(state.position).addScaledVector(state.direction,(pdc ? .94 : .82)*(mount.size==='M'?1.3:1)*extents[2]/mount.hullHalfLength);
                     if(intercept) {

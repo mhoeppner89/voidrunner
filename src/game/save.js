@@ -1,3 +1,4 @@
+import { defaultControllerBindings, normalizeControllerBindings } from './controllerBindings.js';
 import {normalizeExploration} from './explorationData.js';
 import {normalizeDistress} from './distressData.js';
 import {normalizeCareerLoot} from './careerLoot.js';
@@ -57,6 +58,9 @@ export const defaultSettings = () => ({
     quality: 'high',
     powerMode: 'auto',
     touchScale: 1,
+    controllerBindings: defaultControllerBindings(),
+    controllerDeadzone: 0.13,
+    controllerSensitivity: 1,
     vibration: true,
     reducedDamageEffects: false,
     easyMode: false,
@@ -244,6 +248,9 @@ const normalizeSettings = (candidate) => {
         quality: 'high',
         powerMode: ['auto','battery','performance'].includes(source.powerMode) ? source.powerMode : 'auto',
         touchScale: numberInRange('touchScale', 0.8, 1.3),
+        controllerBindings: normalizeControllerBindings(source.controllerBindings),
+        controllerDeadzone: numberInRange('controllerDeadzone', 0.05, 0.35),
+        controllerSensitivity: numberInRange('controllerSensitivity', 0.5, 1.8),
         vibration: boolean('vibration'),
         reducedDamageEffects: boolean('reducedDamageEffects'),
         easyMode: boolean('easyMode'),

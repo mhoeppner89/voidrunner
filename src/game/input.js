@@ -1,4 +1,6 @@
 import { clamp } from './random.js';
+import { FLIGHT_CONTROLLER_BINDINGS, normalizeControllerBindings } from './controllerBindings.js';
+import { connectedGamepad, padAxis, padButton, padNeutral } from './gamepad.js';
 
 const HOLD_ACTIONS = new Set(['fire', 'afterburner', 'utility']);
 const TILT_DEADZONE = 2.5;
@@ -38,6 +40,15 @@ export class InputManager {
     touchBindings = [];
     gamepadButtons = new Map();
     gamepadConnected = false;
+    gamepadActive = false;
+    gamepadBlocked = false;
+    gamepadNeedsNeutral = false;
+    gamepadDeadzone = 0.13;
+    gamepadSensitivity = 1;
+    gamepadBindings = FLIGHT_CONTROLLER_BINDINGS;
+    vibrationEnabled = true;
+    gamepadIndex;
+    gamepadId;
     tiltSupported = false;
     tiltEnabled = false;
     tiltSeen = false;
@@ -57,6 +68,7 @@ export class InputManager {
         window.addEventListener('keydown', this.onKeyDown, { passive: false });
         window.addEventListener('keyup', this.onKeyUp);
         window.addEventListener('blur', this.onBlur);
+        root.addEventListener?.('pointerdown', this.onPointerInput, { passive: true });
         this.bindTouchControls();
         this.bindTilt();
     }
@@ -64,6 +76,7 @@ export class InputManager {
         window.removeEventListener('keydown', this.onKeyDown);
         window.removeEventListener('keyup', this.onKeyUp);
         window.removeEventListener('blur', this.onBlur);
+        this.root.removeEventListener?.('pointerdown', this.onPointerInput);
         window.removeEventListener('deviceorientation', this.onDeviceOrientation);
         for (const [target, type, listener, options] of this.touchBindings)
             target.removeEventListener(type, listener, options);
@@ -71,7 +84,9 @@ export class InputManager {
         this.resolveTiltSampleWaiters(false);
         this.onBlur();
     }
+    onPointerInput = () => { this.gamepadActive = false; };
     onKeyDown = (event) => {
+        this.gamepadActive = false;
         const code = event.code;
         if (!this.keys.has(code))
             this.pressed.add(code);
@@ -84,6 +99,9 @@ export class InputManager {
         this.keys.delete(event.code);
     };
     onBlur = () => {
+        this.haptics?.stop();
+        this.gamepadNeedsNeutral = true;
+        this.gamepadButtons.clear();
         this.cancelStick?.();
         this.keys.clear();
         this.pressed.clear();
@@ -315,7 +333,7 @@ export class InputManager {
                 else {
                     this.touchEdges.add(action);
                 }
-                if (navigator.vibrate && (navigator.userActivation?.hasBeenActive ?? true))
+                if (this.vibrationEnabled && navigator.vibrate && (navigator.userActivation?.hasBeenActive ?? true))
                     navigator.vibrate(8);
             };
             const release = (event) => {
@@ -347,12 +365,16 @@ export class InputManager {
                 knob.style.top = '50%';
             };
             this.cancelStick = centerStick;
+            // A cockpit-kit stick is a large invisible zone: the drag starts
+            // where the thumb lands and travel comes from data-travel.
+            let origin;
             const moveStick = (event) => {
                 const rect = stick.getBoundingClientRect();
                 const scale = stick.offsetWidth > 0 ? rect.width / stick.offsetWidth : 1;
-                const cx = rect.left + rect.width / 2;
-                const cy = rect.top + rect.height / 2;
-                const halfTravel = Math.max(1, (stick.offsetWidth - knob.offsetWidth) / 2);
+                const cx = origin ? origin[0] : rect.left + rect.width / 2;
+                const cy = origin ? origin[1] : rect.top + rect.height / 2;
+                const presetTravel = Number(stick.dataset.travel);
+                const halfTravel = presetTravel > 0 ? presetTravel : Math.max(1, (stick.offsetWidth - knob.offsetWidth) / 2);
                 let dx = (event.clientX - cx) / scale;
                 let dy = (event.clientY - cy) / scale;
                 const distance = Math.hypot(dx, dy);
@@ -368,6 +390,7 @@ export class InputManager {
                 if (stickPointer !== undefined) return;
                 event.preventDefault();
                 stickPointer = event.pointerId;
+                origin = stick.dataset.origin === 'touch' ? [event.clientX, event.clientY] : undefined;
                 stick.setPointerCapture(event.pointerId);
                 moveStick(event);
             });
@@ -404,47 +427,80 @@ export class InputManager {
         this.gamepadButtons.set(buttonIndex, pressed);
         return pressed && !previous;
     }
-    readGamepad() {
-        const pads = navigator.getGamepads?.();
-        const padList = pads && typeof pads[Symbol.iterator] === 'function' ? Array.from(pads) : [];
-        const pad = padList.find((entry) => Boolean(entry && entry.connected));
-        if (!pad) {
-            this.gamepadConnected = false;
+    configureGamepad(settings = {}) {
+        const bindings=normalizeControllerBindings(settings.controllerBindings).flight;
+        if (Object.keys(bindings).some(action=>bindings[action]!==this.gamepadBindings[action])) {
+            this.gamepadNeedsNeutral=true;
             this.gamepadButtons.clear();
-            return {};
+        }
+        this.gamepadBindings=bindings;
+        this.vibrationEnabled = settings.vibration !== false;
+        const finite = (value, fallback, min, max) => Number.isFinite(Number(value)) ? clamp(Number(value), min, max) : fallback;
+        this.gamepadDeadzone = finite(settings.controllerDeadzone, 0.13, 0.05, 0.35);
+        this.gamepadSensitivity = finite(settings.controllerSensitivity, 1, 0.5, 1.8);
+    }
+    setGamepadBlocked(blocked) {
+        if (blocked !== this.gamepadBlocked) {
+            this.gamepadNeedsNeutral = true;
+            if (blocked) this.haptics?.stop();
+        }
+        this.gamepadBlocked = blocked;
+    }
+    readGamepad() {
+        const pad = connectedGamepad(this.gamepadIndex);
+        if (!pad) {
+            const controllerDisconnected = this.gamepadConnected && this.gamepadActive;
+            if (this.gamepadConnected) this.haptics?.stop();
+            this.gamepadConnected = false;
+            this.gamepadActive = false;
+            this.gamepadButtons.clear();
+            this.gamepadIndex = this.gamepadId = undefined;
+            return { controllerDisconnected };
+        }
+        const changed = !this.gamepadConnected || this.gamepadIndex !== pad.index || this.gamepadId !== pad.id;
+        const controllerDisconnected = this.gamepadConnected && this.gamepadActive && changed;
+        if (changed) {
+            this.haptics?.stop();
+            this.gamepadButtons.clear();
+            this.gamepadNeedsNeutral = true;
+            this.gamepadActive = false;
         }
         this.gamepadConnected = true;
-        const axes = pad.axes && typeof pad.axes.length === 'number' ? pad.axes : [];
-        const buttons = pad.buttons && typeof pad.buttons.length === 'number' ? pad.buttons : [];
-        const deadzone = (value) => {
-            const finite = Number(value);
-            if (!Number.isFinite(finite))
-                return 0;
-            const bounded = clamp(finite, -1, 1);
-            return Math.abs(bounded) < 0.13 ? 0 : bounded;
-        };
-        const button = (index) => Boolean(buttons[index]?.pressed);
+        this.gamepadIndex = pad.index;
+        this.gamepadId = pad.id;
+        if (!padNeutral(pad, this.gamepadDeadzone)) this.gamepadActive = true;
+        // Poll while menus/loading own the controller. Require release on return
+        // so menu confirmation cannot become a missile, shot or target command.
+        if (this.gamepadBlocked || this.gamepadNeedsNeutral) {
+            if (!this.gamepadBlocked && padNeutral(pad, this.gamepadDeadzone)) this.gamepadNeedsNeutral = false;
+            this.gamepadButtons.clear();
+            return { controllerDisconnected };
+        }
+        const axis = index => padAxis(pad, index, this.gamepadDeadzone, this.gamepadSensitivity);
+        const B=this.gamepadBindings;
+        const held = action => B[action] !== null && padButton(pad, B[action]);
+        const edge = action => B[action] !== null && this.gamepadEdge(B[action], padButton(pad, B[action]));
         return {
-            yaw: deadzone(axes[0] ?? 0),
-            pitch: deadzone(axes[1] ?? 0),
-            roll: deadzone(axes[2] ?? 0),
-            throttleDelta: -deadzone(axes[3] ?? 0) * 0.42,
-            fire: button(7),
-            missile: this.gamepadEdge(5, button(5)),
-            weaponCycle: this.gamepadEdge(2, button(2)),
-            launcherCycle: this.gamepadEdge(14, button(14)),
-            wingOrder: this.gamepadEdge(11, button(11)),
-            afterburner: button(4),
-            utility: button(5),
-            targetNext: this.gamepadEdge(0, button(0)),
-            cycleMode: this.gamepadEdge(1, button(1)),
-            autopilot: this.gamepadEdge(3, button(3)),
-            transponder: this.gamepadEdge(10, button(10)),
-            capture: this.gamepadEdge(12, button(12)),
-            targetNearestHostile: this.gamepadEdge(13, button(13)),
-            navNext: this.gamepadEdge(15, button(15)),
-            pause: this.gamepadEdge(9, button(9)),
-            map: this.gamepadEdge(8, button(8)),
+            yaw: axis(0),
+            pitch: axis(1),
+            roll: (held('rollRight') ? 1 : 0) - (held('rollLeft') ? 1 : 0) || axis(2),
+            throttleDelta: -axis(3) * 0.42,
+            fire: held('fire'),
+            missile: edge('secondary'),
+            weaponCycle: edge('weaponCycle'),
+            launcherCycle: edge('launcherCycle'),
+            wingOrder: edge('wingOrder'),
+            afterburner: held('afterburner'),
+            utility: held('secondary'),
+            targetNext: edge('targetNext'),
+            autopilot: edge('autopilot'),
+            transponder: edge('transponder'),
+            jettison: edge('jettison'),
+            shipMenu: edge('shipMenu'),
+            targetNearestHostile: edge('targetNearestHostile'),
+            navNext: edge('navNext'),
+            pause: edge('pause'),
+            map: edge('map'),
         };
     }
     getActions() {
@@ -483,17 +539,18 @@ export class InputManager {
             afterburner: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.touchHeld.has('afterburner') || Boolean(gamepad.afterburner),
             targetNext: this.consumePressed('KeyT', 'Tab') || this.consumeTouch('targetNext') || Boolean(gamepad.targetNext),
             targetNearestHostile: this.consumePressed('KeyH') || this.consumeTouch('targetNearestHostile') || Boolean(gamepad.targetNearestHostile),
-            cycleMode: this.consumePressed('KeyC') || this.consumeTouch('cycleMode') || Boolean(gamepad.cycleMode),
             navNext: this.consumePressed('KeyN') || this.consumeTouch('navNext') || Boolean(gamepad.navNext),
             autopilot: this.consumePressed('KeyJ') || this.consumeTouch('autopilot') || Boolean(gamepad.autopilot),
             capture: this.consumeTouch('capture') || Boolean(gamepad.capture),
             transponder: this.consumePressed('KeyB') || this.consumeTouch('transponder') || Boolean(gamepad.transponder),
-            jettison: this.consumePressed('KeyG'),
+            shipMenu: Boolean(gamepad.shipMenu),
+            controllerDisconnected: Boolean(gamepad.controllerDisconnected),
+            jettison: this.consumePressed('KeyG') || Boolean(gamepad.jettison),
             pause: this.consumePressed('Escape', 'KeyP') || this.consumeTouch('pause') || Boolean(gamepad.pause),
             map: this.consumePressed('KeyK') || this.consumeTouch('map') || Boolean(gamepad.map),
         };
     }
     get usingGamepad() {
-        return this.gamepadConnected;
+        return this.gamepadActive;
     }
 }

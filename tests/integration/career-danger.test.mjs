@@ -9,6 +9,38 @@ import {contractRegionDanger,generateMissionOffers} from '../../src/game/mission
 import {seededRandom} from '../../src/game/random.js';
 import {createNewSave} from '../../src/game/save.js';
 import {isTutorialActive} from '../../src/game/tutorialCampaign.js';
+import {updateShipAI} from '../../src/game/shipAI.js';
+
+test('pirates choose between a hail and a fight once, including staged groups',()=>{
+    const s=fixture();s.arena=undefined;s.emergentMugs=true;s.save.player.dockedAt=undefined;
+    s.shipTracksPlayer=()=>true;s.updateSensorAwareness=()=>{};s.updateSearchAI=()=>false;
+    s.resolveShipTarget=()=>({position:new THREE.Vector3(),velocity:new THREE.Vector3()});
+    s.deferentialPilot=()=>false;s.updateAttackAI=()=>{};
+    const calls=[];s.openMug=(lead,escorts)=>calls.push([lead.id,...escorts.map(ship=>ship.id)]);
+    const step=ship=>{s.save.world.time+=1/60;updateShipAI(s,ship,1/60);};
+    const pirate=id=>({id,role:'pirate',faction:'pirates',targetId:'player',hostile:true,hull:40,
+        position:[0,0,170],mugCapable:true,aiRng:()=>0});
+    const roamer=pirate('roamer');let rolls=0;
+    roamer.aiRng=()=>++rolls===1?.95:0;
+    for(let i=0;i<90;i++)step(roamer);
+    assert.equal(rolls,1);assert.deepEqual(calls,[]);
+    const hailed=pirate('hailed');step(hailed);step(hailed);
+    assert.deepEqual(calls.splice(0),[['hailed']]);
+    const fighter=pirate('fighter');fighter.lastCombatShotAt=0;step(fighter);
+    const provoked=pirate('provoked');provoked.combatThreatId='player';step(provoked);
+    assert.deepEqual(calls,[]);
+    const lead=pirate('lead'),escort=pirate('escort');
+    s.ships=[lead,escort];
+    s.stageHunterGroup(lead,[escort]);step(lead);step(escort);
+    assert.deepEqual(calls,[],'an aggressive group keeps its authored opening');
+    s.stageHunterGroup(lead,[escort],{mugOptions:{}});
+    lead.position[2]=400;step(escort);step(lead);assert.equal(calls.length,0);
+    lead.position[2]=170;step(lead);step(escort);step(lead);
+    assert.deepEqual(calls,[['lead','escort']],'one hail speaks for the group');
+    s.stageHunterGroup(lead,[escort],{mugOptions:{}});
+    assert.equal(s.cancelPendingMug(escort),true);step(escort);step(lead);
+    assert.equal(calls.length,1,'refusing the offer by firing never reopens it');
+});
 
 function career(systemId='helios-verge',locationId) {
     const s=fixture();s.arena=undefined;s.save.player.systemId=systemId;

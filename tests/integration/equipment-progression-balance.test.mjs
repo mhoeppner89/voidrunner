@@ -4,6 +4,7 @@ import {SHIPS, LOCATIONS} from '../../src/game/data.js';
 import {BASE_OUTFIT_ITEMS, HULL_HARDPOINTS} from '../../src/game/outfitting.js';
 import {resolveEquipmentDefinition, NAMED_EQUIPMENT} from '../../src/game/equipmentCatalog.js';
 import {createEquipmentRecord, equipmentAction, specialEquipmentOffers, rollEquipmentRecord} from '../../src/game/equipmentInventory.js';
+import {createEnemyLoadout} from '../../src/game/enemyLoadouts.js';
 import {getEffectiveShipStats} from '../../src/game/shipStats.js';
 import {createNewSave, hydrateSave} from '../../src/game/save.js';
 import {balanceFit, firingTrace} from '../helpers/player-balance.mjs';
@@ -62,10 +63,37 @@ test('above-tier equipment loads regeneration, matching tiers do not, and output
  for(const hull of Object.keys(HULL_HARDPOINTS)){
   const base=SHIPS[hull],matching=createEquipmentRecord('pulse-cannon',{tier:base.tier}),fit=balanceFit(hull,[matching.id]);
   assert.equal(fit.stats.overTierLoad,0,hull);
-  if(base.tier<3){const high=createEquipmentRecord('pulse-cannon',{tier:base.tier+1}),oversized=balanceFit(hull,[high.id]);assert.ok(oversized.stats.reactorOutput<fit.stats.reactorOutput,hull);assert.ok(oversized.stats.reactorOutput>=base.reactorOutput*.35,hull);assert.ok(weaponForOutfit(high.id).damageFlat>weaponForOutfit(matching.id).damageFlat,hull);}
+  if(base.tier<3){const high=createEquipmentRecord('pulse-cannon',{tier:base.tier+1}),oversized=balanceFit(hull,[high.id]);assert.ok(oversized.stats.reactorOutput<fit.stats.reactorOutput,hull);assert.ok(oversized.stats.reactorOutput>=base.reactorOutput*.1,hull);assert.ok(weaponForOutfit(high.id).damageFlat>weaponForOutfit(matching.id).damageFlat,hull);}
  }
  const low=balanceFit('wayfarer',Array(3).fill('mortar'),Array(3).fill('sustained-reactor'));
  assert.ok(firingTrace(low).blocked>0,'small hull cannot sustain three heavy guns indefinitely');
+});
+test('oversized equipment imposes large cumulative loads, with a steeper two-tier jump',()=>{
+ const tier1=createEquipmentRecord('pulse-cannon',{tier:1}),tier2=createEquipmentRecord('pulse-cannon',{tier:2}),tier3=createEquipmentRecord('pulse-cannon',{tier:3});
+ const base=balanceFit('wayfarer',[tier1.id]).stats;
+ for(const [guns,fraction,levels] of [[[tier2.id],.75,1],[[tier2.id,tier2.id],.5,2],[[tier3.id],.25,2],[[tier3.id,tier3.id],.1,4]]){
+  const fit=balanceFit('wayfarer',guns).stats;
+  assert.ok(Math.abs(fit.reactorOutput-base.reactorOutput*fraction)<1e-9);
+  assert.equal(createEnemyLoadout({hullId:'wayfarer'},0,{guns}).stats.reactorOutput,fit.reactorOutput,'NPC and player fits pay the same load');
+  assert.equal(fit.overTierLevels,levels);assert.ok(Math.abs(fit.overTierLoad-(base.reactorOutput-fit.reactorOutput))<1e-9);
+  assert.equal(fit.energyCapacity,base.energyCapacity,'penalty affects supply, not capacitor size');
+ }
+ const fighter=balanceFit('talon',[tier2.id]).stats,over=balanceFit('talon',[tier3.id]).stats;
+ assert.equal(fighter.overTierLoad,0);assert.equal(over.reactorOutput,fighter.reactorOutput*.75);
+});
+test('matching guns sustain more fire than oversized guns after the capacitor is spent',()=>{
+ const guns=[1,2,3].map(tier=>createEquipmentRecord('beam-emitter',{tier}));
+ const fits=guns.map(gun=>balanceFit('wayfarer',[gun.id,gun.id]));
+ const traces=fits.map(fit=>firingTrace(fit,{duration:60}));
+ assert.ok(traces[0].shots>traces[1].shots&&traces[1].shots>traces[2].shots);
+ assert.ok(traces[0].hullDamage>traces[1].hullDamage&&traces[1].hullDamage>traces[2].hullDamage);
+ for(let i=0;i<3;i++)assert.ok(Math.abs(weaponForOutfit(guns[i].id).energyCost-3.5*(1+i*.06))<1e-9,'shared per-shot cost stays independent of the hull');
+});
+test('oversized power modules also pay the load, while returning to matching gear removes it',()=>{
+ const records=[1,2,3].map(tier=>createEquipmentRecord('sustained-reactor',{tier}));
+ const fits=records.map(r=>balanceFit('wayfarer',[],[r.id]).stats);
+ assert.equal(fits[0].overTierLoad,0);assert.ok(fits[0].reactorOutput>fits[1].reactorOutput&&fits[1].reactorOutput>fits[2].reactorOutput);
+ const returned=balanceFit('wayfarer',[],[records[0].id]).stats;assert.deepEqual(returned,fits[0]);
 });
 test('colored equipment is rare in ordinary rolls while the named tutorial drop remains explicit',()=>{
  const counts={common:0,uncommon:0,rare:0,named:0};let x=123456;

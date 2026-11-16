@@ -3,7 +3,7 @@ import {TRACKING_LASER,weaponForOutfit,launcherForOutfit} from './weapons.js';
 import {modifiedWeapon,equipmentName,EQUIPMENT_RARITIES,resolveEquipmentDefinition,registerEquipmentDefinition} from './equipmentCatalog.js';
 import {OUTFIT_ITEMS,BASE_OUTFIT_ITEMS,itemAvailable} from './outfitting.js';
 import {inventoryMounts,mountItemId,normalizeEquipmentInventory,shopEquipmentTiers,specialEquipmentOffers,equipmentFitsMount,equipmentInstallMount,equipmentSaleEligibility,equipmentSaleValue} from './equipmentInventory.js';
-import {getEffectiveShipStats} from './shipStats.js';
+import {getEffectiveShipStats,higherTierLoadFraction} from './shipStats.js';
 import {cargoMass} from './economy.js';
 import {COMMODITIES,LOCATIONS,SHIPS} from './data.js';
 import {t} from './i18n.js';
@@ -70,7 +70,7 @@ export function renderEquipmentInventory(ui,{embedded=false}={}){
    if(item.droneType==='mining')values+=stat('Yield per trip',undefined,d.payloadUnits)+stat('Mining time',undefined,d.cutSecondsPerUnit);
    if(item.droneType==='repair')values+=stat('Repair per second',undefined,d.repairRate);
    if(selectedMount&&fit.droneBays[selectedMount.index]?.pendingInventoryDrone)values+=`<p role="status">${t('Drones are returning automatically.')}</p>`;
-  }else if(w){values=stat('Damage',before?.damageFlat??before?.damage,w.damageFlat??w.damage)+stat('Energy per shot',before?.energyCost,w.energyCost)+stat('Shot interval',before?.cooldown??before?.shotInterval,w.cooldown??w.shotInterval,3)+stat('Range',before?.range??before?.lockRange,w.range??w.lockRange);if((w.gunneryAccuracy??1)!==1||(before?.gunneryAccuracy??1)!==1)values+=stat('Aim correction',before?(before.gunneryAccuracy??1)*100:undefined,(w.gunneryAccuracy??1)*100);}
+  }else if(w){values=stat('Damage',before?(before.damageFlat??before.damage):undefined,(w.damageFlat??w.damage))+stat('Energy per shot',before?.energyCost,w.energyCost)+stat('Shot interval',before?.cooldown??before?.shotInterval,w.cooldown??w.shotInterval,3)+stat('Range',before?.range??before?.lockRange,w.range??w.lockRange);if((w.gunneryAccuracy??1)!==1||(before?.gunneryAccuracy??1)!==1)values+=stat('Aim correction',before?(before.gunneryAccuracy??1)*100:undefined,(w.gunneryAccuracy??1)*100);}
   else if(selectedMount?.key==='utility'){
    const preview=JSON.parse(JSON.stringify(player.outfitting)),afterFit=preview.loadouts[player.shipId];
    afterFit.utility[selectedMount.index]=item.id;const after=getEffectiveShipStats({...player,outfitting:preview});
@@ -78,8 +78,8 @@ export function renderEquipmentInventory(ui,{embedded=false}={}){
     values+=`<div class="inventory-stat" data-stat="${row.key}"><span>${html(t(row.label))}</span><b>${item.id===old?.id?'':`<small>${number(row.before)} → </small>`}${number(row.after)}${row.unit?`<small class="stat-unit">${row.unit}</small>`:''}</b></div>`;
    }
   }else values=equipmentEffectStats(item).map(row=>`<div class="inventory-stat" data-stat="${row.key}"><span>${html(t(row.label))}</span><b>${row.value>0?'+':''}${number(row.value)}${row.unit}</b></div>`).join('')||`<p class="inventory-hint">${html(t('Select a mount.'))}</p>`;
-  const levels=Math.max(0,(item.tier??1)-(SHIPS[player.shipId]?.tier??1));
-  if(levels)values+=`<p class="inventory-hint">${html(t('Higher-tier equipment can reduce regeneration by up to {amount}/s on this hull.',{amount:number((SHIPS[player.shipId]?.reactorOutput??0)*.06*levels)}))}</p>`;
+  const tierLoad=higherTierLoadFraction(item.tier,SHIPS[player.shipId]?.tier);
+  if(tierLoad)values+=`<p class="inventory-hint">${html(t('Higher-tier load: up to −{amount}/s.',{amount:number((SHIPS[player.shipId]?.reactorOutput??0)*tierLoad)}))}</p>`;
   let actions='';
   if(record.loot)actions=`<p class="inventory-hint">${t('Fly over dropped loot to collect it.')}</p>`;
   else if(record.shop)actions=button('buy','BUY',`data-base-id="${html(record.baseId)}" data-tier="${record.tier}" ${record.offerId?`data-offer-id="${html(record.offerId)}"`: ''}`,player.credits<item.price);
@@ -109,7 +109,7 @@ export function renderEquipmentInventory(ui,{embedded=false}={}){
  const holdMass=cargoMass(player),holdCapacity=stats.cargo,holdPercent=holdCapacity>0?Math.round(holdMass/holdCapacity*100):0;
  const cargoUsage=view==='cargo'?`<div class="inventory-cargo-usage ${holdMass>=holdCapacity?'is-full':''}"><div><span>${t('CARGO')}</span><b>${number(holdMass)} / ${number(holdCapacity)} ${t('MASS')} · ${holdPercent}%</b></div><div class="inventory-cargo-meter" role="progressbar" aria-label="${t('CARGO')}" aria-valuemin="0" aria-valuemax="${holdCapacity}" aria-valuenow="${Math.min(holdMass,holdCapacity)}" aria-valuetext="${number(holdMass)} / ${number(holdCapacity)} ${t('MASS')}"><i style="width:${Math.max(0,Math.min(100,holdPercent))}%"></i></div></div>`:'';
  const hideMounts=view==='loot';
- return `<section data-inventory-view="${view}" data-inventory-context="${docked?'station':'flight'}" class="equipment-inventory ${hideMounts?'inventory-focused':''} ${item?'has-detail':''}">${docked||embedded?'':`<header><button type="button" data-ui-command="close-ship" aria-label="${t('BACK')}">◀</button><h2>${t('EQUIPMENT & CARGO')}</h2><b>${number(player.credits)} CR</b></header>`}${ui.inventoryNotice?`<p class="inventory-notice" role="status">${html(t(ui.inventoryNotice))}</p>`:''}<div class="inventory-layout"><section class="inventory-mounts" aria-label="${t('INSTALLED EQUIPMENT')}">${mounts.map(s=>{const id=mountItemId(fit,s),d=OUTFIT_ITEMS[id];return `<button type="button" class="inventory-mount ${s.mount.id===ui.inventoryMountId?'selected':''}" ${rarityStyle(d)} data-inventory-mount="${html(s.mount.id)}"><small>${html(mountLabel(s))}</small><b>${html(d?itemLabel(d):t('EMPTY'))}</b></button>`;}).join('')}</section><section class="inventory-stock ${item?'has-detail':''}">${cargoUsage}<nav><select class="inventory-tab-select" data-inventory-tab aria-label="${t('Inventory section')}">${tabs.map(v=>`<option value="${v}" ${view===v?'selected':''}>${t(tabLabels[v])}</option>`).join('')}</select><div class="inventory-tab-buttons">${tabs.map(v=>button('tab',tabLabels[v],`data-tab="${v}" aria-pressed="${view===v}"`)).join('')}</div>${hideMounts||view==='remote'||!selectedMount?'':button('clear-mount','All items',`aria-label="${t('All items')}"`)}${hideMounts?'':`<select data-inventory-sort aria-label="${t('Sort inventory')}"><option value="name">${t('Name')}</option><option value="tier" ${ui.inventorySort==='tier'?'selected':''}>${t('Tier')}</option><option value="mass" ${ui.inventorySort==='mass'?'selected':''}>${t('Mass')}</option></select>`}</nav><div class="inventory-stock-body">${list}${panel||(!hideMounts?`<aside class="inventory-comparison inventory-empty inventory-overview">${budgetMarkup}</aside>`:'')}</div></section></div></section>`;
+ return `<section data-inventory-view="${view}" data-inventory-context="${docked?'station':'flight'}" class="equipment-inventory ${hideMounts?'inventory-focused':''} ${item?'has-detail':''}">${docked||embedded?'':`<header><button type="button" data-ui-command="close-ship" aria-label="${t('BACK')}">◀</button><h2>${t('EQUIPMENT & CARGO')}</h2><b>${number(player.credits)} CR</b></header>`}${ui.inventoryNotice?`<p class="inventory-notice" role="status">${html(t(ui.inventoryNotice))}</p>`:''}<div class="inventory-layout"><section class="inventory-mounts" aria-label="${t('INSTALLED EQUIPMENT')}">${mounts.map(s=>{const id=mountItemId(fit,s),d=OUTFIT_ITEMS[id];return `<button type="button" class="inventory-mount ${s.mount.id===ui.inventoryMountId?'selected':''}" ${rarityStyle(d)} data-inventory-mount="${html(s.mount.id)}"><small>${html(mountLabel(s))}</small><b>${html(d?itemLabel(d):t('EMPTY'))}</b></button>`;}).join('')}</section><section class="inventory-stock ${item?'has-detail':''}">${cargoUsage}<nav><select class="inventory-tab-select" data-inventory-tab aria-label="${t('Inventory section')}">${tabs.map(v=>`<option value="${v}" ${view===v?'selected':''}>${t(tabLabels[v])}</option>`).join('')}</select><div class="inventory-tab-buttons">${tabs.map(v=>button('tab',tabLabels[v],`data-tab="${v}" aria-pressed="${view===v}"`)).join('')}</div>${hideMounts||view==='remote'||!selectedMount?'':button('clear-mount','All items',`aria-label="${t('All items')}"`)}${hideMounts?'':`<details class="inventory-sort"><summary aria-label="${html(t('Sort inventory')+': '+t(({name:'Name',tier:'Tier',mass:'Mass'})[ui.inventorySort]??'Name'))}"><span>${t(({name:'Name',tier:'Tier',mass:'Mass'})[ui.inventorySort]??'Name')}</span><i aria-hidden="true">▾</i></summary><div class="inventory-sort-menu" role="group" aria-label="${html(t('Sort inventory'))}">${[['name','Name'],['tier','Tier'],['mass','Mass']].map(([value,label])=>button('sort',label,`data-sort="${value}" aria-pressed="${(ui.inventorySort??'name')===value}"`)).join('')}</div></details>`}</nav><div class="inventory-stock-body">${list}${panel||(!hideMounts?`<aside class="inventory-comparison inventory-empty inventory-overview">${budgetMarkup}</aside>`:'')}</div></section></div></section>`;
 }
 
 export function bindEquipmentInventory(ui){
@@ -124,6 +124,7 @@ export function bindEquipmentInventory(ui){
   for(const selector of selectors){const e=next?.querySelector(selector);if(e)e.scrollTop=ui.inventoryScroll[`${nextView}:${selector}`]??0;}
  };
  ui.root.addEventListener('click',event=>{
+  for(const menu of ui.root.querySelectorAll('.inventory-sort[open]'))if(!menu.contains(event.target))menu.open=false;
   const b=event.target.closest('[data-inventory-id],[data-inventory-mount],[data-inventory-action]');if(!b)return;
   if(b.dataset.inventoryId){ui.inventoryItemId=b.dataset.inventoryId;ui.inventoryFitExplicit=false;redraw();return;}
   if(b.dataset.inventoryMount){ui.inventoryMountId=b.dataset.inventoryMount;const slot=inventoryMounts(ui.save.player.shipId).find(s=>s.mount.id===ui.inventoryMountId);ui.inventoryItemId=mountItemId(ui.save.player.outfitting.loadouts[ui.save.player.shipId],slot);if(!ui.inventoryItemId)ui.inventoryTab=ui.save.player.dockedAt?'shop':'cargo';redraw();return;}
@@ -131,6 +132,7 @@ export function bindEquipmentInventory(ui){
   if(action==='fit-mount'){ui.inventoryMountId=b.dataset.mountId;ui.inventoryFitExplicit=true;redraw();return;}
   if(action==='open'){ui.inventoryView=true;ui.showShipMenu();return;}
   if(action==='tab'){ui.inventoryTab=b.dataset.tab;ui.inventoryItemId=undefined;redraw();return;}
+  if(action==='sort'&&['name','tier','mass'].includes(b.dataset.sort)){ui.inventorySort=b.dataset.sort;redraw();activeInventory()?.querySelector('.inventory-sort > summary')?.focus({preventScroll:true});return;}
   if(action==='close-detail'){ui.inventoryItemId=undefined;redraw();return;}
   if(action==='clear-mount'){ui.inventoryMountId=undefined;ui.inventoryItemId=undefined;redraw();return;}
   if(action==='jettison-cargo'){
@@ -146,7 +148,8 @@ export function bindEquipmentInventory(ui){
   if(result?.ok&&['recover','recover-drone','sell','jettison'].includes(action))ui.inventoryItemId=undefined;
   redraw();
  });
- ui.root.addEventListener('change',e=>{if(e.target.matches('[data-inventory-tab]')){ui.inventoryTab=e.target.value;ui.inventoryItemId=undefined;ui.inventoryNotice=undefined;redraw();}if(e.target.matches('[data-inventory-sort]')){ui.inventorySort=e.target.value;redraw();}});
+ ui.root.addEventListener('change',e=>{if(e.target.matches('[data-inventory-tab]')){ui.inventoryTab=e.target.value;ui.inventoryItemId=undefined;ui.inventoryNotice=undefined;redraw();}});
+ ui.root.addEventListener('keydown',e=>{if(e.key!=='Escape')return;const menu=e.target.closest('.inventory-sort[open]');if(menu){e.preventDefault();e.stopPropagation();menu.open=false;menu.querySelector('summary')?.focus();}},true);
  ui.root.addEventListener('dragstart',e=>{const b=e.target.closest('[data-inventory-id]');if(b)e.dataTransfer.setData('text/plain',b.dataset.inventoryId);});
  ui.root.addEventListener('dragover',e=>{if(e.target.closest('[data-inventory-mount]'))e.preventDefault();});
  ui.root.addEventListener('drop',e=>{const b=e.target.closest('[data-inventory-mount]');if(!b)return;e.preventDefault();const result=ui.actions.inventoryCommand('install',{id:e.dataTransfer.getData('text/plain'),mountId:b.dataset.inventoryMount});ui.inventoryNotice=result.ok?undefined:result.code;redraw();});

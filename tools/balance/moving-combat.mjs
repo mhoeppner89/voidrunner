@@ -6,7 +6,7 @@ import {createEnemyLoadout} from '../../src/game/enemyLoadouts.js';
 import {regenerateCombatResources} from '../../src/game/combatResources.js';
 import {registerHitReaction} from '../../src/game/flightDynamics.js';
 import {disruptWeapons} from '../../src/game/weaponDamage.js';
-import {activationWeaponDamage} from '../../src/game/weaponDamage.js';
+import {weaponDamage} from '../../src/game/weaponDamage.js';
 const source=await readFile('src/game/game.js','utf8'),rows=[];
 const config={starter:balanceFit('wayfarer',['beam-emitter','beam-emitter'],['sustained-reactor']),stack:balanceFit('wayfarer',['mortar','mortar','mortar'],Array(3).fill('sustained-reactor')),scrapper:balanceFit('scrapper',Array(4).fill('pulse-cannon')),talon:balanceFit('talon',['pulse-cannon','pulse-cannon','ion-blaster','seeker-launcher']),legionary:balanceFit('legionary',Array(3).fill('pulse-cannon'),['sustained-reactor']),blade:balanceFit('blade',['pulse-cannon-t2','gauss-cannon','pulse-cannon-t2','gauss-cannon'],['sustained-reactor','shield-mk2']),lancer:balanceFit('lancer',['pulse-cannon-t2','gauss-cannon','pulse-cannon-t2','gauss-cannon'],['sustained-reactor'])};
 config['talon-equal']=balanceFit('talon',['pulse-cannon','pulse-cannon','ion-blaster'],['sustained-reactor']);config['lancer-equal']=balanceFit('lancer',['pulse-cannon','pulse-cannon','ion-blaster'],['sustained-reactor']);
@@ -14,7 +14,7 @@ const cases=[['talon-equal','lancer-equal',1,1],['starter','scrapper',1,1],['sta
 for(const seed of [718,1501,9007])for(const [a,b,na,nb]of cases)for(const swap of [false,true]){
  const s=fixture();s.save.world.seed=seed;s.save.player.position=[1e6,1e6,1e6];s.arena={observer:true};s.ui={pushEvent(){},pushSensor(){}};s.audio={play(){},playAtDirection(){}};
  for(const m of source.matchAll(/^    (\w+) = new THREE\.(Vector3|Quaternion|Matrix4)\(\);/gm))s[m[1]]=new THREE[m[2]]();
- s.damageShip=(ship,amount,owner,position,weapon={})=>{const shieldBefore=ship.shield,hit=activationWeaponDamage(ship,ship.maxShield,amount,weapon,s.save.world.time);ship.shield=Math.max(0,ship.shield-hit.shield);ship.hull=Math.max(0,ship.hull-hit.hull);disruptWeapons(ship,weapon,s.save.world.time,shieldBefore);if(ship.hull>0)registerHitReaction(ship,s.save.world.time,hit.shield+hit.hull);if(weapon.range)ship.observedWeaponRange=Math.max(ship.observedWeaponRange??0,weapon.range);ship.shieldDelay=4.5;};
+ s.damageShip=(ship,amount,owner,position,weapon={})=>{const shieldBefore=ship.shield,hit=weaponDamage(ship.shield,amount,weapon);ship.shield=Math.max(0,ship.shield-hit.shield);ship.hull=Math.max(0,ship.hull-hit.hull);disruptWeapons(ship,weapon,s.save.world.time,shieldBefore);if(ship.hull>0)registerHitReaction(ship,s.save.world.time,hit.shield+hit.hull);if(weapon.range)ship.observedWeaponRange=Math.max(ship.observedWeaponRange??0,weapon.range);ship.shieldDelay=4.5;};
  s.renderer.spawnExplosion=()=>{};
  const sides=[[],[]];
  for(const [side,count,id]of [[0,na,a],[1,nb,b]])for(let i=0;i<count;i++){

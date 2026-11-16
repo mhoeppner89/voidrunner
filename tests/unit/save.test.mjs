@@ -26,6 +26,25 @@ globalThis.window = {
     },
 };
 
+saveSettingsPreferences({controllerDeadzone:.21,controllerSensitivity:1.4,controllerLayout:'roll'});
+assert.equal(loadSettingsPreferences().controllerDeadzone,.21);
+assert.equal(loadSettingsPreferences().controllerSensitivity,1.4);
+assert.equal(loadSettingsPreferences().controllerLayout,undefined,'removed layouts do not survive migration');
+saveSettingsPreferences({controllerDeadzone:100,controllerSensitivity:-1,controllerLayout:'bad'});
+assert.equal(loadSettingsPreferences().controllerDeadzone,.35);
+assert.equal(loadSettingsPreferences().controllerSensitivity,.5);
+assert.equal(loadSettingsPreferences().controllerLayout,undefined);
+assert.equal(defaultSettings().controllerLayout,undefined);
+assert.equal(defaultSettings().controllerDeadzone,.13);
+storage.clear();
+
+saveSettingsPreferences({controllerBindings:{flight:{fire:42},menus:{confirm:43}}});
+assert.equal(loadSettingsPreferences().controllerBindings.flight.fire,42);
+assert.equal(loadSettingsPreferences().controllerBindings.menus.confirm,43);
+assert.equal(loadSettingsPreferences().controllerBindings.flight.afterburner,7);
+assert.equal(defaultSettings().controllerBindings.flight.fire,0,'custom preferences do not mutate defaults');
+storage.clear();
+
 const canonicalPlayer = (overrides = {}) => ({
     shipId: 'wayfarer',
     ownedShips: ['wayfarer'],

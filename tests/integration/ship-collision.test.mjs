@@ -15,7 +15,7 @@ test('fighters get the frigate-sized avoidance envelope before a contact',()=>{
  fighter.rotation=[0,0,0,1];
  frigate.velocity=[0,0,0];
  fighter.velocity=[0,0,-57];
- const avoidance=s.getShipAvoidance(new THREE.Vector3(0,0,260),new THREE.Vector3(0,0,-57),fighter.id);
+ const avoidance=s.getShipAvoidance(new THREE.Vector3(0,0,260),new THREE.Vector3(0,0,-57),fighter);
  assert.ok(avoidance&&avoidance.length()>0,'a fighter should turn before its centreline reaches the frigate hull');
 });
 
@@ -67,13 +67,48 @@ test('an actual NPC impact exchanges momentum without adding kinetic energy',()=
  assert.ok(Math.hypot(...a.velocity)<30,'the impact loses rather than creates kinetic energy');
 });
 
-test('opposing career NPCs steer away before a head-on pass',()=>{
- const s=session();s.arena=null;s.save.player.position=[1000,1000,1000];s.save.player.velocity=[0,0,0];
- const a=s.spawnShip('patrol',[0,0,-150]),b=s.spawnShip('pirate',[0,0,150]);
- a.velocity=[0,0,100];b.velocity=[0,0,-100];
- const first=s.getShipAvoidance(new THREE.Vector3(...a.position),new THREE.Vector3(...a.velocity),a.id)?.clone();
- const second=s.getShipAvoidance(new THREE.Vector3(...b.position),new THREE.Vector3(...b.velocity),b.id)?.clone();
- assert.ok(first?.length()>0&&second?.length()>0);assert.ok(first.dot(second)<0,'opposite headings choose opposite passing directions');
+test('pilots open the predicted passing gap, even when the other ship starts on the opposite side',()=>{
+ const s=session();
+ s.save.player.position=[4000,4000,4000];
+ const a=s.spawnShip('patrol',[0,0,0]), b=s.spawnShip('pirate',[25,0,-100]);
+ a.velocity=[0,0,-90];b.velocity=[-40,0,0];
+ const dodge=()=>s.getShipAvoidance(new THREE.Vector3(...a.position),new THREE.Vector3(...a.velocity),a);
+ // The contact is to starboard now, but will pass to port if both coast.
+ assert.ok(dodge().x>0);
+ b.position=[160,0,-100];assert.equal(dodge(),undefined,'a safe crossing does not interrupt the attack');
+ b.position=[25,0,100];assert.equal(dodge(),undefined,'diverging traffic needs no correction');
+});
+
+test('fast head-on, crossing and overtaking Talons fly apart before their hulls touch',()=>{
+ const cases=[
+  [[0,0,-100],[0,0,95],[0,0,100],[0,0,-95]],
+  [[0,-100,0],[0,95,0],[0,100,0],[0,-95,0]],
+  [[0,0,0],[0,0,-90],[80,0,-68],[-70,0,-30]],
+  [[0,0,0],[0,0,-100],[5,0,-80],[-5,0,-30]],
+ ];
+ const nose=new THREE.Vector3(0,0,-1),p=new THREE.Vector3(),v=new THREE.Vector3();
+ for(const [pa,va,pb,vb] of cases){
+  const s=session();s.save.player.position=[4000,4000,4000];
+  const pilot={tier:'veteran',temperament:'steady'},hull={hullId:'talon'};
+  const a=s.spawnShip('patrol',pa,undefined,undefined,pilot,hull),b=s.spawnShip('pirate',pb,undefined,undefined,pilot,hull);
+  const pair=[[a,va,b],[b,vb,a]],steering=[];
+  for(const [ship,velocity,target] of pair){
+   ship.velocity=velocity.slice();
+   ship.rotation=new THREE.Quaternion().setFromUnitVectors(nose,v.fromArray(velocity).normalize()).toArray();
+   ship.targetId=target.id;ship.holdFire=true;ship.combatFit.turrets=[];ship.combatFit.missiles=0;
+  }
+  for(const [ship] of pair)steering.push(s.getShipAvoidance(p.fromArray(ship.position),v.fromArray(ship.velocity),ship).clone().normalize());
+  assert.ok(steering[0].dot(steering[1])<-.99,'both pilots choose complementary sides');
+  let closest=Infinity;
+  for(let i=0;i<480;i++){
+   s.save.world.time+=1/60;
+   for(const [ship,,target] of pair)s.updateAttackAI(ship,p.fromArray(target.position),v.fromArray(target.velocity),1/60);
+   closest=Math.min(closest,p.fromArray(a.position).distanceTo(v.fromArray(b.position)));
+   p.fromArray(a.position);s.resolveShipContacts();
+   assert.ok(p.equals(v.fromArray(a.position)),'pilots avoid an actual hull impact');
+  }
+  assert.ok(closest<45,'pilots still make a close pass');
+ }
 });
 
 test('Rin and the tutorial pirate keep flying through a close-range duel',()=>{

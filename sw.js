@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v636-0-8-2nj-tutorial-feedback';
+const CACHE = 'voidrunner-v661-0-8-2oi-stick-base';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -19,7 +19,13 @@ const CORE_ASSETS = [
   './manifest.webmanifest',
   './src/style.css',
   './src/main.js',
+  './src/game/gamepad.js',
+  './src/game/controllerBindings.js',
+  './src/game/haptics.js',
+  './src/game/controllerUi.js',
   './src/game/retroDisplay.js',
+  './src/game/terrainManeuvers.js',
+  './src/game/pilotJudgment.js',
   './src/game/pixelResolve.js',
   './src/game/illustratedLighting.js',
   './src/game/materialNormals.js',
@@ -55,6 +61,7 @@ const CORE_ASSETS = [
   './src/game/weaponDamage.js',
   './src/game/weaponFlight.js',
   './src/game/cockpitDamage.js',
+  './src/game/cockpitArtwork.js',
   './src/game/fleetPaintCatalog.js',
   './src/game/fleetEquipmentData.js',
   './src/game/fleetTurretClearance.js',
@@ -177,7 +184,6 @@ const CORE_ASSETS = [
   './src/game/canvasSizeCache.js',
   './src/game/weapons.js',
   './art/title-cockpit.webp',
-  './assets/remaster/cockpit-wayfarer-sprite.png',
   // A new career must have its actual first-room artwork when offline,
   // rather than only a cached shell with broken image placeholders.
   './art/locations/simplified/helix-hd-v1.webp',

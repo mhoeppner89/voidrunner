@@ -5,7 +5,8 @@ import {relativeIntercept} from './weaponFlight.js';
 import {integrateFlightVelocity} from './flightDynamics.js';
 import {PDC_TURRET} from './turrets.js';
 import {getPdcDefenseChannel} from './pdcFireControl.js';
-export const CRUISER_GUN=Object.freeze({id:'cruiser-heavy-battery',kind:'gauss',speed:900,range:1900,life:1900/900,damageFlat:160,energyCost:45,shieldMul:.8,hullMul:1.3,visualScale:2});
+import {WEAPON_DAMAGE_SCALE} from './weapons.js';
+export const CRUISER_GUN=Object.freeze({id:'cruiser-heavy-battery',kind:'gauss',speed:900,range:1900,life:1900/900,damageFlat:200*WEAPON_DAMAGE_SCALE,energyCost:45,shieldMul:.8,hullMul:1.3,visualScale:2});
 export const CRUISER_PDC_RANGE=180;
 const forward=new THREE.Vector3(0,0,-1);
 function state(ship){return ship.cruiserRuntime??={q:new THREE.Quaternion(),inverse:new THREE.Quaternion(),turn:new THREE.Quaternion(),position:new THREE.Vector3(),pivot:new THREE.Vector3(),origin:new THREE.Vector3(),direction:new THREE.Vector3(),normal:new THREE.Vector3(),target:new THREE.Vector3(),lead:new THREE.Vector3(),velocity:new THREE.Vector3(),local:new THREE.Vector3(),end:new THREE.Vector3(),scratch:new THREE.Vector3(),barrelDirection:new THREE.Vector3(),barrelRight:new THREE.Vector3(),barrelStart:new THREE.Vector3(),barrelOffset:new THREE.Vector3(),mounts:CRUISER_MOUNTS.map(()=>({direction:new THREE.Vector3(),fireAt:0,lockedAt:0,point:new THREE.Vector3(),velocity:new THREE.Vector3()}))};}

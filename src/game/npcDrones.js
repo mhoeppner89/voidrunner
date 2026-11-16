@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import {createPdcDroneController,destroyPdcDrone} from './dronePdc.js';
 import {createDroneFleet,createDroneUnit,droneBayLayoutFor,DRONE_TYPES,canonicalDroneType} from './droneData.js';
 import {combatTargetEligible} from './combatTargeting.js';
+import {npcPlayerAttackWindow} from './combatAwareness.js';
 import {getPdcDefenseChannel} from './pdcFireControl.js';
 import {TURRET_LAYOUTS} from './turretLayouts.js';
 import {WEAPONS} from './weapons.js';
@@ -37,6 +38,8 @@ function initialize(session,ship){
  }
  context.repairHull=(unit,dt)=>applyDroneRepair(session,ship,unit,dt,state.repair);
  context.canFire=(unit,target,start,direction,time)=>{
+  // Escort guns share their carrier's offensive pass; interception stays available.
+  if(target.id==='player'&&!npcPlayerAttackWindow(session,ship,'player'))return false;
   const unitType=DRONE_TYPES[unit.type]??type,shot=weapon;
   if(time>shot.life)return false;
   state.p.fromArray(start);state.end.fromArray(direction).multiplyScalar(unitType.projectileSpeed).add(state.v.fromArray(unit.velocity)).multiplyScalar(time).add(state.p);
@@ -99,7 +102,7 @@ export function updateNpcDrones(session,dt){
   c.shipPosition=ship.position;c.shipVelocity=ship.velocity;c.ownerRadius=Math.max(ext[0],ext[1],ext[2]);c.now=now;
   c.inFlight=active;c.assignments=session.pdcAssignments;c.defenseChannel=getPdcDefenseChannel(session,ship.id);
   c.opponents.length=0;c.weaponOwner.faction=ship.faction;c.weaponOwner.targetId=ship.targetId;
-  const ready=!ship.holdFire&&!ship.pursuitHoldFire&&!ship.pendingMug&&!ship.pendingMugLeaderId;
+  const ready=!ship.holdFire&&!ship.pursuitHoldFire&&!ship.recoveryTargetHidden&&!(ship.terrainManeuver?.active&&ship.terrainManeuver.targetHidden)&&!ship.pendingMug&&!ship.pendingMugLeaderId;
   if(ready){
    let index=0;const add=(actor,id)=>{const proxy=s.opponentPool[index++]??={};proxy.id=id;proxy.hostile=true;proxy.hull=actor.hull;proxy.position=actor.position;proxy.velocity=actor.velocity;c.opponents.push(proxy);};
    for(const other of session.ships)if(other!==ship&&combatTargetEligible(other)&&session.projectileCanHitShip(c.weaponOwner,other))add(other,other.id);

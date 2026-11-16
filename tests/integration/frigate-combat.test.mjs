@@ -257,7 +257,7 @@ function projectileStage(){
 test('rear torpedo impacts bypass shields and progressively cripple the engines',async()=>{
  const {LAUNCHERS}=await import('../../src/game/weapons.js');const {s,ship}=projectileStage();
  const shield=ship.shield,originalSpeed=ship.speed;
- for(let shot=0;shot<2;shot++){
+ for(let shot=0;shot<4;shot++){
   const slot=s.projStore.alloc();const enginePoint=frigateMountPosition(ship,8,new THREE.Vector3());s.projStore.setPos(slot,enginePoint.x,enginePoint.y,enginePoint.z+37);s.projStore.setVel(slot,0,0,-115);
   s.projectiles.push({id:`tor-${shot}`,slot,kind:'missile',ownerId:'player',launcherId:'torpedo',damage:LAUNCHERS.torpedo.damage,life:2,targetId:ship.id,targetMount:8,homingSpeed:115,homingTurn:.28,acceleration:140,shield:12});
   s.updateProjectiles(.5);
@@ -296,7 +296,7 @@ test('PDC intercept rounds kill ordinary missiles but only chip a torpedo shield
   const slot=s.projStore.alloc();s.projStore.setPos(slot,0,0,0);s.projStore.setVel(slot,0,0,0);
   const missile={id:'incoming',slot,kind:'missile',ownerId:'enemy',life:10,damage:30,shield};s.projectiles.push(missile);
   const round=s.projStore.alloc();s.projStore.setPos(round,-5,0,0);s.projStore.setVel(round,100,0,0);
-  s.projectiles.push({id:'intercept',slot:round,kind:'pdc',ownerId:'player',life:1,damage:1.76,targetMissile:missile});
+  s.projectiles.push({id:'intercept',slot:round,kind:'pdc',ownerId:'player',life:1,damage:PDC_TURRET.damageFlat,targetMissile:missile});
   s.updateProjectiles(.1);
   if(shield){assert.ok(missile.life>0);assert.equal(missile.shield,10.24);}else assert.equal(missile.life,0);
  }
@@ -386,8 +386,13 @@ test('all fourteen visible frigate components register real beams in rotated and
 test('intact shields and actual cover protect frigate attachments from beams',()=>{
  const {s,ship}=stage();ship.captured=true;const m=FRIGATE_MOUNTS[11],point=frigateMountPosition(ship,11,new THREE.Vector3()).add(new THREE.Vector3(0,m.hitOffset,0)),start=point.clone().add(new THREE.Vector3(0,80,0)),dir=new THREE.Vector3(0,-1,0),beam={id:'beam',kind:'beam',range:100,damageFlat:25};
  s.fireBeam('inspection',beam,start,dir,'shield');assert.equal(ship.capitalMountHull[11],m.hull);assert.equal(ship.shield,625);
- ship.shield=0;s.firstObstacleHit=()=>.1;s.fireBeam('inspection',beam,start,dir,'cover');assert.equal(ship.capitalMountHull[11],m.hull);
- s.firstObstacleHit=()=>undefined;s.fireBeam('inspection',beam,start,dir,'clear');assert.equal(ship.capitalMountHull[11],m.hull-25);
+ // Exercise actual geometry: fireBeam uses the detailed obstacle query, so
+ // stubbing the old firstObstacleHit wrapper never supplied real cover.
+ ship.shield=0;s.obstacles=[{id:'cover',x:point.x,y:point.y+40,z:point.z,radius:8,losRadius:8}];
+ const cover=s.firstObstacleHitInfo(start,start.clone().addScaledVector(dir,beam.range));
+ assert.equal(cover?.obstacle.id,'cover');assert.ok(cover.t<.5);
+ s.fireBeam('inspection',beam,start,dir,'cover');assert.equal(ship.capitalMountHull[11],m.hull);
+ s.obstacles=[];s.fireBeam('inspection',beam,start,dir,'clear');assert.equal(ship.capitalMountHull[11],m.hull-25);
 });
 test('destroying the single torpedo launcher disables paired salvos without spending its magazine',()=>{
   const {s,ship}=stage();ship.capitalMountHull[0]=ship.capitalMountHull[1]=ship.capitalMountHull[2]=ship.capitalMountHull[3]=0;s.save.player.shipId='atlas';s.spawnGunProjectile=()=>{};

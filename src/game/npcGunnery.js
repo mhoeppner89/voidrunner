@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import {weaponAssistCone} from './weapons.js';
 const DEG=Math.PI/180,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const profiles={
- novice:{settle:.08,shots:7,pause:.55,spread:1.7*DEG,lead:.925,wander:.4*DEG,curve:.12,beam:.25*DEG,beamSlip:.16,beamWide:1.2*DEG,turretError:1.25,turretAcquire:.45,turretTurn:.85},
- veteran:{settle:.12,shots:5,pause:.35,spread:.3*DEG,lead:.99,wander:.22*DEG,curve:.55,beam:.12*DEG,beamSlip:.045,beamWide:.8*DEG,turretError:.65,turretAcquire:.3,turretTurn:1},
- ace:{settle:0,shots:8,pause:.15,spread:.15*DEG,lead:1,wander:.13*DEG,curve:.85,beam:.035*DEG,beamSlip:.006,beamWide:.45*DEG,turretError:.35,turretAcquire:.18,turretTurn:1.15},
+ novice:{settle:.08,shots:7,pause:.55,spread:2.6*DEG,lead:.90,wander:.5*DEG,curve:.12,beam:.4*DEG,beamSlip:.22,beamWide:1.4*DEG,turretError:1.25,turretAcquire:.45,turretTurn:.85},
+ veteran:{settle:.12,shots:5,pause:.35,spread:.6*DEG,lead:.99,wander:.25*DEG,curve:.55,beam:.18*DEG,beamSlip:.09,beamWide:1*DEG,turretError:.65,turretAcquire:.3,turretTurn:1},
+ ace:{settle:0,shots:8,pause:.15,spread:.28*DEG,lead:.998,wander:.16*DEG,curve:.85,beam:.055*DEG,beamSlip:.015,beamWide:.55*DEG,turretError:.35,turretAcquire:.18,turretTurn:1.15},
 };
 export const npcGunneryProfile=ship=>profiles[ship.pilot?.tier]??profiles.veteran;
 export const DEFAULT_NPC_AIM_ERROR=1.5;
@@ -18,7 +18,11 @@ export const npcAimErrorFactor=ship=>{
  return DEFAULT_NPC_AIM_ERROR;
 };
 export const npcForwardCone=weapon=>weapon?.kind==='beam'?weaponAssistCone(weapon):(weapon?.id==='ripper'?7:weapon?.id==='pulse'||weapon?.id==='pulse-mk2'?6:4)*DEG;
-const sprayCone=weapon=>weapon?.id==='ripper'?9*DEG:weapon?.id==='pulse'||weapon?.id==='pulse-mk2'?7*DEG:0;
+// Start a short ranging burst while bringing the nose onto the lead point.
+// This widens only trigger permission: rounds outside the normal correction
+// cone still leave along the barrel and can miss by the full pointing error.
+const RANGING_CONES=Object.freeze({pulse:18,'pulse-mk2':18,ripper:20,ion:14,gauss:8,mortar:10,pdc:14});
+const sprayCone=weapon=>(RANGING_CONES[weapon?.id]??0)*DEG;
 export const npcTriggerCone=(ship,weapon,now=0)=>ship.gunSpeculateWeapon===weapon?.id&&now<(ship.gunSpeculateUntil??0)?sprayCone(weapon):npcForwardCone(weapon);
 export function npcTriggerReady(ship,weapon,facing,now){
  if(ship.gunDecisionTarget!==ship.targetId){ship.gunDecisionTarget=ship.targetId;ship.gunAlignedSince=undefined;ship.gunLastAlignedAt=-Infinity;ship.gunSpeculateUntil=0;ship.gunDecisionAt=-Infinity;}
@@ -30,9 +34,10 @@ export function npcTriggerReady(ship,weapon,facing,now){
   ship.gunAlignedSince=undefined;
   const cone=sprayCone(weapon);
   if(!cone||facing<Math.cos(cone))return false;
-  const approaching=now>previousAt&&now-previousAt<=.25&&(facing-previousFacing)/(now-previousAt)>.015;
-  if(now>=(ship.gunSpeculateReadyAt??0)&&(approaching||now-(ship.gunLastAlignedAt??-Infinity)<.25)){
-   ship.gunSpeculateWeapon=weapon.id;ship.gunSpeculateUntil=now+(weapon.id==='ripper'?.35:.28);ship.gunSpeculateReadyAt=now+1.5;
+  const approaching=now>previousAt&&now-previousAt<=.25&&(facing-previousFacing)/(now-previousAt)>.005;
+  if(now>=(ship.gunSpeculateReadyAt??0)&&(approaching||now-(ship.gunLastAlignedAt??-Infinity)<.35)){
+   const duration=weapon.id==='pulse'||weapon.id==='pulse-mk2'?.9:weapon.id==='ripper'?.85:.55;
+   ship.gunSpeculateWeapon=weapon.id;ship.gunSpeculateUntil=now+duration;ship.gunSpeculateReadyAt=now+duration+.6;
   }
   return ship.gunSpeculateWeapon===weapon.id&&now<(ship.gunSpeculateUntil??0);
  }
@@ -76,7 +81,7 @@ export function npcShotDirection(ship,weapon,targetDirection,out,now=0,distance=
   const tier=ship.pilot?.tier??'veteran',hard=gauss||weapon?.id==='mortar';
   // Precision weapons demand deliberate tracking; forgiving guns retain a
   // useful stream of speculative fire even with inexperienced pilots.
-  if(hard)spread*=tier==='novice'?(gauss?1.2:1.35):tier==='veteran'?2:1;
+  if(hard)spread*=tier==='novice'?(gauss?1.2:1.35):tier==='veteran'?1.4:1;
   else spread*=tier==='novice'?.65:1;
   if(gauss)spread*=.45+.6*clamp(distance/weapon.range,0,1);
   if(out.dot(targetDirection)>=Math.cos(npcForwardCone(weapon)))out.lerp(targetDirection,tier==='ace'?(hard?.96:.94):tier==='veteran'?(hard?.55:.97):gauss?.85:hard?.25:.65).normalize();

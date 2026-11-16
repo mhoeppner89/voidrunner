@@ -1,4 +1,5 @@
-import {normalizeEquipmentInventory} from './equipmentInventory.js';
+import {equipmentBaseId} from './equipmentCatalog.js';
+import {createEquipmentRecord,registerInventoryDefinitions,normalizeEquipmentInventory} from './equipmentInventory.js';
 import {createNewSave,hydrateSave} from './save.js';
 import {HULL_HARDPOINTS,OUTFIT_ITEMS,canonicalOutfitId,LOADOUT_KEYS,loadoutFor,createOutfittingState,itemFitsMount,validateLoadout,projectLegacyEquipment,projectLegacyWeaponId} from './outfitting.js';
 import {getEffectiveShipStats} from './shipStats.js';
@@ -49,37 +50,37 @@ export const RUN_ACTS=[
    {name:'Freight lane',hint:'Armed convoy.',environment:'open',enemies:[enemy('wayfarer',{faction:'independents',role:'escort',tier:'veteran',missiles:1}),enemy('mule',{faction:'independents',role:'trader',tier:'novice'})]},
    {name:'Claim jumpers',hint:'Gaia under escort.',environment:'asteroid-field',enemies:[enemy('prospector',{faction:'independents',role:'miner',tier:'veteran'}),enemy('wayfarer',{faction:'independents',role:'escort',tier:'novice',delay:8})]},
    {name:'Haul trouble',hint:'Heavy haulers and escort.',environment:'debris-field',enemies:[enemy('torsas',{faction:'independents',role:'trader',tier:'veteran',missiles:2}),enemy('atlas',{faction:'independents',role:'trader',tier:'veteran',delay:6}),enemy('speedster',{faction:'independents',role:'escort',tier:'novice',delay:12})]},
-   {name:'Crossfire',hint:'Mixed skirmish.',environment:'open',enemies:[enemy('speedster',{faction:'independents',role:'escort',tier:'veteran'}),enemy('scrapper',{faction:'pirates',role:'pirate',tier:'veteran',delay:8,missiles:1})]},
-   {name:'Rookie wing',hint:'Choose your first wingman (Tier 1).',environment:'debris-field',enemies:[enemy('mule',{faction:'independents',role:'trader',tier:'veteran'}),enemy('wayfarer',{faction:'independents',role:'escort',tier:'novice',delay:8})]},
+   {name:'Crossfire',hint:'Three veterans converge.',environment:'open',enemies:[enemy('speedster',{faction:'independents',role:'escort',tier:'veteran'}),enemy('scrapper',{faction:'pirates',role:'pirate',tier:'veteran',delay:3,missiles:1}),enemy('demon',{faction:'pirates',role:'pirate',tier:'veteran',delay:6,missiles:1})]},
+   {name:'Rookie wing',hint:'Freighter and two veteran escorts.',environment:'debris-field',enemies:[enemy('mule',{faction:'independents',role:'trader',tier:'veteran',missiles:1}),enemy('wayfarer',{faction:'independents',role:'escort',tier:'veteran',delay:3}),enemy('speedster',{faction:'independents',role:'escort',tier:'veteran',delay:6,missiles:1})]},
   ],
  },
  {
   id:'league',name:'Frontier League',faction:'alliance',
   waves:[
-   {name:'Patrol shift',hint:'League line.',environment:'open',enemies:[enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',missiles:1})]},
-   {name:'Courier run',hint:'Pair working together.',environment:'asteroid-field',enemies:[enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran'}),enemy('speedster',{faction:'alliance',role:'escort',tier:'novice',delay:10})]},
-   {name:'Strike',hint:'Bomber package.',environment:'open',enemies:[enemy('andromeda',{faction:'alliance',role:'bounty',tier:'veteran',missiles:2})]},
-   {name:'Honorguard',hint:'Hunter and escort.',environment:'debris-field',enemies:[enemy('lancer',{faction:'alliance',role:'patrol',tier:'veteran',missiles:2}),enemy('legionary',{faction:'alliance',role:'patrol',tier:'novice',delay:8})]},
-   {name:'Veteran wing',hint:'Upgrade your first wingman to Tier 2.',environment:'asteroid-field',enemies:[enemy('astra',{faction:'alliance',role:'escort',tier:'veteran',missiles:1}),enemy('speedster',{faction:'alliance',role:'escort',tier:'novice',delay:10})]},
+   {name:'Patrol shift',hint:'League line.',environment:'open',enemies:[enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',missiles:1}),enemy('speedster',{faction:'alliance',role:'escort',tier:'veteran',delay:4,missiles:1})]},
+   {name:'Courier run',hint:'Three ships working together.',environment:'asteroid-field',enemies:[enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',missiles:1}),enemy('speedster',{faction:'alliance',role:'escort',tier:'veteran',delay:3}),enemy('andromeda',{faction:'alliance',role:'escort',tier:'veteran',delay:6,missiles:1})]},
+   {name:'Strike',hint:'Bomber package.',environment:'open',enemies:[enemy('andromeda',{faction:'alliance',role:'bounty',tier:'ace',missiles:2}),enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',delay:3,missiles:1})]},
+   {name:'Honorguard',hint:'Hunter and two escorts.',environment:'debris-field',enemies:[enemy('lancer',{faction:'alliance',role:'patrol',tier:'veteran',missiles:2}),enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',delay:3}),enemy('speedster',{faction:'alliance',role:'escort',tier:'veteran',delay:6,missiles:1})]},
+   {name:'Veteran wing',hint:'Ace-led League wing.',environment:'asteroid-field',enemies:[enemy('astra',{faction:'alliance',role:'escort',tier:'ace',missiles:1}),enemy('speedster',{faction:'alliance',role:'escort',tier:'veteran',delay:3}),enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
   ],
  },
  {
   id:'concord',name:'Concord Frontier Fleet',faction:'concord',
   waves:[
-   {name:'Show of force',hint:'Concord courier.',environment:'open',enemies:[enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',missiles:1})]},
-   {name:'Victoria dance',hint:'Heavy fighter and courier.',environment:'debris-field',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'novice',delay:10})]},
-   {name:'Battery test',hint:'Bellona with support.',environment:'open',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'veteran',missiles:2})]},
-   {name:'Screened',hint:'Hunter screened by Victoria.',environment:'asteroid-field',enemies:[enemy('lancer',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'novice',delay:8})]},
-   {name:'Heavy metal',hint:'Choose a tier-3 hull.',environment:'open',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('vanguard',{faction:'concord',role:'patrol',tier:'novice',delay:10,missiles:1})]},
+   {name:'Show of force',hint:'Concord interception wing.',environment:'open',enemies:[enemy('talon',{faction:'concord',role:'patrol',tier:'ace',missiles:1}),enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',delay:4,missiles:1})]},
+   {name:'Victoria dance',hint:'Heavy fighters with a courier.',environment:'debris-field',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:3}),enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
+   {name:'Battery test',hint:'Bellona with support.',environment:'open',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',delay:3,missiles:1}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
+   {name:'Screened',hint:'Hunter screened by Victoria.',environment:'asteroid-field',enemies:[enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',delay:3}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
+   {name:'Heavy metal',hint:'Elite Concord strike wing.',environment:'open',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('vanguard',{faction:'concord',role:'patrol',tier:'veteran',delay:3,missiles:1}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
   ],
  },
  {
   id:'capital',name:'Concord Capital',faction:'concord',
   waves:[
-   {name:'Picket',hint:'Two heavies.',environment:'debris-field',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('lancer',{faction:'concord',role:'patrol',tier:'novice',delay:10,missiles:2})]},
-   {name:'Reserves',hint:'Mixed heavy pack.',environment:'asteroid-field',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('lancer',{faction:'concord',role:'patrol',tier:'veteran',missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'novice',delay:12,missiles:1})]},
-   {name:'Ace screen',hint:'Ace pair.',environment:'open',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:8,missiles:2})]},
-   {name:'Elite guard',hint:'Upgrade your first wingman to Tier 3.',environment:'debris-field',enemies:[enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',delay:8,missiles:2})]},
+   {name:'Picket',hint:'Two heavies and a courier.',environment:'debris-field',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',delay:4,missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:7,missiles:1})]},
+   {name:'Reserves',hint:'Mixed heavy pack.',environment:'asteroid-field',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',delay:3,missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
+   {name:'Ace screen',hint:'Three aces.',environment:'open',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:3,missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'ace',delay:6,missiles:1})]},
+   {name:'Elite guard',hint:'Elite heavy wing.',environment:'debris-field',enemies:[enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',delay:3,missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:6,missiles:1})]},
    {name:'The line',hint:'Choose your second wingman (Tier 3). Frigate with two Victoria escorts, all aces.',environment:'asteroid-field',enemies:[enemy('concord-frigate',{faction:'concord',role:'frigate',tier:'ace'}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:4,missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:8,missiles:2})]},
   ],
  },
@@ -123,6 +124,7 @@ export function readArenaRun(){try{
  const raw=JSON.parse(window.localStorage.getItem(ARENA_RUN_KEY)),r=raw?.arenaRun;
  const totals={...OLD_WAVE_TOTALS,3:RUN_WAVES.length};
  if(![1,2,3].includes(r?.version)||!['prepare','combat','won','lost'].includes(r.phase)||!Number.isInteger(r.wave)||r.wave<0||r.wave>=totals[r.version])return null;
+ registerInventoryDefinitions({items:r.rewardRecords});
  const save=hydrateSave(raw);save.arenaRun=r;r.offers=[...new Set((r.offers??[]).map(canonicalOutfitId))];if(r.selectedReward)r.selectedReward=canonicalOutfitId(r.selectedReward);save.arena={run:true};normalizeEquipmentInventory(save.player,{disabled:true});
  // Finished short runs stay finished with their old totals; an active one moves
  // into the current five-act run at the same fraction of the way through.
@@ -145,8 +147,8 @@ export function writeArenaRun(save){try{const clean={...save,player:{...save.pla
 export function arenaRecord(){try{return JSON.parse(window.localStorage.getItem(ARENA_RECORD_KEY))??{};}catch{return {};}}
 export function recordArenaRun(save){const r=save.arenaRun,old=arenaRecord();try{window.localStorage.setItem(ARENA_RECORD_KEY,JSON.stringify({unlockedHard:old.unlockedHard||r.phase==='won',best:Math.max(old.best??0,runScore(r)),last:{cleared:r.cleared,score:runScore(r)}}));}catch{}}
 export const runScore=r=>Math.max(0,Math.round(r.cleared*1000+(r.phase==='won'?2000:0)-r.elapsed*2-r.damage*2-r.missiles*20));
-// Arena Run has fixed authored equipment, not rolled career affixes. Quality
-// labels describe its reward grades; they never modify stats or offer weights.
+// Arena Run uses fixed reward pools without rolled career affixes. Hull-tier
+// upgrades and skip bonuses use the same real equipment records as career loot.
 export const RUN_EQUIPMENT_RARITY=Object.freeze({
  'pulse-cannon':'common','beam-emitter':'common','ripper':'common','seeker-launcher':'common','pdc':'common',
  'gauss-cannon':'uncommon','ion-blaster':'uncommon','mortar':'uncommon','tracking-turret':'uncommon',
@@ -159,19 +161,41 @@ const rewardPools={
  handling:['engine-mk2','thrusters-mk2','capacitor-bank','sustained-reactor'],
 };
 const rewardWave={'pulse-cannon-t2':3,'pulse-cannon-t3':8,'swarm-launcher':3,'torpedo-launcher':5,'mortar':2,'gauss-cannon':2};
+const REWARD_GRADES=['common','uncommon','rare','named'];
+function runRewardItem(save,id){
+ const item=OUTFIT_ITEMS[id];if(!item)return id;
+ const r=save.arenaRun,hull=Math.max(1,hullTier(save.player.shipId)??1);
+ const bonus=r.rarityBonusWave===r.wave;
+ const tier=Math.max(item.tier??1,hull===2&&seededRandom(`${r.seed}:reward-tier:${r.wave}:${id}`)()<.2?3:hull);
+ if(tier<=(item.tier??1)&&!bonus)return id;
+ const usual=item.rarity??RUN_EQUIPMENT_RARITY[id]??'common';
+ const rarity=REWARD_GRADES[Math.min(3,REWARD_GRADES.indexOf(usual)+(bonus?1:0))];
+ const key=`eq-arena-${r.seed}-${r.wave}-${id}-t${tier}-${rarity}`;
+ r.rewardRecords??={};
+ const record=r.rewardRecords[key]??createEquipmentRecord(id,{id:key,tier,rarity});
+ r.rewardRecords[key]=record;return record.id;
+}
+function enoughRunEquipment(save,id,owned){
+ const p=save.player,item=OUTFIT_ITEMS[id],grade=REWARD_GRADES.indexOf(item.rarity??RUN_EQUIPMENT_RARITY[equipmentBaseId(id)]??'common');
+ const asGood=other=>equipmentBaseId(other)===equipmentBaseId(id)&&(OUTFIT_ITEMS[other]?.tier??1)>=(item.tier??1)
+  &&REWARD_GRADES.indexOf(OUTFIT_ITEMS[other]?.rarity??RUN_EQUIPMENT_RARITY[equipmentBaseId(other)]??'common')>=grade;
+ let count=owned.filter(asGood).length;
+ for(const [other,n] of Object.entries(p.outfitting.locker))if(asGood(other))count+=n;
+ return count>=(item.category==='gun'?HULL_HARDPOINTS[p.shipId].guns.filter(m=>itemFitsMount(item,m)).length:1);
+}
 export function runOffers(save){
  const r=save.arenaRun,p=save.player,fit=loadoutFor(p),owned=LOADOUT_KEYS.flatMap(k=>fit[k]).filter(Boolean);
  if(r.wave===0&&r.openingPicks===0)return ['pulse-cannon','beam-emitter','ripper'].filter(id=>runRewardPlan(save,id));
  const rng=seededRandom(`${r.seed}:reward:${r.wave}:${p.shipId}`);
- const eligible=id=>(r.wave===0||r.wave>=(rewardWave[id]??1))&&runRewardPlan(save,id)&&!p.outfitting.locker[id]&&(OUTFIT_ITEMS[id].category==='gun'||!owned.includes(id));
- const candidates=Object.fromEntries(Object.entries(rewardPools).map(([key,ids])=>[key,ids.filter(eligible).map(id=>({id,sort:rng()})).sort((a,b)=>a.sort-b.sort).map(x=>x.id)]));
+ const eligible=id=>runRewardPlan(save,id)&&!enoughRunEquipment(save,id,owned);
+ const candidates=Object.fromEntries(Object.entries(rewardPools).map(([key,ids])=>[key,ids.filter(id=>r.wave===0||r.wave>=(rewardWave[id]??1)).map(id=>runRewardItem(save,id)).filter(eligible).map(id=>({id,sort:rng()})).sort((a,b)=>a.sort-b.sort).map(x=>x.id)]));
  const offers=[];
  // Offer a heavy boss weapon where mounts permit it; small hulls get
  // scatterguns for exposed batteries. Stored copies do not block this offer.
  if(r.wave===RUN_WAVES.length-1){
   const heavy=HULL_HARDPOINTS[p.shipId].weapons.length>1;
   const counters=heavy?['torpedo-launcher','mortar']:['ripper'];
-  if(!owned.some(id=>counters.includes(id))){const counter=counters.find(id=>runRewardPlan(save,id));if(counter)offers.push(counter);}
+  if(!owned.some(id=>counters.includes(equipmentBaseId(id)))){const counter=counters.map(id=>runRewardItem(save,id)).find(id=>runRewardPlan(save,id));if(counter)offers.push(counter);}
  }
  for(const key of ['offense','survival','handling']){if(key==='offense'&&offers.length)continue;const id=candidates[key].find(id=>!offers.includes(id));if(id)offers.push(id);}
  for(const id of Object.values(candidates).flat())if(offers.length<3&&!offers.includes(id))offers.push(id);
@@ -189,9 +213,10 @@ export function refreshRunRepairOffer(save){const r=save.arenaRun;if(r.phase!=='
 export function refreshRunRewardOffers(save){
  const r=save.arenaRun;if(r.phase!=='prepare'||r.rewardChosen||!r.hullChosen)return;
  const highHull=save.player.hull>getEffectiveShipStats(save.player).hull*.8, fresh=runOffers(save);
- const valid=[...new Set(r.offers??[])].filter(id=>runRewardPlan(save,id)&&!(highHull&&id==='repair'&&!fresh.includes('repair')));
+ const current=(r.offers??[]).map(id=>OUTFIT_ITEMS[id]&&(OUTFIT_ITEMS[id].tier??1)<(hullTier(save.player.shipId)??1)?runRewardItem(save,equipmentBaseId(id)):id);
+ const valid=[...new Set(current)].filter(id=>runRewardPlan(save,id)&&!(highHull&&id==='repair'&&!fresh.includes('repair')));
  for(const id of fresh)if(valid.length<3&&!valid.includes(id))valid.push(id);
- const bossOffer=fresh[0];if(r.wave===RUN_WAVES.length-1&&['torpedo-launcher','mortar','ripper'].includes(bossOffer)&&!valid.includes(bossOffer))valid[0]=bossOffer;
+ const bossOffer=fresh[0];if(r.wave===RUN_WAVES.length-1&&['torpedo-launcher','mortar','ripper'].includes(equipmentBaseId(bossOffer))&&!valid.includes(bossOffer))valid[0]=bossOffer;
  r.offers=valid.slice(0,3);if(!valid.includes(r.selectedReward))r.selectedReward=null;
 }
 export function recoverRun(save,extra=false){const p=save.player,stats=getEffectiveShipStats(p),r=save.arenaRun;p.hull=Math.min(stats.hull,p.hull+stats.hull*(extra?.5:r.hard?.1:.3));p.shield=stats.shield;p.energy=stats.energyCapacity;p.fuel=stats.fuel;
@@ -200,17 +225,18 @@ export function recoverRun(save,extra=false){const p=save.player,stats=getEffect
 // A reward is a complete, mount-checked replacement plan, not a loose gun.
 export function runRewardPlan(save,id){
  if(['repair','rearm','resupply'].includes(id))return {id,count:1,changes:[],replaced:[]};
- const p=save.player,item=OUTFIT_ITEMS[id],spec=HULL_HARDPOINTS[p.shipId];if(!item||id==='ion-blaster'&&spec.guns.length<2)return null;
+ const p=save.player,item=OUTFIT_ITEMS[id],spec=HULL_HARDPOINTS[p.shipId];if(!item||equipmentBaseId(id)==='ion-blaster'&&spec.guns.length<2)return null;
  const fit=loadoutFor(p),key=item.category==='gun'?'guns':item.category==='launcher'?'launchers':item.category==='turret'?'turrets':'utility';if(!key)return null;
  let indices=spec[key].map((m,i)=>itemFitsMount(item,m)?i:-1).filter(i=>i>=0);
+ if(!indices.length)return null;
  if(['guns','launchers'].includes(key)){
   // Guns and launchers are two views of the same physical bays. An empty
   // launcher slot is not free if a gun occupies that index (and vice versa).
   const free=indices.filter(i=>!fit.guns[i]&&!fit.launchers[i]);
   if(free.length){
-   const count=key==='guns'&&id!=='ion-blaster'?Math.min(2,spec.weapons.length):1;
+   const count=equipmentBaseId(id)==='ion-blaster'?1:Math.min(2,spec.weapons.length,key==='launchers'?Math.max(0,fit.guns.filter(Boolean).length+free.length-1):2);
    indices=free.slice(0,count);
-  }else if(key==='guns'&&id!=='ion-blaster'){
+  }else if(key==='guns'&&equipmentBaseId(id)!=='ion-blaster'){
    // When every bay is occupied, prefer the usual pair but do not waste a
    // duplicate on a mount that already carries this exact gun.
    const paired=indices.slice(0,Math.min(2,spec.weapons.length));
@@ -222,7 +248,7 @@ export function runRewardPlan(save,id){
  const changes=indices.map(index=>({key,index,old:fit[key][index],otherKey:key==='guns'?'launchers':key==='launchers'?'guns':null,other:(key==='guns'?fit.launchers:key==='launchers'?fit.guns:[])?.[index]}));
  for(const change of changes){fit[key][change.index]=id;if(change.otherKey)fit[change.otherKey][change.index]=null;}
  if(!validateLoadout(p,p.shipId,fit).ok||!fit.guns.some(Boolean))return null;
- return {id,count:changes.length,changes,replaced:changes.flatMap(c=>[c.old,c.other]).filter(Boolean)};
+ return {id,count:['gun','launcher','turret'].includes(item.category)?2:changes.length,changes,replaced:changes.flatMap(c=>[c.old,c.other]).filter(Boolean)};
 }
 export function chooseRunReward(save,id){
  refreshRunRepairOffer(save);const r=save.arenaRun;if(r.phase!=='prepare'||r.rewardChosen||!r.hullChosen||!r.offers.includes(id))return false;
@@ -238,11 +264,21 @@ export function chooseRunReward(save,id){
    if(old){state.locker[old]=(state.locker[old]??0)+1;if(state.factory[p.shipId][key][index])state.factoryLocker[old]=(state.factoryLocker[old]??0)+1;}
    fit[key][index]=id;state.factory[p.shipId][key][index]=false;
   }
+  const stored=Math.max(0,plan.count-plan.changes.length);
+  if(stored)state.locker[id]=(state.locker[id]??0)+stored;
+  if(OUTFIT_ITEMS[id].category==='launcher'&&stored){r.freshLaunchers??={};r.freshLaunchers[id]=(r.freshLaunchers[id]??0)+stored;}
   const equipped={...p,outfitting:state};p.equipment=projectLegacyEquipment(equipped,state);p.weaponId=projectLegacyWeaponId(equipped);p.outfitting=state;normalizeLauncherMagazines(p);
   if(OUTFIT_ITEMS[id].category==='launcher'){for(const entry of launcherMagazineEntries(p))if(plan.changes.some(c=>c.key==='launchers'&&HULL_HARDPOINTS[p.shipId].launchers[c.index].id===entry.mount.id)){p.launcherMagazines[entry.mount.id].rounds=entry.capacity;p.activeLauncherMountId=entry.mount.id;}normalizeLauncherMagazines(p);}
  }
  if(r.wave===0&&r.openingPicks!==undefined){r.openingPicks++;r.rewardChosen=r.openingPicks>=2;}else r.rewardChosen=true;
  r.selectedReward=null;if(!r.rewardChosen)r.offers=runOffers(save);return true;
+}
+export function skipRunReward(save){
+ const r=save.arenaRun;
+ if(!save.arena?.run||r?.phase!=='prepare'||r.rewardChosen||!r.hullChosen||!loadoutFor(save.player).guns.some(Boolean))return false;
+ recoverRun(save,true);r.rewardChosen=true;r.selectedReward=null;r.rarityBonusWave=r.wave+1;
+ if(r.wave===0)r.openingPicks=2;
+ return true;
 }
 export function fitRunItem(save,key,index,id){
  const r=save.arenaRun;if(!save.arena?.run||r.phase!=='prepare'||!r.rewardChosen)return false;
@@ -261,7 +297,12 @@ export function fitRunItem(save,key,index,id){
  state.loadouts[p.shipId]=validation.loadout;
  const equipped={...p,outfitting:state};
  p.equipment=projectLegacyEquipment(equipped,state);p.weaponId=projectLegacyWeaponId(equipped);p.outfitting=state;
- normalizeLauncherMagazines(p);return true;
+ normalizeLauncherMagazines(p);
+ if(next&&OUTFIT_ITEMS[next]?.category==='launcher'&&(r.freshLaunchers?.[next]??0)>0){
+  const entry=launcherMagazineEntries(p).find(e=>e.mount.id===HULL_HARDPOINTS[p.shipId][key][index].id);
+  if(entry){p.launcherMagazines[entry.mount.id].rounds=entry.capacity;r.freshLaunchers[next]--;normalizeLauncherMagazines(p);}
+ }
+ return true;
 }
 // The hulls a stage offers: the stage's tier, filtered to the faction blocs the
 // run has reached, minus the pilot's current hull (staying put is the wingman

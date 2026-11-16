@@ -6,6 +6,21 @@ const {npcForwardCone,npcShotDirection,npcTriggerReady,recordNpcShot}=await impo
 import {WEAPONS,weaponAssistCone} from '../../src/game/weapons.js';
 import {seededRandom} from '../../src/game/random.js';
 const dir=degrees=>new THREE.Vector3(Math.sin(degrees*Math.PI/180),0,-Math.cos(degrees*Math.PI/180));
+test('skill changes physical shot accuracy with identical weapon specifications',()=>{
+ for(const w of [WEAPONS.pulse,WEAPONS.beam,WEAPONS.gauss,WEAPONS.ripper,WEAPONS.ion,WEAPONS.mortar,WEAPONS.pdc]){
+  const before=JSON.stringify(w),hits=[];
+  for(const tier of ['novice','veteran','ace']){
+   const ship=pilot(tier),out=new THREE.Vector3();let landed=0;
+   for(let i=0;i<1200;i++){
+    assert.ok(npcShotDirection(ship,w,dir(0),out,i*.17,250));
+    if(Math.hypot(out.x,out.y)*250/Math.max(.001,-out.z)<3)landed++;
+   }
+   hits.push(landed);
+  }
+  assert.ok(hits[0]<hits[1]&&hits[1]<hits[2],`${w.id}: ${hits}`);
+  assert.equal(JSON.stringify(w),before,'aiming never changes damage, energy or projectile stats');
+ }
+});
 function pilot(tier){return {rotation:[0,0,0,1],pilot:{tier},aiRng:seededRandom('gunnery-'+tier)};}
 function installWeapon(ship,index,id){
  const fit=ship.combatFit,physical=fit.gunIndices?.[index]??index;
@@ -52,6 +67,6 @@ test('NPC beam assistance aims from the physical mount and refuses a target outs
 
 
 test('ordinary novice shots require forward alignment and retain bounded spread and tracking error',()=>{
- const ship=pilot('novice'),out=new THREE.Vector3();for(let i=0;i<200;i++){assert.ok(npcShotDirection(ship,WEAPONS.pulse,dir(5.9),out));assert.ok(out.angleTo(dir(0))<=7*Math.PI/180+1e-8);}
+ const ship=pilot('novice'),out=new THREE.Vector3();for(let i=0;i<200;i++){assert.ok(npcShotDirection(ship,WEAPONS.pulse,dir(5.9),out));assert.ok(out.angleTo(dir(0))<=8*Math.PI/180+1e-8);}
  assert.equal(npcShotDirection(pilot('novice'),WEAPONS.pulse,dir(6.1),out),false);
 });

@@ -5,7 +5,7 @@ import {getEffectiveShipStats} from '../../src/game/shipStats.js';
 import {weaponForOutfit} from '../../src/game/weapons.js';
 import {registerEquipmentDefinition,resolveEquipmentDefinition} from '../../src/game/equipmentCatalog.js';
 import {regenerateCombatResources,spendEnergy} from '../../src/game/combatResources.js';
-import {activationWeaponDamage,weaponDamage} from '../../src/game/weaponDamage.js';
+import {weaponDamage} from '../../src/game/weaponDamage.js';
 export const GUNS=['pulse-cannon','beam-emitter','gauss-cannon','ripper','ion-blaster','mortar','frigate-battery','cruiser-battery'];
 export function itemAtTier(baseId,tier=1){
  const base=OUTFIT_ITEMS[baseId];if(tier===1||base.tier>=tier)return baseId;
@@ -29,7 +29,7 @@ export function firingTrace(fit,{duration=24,passes=false,recharging=false}={}){
    if(!spendEnergy(p,w.energyCost)){blocked++;continue;}
    ready[i]=now+w.cooldown;energySpent+=w.energyCost;shots++;
    for(let pellet=0;pellet<(w.pellets??1);pellet++){
-    const h=weaponDamage(0,w.damageFlat,w).hull,s=activationWeaponDamage(target,1e9,w.damageFlat,w,now).shield;target.shield-=s;
+    const h=weaponDamage(0,w.damageFlat,w).hull,s=weaponDamage(target.shield,w.damageFlat,w).shield;target.shield-=s;
     hullDamage+=h;shieldDamage+=s;if(now<2.4){openingHull+=h;openingShield+=s;}
    }
   }

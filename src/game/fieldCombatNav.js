@@ -3,10 +3,12 @@ import * as THREE from 'three';
 import {terrainFlightDistance} from './asteroidTerrain.js';
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const forward=new THREE.Vector3(0,0,-1),worldUp=new THREE.Vector3(0,1,0);
+const LOCAL_TURNS=[[-.5,0],[.5,0],[-1.4,0],[1.4,0],[0,.5],[0,-.5],[0,1.4],[0,-1.4]];
 // Cheap swept-hull queries against world-sized obstacle bounds. Debris box
 // extents already include model scale; applying scale again closes real gaps.
 function rayDistance(o,p,d,reach,limit,s){
- if(o.terrain)return terrainFlightDistance(o,p,d,reach,limit,s);
+ if(o===s.grazeObstacle)reach=Math.min(reach,s.grazeReach);
+ if(o.terrain)return terrainFlightDistance(o,p,d,reach,limit,s,s.safetyProbe?s.forwardReach:0);
  s.local.set(p.x-o.x,p.y-o.y,p.z-o.z);s.ray.copy(d);
  if(o.box&&(o.shape!=='asteroid'||Math.max(o.box.hx,o.box.hy,o.box.hz)>Math.min(o.box.hx,o.box.hy,o.box.hz)*1.5)){
   const b=o.box;s.q.set(b.qx,b.qy,b.qz,b.qw).invert();s.local.applyQuaternion(s.q);s.ray.applyQuaternion(s.q);
@@ -34,10 +36,16 @@ function support(o,dir,s){
  const b=o.box;s.q.set(b.qx,b.qy,b.qz,b.qw).invert();s.local.copy(dir).applyQuaternion(s.q);
  return Math.abs(s.local.x)*b.hx+Math.abs(s.local.y)*b.hy+Math.abs(s.local.z)*b.hz;
 }
+// Shared swept-hull queries for short combat commitments. Callers supply their
+// own scratch state; the navigation controller keeps ownership of its vectors.
+export {clearDistance as fieldClearDistance,support as fieldObstacleSupport};
 export function fieldCombatSteering(session,ship,goal,desired,dt,out){
  const now=session.save.world.time,stats=ship.combatFit.stats;
  const s=ship.fieldNav??={position:new THREE.Vector3(),travel:new THREE.Vector3(),nose:new THREE.Vector3(),goal:new THREE.Vector3(),waypoint:new THREE.Vector3(),direction:new THREE.Vector3(),side:new THREE.Vector3(),candidate:new THREE.Vector3(),best:new THREE.Vector3(),delta:new THREE.Vector3(),local:new THREE.Vector3(),ray:new THREE.Vector3(),q:new THREE.Quaternion(),obstacles:[],nextPlan:0,until:0,lowTime:0,plans:0,rayTests:0,bank:0};
  const p=s.position.fromArray(ship.position),v=s.travel.fromArray(ship.velocity),speed=v.length();
+ const graze=ship.terrainManeuver;
+ s.grazeObstacle=graze?.active&&graze.kind==='cover-graze'&&now<graze.until&&(ship.combatBumpAt??-Infinity)<graze.started?graze.grazeObstacle:undefined;
+ s.grazeReach=graze?.grazeReach??0;
  s.q.fromArray(ship.rotation);s.nose.copy(forward).applyQuaternion(s.q);v.copy(speed>1?v.multiplyScalar(1/speed):s.nose);
  const reach=Math.max(...session.npcHullExtents(ship))+2;
  const stopping=speed*speed/(2*stats.acceleration*1.25),look=clamp(stopping+speed*.65+reach,65,450);
@@ -57,7 +65,7 @@ export function fieldCombatSteering(session,ship,goal,desired,dt,out){
   s.goal.copy(desired).normalize();
   // Commit around isolated cover while hunting. Dense fields keep sampled
   // escape headings, which handle overlapping clearance bounds better.
-  s.roundField=(ship.combatIntent!=='hunt'||s.obstacles.length>3)&&s.obstacles.length>0&&s.obstacles.every(o=>o.shape==='asteroid'&&!o.terrain);
+  s.roundField=!s.grazeObstacle&&(ship.combatIntent!=='hunt'||s.obstacles.length>3)&&s.obstacles.length>0&&s.obstacles.every(o=>o.shape==='asteroid'&&!o.terrain);
   if(s.roundField)steerToward(session,ship,goal,{goalDir:s.goal,speed,horizon:1.8,brakeScale:0,synthesize:true},s.goal);
   const goalClear=clearDistance(s,p,s.goal,reach,look);
   const stuck=(s.obstacles.length>0 && (s.lowTime>.75||s.blockedTime>.6))||(Boolean(ship.search)&&s.blockedTime>.4);
@@ -85,6 +93,20 @@ export function fieldCombatSteering(session,ship,goal,desired,dt,out){
      const value=(clear<corridor*.98?-2:0)+clear/corridor*2+turn*.35+progress*(stuck?.15:.65)+(i<2?.08:0)+(ship.pilot?.tier==='ace'&&i===2?.16:0);
      if(value>score){score=value;s.best.copy(s.candidate);bestIndex=i;}
     }
+    // A fractured asteroid's outer box is not its flyable surface. Probe
+    // short local shoulders/passages against the actual terrain instead of
+    // always asking for a waypoint beyond the entire giant fragment.
+    if(!stuck&&score<2&&s.obstacles.length===1&&s.obstacles[0].terrain&&s.obstacles[0].box&&Math.max(s.obstacles[0].box.hx,s.obstacles[0].box.hy,s.obstacles[0].box.hz)>look*1.5){
+     const corridor=clamp(speed*1.5+reach,90,180);
+     for(let i=0;i<LOCAL_TURNS.length;i++){
+      const [yaw,pitch]=LOCAL_TURNS[i];
+      s.delta.copy(s.goal).addScaledVector(s.side,yaw);s.delta.y+=pitch;s.delta.normalize();
+      const clear=clearDistance(s,p,s.delta,reach,corridor);
+      if(clear<corridor*.98)continue;
+      const value=2+s.nose.dot(s.delta)*.35+s.goal.dot(s.delta)*.65;
+      if(value>score){score=value;s.best.copy(p).addScaledVector(s.delta,corridor);bestIndex=i;}
+     }
+    }
     if(stuck){
      // A single blocker's left/right waypoints can all enter its neighbours.
      // At a standstill, sample the surrounding volume for a short clear exit.
@@ -110,8 +132,13 @@ export function fieldCombatSteering(session,ship,goal,desired,dt,out){
  out.copy(s.active?s.direction.copy(s.waypoint).sub(p).normalize():s.roundField?s.goal:desired).normalize();
  // Only the current motion and nose corridor can demand braking. Sideways
  // clearance affects the next route choice, never the throttle itself.
+ // Reserve extra nose room at combat speed. Taper the precaution while
+ // crawling out of cover so it cannot pin a turning ship against a surface.
+ s.forwardReach=reach*clamp((speed/stats.maxSpeed-.2)/.4,0,1);
+ s.safetyProbe=true;
  const travelClear=clearDistance(s,p,v,reach,look);
  const noseClear=clearDistance(s,p,s.nose,reach,Math.min(look,Math.max(35,speed*.5)));
+ s.safetyProbe=false;
  const available=Math.max(0,travelClear-2-speed*.12);
  const safeSpeed=travelClear>=look?stats.afterburnSpeed:Math.sqrt(2*stats.acceleration*1.25*available);
  const noseLimit=noseClear<20?stats.maxSpeed*clamp(noseClear/20,0,1):stats.afterburnSpeed;

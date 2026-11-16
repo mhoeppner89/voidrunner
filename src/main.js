@@ -1,9 +1,12 @@
+import { normalizeControllerBindings } from './game/controllerBindings.js';
 import {newArenaRun,readArenaRun,arenaRecord} from './game/arenaRun.js';
 import { AudioManager } from './game/audio.js';
 import { TURRET_TEST_MODE, DRONE_TEST_MODE, LANDING_PREVIEW_ID, createNewSave, defaultSettings, loadGame, loadSettingsPreferences, saveGame, saveSettingsPreferences } from './game/save.js';
 import { DOCK_LOCATION_IDS, LOCATIONS, SHIPS } from './game/data.js';
 import { getLanguage, setLanguage, t } from './game/i18n.js';
 import { GameUI } from './game/ui.js';
+import { Haptics } from './game/haptics.js';
+import { ControllerUI } from './game/controllerUi.js';
 import { playerBerth } from './game/playerDocking.js';
 import { stationVisualSurfaceRadius } from './game/stationTraffic.js';
 import { tutorialCampaignSummary } from './game/tutorialCampaign.js';
@@ -40,6 +43,10 @@ const titleSettings = {
     language: getLanguage(),
 };
 const titleSave = () => cachedSave ?? { settings: titleSettings };
+const titleHaptics = new Haptics(() => titleSave().settings.vibration, () => undefined);
+window.addEventListener('blur', () => titleHaptics.stop());
+window.addEventListener('pagehide', () => titleHaptics.stop());
+document.addEventListener('visibilitychange', () => { if (document.hidden) titleHaptics.stop(); });
 const syncTitleSettings = (settings = {}) => {
     Object.assign(titleSettings, defaultSettings(), settings, { language: getLanguage() });
     saveSettingsPreferences(titleSettings);
@@ -91,7 +98,8 @@ const SHIP_WARM_ASSETS = Object.freeze({
     andromeda: ['./assets/models/ships/andromeda.glb', './assets/remaster/cockpit-andromeda-sprite-v2.png'],
     torsas: ['./assets/models/ships/torsas.glb', './assets/remaster/cockpit-torsas-sprite-v4.png'],
     astra: ['./assets/models/ships/astra.glb', './assets/remaster/cockpit-astra-sprite-v2.png'],
-    wayfarer: ['./assets/models/ships/wayfarer.glb', './assets/remaster/cockpit-wayfarer-sprite.png'],
+    // Warm the approved starter frame and its anchored hand strip before flight.
+    wayfarer: ['./assets/models/ships/wayfarer.glb', './assets/cockpits/wayfarer-paint-atlas-v2.png', './assets/cockpits/wayfarer-hand-pitch-v4.png', './assets/cockpits/wayfarer-stick-base-v1.png'],
     vanguard: ['./assets/models/ships/vanguard.glb', './assets/remaster/cockpit-vanguard-sprite-v7.png'],
     talon: ['./assets/models/ships/talon.glb', './assets/remaster/cockpit-talon-sprite-v6.png'],
     prospector: ['./assets/models/ships/prospector.glb', './assets/remaster/cockpit-prospector-sprite-v3.png'],
@@ -344,8 +352,11 @@ const toggleFullscreen = async () => {
     await enterFullscreen();
 };
 const assignSetting = (settings, key, value) => {
-    if (key === 'music' || key === 'effects' || key === 'touchScale' || key === 'tiltSensitivity') {
+    if (key === 'music' || key === 'effects' || key === 'touchScale' || key === 'tiltSensitivity' || key === 'controllerDeadzone' || key === 'controllerSensitivity') {
         settings[key] = Number(value);
+    }
+    else if (key === 'controllerBindings') {
+        settings.controllerBindings = normalizeControllerBindings(value);
     }
     else if (key === 'steering') {
         settings.steering = 'stick';
@@ -365,6 +376,10 @@ const assignSetting = (settings, key, value) => {
     return true;
 };
 const actions = {
+    testControllerVibration: () => {
+        if (session?.ui.isModalOpen) session.input.setGamepadBlocked(true);
+        return (session?.haptics ?? titleHaptics).test();
+    },
     cinematicSound: (...args) => session?.audio?.cinematicSound(...args),
     stationTransitData: id => session?.stationTransitData(id),
     flightPresentation: () => ({qualityMode:session?.save.settings.quality??'auto',qualityScale:session?.renderer?.lastQualityScale??1}),
@@ -485,6 +500,7 @@ const actions = {
         // preference record and mirror it into an existing career if present.
         if (!assignSetting(titleSettings, key, value))
             return;
+        if (key === 'vibration' && !value) titleHaptics.stop();
         saveSettingsPreferences(titleSettings);
         const save = cachedSave ?? loadGame();
         if (save) {
@@ -497,6 +513,7 @@ const actions = {
 };
 ui.mugStandoff = () => session?.standoffBriefing();
 ui.setActions(actions);
+ui.controller = new ControllerUI(ui, () => session, () => session?.save.settings ?? titleSave().settings);
 showTitleScreen();
 scheduleLikelyFlightWarmup();
 window.addEventListener('pagehide', () => {

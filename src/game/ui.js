@@ -1,3 +1,4 @@
+import { CONTROLLER_ACTIONS, CONTROLLER_BUTTON_LABELS, defaultControllerBindings, normalizeControllerBindings, rebindController, requiredMenuBinding } from './controllerBindings.js';
 import {UI_TERMS,socialVenueKey,missionBoardKey} from './interfaceTerms.js';
 import {explorationDialogue,explorationJournal,explorationText} from './explorationData.js';
 import {distressDialogue,distressJournal,distressText} from './distressData.js';
@@ -27,6 +28,7 @@ import {equipmentStatChanges} from './equipmentStatPresentation.js';
 import { shipTopDownProfile, shipProfilePath } from './shipTopDownProfile.js';
 import { defaultSettings, saveGame } from './save.js';
 import { getLanguage, t } from './i18n.js';
+import { PaintedCockpit, hasPaintedCockpit, paintedCockpitAssets } from './cockpitArtwork.js';
 import { ADVENTURE_DIALOGUES, dialogueText } from './adventureDialogues.js';
 import { HULL_TRADE_IN_RATE, quoteShipTrade } from './shipTrade.js';
 import { LOADOUT_KEYS, HARDPOINT_SPECS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, RESALE_RATE, itemAvailable, itemFitsMount, loadoutFor, quoteOutfitting } from './outfitting.js';
@@ -473,7 +475,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2nj';
+const GAME_VERSION = '0.8.2oi';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -969,6 +971,7 @@ export class GameUI {
         this.targetLayout = host.querySelector('.screen-target-layout');
         this.targetScreen = host.querySelector('.cockpit-screen-target');
         this.boostButtons = host.querySelectorAll('.touch-boost');
+        this.cockpitArtwork = new PaintedCockpit(this.root);
         this.bindStaticEvents();
         bindEquipmentInventory(this);
         this.syncFullscreenButton();
@@ -985,6 +988,7 @@ export class GameUI {
             this.monitorRatio = monitorRasterRatio();
             this.radarLayoutDirty = true;
             this.cockpitVisibilityDirty = true;
+            this.cockpitArtwork?.invalidate();
             this.updateOrientationNotice();
             this.syncConcourseOverlay();
             this.scheduleCommsFit();
@@ -1010,22 +1014,28 @@ export class GameUI {
         const nextId = shipId === 'blade' ? 'legionary' : COCKPIT_ART_BY_SHIP[shipId] ? shipId : 'wayfarer';
         if (this.cockpitShipId === nextId && this.root.dataset.cockpitShip === nextId)
             return;
-        void this.preloadImageSet('flight-core', [COCKPIT_ART_BY_SHIP[nextId], ...FLIGHT_SCREEN_ART], { priority: 'high' });
+        // The approved starter frame and hand replace its legacy cockpit plate.
+        const kit = hasPaintedCockpit(nextId);
+        void this.preloadImageSet('flight-core', kit ? [...paintedCockpitAssets(nextId), ...FLIGHT_SCREEN_ART] : [COCKPIT_ART_BY_SHIP[nextId], ...FLIGHT_SCREEN_ART], { priority: 'high' });
         this.cockpitShipId = nextId;
+        if (kit) this.cockpitArtwork?.activate(nextId);
+        else this.cockpitArtwork?.deactivate();
         this.radarLayoutDirty = true;
         this.cockpitVisibilityDirty = true;
         this.root.dataset.cockpitShip = nextId;
-        this.el('.canopy-aperture')?.setAttribute('points',CANOPY_APERTURES[nextId]);
-        this.el('.canopy-art-mask')?.setAttribute('href',COCKPIT_ART_BY_SHIP[nextId]);
+        if (!kit) {
+            this.el('.canopy-aperture')?.setAttribute('points',CANOPY_APERTURES[nextId]);
+            this.el('.canopy-art-mask')?.setAttribute('href',COCKPIT_ART_BY_SHIP[nextId]);
+        }
         const instruments = this.el('.cockpit-instruments');
         instruments?.removeAttribute('style');
         for (const [screen, layout] of Object.entries(COCKPIT_LAYOUT_BY_SHIP[nextId])) {
             for (const [property, value] of Object.entries(layout))
                 instruments?.style?.setProperty?.('--cockpit-' + screen.replace('Phone', '-phone') + '-' + property, value);
         }
-        // Reuse the actual ship's painted bezel around resized screen apertures.
+        // Legacy hulls reuse their painted bezel around resized apertures.
         // CSS crops the sprite; no extra textures, downloads or canvas redraws.
-        for (const [panel, [x,y,w,h]] of Object.entries(COCKPIT_BEZEL_BY_SHIP[nextId])) {
+        if (!kit) for (const [panel, [x,y,w,h]] of Object.entries(COCKPIT_BEZEL_BY_SHIP[nextId])) {
             let bezel = instruments.querySelector('.cockpit-bezel-' + panel);
             if (!bezel) {
                 bezel = document.createElement('div');
@@ -1040,12 +1050,17 @@ export class GameUI {
         }
         const art = this.el('.cockpit-art');
         if (art) {
-            art.style.backgroundImage = `url("${COCKPIT_ART_BY_SHIP[nextId]}")`;
+            art.style.backgroundImage = kit ? 'none' : `url("${COCKPIT_ART_BY_SHIP[nextId]}")`;
         }
         this.scheduleCommsFit();
     }
+    // Per-frame approved cockpit animation (anchored hand and control feedback).
+    updateCockpitKit(dt, actions) {
+        this.cockpitArtwork?.update(dt, actions);
+    }
     cockpitPointVisible(x,y,shipId=this.save?.player?.shipId) {
         this.setCockpitShip(shipId);
+        if(this.cockpitArtwork?.active)return this.cockpitArtwork.pointVisible(x,y);
         const art=this.el('.cockpit-art');
         if(!art)return true;
         // Layout reads happen only after a hull/viewport change. The HUD's
@@ -1188,7 +1203,8 @@ export class GameUI {
     }
     preloadSessionAssets(save, { priority = 'high', includeLocation = true } = {}) {
         const shipId = COCKPIT_ART_BY_SHIP[save?.player?.shipId] ? save.player.shipId : 'wayfarer';
-        const jobs = [this.preloadImageSet('flight-core', [COCKPIT_ART_BY_SHIP[shipId], ...FLIGHT_SCREEN_ART], { priority })];
+        const cockpitArt = hasPaintedCockpit(shipId) ? paintedCockpitAssets(shipId) : [COCKPIT_ART_BY_SHIP[shipId]];
+        const jobs = [this.preloadImageSet('flight-core', [...cockpitArt, ...FLIGHT_SCREEN_ART], { priority })];
         if (!includeLocation) {
             this.clearWarmImageSlot('location-current');
             this.clearWarmImageSlot('location-next');
@@ -1890,6 +1906,21 @@ export class GameUI {
                 this.actions?.explorationJournalAction?.(element.dataset.explorationAction);break;
             case 'distress-journal':
                 this.actions?.distressJournalAction?.(element.dataset.distressAction);break;
+            case 'controller-bind':
+                this.controller?.startBinding(element.dataset.bindingContext, element.dataset.bindingAction);break;
+            case 'controller-unbind':
+                this.controller?.cancelBinding('');this.assignControllerBinding(element.dataset.bindingContext,element.dataset.bindingAction,null);break;
+            case 'controller-binding-context':
+                this.controller?.cancelBinding('');this.controllerBindingContext=element.dataset.bindingContext;this.renderControllerBindings();break;
+            case 'controller-binding-test':
+                if(this.controller?.bindingTest)this.controller.cancelBinding(t('Button test ended.'));else this.controller?.startButtonTest();break;
+            case 'controller-binding-cancel':
+                this.controller?.cancelBinding(t('Assignment cancelled.'));break;
+            case 'controller-binding-reset':
+                this.controller?.cancelBinding('');this.actions?.setSetting('controllerBindings',defaultControllerBindings());this.renderControllerBindings();this.controllerBindingStatus(t('Default controller buttons restored.'));break;
+            case 'test-vibration':
+                void this.testControllerVibration(element);
+                break;
             case 'transponder-toggle':
                 this.actions?.toggleTransponder?.();
                 this.showShipMenu();
@@ -4891,8 +4922,8 @@ export class GameUI {
         const size = (this.hullCanvasSizes ??= new CanvasSizeCache()).get(canvas);
         const cssW = size.width || 150;
         const cssH = size.height || 110;
-        const width = Math.floor(Math.max(60, cssW) * ratio);
-        const height = Math.floor(Math.max(60, cssH) * ratio);
+        const width = Math.max(1, Math.round(cssW * ratio));
+        const height = Math.max(1, Math.round(cssH * ratio));
         // Stations/rocks/planets have fixed schematics. Redrawing and uploading
         // their identical canvas at HUD frequency cannot add information.
         if (this.objectOutlineCanvas===canvas && this.objectOutlineKind===kind
@@ -5027,8 +5058,8 @@ export class GameUI {
         const size = (this.hullCanvasSizes ??= new CanvasSizeCache()).get(canvas);
         const cssW = size.width || 150;
         const cssH = size.height || 110;
-        const width = Math.floor(Math.max(60, cssW) * ratio);
-        const height = Math.floor(Math.max(60, cssH) * ratio);
+        const width = Math.max(1, Math.round(cssW * ratio));
+        const height = Math.max(1, Math.round(cssH * ratio));
         // The own-ship display has a fixed heading. Keep its bitmap until
         // its contents or size change; target outlines still redraw normally.
         const ownDrawKey = canvas === this.ownHullCanvas
@@ -5185,16 +5216,18 @@ export class GameUI {
         if (ratio !== this.radarPixelRatio)
             this.radarLayoutDirty = true;
         if (this.radarLayoutDirty || this.radarCssWidth <= 0 || this.radarCssHeight <= 0) {
-            const rect = canvas.getBoundingClientRect();
-            if (rect.width > 0 && rect.height > 0) {
-                this.radarCssWidth = rect.width;
-                this.radarCssHeight = rect.height;
+            // Canvas pixels follow the untransformed content box. Bounding
+            // rects include cockpit banking and can squash the drawn circles.
+            const width = canvas.clientWidth, height = canvas.clientHeight;
+            if (width > 0 && height > 0) {
+                this.radarCssWidth = width;
+                this.radarCssHeight = height;
                 this.radarPixelRatio = ratio;
                 this.radarLayoutDirty = false;
             }
         }
-        const width = Math.floor(Math.max(72, this.radarCssWidth || 150) * ratio);
-        const height = Math.floor(Math.max(72, this.radarCssHeight || 150) * ratio);
+        const width = Math.max(1, Math.round((this.radarCssWidth || 150) * ratio));
+        const height = Math.max(1, Math.round((this.radarCssHeight || 150) * ratio));
         if (canvas.width !== width || canvas.height !== height) {
             canvas.width = width;
             canvas.height = height;
@@ -6005,6 +6038,72 @@ export class GameUI {
         panel.querySelectorAll('[data-settings-pane]').forEach(p=>p.hidden=p.dataset.settingsPane!==this.settingsTab);
         panel.querySelectorAll('[data-settings-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.settingsTab===this.settingsTab)));
     }
+    async testControllerVibration(button) {
+        const output = this.root.querySelector('[data-vibration-status]');
+        button.disabled = true;
+        if (output) output.textContent = t('Sending vibration test…');
+        let result;
+        try { result = await this.actions?.testControllerVibration?.(); }
+        catch { result = 'failed'; }
+        const messages = {
+            sent: 'Vibration signal sent to the controller.',
+            disabled: 'Enable vibration first.',
+            'not-connected': 'Connect a controller and press a button first.',
+            unsupported: 'This browser does not expose vibration for this controller.',
+            failed: 'The controller rejected the vibration test. Try another connection or browser.',
+            cancelled: 'Vibration test stopped.',
+        };
+        if (button.isConnected) button.disabled = false;
+        if (output?.isConnected) output.textContent = t(messages[result] ?? messages.unsupported);
+    }
+    controllerButtonLabel(button) {
+        return button === null ? t('Unassigned') : CONTROLLER_BUTTON_LABELS[button] ?? t('Button {number}',{number:button});
+    }
+    controllerBindingMarkup(settings) {
+        const context=this.controllerBindingContext==='menus'?'menus':'flight';
+        const bindings=normalizeControllerBindings(settings.controllerBindings)[context];
+        const capture=this.controller?.bindingCapture;
+        return `<div class="controller-binding-context" role="group" aria-label="${t('Button context')}">${['flight','menus'].map(id=>`<button type="button" data-ui-command="controller-binding-context" data-binding-context="${id}" aria-pressed="${id===context}">${t(id==='flight'?'FLIGHT':'Menus')}</button>`).join('')}</div>
+        <p class="settings-help">${t('Select an action, release all buttons, then press its new button. Occupied buttons swap actions. Stick movement stays unchanged.')}</p>
+        <p class="settings-help" data-controller-binding-status role="status">${escapeHtml(this.controllerBindingMessage??t('Changes save automatically for every career.'))}</p>
+        <p class="controller-binding-live" data-controller-live aria-live="polite">${t('Press a button to test its assignment.')}</p>
+        <div class="controller-binding-rows">${CONTROLLER_ACTIONS[context].map(([action,label])=>{
+            const button=bindings[action],waiting=capture?.context===context&&capture?.action===action;
+            return `<div class="controller-bind-row" data-controller-button="${button??''}"><span>${escapeHtml(t(label))}</span><button type="button" class="${waiting?'is-capturing':''}" data-ui-command="controller-bind" data-binding-context="${context}" data-binding-action="${action}" aria-label="${escapeHtml(t(label)+': '+this.controllerButtonLabel(button))}">${waiting?t('Press a button…'):escapeHtml(this.controllerButtonLabel(button))}</button><button type="button" class="controller-bind-clear" data-ui-command="controller-unbind" data-binding-context="${context}" data-binding-action="${action}" aria-label="${escapeHtml(t('Clear {action}',{action:t(label)}))}" ${requiredMenuBinding(context,action)?`disabled title="${t('Confirm and Back must keep a button.')}"`:''}>×</button></div>`;
+        }).join('')}</div>
+        <div class="controller-binding-footer"><button type="button" data-ui-command="controller-binding-test" aria-pressed="${Boolean(this.controller?.bindingTest)}">${t(this.controller?.bindingTest?'Stop testing':'Test buttons')}</button><button type="button" data-ui-command="controller-binding-cancel" ${capture?'':'disabled'}>${t('Cancel assignment')}</button><button type="button" data-ui-command="controller-binding-reset">${t('Restore default buttons')}</button></div>
+        <p class="settings-help">${t('Confirm and Back must keep a button. Use Esc to cancel an assignment.')}</p>`;
+    }
+    renderControllerBindings() {
+        const region=this.root.querySelector('[data-controller-bindings]');
+        if(!region)return;
+        const active=region.contains(document.activeElement)?document.activeElement:undefined;
+        const saved=active?.dataset?.uiCommand?{command:active.dataset.uiCommand,context:active.dataset.bindingContext,action:active.dataset.bindingAction}:undefined;
+        region.innerHTML=this.controllerBindingMarkup(this.save?.settings??defaultSettings());
+        if(saved){
+            const selector=`[data-ui-command="${saved.command}"]${saved.context?`[data-binding-context="${saved.context}"]`:''}${saved.action?`[data-binding-action="${saved.action}"]`:''}`;
+            region.querySelector(selector)?.focus({preventScroll:true});
+        }
+    }
+    controllerBindingStatus(message) {
+        this.controllerBindingMessage=message;
+        const status=this.root.querySelector('[data-controller-binding-status]');
+        if(status)status.textContent=message;
+    }
+    assignControllerBinding(context,action,button) {
+        try {
+            const result=rebindController(this.save?.settings?.controllerBindings,context,action,button);
+            this.actions?.setSetting('controllerBindings',result.bindings);
+            this.renderControllerBindings();
+            const label=t(CONTROLLER_ACTIONS[context].find(entry=>entry[0]===action)[1]);
+            const other=result.swapped?t(CONTROLLER_ACTIONS[context].find(entry=>entry[0]===result.swapped)[1]):null;
+            this.controllerBindingStatus(other?t('{action}: {button}. Swapped with {other}.',{action:label,button:this.controllerButtonLabel(button),other}):t('{action}: {button}.',{action:label,button:this.controllerButtonLabel(button)}));
+            return true;
+        } catch {
+            this.controllerBindingStatus(t('Confirm and Back must keep a button. Choose another button.'));
+            return false;
+        }
+    }
     settingsSections(settings) {
         const selected=this.settingsTab??'flight';
         return `
@@ -6012,7 +6111,7 @@ export class GameUI {
         <div class="settings-pane" id="settings-flight-pane" data-settings-pane="flight" role="tabpanel" aria-labelledby="settings-flight-tab" ${selected==='flight'?'':'hidden'}><div class="pause-grid"><section><label><span>${t('Flight assist')}</span><input type="checkbox" data-setting="flightAssist" ${settings.flightAssist ? 'checked' : ''}></label><label><span>${t('Aim assistance')}</span><input type="checkbox" data-setting="aimAssist" ${settings.aimAssist ? 'checked' : ''}></label><label><span>${t('Easy mode · 50% damage taken')}</span><input type="checkbox" data-setting="easyMode" ${settings.easyMode ? 'checked' : ''}></label></section></div></div>
         <div class="settings-pane" id="settings-audio-pane" data-settings-pane="audio" role="tabpanel" aria-labelledby="settings-audio-tab" ${selected==='audio'?'':'hidden'}><div class="pause-grid"><section><label><span>${t('Music')}</span><input type="range" min="0" max="1" step="0.05" value="${settings.music}" data-setting="music"></label><label><span>${t('Effects')}</span><input type="range" min="0" max="1" step="0.05" value="${settings.effects}" data-setting="effects"></label></section></div></div>
         <div class="settings-pane" id="settings-display-pane" data-settings-pane="display" role="tabpanel" aria-labelledby="settings-display-tab" ${selected==='display'?'':'hidden'}><div class="pause-grid"><section><label><span>${t('Power use')}</span><select data-setting="powerMode"><option value="auto" ${!settings.powerMode || settings.powerMode === 'auto' ? 'selected' : ''}>${t('Automatic')}</option><option value="battery" ${settings.powerMode === 'battery' ? 'selected' : ''}>${t('Battery saving · 30 FPS')}</option><option value="performance" ${settings.powerMode === 'performance' ? 'selected' : ''}>${t('Smoother motion · 60 FPS')}</option></select></label><label><span>${t('Reduced damage effects')}</span><input type="checkbox" data-setting="reducedDamageEffects" ${settings.reducedDamageEffects ? 'checked' : ''}></label><label><span>${t('Fullscreen')}</span><button type="button" class="fullscreen-switch" data-ui-command="toggle-fullscreen" role="switch" aria-label="${t('Toggle fullscreen')}" aria-checked="false">⛶</button></label></section><section><label><span>${t('Language')}</span><select data-setting="language"><option value="de" ${settings.language !== 'en' ? 'selected' : ''}>Deutsch</option><option value="en" ${settings.language === 'en' ? 'selected' : ''}>English</option></select></label></section></div></div>
-        <div class="settings-pane" id="settings-controls-pane" data-settings-pane="controls" role="tabpanel" aria-labelledby="settings-controls-tab" ${selected==='controls'?'':'hidden'}><div class="pause-grid"><section><label><span>${t('Haptics')}</span><input type="checkbox" data-setting="vibration" ${settings.vibration ? 'checked' : ''}></label><label><span>${t('Touch scale')}</span><input type="range" min="0.8" max="1.3" step="0.05" value="${settings.touchScale}" data-setting="touchScale"></label><label><span>${t('Invert pitch')}</span><input type="checkbox" data-setting="tiltInvertPitch" ${settings.tiltInvertPitch ? 'checked' : ''}></label><label><span>${t('Invert yaw')}</span><input type="checkbox" data-setting="tiltInvertYaw" ${settings.tiltInvertYaw ? 'checked' : ''}></label><p class="settings-help">${t('Inversion applies to the joystick, keyboard and controller.')}</p></section></div><section class="controls-reference"><details class="ui-details"><summary>${t('KEYBOARD / CONTROLLER')}</summary><p>${t('W/S pitch · A/D yaw · Q/E roll · R/F throttle · Shift afterburn · Space fire · X fire group · L launcher · hold M secondary tool / tap missile or capture · T target · C mode · N nav · J hyperdrive · K map · B transponder')}</p><p>${t('Gamepad: left stick steer · right stick roll/throttle · RT fire · hold RB secondary tool / tap missile or capture · LB afterburn · face buttons target/mode/fire group/hyperdrive · left stick click transponder · D-pad launcher/capture/hostile/nav.')}</p></details></section></div>
+        <div class="settings-pane" id="settings-controls-pane" data-settings-pane="controls" role="tabpanel" aria-labelledby="settings-controls-tab" ${selected==='controls'?'':'hidden'}><div class="pause-grid"><section><label><span>${t('Haptics')}</span><input type="checkbox" data-setting="vibration" ${settings.vibration ? 'checked' : ''}></label><label><span>${t('Touch scale')}</span><input type="range" min="0.8" max="1.3" step="0.05" value="${settings.touchScale}" data-setting="touchScale"></label><label><span>${t('Invert pitch')}</span><input type="checkbox" data-setting="tiltInvertPitch" ${settings.tiltInvertPitch ? 'checked' : ''}></label><label><span>${t('Invert yaw')}</span><input type="checkbox" data-setting="tiltInvertYaw" ${settings.tiltInvertYaw ? 'checked' : ''}></label><p class="settings-help">${t('Inversion applies to the joystick, keyboard and controller.')}</p></section><section class="controller-settings"><h3>${t('Controller')}</h3><p class="settings-help" data-controller-status aria-live="polite">${t('Connect a controller and press a button.')}</p><button type="button" data-ui-command="test-vibration">${t('Test vibration')}</button><p class="settings-help" data-vibration-status aria-live="polite"></p><label><span>${t('Stick deadzone')}</span><input type="range" min="0.05" max="0.35" step="0.01" value="${settings.controllerDeadzone ?? 0.13}" data-setting="controllerDeadzone"></label><label><span>${t('Stick sensitivity')}</span><input type="range" min="0.5" max="1.8" step="0.05" value="${settings.controllerSensitivity ?? 1}" data-setting="controllerSensitivity"></label><p class="settings-help">${t('Menus: left stick navigate · {confirm} confirm · {back} back · {next} next control · right stick scroll.',{confirm:this.controllerButtonLabel((settings.controllerBindings??defaultControllerBindings()).menus.confirm),back:this.controllerButtonLabel((settings.controllerBindings??defaultControllerBindings()).menus.back),next:this.controllerButtonLabel((settings.controllerBindings??defaultControllerBindings()).menus.nextControl)})}</p></section></div><details class="ui-details controller-binding-editor"><summary>${t('Button assignments')}</summary><div data-controller-bindings>${this.controllerBindingMarkup(settings)}</div></details><section class="controls-reference"><details class="ui-details"><summary>${t('KEYBOARD / CONTROLLER')}</summary><p>${t('W/S pitch · A/D yaw · Q/E roll · R/F throttle · Shift afterburn · Space fire · X fire group · L launcher · M missile / capture / mining drones · T target · N nav · J hyperdrive · K map · B transponder')}</p><p>${t('Controller: left stick steer · right stick roll / throttle. See Button assignments for your current buttons.')}</p></details></section></div>
         </div>`;
     }
     showPause() {
@@ -6119,7 +6218,7 @@ export class GameUI {
             }
             card.classList.toggle('is-powered-down',Boolean(entry.poweredDown));
         }
-        if(previousCount!==rail.children.length)this.scheduleCommsFit();
+        if(previousCount!==rail.children.length){this.scheduleCommsFit();this.cockpitArtwork?.invalidate();}
     }
     showArenaRun(save) {
         const r=save.arenaRun,p=save.player,stats=getEffectiveShipStats(p),wave=RUN_WAVES[r.wave],fit=loadoutFor(p),spec=HARDPOINT_SPECS[p.shipId];
@@ -6140,7 +6239,7 @@ export class GameUI {
         const metrics=id=>{
             const d=OUTFIT_ITEMS[id],w=d.category==='turret'?modifiedWeapon(d.turretKind==='pdc'?PDC_TURRET:TRACKING_LASER,d):weaponForOutfit(id)??launcherForOutfit(id);
             if(w){
-                const damage=w.damageFlat??w.damage,shots=w.volley??w.pellets??1;
+                const damage=(w.damageFlat??w.damage),shots=w.volley??w.pellets??1;
                 const amount=value=>shots>1?`${shots}×${number(value)}`:value;
                 if(d.category==='launcher')return `<span class="run-metrics run-weapon-metrics">${metric('Shield damage',amount(damage*(1-(w.shieldBypass??0))*(w.shieldMul??1)))}${metric('Hull damage',amount(damage*(w.hullMul??1)))}${metric('Energy per shot',w.energyCost??0)}${metric('Range',`${number(w.range??w.lockRange??0)} km`)}</span>`;
                 return `<span class="run-metrics">${metric('Damage',amount(damage))}${metric('Energy per shot',w.energyCost??0)}${metric('Range',`${number(w.range??w.lockRange??0)} km`)}</span>`;
@@ -6179,8 +6278,9 @@ export class GameUI {
                 const visual=service?`<span class="run-art"><span class="run-service-icon">${id==='repair'?'✚':id==='rearm'?'⟐':'⚡'}</span></span><span class="run-metrics">${id==='repair'?metric('HULL',50,'+ %')+metric('MISSILES',100,'%'):id==='rearm'?metric('MISSILES',100,'%'):metric('ENERGY',100,'%')+metric('FUEL',100,'%')}</span>`:`<span class="run-art">${image(id)}${plan.count>1?`<em class="run-quantity">×${plan.count}</em>`:''}</span>${metrics(id)}<span class="run-replacement" aria-label="${t('REPLACES')}">${[...new Set(plan.replaced)].map(image).join('')||'<span class="run-empty-mount">+</span>'}<i>→</i>${image(id)}</span>`;
                 return command('reward',id,`<b>${escapeHtml(title)}</b>${visual}<span class="run-selected-mark" aria-hidden="true">✓</span>`,`class="${r.selectedReward===id?'is-selected':''}" ${service?'data-service="true"':paint(id)} title="${escapeHtml(service?title:equipmentName(OUTFIT_ITEMS[id]))}" aria-label="${escapeHtml((service?'':plan.count+'× ')+title+(service?'':' · '+t(EQUIPMENT_RARITIES[quality(id)].name)))}" aria-pressed="${r.selectedReward===id}"`);
             }).join('')}</div>`;
+            if(fit.guns.some(Boolean))body+=`<p class="run-reward-hint">${t('Skip: +50% hull, full missiles. Next draw: rarity +1.')}</p>`;
             const selected=r.offers.includes(r.selectedReward)&&runRewardPlan(save,r.selectedReward);
-            footer=`${leave}${r.wave===0&&r.openingPicks===0?'':command('equip','',t('Fitting'),selected?'':'disabled')}${command('accept','',t(r.wave===0&&r.openingPicks===0?'NEXT':'LAUNCH'),`class="primary" ${selected?'':'disabled'}`)}`;
+            footer=`${leave}${fit.guns.some(Boolean)?command('skip','',t('Skip draw'),`title="${t('Repair 50% hull, refill missiles; next round rewards are one rarity higher.')}"`):''}${r.wave===0&&r.openingPicks===0?'':command('equip','',t('Fitting'),selected?'':'disabled')}${command('accept','',t(r.wave===0&&r.openingPicks===0?'NEXT':'LAUNCH'),`class="primary" ${selected?'':'disabled'}`)}`;
         }else{
             const slots=['weapons','turrets','utility'].flatMap(key=>spec[key].map((mount,index)=>({key,mount,index,id:key==='weapons'?fit.guns[index]??fit.launchers[index]:fit[key][index]})));
             if(this.runFitOpen){
@@ -6435,6 +6535,7 @@ export class GameUI {
     }
     setTouchScale(scale) {
         this.root.style.setProperty('--touch-scale', String(scale));
+        this.cockpitArtwork?.invalidate();
     }
     setTouchSteering() {
         this.root.classList.remove('steering-tilt');

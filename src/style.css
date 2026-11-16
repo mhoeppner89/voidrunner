@@ -1,6 +1,23 @@
 @font-face { font-family:"Void VGA"; src:url("../assets/fonts/void-vga.ttf") format("truetype"); font-display:swap; font-style:normal; font-weight:400 900; }
 @font-face { font-family:"Void VGA Text"; src:url("../assets/fonts/void-vga-text.ttf") format("truetype"); font-display:swap; font-style:normal; font-weight:400 900; }
 :root {
+  --cockpit-control-edge: #a6a89d;
+  --cockpit-control-hi: #405768;
+  --cockpit-control-bg: #122c42;
+  --cockpit-control-low: #091826;
+  --cockpit-control-glint: #c5c6af;
+  --cockpit-control-shadow: #07101d;
+  --cockpit-control-ink: #eee2bb;
+  --cockpit-control-gold: #d6b677;
+  --cockpit-control-pressed: #020812;
+  --cockpit-control-focus: #f4cf78;
+  --cockpit-throttle-bg: #102536;
+  --cockpit-throttle-tick: #566a77;
+  --cockpit-lever-hi: #879693;
+  --cockpit-lever-lo: #3b5263;
+  --cockpit-lever-edge: #9da69d;
+  --cockpit-status-edge: #72818a;
+  --cockpit-status-bg: #071421;
   --speaker-yellow: #ffd24a;
   --console-brass: #a58b58;
   --console-brass-light: #cfb67a;
@@ -47,7 +64,16 @@
   --retro-amber-hi: #ffe89a;
   --retro-green: #75e7c8;
   --retro-red: #ff5e57;
-  --pixel-font: "Void VGA", "Lucida Console", "Courier New", ui-monospace, monospace;
+  /* Code-drawn cockpit kit: DOM chrome that sits on the rendered cockpit
+     (frame palette lives in cockpitScene.js). */
+  --kit-outline: #03060f;
+  --kit-trim: #d8cdae;
+  --kit-trim-hi: #f2e9cf;
+  --kit-trim-lo: #8a7d60;
+  --kit-lcd-ink: #ffb83d;
+  --kit-glass: #030c22;
+  --kit-glass-glow: rgba(40, 140, 220, 0.16);
+  --pixel-font: "Void VGA Text", "Lucida Console", "Courier New", ui-monospace, monospace;
   --display-font: Impact, "Arial Narrow", Haettenschweiler, sans-serif;
   /* Docked UI type floors. Station interfaces scroll or reflow before these
      values are reduced; dense pixel text below this scale is not readable. */
@@ -5035,7 +5061,8 @@ button.primary,
 .cockpit-art {
   inset: -1.2%;
   z-index: 1;
-  background: url("../assets/remaster/cockpit-wayfarer-sprite.png") center / 100% 100% no-repeat;
+  /* Sprite hulls get their art inline from GameUI; the starter hull is code-drawn. */
+  background: none center / 100% 100% no-repeat;
   image-rendering: auto;
   transform: translate3d(var(--cockpit-shift-x), var(--cockpit-shift-y), 0) rotate(var(--cockpit-roll)) scale(var(--cockpit-zoom));
   transform-origin: 50% 72%;
@@ -16456,7 +16483,27 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 .inventory-mount b { color:var(--item-color); font-weight:500; line-height:1.4; }
 .inventory-stock { min-width:0; min-height:0; display:flex; flex-direction:column; }
 .inventory-stock nav { display:flex; gap:6px; flex-shrink:0; margin-bottom:10px; }
-.inventory-stock nav > select:last-child { margin-left:auto; max-width:120px; }
+.inventory-sort { position:relative; flex:0 0 auto; margin-left:auto; }
+.inventory-sort > summary {
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  min-width:106px; min-height:44px; box-sizing:border-box; padding:8px 10px;
+  border:1px solid #456378; background:#102840; color:var(--void-cream);
+  cursor:pointer; list-style:none; font:500 13px/1.35 var(--ui-font);
+}
+.inventory-sort > summary::-webkit-details-marker { display:none; }
+.inventory-sort > summary:focus-visible { outline:2px solid var(--void-gold); outline-offset:-3px; }
+.inventory-sort > summary i { color:var(--void-muted); font-style:normal; }
+.inventory-sort[open] > summary { border-color:var(--void-gold); }
+.inventory-sort-menu {
+  position:absolute; z-index:20; top:100%; right:0; min-width:max(100%,150px);
+  display:flex; flex-direction:column; padding:3px; box-sizing:border-box;
+  border:1px solid var(--void-gold); background:#06152c; box-shadow:0 8px 16px #0009;
+}
+.equipment-inventory .inventory-sort-menu button { width:100%; text-align:left; white-space:nowrap; }
+.equipment-inventory .inventory-sort-menu button,
+#dock-screen .equipment-inventory .inventory-sort-menu button,
+#ship-panel .equipment-inventory .inventory-sort-menu button { white-space:nowrap; overflow-wrap:normal; }
+.equipment-inventory .inventory-sort-menu button[aria-pressed="true"] { color:var(--void-gold); }
 .inventory-tab-buttons { display:flex; gap:4px; scrollbar-width:thin; scrollbar-color:var(--void-muted) transparent; }
 .inventory-tab-buttons::-webkit-scrollbar { height:3px; }
 .inventory-tab-buttons::-webkit-scrollbar-thumb { background:var(--void-muted); }
@@ -16545,7 +16592,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   .equipment-inventory > header > b { margin-left:auto; font-size:12px; }
   .inventory-layout { grid-template-columns:112px minmax(0,1fr); }
   .inventory-stock nav { flex-wrap:wrap; }
-  .inventory-stock nav > select:last-child { max-width:90px; }
+  .inventory-sort > summary { min-width:90px; }
   .inventory-stat { flex-wrap:wrap; }
   .inventory-loot { flex-wrap:wrap; }
   .inventory-loot-actions { width:100%; }
@@ -17697,3 +17744,240 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 .inventory-cargo-meter i { display:block; height:100%; background:var(--void-cyan); }
 .inventory-cargo-usage.is-full .inventory-cargo-meter i { background:var(--retro-red); }
 @media(max-height:520px) { .inventory-cargo-usage { margin-bottom:5px; } .inventory-cargo-usage > div:first-child { font-size:12px; } }
+
+.run-reward-hint { color:var(--void-muted); margin:6px 0 0; font:12px/1.25 var(--ui-font); }
+
+/* Controller focus uses the existing palette and never covers the flight view. */
+.controller-focus { outline: 3px solid var(--void-gold); outline-offset: 3px; scroll-margin: 8px; }
+.controller-settings { display: grid; gap: .75rem; margin: 1rem 0; }
+.controller-settings label { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+
+.controller-binding-editor { margin:12px 0; padding:8px 12px; border:1px solid var(--console-edge); }
+.controller-binding-editor > summary { min-height:44px; padding:10px 0; cursor:pointer; color:var(--void-gold); }
+.controller-binding-context,.controller-binding-footer { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
+.controller-binding-context button,.controller-binding-footer button { min-height:44px; }
+.controller-binding-context [aria-pressed="true"] { border-color:var(--void-gold); color:var(--void-gold); }
+.controller-binding-rows { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 18px; }
+.controller-bind-row { min-width:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(100px,140px) 36px; align-items:center; gap:6px; border-bottom:1px solid var(--console-edge); padding:6px 0; font:14px/1.3 var(--ui-font); }
+.controller-bind-row > span { min-width:0; overflow-wrap:break-word; }
+.controller-bind-row button { min-width:0; min-height:44px; padding:5px; white-space:normal; }
+.controller-bind-row .is-capturing { border-color:var(--void-gold); color:var(--void-gold); }
+.controller-bind-row.is-pressed { background:var(--void-navy); outline:1px solid var(--void-cyan); }
+.controller-binding-live { color:var(--void-cyan); font:13px/1.4 var(--ui-font); min-height:20px; }
+@media(max-width:760px) { .controller-binding-rows { grid-template-columns:1fr; } }
+@media(max-width:440px) { .controller-bind-row { grid-template-columns:minmax(0,1fr) 105px 30px; font-size:13px; } }
+
+/* ===== Code-drawn cockpit kit =====================================================
+   Active when GameUI sets data-cockpit-kit (hulls in COCKPIT_SCENES). CockpitKit
+   renders the 3D cockpit into pixel canvases (.kit-layer) and places the live
+   monitors and touch hit areas with inline px rects on the same grid
+   (--kit-unit CSS px per art pixel). The touch elements are invisible hit
+   areas over the painted controls; canvases, monitors and controls share one
+   banking transform. */
+.kit-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+}
+.kit-frame { z-index: 1; }
+.kit-hand { z-index: 2; }
+.kit-safe-probe {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+#game-shell:not([data-cockpit-kit]) .kit-layer { display: none; }
+#game-shell[data-cockpit-kit] .cockpit-art,
+#game-shell[data-cockpit-kit] .cockpit-bezel { display: none; }
+#game-shell[data-cockpit-kit] .cockpit-instruments,
+#game-shell[data-cockpit-kit] .touch-controls {
+  inset: 0;
+  /* No zoom: the kit is solved for the exact viewport, so scaling would push
+     controls past the screen edges. Head motion keeps the sway and bank. */
+  transform: translate3d(var(--cockpit-shift-x), var(--cockpit-shift-y), 0) rotate(var(--cockpit-roll));
+  transform-origin: 50% 72%;
+}
+
+/* Monitor glass: the housing is rendered; the DOM element is only the screen. */
+#game-shell[data-cockpit-kit] .cockpit-screen {
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  transform: none;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 calc(var(--kit-unit) * 2), rgba(0, 0, 0, 0.18) calc(var(--kit-unit) * 2) calc(var(--kit-unit) * 3)),
+    radial-gradient(ellipse at 50% 40%, #0a2350, var(--kit-glass) 72%);
+  box-shadow: inset 0 0 calc(var(--kit-unit) * 8) var(--kit-glass-glow), inset 0 0 0 var(--kit-unit) #02040a;
+}
+#game-shell[data-cockpit-kit] .cockpit-screen::after { inset: calc(var(--kit-unit) * 2); border-color: rgba(79, 205, 231, 0.18); }
+
+/* Hyperdrive: a pixel plate on its projector housing. */
+#game-shell[data-cockpit-kit] #hyperdrive-card {
+  max-width: none;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: var(--kit-unit) solid var(--kit-trim-lo);
+  border-top-color: var(--kit-trim);
+  border-radius: 0;
+  background: #050c1a;
+  box-shadow: 0 0 0 var(--kit-unit) var(--kit-outline), inset 0 calc(var(--kit-unit) * -1) 0 #0d1b33;
+  filter: none;
+}
+#game-shell[data-cockpit-kit] #hyperdrive-card b { color: #a87a3a; text-shadow: none; letter-spacing: 0.14em; }
+#game-shell[data-cockpit-kit] #hyperdrive-card[data-hyperdrive-ready="true"] {
+  border-color: var(--retro-amber);
+  border-top-color: var(--retro-amber-hi);
+  box-shadow: 0 0 0 var(--kit-unit) var(--kit-outline), 0 0 calc(var(--kit-unit) * 6) rgba(255, 184, 61, 0.45);
+}
+#game-shell[data-cockpit-kit] #hyperdrive-card[data-hyperdrive-ready="true"] b { color: var(--retro-amber-hi); text-shadow: 0 0 calc(var(--kit-unit) * 3) rgba(255, 184, 61, 0.7); }
+
+/* Controls exist on every device (mouse works too). Each element is only a
+   hit area, larger than the rendered cap/lever/stick it sits over. */
+#game-shell[data-cockpit-kit] .touch-controls { display: block; }
+#game-shell[data-cockpit-kit] .touch-left,
+#game-shell[data-cockpit-kit] .touch-right {
+  position: absolute;
+  inset: 0;
+  display: block;
+  gap: 0;
+  transform: none;
+  pointer-events: none;
+}
+#game-shell[data-cockpit-kit] .touch-secondary-row { display: contents; }
+#game-shell[data-cockpit-kit] .touch-boost-left { display: none; }
+#game-shell[data-cockpit-kit] :is(.touch-stick, .touch-throttle) {
+  position: absolute;
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: auto;
+}
+#game-shell[data-cockpit-kit] :is(.touch-stick-rings, .touch-stick-knob, .touch-throttle-fill, .touch-throttle-thumb, .touch-throttle-label),
+#game-shell[data-cockpit-kit] .touch-throttle::before { opacity: 0; }
+#game-shell[data-cockpit-kit] .touch-controls :is(.touch-fire, .touch-missile, .touch-launcher-cycle, .touch-boost-right) {
+  position: absolute;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--kit-unit) * 3);
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  color: transparent;
+  background: transparent;
+  box-shadow: none;
+  opacity: 1;
+  filter: none;
+  overflow: visible;
+}
+#game-shell[data-cockpit-kit] .touch-controls :is(.touch-fire, .touch-missile, .touch-boost-right) svg,
+#game-shell[data-cockpit-kit] .touch-controls #touch-drone-label { display: none; }
+#game-shell[data-cockpit-kit] .touch-controls :is(.touch-fire, .touch-missile, .touch-launcher-cycle, .touch-boost-right):is(:hover, :active, .is-active, .is-engaged) {
+  background: transparent;
+  box-shadow: none;
+  filter: none;
+  transform: none;
+}
+#game-shell[data-cockpit-kit] .touch-controls :is(.touch-fire, .touch-missile, .touch-launcher-cycle, .touch-boost-right):focus-visible { outline: 1px dashed var(--retro-amber); outline-offset: 0; }
+/* The rack display: live text on the rendered LCD. */
+#game-shell[data-cockpit-kit] .touch-controls .touch-launcher-cycle { font: 700 clamp(9px, calc(var(--cap-h) * 0.5), 15px) / 1 var(--pixel-font); }
+#game-shell[data-cockpit-kit] .touch-controls .touch-launcher-cycle span { color: #c98a2a; font-size: 0.82em; letter-spacing: 0.06em; }
+#game-shell[data-cockpit-kit] .touch-controls .touch-launcher-cycle b { color: var(--kit-lcd-ink); font-size: 1em; }
+#game-shell[data-cockpit-kit] .touch-controls .touch-launcher-cycle.is-empty b { color: var(--retro-red); }
+#game-shell[data-cockpit-kit] .touch-controls .touch-launcher-cycle:disabled { opacity: 1; }
+/* Drone states keep an engraved label under the missile cap (MINE, RECALL …). */
+#game-shell[data-cockpit-kit] .touch-controls .touch-utility-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--cap-y) + var(--cap-h) + var(--kit-unit) * 3);
+  margin: 0;
+  color: var(--kit-trim);
+  font: 700 clamp(8px, calc(var(--kit-unit) * 6), 12px) / 1 var(--pixel-font);
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-shadow: 0 var(--kit-unit) 0 var(--kit-outline);
+  pointer-events: none;
+}
+/* Pause / fullscreen become small console keys in the header corner. */
+#game-shell[data-cockpit-kit] .hud-corner-buttons button {
+  border: var(--kit-unit) solid var(--kit-trim-lo);
+  border-top-color: var(--kit-trim);
+  border-radius: 0;
+  color: var(--kit-trim-hi);
+  background: #0b1830;
+  box-shadow: 0 0 0 var(--kit-unit) var(--kit-outline), 0 calc(var(--kit-unit) * 2) 0 var(--kit-unit) rgba(0, 0, 0, 0.4);
+  opacity: 1;
+}
+#game-shell[data-cockpit-kit] .hud-corner-buttons button:active { transform: translateY(var(--kit-unit)); box-shadow: 0 0 0 var(--kit-unit) var(--kit-outline); }
+
+/* Approved starter cockpit artwork. Scope every override to this hull so
+   switching ships restores the existing cockpit and control layouts. */
+.painted-cockpit-frame,.painted-pilot-hand,.painted-stick-mount,.painted-hand-layer{display:none}
+.painted-throttle-rail{display:contents}
+#game-shell[data-cockpit-paint] .cockpit-art,
+#game-shell[data-cockpit-paint] .cockpit-bezel,
+#game-shell[data-cockpit-paint] .cockpit-glass{display:none}
+#game-shell[data-cockpit-paint] .cockpit-instruments{inset:0;transform:none}
+#game-shell[data-cockpit-paint] :is(.painted-cockpit-frame,.painted-stick-mount){display:block;position:absolute;inset:0;width:100%;height:100%;pointer-events:none;image-rendering:pixelated}
+#game-shell[data-cockpit-paint] .painted-cockpit-frame{z-index:3;transform:translateZ(0)}
+#game-shell[data-cockpit-paint] .cockpit-vignette{transform:none}
+#game-shell[data-cockpit-paint] .painted-hand-layer{display:block;position:absolute;z-index:4;pointer-events:none;overflow:hidden;contain:strict;isolation:isolate;transform:translateZ(0)}
+#game-shell[data-cockpit-paint] .painted-stick-mount{z-index:0;overflow:visible}
+#game-shell[data-cockpit-paint] .painted-pilot-hand{display:block;position:absolute;z-index:1;overflow:visible;pointer-events:none;image-rendering:pixelated}
+#game-shell[data-cockpit-paint] .cockpit-instruments .cockpit-screen{z-index:2;translate:none;transform:translateZ(0);max-width:none;max-height:none;overflow:hidden;border:0;border-radius:0;box-shadow:none;background:var(--console-recess);contain:layout paint style;isolation:isolate}
+#game-shell[data-cockpit-paint] .cockpit-screen::before,#game-shell[data-cockpit-paint] .cockpit-screen::after{display:none}
+#game-shell[data-cockpit-paint] .cockpit-instruments #hyperdrive-card{z-index:4;margin:0;padding-inline:6px;min-width:0}
+#game-shell[data-cockpit-paint] .touch-controls{display:block}
+#game-shell[data-cockpit-paint] .touch-left .touch-stick{background:transparent;border-color:transparent;box-shadow:none}
+#game-shell[data-cockpit-paint] :is(.touch-stick-rings,.touch-stick-knob){visibility:hidden}
+#game-shell[data-cockpit-paint][data-cockpit-touch=false] :is(.touch-right,[data-touch-throttle]){visibility:hidden;pointer-events:none}
+#game-shell[data-cockpit-paint] .touch-right button{border-color:var(--cockpit-control-edge);border-radius:6px;background:linear-gradient(145deg,var(--cockpit-control-hi),var(--cockpit-control-bg) 65%,var(--cockpit-control-low));box-shadow:inset 0 1px var(--cockpit-control-glint),inset 0 -3px var(--cockpit-control-shadow),0 2px 2px #0008;color:var(--cockpit-control-ink)}
+#game-shell[data-cockpit-paint] .touch-right #touch-fire{border-color:var(--cockpit-control-gold)}
+#game-shell[data-cockpit-paint] .touch-right :is(.touch-fire,.touch-missile).is-mining{color:var(--void-gold)}
+#game-shell[data-cockpit-paint] .touch-right :is(.is-salvage,.is-capture,.is-scan){color:var(--void-cyan)}
+#game-shell[data-cockpit-paint] .touch-right button:is(:active,.is-active,.is-engaged){box-shadow:inset 0 2px 3px var(--cockpit-control-pressed);filter:brightness(1.2)}
+#game-shell[data-cockpit-paint] .touch-right button:focus-visible{outline:2px solid var(--cockpit-control-focus);outline-offset:3px}
+#game-shell[data-cockpit-paint] .touch-right :is(.touch-boost-right,#touch-launcher-cycle){position:relative;overflow:visible}
+#game-shell[data-cockpit-paint] .touch-right .touch-boost-right::before{content:'';position:absolute;inset:-28px 0 0 -28px;pointer-events:auto}
+#game-shell[data-cockpit-paint] .touch-right #touch-launcher-cycle::before{content:'';position:absolute;inset:0 0 0 -28px;pointer-events:auto}
+#game-shell[data-cockpit-paint] .touch-left .touch-throttle{background:transparent;border-color:transparent;box-shadow:none}
+#game-shell[data-cockpit-paint] .touch-left .touch-throttle::before{content:none}
+#game-shell[data-cockpit-paint] .painted-throttle-rail{display:block;position:absolute;left:25%;top:0;width:50%;height:100%;border:1px solid var(--console-brass);border-radius:3px;background:repeating-linear-gradient(to top,var(--cockpit-throttle-bg) 0 14px,var(--cockpit-throttle-tick) 15px,var(--cockpit-throttle-bg) 16px);pointer-events:none;overflow:visible}
+#game-shell[data-cockpit-paint] .painted-throttle-rail .touch-throttle-thumb{left:-3px;right:-3px;background:linear-gradient(var(--cockpit-lever-hi),var(--cockpit-lever-lo));border:1px solid var(--cockpit-lever-edge);box-shadow:none}
+#game-shell[data-cockpit-paint] .hud-corner-buttons button,
+#game-shell[data-cockpit-paint] #hud-wing-tactics .hud-wing-btn{border:2px solid var(--cockpit-control-edge);border-radius:6px;background:linear-gradient(145deg,var(--cockpit-control-hi),var(--cockpit-control-bg) 65%,var(--cockpit-control-low));box-shadow:inset 0 1px var(--cockpit-control-glint),inset 0 -3px var(--cockpit-control-shadow),0 2px 2px #0008;color:var(--cockpit-control-ink);text-shadow:none;font-family:var(--flight-font)}
+#game-shell[data-cockpit-paint] .hud-corner-buttons button:is(:active,.is-active),
+#game-shell[data-cockpit-paint] #hud-wing-tactics .hud-wing-btn:active{box-shadow:inset 0 2px 3px var(--cockpit-control-pressed);filter:brightness(1.15)}
+#game-shell[data-cockpit-paint] .hud-corner-buttons button:focus-visible,
+#game-shell[data-cockpit-paint] #hud-wing-tactics .hud-wing-btn:focus-visible{outline:2px solid var(--cockpit-control-focus);outline-offset:3px}
+#game-shell[data-cockpit-paint] #hud-wing-tactics{top:var(--painted-top,var(--safe-top))}
+#game-shell[data-cockpit-paint] #hud-wing-tactics .hud-wing-btn{height:var(--painted-top-height,44px);min-height:var(--painted-top-height,44px)}
+#game-shell[data-cockpit-paint] #hud-wing-tactics .hud-wing-btn>b{color:var(--cockpit-control-ink);text-shadow:none}
+#game-shell[data-cockpit-paint] #hud-wing-tactics .hud-wing-btn i{border-color:var(--cockpit-status-edge);background:var(--cockpit-status-bg)}
+#game-shell[data-cockpit-paint] .comms-channel,
+#game-shell[data-cockpit-paint] .comms-channel:has(.comms-bar.active){left:50%;right:auto;top:var(--painted-top,var(--safe-top));transform:translateX(-50%);width:128px;max-width:var(--painted-comms-max)}
+#game-shell[data-cockpit-paint] .comms-channel:has(.comms-bar.active){width:min(560px,var(--painted-comms-max))}
+#game-shell[data-cockpit-paint] .comms-channel #comms-bar{min-height:var(--painted-top-height,44px);text-align:center}
+@media(max-height:520px){
+ #game-shell[data-cockpit-paint] .cockpit-screen-own .screen-ship-layout{padding:1px 3px;gap:1px;grid-template-rows:auto auto minmax(0,1fr) 10px}
+ #game-shell[data-cockpit-paint] .cockpit-screen-own .screen-ticker{font-size:9px;line-height:10px}
+ #game-shell[data-cockpit-paint] .cockpit-screen-own .screen-bars{gap:2px}
+ #game-shell[data-cockpit-paint] .cockpit-screen-own .screen-bars>div{min-height:8px;line-height:1}
+ #game-shell[data-cockpit-paint] .cockpit-screen-target .screen-target-layout{padding:1px 3px;gap:2px}
+ #game-shell[data-cockpit-paint] .cockpit-screen-target .screen-bars{gap:2px}
+}

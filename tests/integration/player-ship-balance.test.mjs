@@ -8,7 +8,7 @@ import {createEquipmentRecord} from '../../src/game/equipmentInventory.js';
 import {createEnemyLoadout} from '../../src/game/enemyLoadouts.js';
 import {weaponForOutfit} from '../../src/game/weapons.js';
 import {regenerateCombatResources,spendEnergy} from '../../src/game/combatResources.js';
-import {activationWeaponDamage} from '../../src/game/weaponDamage.js';
+import {weaponDamage} from '../../src/game/weaponDamage.js';
 import {balanceFit,itemAtTier,firingTrace} from '../helpers/player-balance.mjs';
 test('all flyable base capacities are multiples of five and regeneration uses whole numbers',()=>{
  for(const id of Object.keys(HULL_HARDPOINTS)){const s=SHIPS[id];for(const k of ['hull','shield','energyCapacity'])assert.equal(s[k]%5,0,`${id}: ${k}`);for(const k of ['reactorOutput','shieldRegen'])assert.ok(Number.isInteger(s[k])&&s[k]>0,`${id}: ${k}`);}
@@ -37,16 +37,22 @@ test('hull-specific shield regeneration is shared by player and NPC and spends r
  }
  const fit=balanceFit('wayfarer',['pulse-cannon','pulse-cannon'],['sustained-reactor']);assert.ok(firingTrace(fit,{recharging:true}).energySpent<firingTrace(fit).energySpent);
 });
-test('healthy fighters survive one coordinated ordinary gun pass without an extra burst reserve',()=>{
+test('a single ordinary gun pass is survivable while perfect coordinated focus remains dangerous',()=>{
  const attacker=balanceFit('scrapper',Array(4).fill('pulse-cannon'));
- for(const hull of ['speedster','scrapper','talon','legionary','blade']){
-  const stats=SHIPS[hull],victim={shield:stats.shield,hull:stats.hull};const actors=Array.from({length:2},()=>({energy:attacker.stats.energyCapacity,shield:attacker.stats.shield})),ready=actors.map(()=>Array(4).fill(0));const w=weaponForOutfit('pulse-cannon');
+ let focusedLightHull;
+ for(const hull of ['speedster','scrapper','talon','legionary','blade'])for(const count of [1,2]){
+  const stats=SHIPS[hull],victim={shield:stats.shield,hull:stats.hull};const actors=Array.from({length:count},()=>({energy:attacker.stats.energyCapacity,shield:attacker.stats.shield})),ready=actors.map(()=>Array(4).fill(0));const w=weaponForOutfit('pulse-cannon');
+  // Every physical round lands in this upper bound. Actual NPC accuracy and
+  // evasive player flight are measured separately; no hit gets discounted.
   for(let tick=0;tick<144;tick++)for(let a=0;a<actors.length;a++){
-   const now=tick/60;for(let g=0;g<4;g++)if(now>=ready[a][g]&&spendEnergy(actors[a],w.energyCost)){ready[a][g]=now+w.cooldown;const hit=activationWeaponDamage(victim,stats.shield,w.damageFlat,w,now);victim.shield-=hit.shield;victim.hull-=hit.hull;}
+   const now=tick/60;for(let g=0;g<4;g++)if(now>=ready[a][g]&&spendEnergy(actors[a],w.energyCost)){ready[a][g]=now+w.cooldown;const hit=weaponDamage(victim.shield,w.damageFlat,w);victim.shield-=hit.shield;victim.hull-=hit.hull;}
    regenerateCombatResources(actors[a],attacker.stats,1/60,0);
   }
-  assert.ok(victim.hull>0,hull);assert.ok(victim.shield<stats.shield,hull);
+  if(count===1)assert.ok(victim.hull>0,hull);
+  if(hull==='speedster'&&count===2)focusedLightHull=victim.hull;
+  assert.ok(victim.shield<stats.shield,hull);
  }
+ assert.ok(focusedLightHull<=0,'perfect dual focus is lethal; survival must come from missed shots and flight, not damage discounts');
 });
 test('shrinking schema-4 mounts preserves every physical loot ID once, docked and in flight',()=>{
  for(const docked of [true,false]){

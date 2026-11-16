@@ -8,7 +8,7 @@ registerHooks({ resolve(specifier, context, nextResolve) {
 } });
 const THREE = await import('three');
 const { buildGlbScene } = await import('../../src/game/glbLoader.js');
-const { GLB_SHIP_CONFIG } = await import('../../src/game/render.js');
+const { GLB_SHIP_CONFIG, SpaceRenderer } = await import('../../src/game/render.js');
 const { GameUI } = await import('../../src/game/ui.js');
 const { CANOPY_APERTURES } = await import('../../src/game/cockpitDamage.js');
 
@@ -156,26 +156,47 @@ test('own hull redraws for content, size and canvas changes; targets remain live
     assert.equal(clears, first + 5, 'target redraws must not be skipped');
 });
 
+test('small monitor bitmaps keep their displayed aspect ratio without legacy size floors',()=>{
+    const context=new Proxy({}, {get:(_,key)=>key==='measureText'?()=>({width:10}):()=>{},set:()=>true});
+    const canvas={width:0,height:0,clientWidth:35,clientHeight:47,getContext:()=>context,getBoundingClientRect:()=>{throw Error('must not measure a banking transform');}};
+    // A real context exposes its canvas; use an explicit get trap for it.
+    const ctx=new Proxy(context,{get:(target,key)=>key==='canvas'?canvas:target[key]});canvas.getContext=()=>ctx;
+    const ui=Object.create(GameUI.prototype);ui.monitorRatio=2;ui.ownHullCanvas=canvas;ui.radarContext=ctx;
+    ui.drawHullOutline(canvas,'kestrel');assert.deepEqual([canvas.width,canvas.height],[70,94]);
+    ui.drawObjectOutline(canvas,'station');assert.deepEqual([canvas.width,canvas.height],[70,94]);
+    ui.drawRadar([], [.2,.5,1]);assert.deepEqual([canvas.width,canvas.height],[70,94]);
+});
+
+test('fixed cockpit avoids per-frame inherited motion style updates while other hulls retain them',()=>{
+    const writes=[],renderer={shell:{dataset:{cockpitPaint:'wayfarer'},style:{setProperty:(...args)=>writes.push(args)}},shellStyleValues:new Map()};
+    for(const name of ['--cockpit-shift-x','--cockpit-shift-y','--cockpit-roll','--cockpit-zoom'])SpaceRenderer.prototype.setShellStyle.call(renderer,name,'1');
+    assert.equal(writes.length,0);
+    SpaceRenderer.prototype.setShellStyle.call(renderer,'--damage-warning','.5');assert.equal(writes.length,1);
+    delete renderer.shell.dataset.cockpitPaint;
+    SpaceRenderer.prototype.setShellStyle.call(renderer,'--cockpit-roll','1deg');assert.equal(writes.length,2);
+});
+
 test('cockpit images are preloaded on ship changes, not every HUD update', t => {
     const ui = Object.create(GameUI.prototype);
     const { nodes, instruments } = cockpitNodeMocks();
     const flushFrames = mockCockpitBrowser(t);
     ui.root = { dataset: {} }; ui.el = (selector) => nodes[selector];
     let preloads = 0; ui.preloadImageSet = () => { preloads++; };
-    ui.setCockpitShip('wayfarer');
+    ui.setCockpitShip('vanguard');
     assert.ok(instruments.querySelector('.cockpit-bezel-own'));
     assert.ok(instruments.querySelector('.cockpit-bezel-radar'));
     assert.ok(instruments.querySelector('.cockpit-bezel-target'));
-    for (let i = 0; i < 60; i++) ui.setCockpitShip('wayfarer');
+    for (let i = 0; i < 60; i++) ui.setCockpitShip('vanguard');
     assert.equal(preloads, 1);
     delete ui.root.dataset.cockpitShip;
-    ui.setCockpitShip('wayfarer'); assert.equal(preloads, 2);
+    ui.setCockpitShip('vanguard'); assert.equal(preloads, 2);
     flushFrames();
 });
 
-test('all eleven ships use hull-matched transparent cockpit sprites and distinct monitor layouts', async t => {
+test('sprite hulls use hull-matched transparent cockpit sprites and distinct monitor layouts', async t => {
     const { readFile } = await import('node:fs/promises');
-    const shipIds = ['wayfarer', 'vanguard', 'talon', 'prospector', 'lancer', 'atlas',
+    // The starter has its approved frame/hand; other hulls keep their matched plates.
+    const shipIds = ['vanguard', 'talon', 'prospector', 'lancer', 'atlas',
         'speedster', 'legionary', 'andromeda', 'torsas', 'astra'];
     const artByShip = {
         vanguard:'cockpit-vanguard-sprite-v7.png', talon:'cockpit-talon-sprite-v6.png',
@@ -218,13 +239,18 @@ test('all eleven ships use hull-matched transparent cockpit sprites and distinct
     }
     ui.setCockpitShip('vanguard');
     assert.ok(instruments.style.values['--cockpit-radar-width'], 'Vanguard radar has a fitted monitor aperture');
+    const kitCalls = [];
+    ui.cockpitArtwork = { activate: (id) => kitCalls.push(['activate', id]), deactivate: () => kitCalls.push(['deactivate']) };
+    const preloaded = [];
+    ui.preloadImageSet = (_set, urls) => preloaded.push(...urls);
     ui.setCockpitShip('wayfarer');
-    assert.equal(nodes['.canopy-art-mask'].href, './assets/remaster/cockpit-wayfarer-sprite.png', 'approved Wayfarer sprite stays unchanged');
-    for (const panel of ['own', 'radar', 'target']) {
-        const left = Number.parseFloat(instruments.style.values[`--cockpit-${panel}-left`]);
-        assert.ok(Number.isFinite(left) && left >= 0 && left <= 100,
-            `Wayfarer ${panel} monitor remains inside the cockpit layout`);
-    }
+    assert.deepEqual(kitCalls.at(-1), ['activate', 'wayfarer'], 'Wayfarer uses the approved frame and hand');
+    assert.equal(nodes['.cockpit-art'].style.backgroundImage, 'none');
+    assert.ok(!preloaded.some((url) => /cockpit-wayfarer-sprite/.test(url)), 'no legacy starter cockpit sprite download');
+    assert.ok(preloaded.some(url=>url.includes('wayfarer-paint-atlas-v2.png')));
+    assert.ok(preloaded.some(url=>url.includes('wayfarer-hand-pitch-v4.png')));
+    ui.setCockpitShip('talon');
+    assert.deepEqual(kitCalls.at(-1), ['deactivate'], 'sprite hulls leave the kit');
     assert.equal(layouts.size, shipIds.length, 'every hull has its own monitor layout');
     assert.equal(artUrls.size, shipIds.length, 'every hull has its own cockpit sprite');
     flushFrames();

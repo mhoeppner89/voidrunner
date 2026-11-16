@@ -9,6 +9,7 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export function planShieldRecovery(session,ship,plan,target,now,distance){
  const r=plan.recovery??={active:false,readyAt:0,direction:new THREE.Vector3(),entry:new THREE.Vector3(),side:new THREE.Vector3(),up:new THREE.Vector3(),threat:new THREE.Vector3(),cover:new THREE.Vector3(),candidate:new THREE.Vector3(),end:new THREE.Vector3(),away:new THREE.Vector3(),tangent:new THREE.Vector3(),targetPosition:new THREE.Vector3(),targetVelocity:new THREE.Vector3()};
  const stats=ship.combatFit.stats,novice=ship.pilot?.tier==='novice',ace=ship.pilot?.tier==='ace';
+ const timid=ship.pilot?.temperament==='timid',aggressive=ship.pilot?.temperament==='aggressive';
  if(r.targetId!==ship.targetId){r.active=false;r.targetId=ship.targetId;r.attempts=0;}
  if(plan.visible){r.threat.copy(plan.threatPosition);r.targetPosition.copy(plan.position).add(plan.relative);r.targetVelocity.copy(plan.targetVelocity);}
  const hull=SHIPS[target?.shipId??target?.combatFit?.hullId],observed=plan.targetVelocity.length();
@@ -24,12 +25,12 @@ export function planShieldRecovery(session,ship,plan,target,now,distance){
   }
  }
  const finishable=target&&target.shield<1&&target.hull<=(target.maxHull??hull?.hull??0)*.4&&ship.hull>ship.maxHull*.4;
- if(!r.active&&now>=r.readyAt&&r.attempts<(ace?2:1)&&plan.visible&&target&&!finishable&&!ship.fleeing&&!ship.holdFire&&ship.shield<ship.maxShield*(novice?.35:ace?.2:.25)){
-  const cover=!r.speedAdvantage?session.findCoverPoint(plan.position,r.threat):undefined;
+ if(!r.active&&now>=r.readyAt&&r.attempts<(ace?2:1)&&plan.visible&&target&&!finishable&&!ship.fleeing&&!ship.holdFire&&ship.shield<ship.maxShield*(novice?.35:ace?.2:.25)*(timid?1.4:aggressive?.75:1)){
+  const cover=!r.speedAdvantage||timid?session.findCoverPoint(plan.position,r.threat):undefined;
   const exitReady=distance>120&&(plan.nose.dot(plan.direct)<-.25||plan.travel.dot(plan.direct)<-stats.maxSpeed*.4||distance>clamp((ship.observedWeaponRange??400)+80,380,750));
   if(r.speedAdvantage&&exitReady||cover){
    r.mode=cover?'cover':'range';if(cover)r.cover.set(cover.x,cover.y,cover.z);
-   r.active=true;r.attempts++;r.started=now;r.startRange=distance;r.holdingRange=false;r.shieldGoal=ship.maxShield*(novice?.3:ace?.4:.35);
+   r.active=true;r.attempts++;r.started=now;r.startRange=distance;r.holdingRange=false;r.shieldGoal=ship.maxShield*((novice?.3:ace?.4:.35)+(timid?.05:aggressive?-.05:0));
    r.safeRange=clamp((ship.observedWeaponRange??400)+80,380,750);
    r.until=now+clamp(Math.max(0,ship.shieldDelay??4.5)+(r.shieldGoal-ship.shield)/(ship.combatFit?.stats?.shieldRegeneration??SHIELD_RECHARGE_RATE)+6,10,14);
    r.side.copy(plan.right);r.up.copy(plan.up);ship.fireCommitUntil=0;plan.reapproachUntil=0;

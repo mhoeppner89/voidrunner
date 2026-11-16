@@ -1,3 +1,6 @@
+import { normalizeControllerBindings } from './controllerBindings.js';
+import { Haptics } from './haptics.js';
+import { connectedGamepad } from './gamepad.js';
 import {ExplorationMethods} from './exploration.js';
 import {DistressMethods} from './distressEvents.js';
 import {DISTRESS_ANSWER_RANGE, distressLabel, distressSetup, distressText} from './distressData.js';
@@ -41,11 +44,13 @@ import {ArenaRunMethods} from './arenaRunSession.js';
 import {CampaignWingMethods, campaignWingUnlocked} from './campaignWing.js';
 import {writeArenaRun} from './arenaRun.js';
 import { updateAutomaticTurrets } from './turrets.js';
-import {selectCombatFocus,fireCrossfireOpportunity} from './combatAwareness.js';
-import { aceManeuver } from './aceManeuvers.js';
+import {selectCombatFocus,fireCrossfireOpportunity,npcPlayerAttackWindow} from './combatAwareness.js';
+import { aceManeuver, maneuverHeading, maneuverSpeed, maneuverBank } from './aceManeuvers.js';
+import { terrainCombatManeuver } from './terrainManeuvers.js';
+import { pilotJudgment, judgmentSpeed } from './pilotJudgment.js';
 import { integrateFlightTurn, integrateFlightVelocity, steerFlightTurn, registerHitReaction } from './flightDynamics.js';
 import { createEnemyLoadout } from './enemyLoadouts.js';
-import { activationWeaponDamage, disruptWeapons, disruptionFactor } from './weaponDamage.js';
+import { weaponDamage, disruptWeapons, disruptionFactor } from './weaponDamage.js';
 import { combatProfile, interceptTime } from './combatTactics.js';
 import * as THREE from 'three';
 import { AudioManager } from './audio.js';
@@ -70,7 +75,7 @@ import { playerStrengthValue } from './playerStrength.js';
 import { getEffectiveShipStats, dockServiceQuote, repaintCost } from './shipStats.js';
 import { WEAPON_DAMAGE_SCALE, weaponAssistCone, weaponRange, weaponShotDamage, ammoCapacity, AMMO_CAPACITY, clearLauncherMagazines, fillLauncherMagazines, launcherMagazineEntries, normalizeLauncherMagazines, syncLauncherMissileTotal, WEAPON_ORDER, WEAPONS, LAUNCHERS, weaponForSlot, weaponForOutfit, launcherForOutfit, weaponIdForOutfit, weaponOwned } from './weapons.js';
 import { HULL_HARDPOINTS, OUTFIT_ITEMS, OUTFIT_ITEM_IDS, canonicalOutfitId, collapseOutfittingToSingleShip, commitOutfitting, itemFitsMount, loadoutFor, normalizeOutfitting, outfitItem, projectLegacyEquipment, quoteOutfitting, outfittingUsage } from './outfitting.js';
-import { combinedHullIntegrity, normalizeEnergy, SHIELD_ENERGY_PER_POINT, passiveShieldRechargeRate, regenerateCombatResources, spendEnergy } from './combatResources.js';
+import { combinedHullIntegrity, normalizeEnergy, SHIELD_ENERGY_PER_POINT, passiveShieldRechargeRate, regenerateCombatResources, registerCombatShieldHit, combatShieldRechargeScale, spendEnergy } from './combatResources.js';
 import { commitShipTrade, quoteShipTrade } from './shipTrade.js';
 import { TURRET_LAYOUTS } from './turretLayouts.js';
 import { SHIP_MOUNT_ANCHORS } from './shipMounts.js';
@@ -99,6 +104,15 @@ const npcDistanceSq = (from, point) => {
     return dx * dx + dy * dy + dz * dz;
 };
 const npcSpeed = velocity => Math.hypot(velocity[0], velocity[1], velocity[2]);
+// Own these vectors per pilot: attack planning reuses the session scratches,
+// and resolving another ship must not overwrite a caller's target snapshot.
+function npcTargetSnapshot(ship, position, velocity) {
+    const target = ship.resolvedTarget ??= { position: new THREE.Vector3(), velocity: new THREE.Vector3() };
+    target.position.fromArray(position);
+    if (velocity) target.velocity.fromArray(velocity);
+    else target.velocity.set(0, 0, 0);
+    return target;
+}
 const npcTargetIsValid = (session, ship, entry, observerCombat, retaliation = false) => {
     if (!entry || entry === ship || !combatTargetEligible(entry))
         return false;
@@ -1379,7 +1393,11 @@ export class GameSession {
         for(const node of this.wreckNodes){const point=save.world.salvageImpactFaces?.[node.id];if(Array.isArray(point)&&point.length===3&&point.every(Number.isFinite)&&Math.hypot(...point)<3)node.salvageImpactLocal=point;}
         if(!save.arena)for(const wreck of Object.values(save.world.combatWrecks??{}))if(wreck.contents?.length||wreck.derelict)this.wreckNodes.push(combatWreckNode(wreck));
         this.input = new InputManager(ui.root);
+        this.haptics = new Haptics(() => this.save.settings.vibration, () => this.input.usingGamepad ? connectedGamepad(this.input.gamepadIndex) : undefined);
+        this.input.haptics = this.haptics;
         this.input.configureTilt(save.settings);
+        this.input.configureGamepad(save.settings);
+        this.input.setGamepadBlocked(true);
         // Normalize even direct/debug sessions that bypass save hydration.
         save.settings.steering = 'stick';
         this.input.disableTilt();
@@ -2357,7 +2375,7 @@ export class GameSession {
                 const attackerPos = center.clone().addScaledVector(wingDir, 1100);
                 wingman = this.spawnShip('patrol', tuple(wingmanPos));
                 const wingAttacker = this.spawnShip('escort', tuple(attackerPos), undefined, undefined, hostilePilot,{faction:'pirates'});
-                wingAttacker.targetId = wingman.id;
+                wingAttacker.targetId = wingman.id;wingAttacker.noSurrender=true;
                 const faceToward = (ship, toward) => {
                     const dir = toward.clone().sub(vec(ship.position)).normalize();
                     ship.rotation = quatTuple(new THREE.Quaternion().setFromUnitVectors(FORWARD, dir));
@@ -2370,7 +2388,7 @@ export class GameSession {
                 const flanks = [new THREE.Vector3(1, 0, 0.25), new THREE.Vector3(-0.9, 0, -0.3)];
                 flanks.forEach((dir, index) => {
                     const hostile = this.spawnShip(index === 0 ? 'pirate' : 'bounty', tuple(center.clone().addScaledVector(dir.normalize(), 1100 + index * 40)), undefined, undefined, hostilePilot,{faction:'pirates',hullId:index===1?'lancer':'demon'});
-                    hostile.targetId = 'player';
+                    hostile.targetId = 'player';hostile.noSurrender=true;
                 });
             }
             else {
@@ -2378,7 +2396,7 @@ export class GameSession {
                     const angle = (index / Math.max(1, hostileCount)) * Math.PI * 2 + 0.6;
                     const offset = new THREE.Vector3(Math.cos(angle), index % 2 ? 0.5 : -0.35, Math.sin(angle)).normalize().multiplyScalar(1100 + index * 40);
                     const hostile = this.spawnShip(index === 0 ? 'pirate' : index === 2 ? 'bounty' : 'escort', tuple(center.clone().add(offset)), undefined, undefined, hostilePilot,{faction:'pirates',hullId:index===2?'lancer':index===1?'demon':'scrapper'});
-                    hostile.targetId = 'player';
+                    hostile.targetId = 'player';hostile.noSurrender=true;
                 }
             }
         }
@@ -2740,6 +2758,7 @@ export class GameSession {
         this.fpsFrames = 0;
     }
     onPageVisibilityChange = () => {
+        if (globalThis.document?.hidden) this.haptics?.stop();
         this.lastFrame = performance.now();
         this.simAccumulator = 0;
         this.renderBudget?.reset();
@@ -2782,8 +2801,10 @@ export class GameSession {
         // same frame the story clears.
         this.refreshStoryLine();
         this.updateTutorialRadio();
+        this.input.setGamepadBlocked(Boolean(this.save.player.dockedAt || this.arena?.observer || this.ui.isModalOpen || this.ui.controller?.blocksFlight));
         const actions = this.input.getActions();
         const flying = !this.save.player.dockedAt;
+        if (flying && !this.ui.isModalOpen) this.ui.updateCockpitKit?.(dt, actions);
         if (flying) {
             if (this.ui.isModalOpen) {
                 // Pause/map freeze the sim: drop the accumulated time entirely.
@@ -2795,9 +2816,14 @@ export class GameSession {
                     this.ui.hideChatLog?.();
                 }
             }
-            else if (actions.pause) {
+            else if (actions.pause || actions.controllerDisconnected) {
                 this.simAccumulator = 0;
+                if (actions.controllerDisconnected) this.ui.showToast(t('Controller disconnected. Reconnect it or use keyboard/touch controls.'), 'warning', 6000);
                 this.ui.showPause();
+            }
+            else if (actions.shipMenu) {
+                this.simAccumulator = 0;
+                this.openShipMenu();
             }
             else if (actions.map) {
                 this.simAccumulator = 0;
@@ -3075,7 +3101,7 @@ export class GameSession {
     }
     handleActions(actions) {
         if (this.playerDocking) return;
-        if(this.save.player.raceReturn){actions.missile=actions.utility=actions.miningDrones=actions.cycleMode=actions.autopilot=actions.jettison=actions.capture=actions.weaponSelect=actions.weaponCycle=actions.launcherCycle=false;}
+        if(this.save.player.raceReturn){actions.missile=actions.utility=actions.miningDrones=actions.autopilot=actions.jettison=actions.capture=actions.weaponSelect=actions.weaponCycle=actions.launcherCycle=false;}
         // Absolute slider input is an edge: apply even on a zero-step frame.
         if (actions.throttleSet !== undefined) {
             this.save.player.throttle = clamp(actions.throttleSet, 0, 1);
@@ -3085,14 +3111,6 @@ export class GameSession {
         // repeat. The latch also protects sparse drivers passing a held true.
         const missileEdge = Boolean(actions.missile) && !this.miningMissileHeld;
         this.miningMissileHeld = Boolean(actions.missile);
-        if (actions.cycleMode) {
-            const order = ['combat', 'mining', 'salvage'];
-            const index = order.indexOf(this.save.player.mode);
-            this.save.player.mode = order[(index + 1) % order.length];
-            this.save.player.currentTargetId = undefined;
-            this.renderer.setTarget();
-            this.audio.play('ui');
-        }
         if (actions.transponder)
             this.toggleTransponder();
         if (actions.navNext) {
@@ -3193,14 +3211,12 @@ export class GameSession {
             }
             if (!wasActive || sourceChanged) {
                 this.ui.pushSensor(t('SLIPSTREAM · {name}', { name: sourceName ?? t('RIVAL') }), 'success', 1000);
-                if (this.save.settings.vibration)
-                    try { globalThis.navigator?.vibrate?.(18); } catch { /* vibration is optional */ }
+                this.haptics?.pulse(35, 0.06, 0.2, 0, 18);
             }
         }
         else if (!active && wasActive) {
             this.ui.pushSensor(t('SLIPSTREAM LOST'), 'info', 700);
-            if (this.save.settings.vibration)
-                try { globalThis.navigator?.vibrate?.([10, 12, 10]); } catch { /* vibration is optional */ }
+            this.haptics?.pulse(45, 0.03, 0.16, 0, [10, 12, 10]);
         }
         draft.lastStrength = active ? strength : 0;
     }
@@ -4654,6 +4670,8 @@ export class GameSession {
         else this.renderer.showCombatBeam?.(`${ownerId}:${beamId}`,start,end,color,ownerId==='player'?this.save.player:undefined);
     }
     spawnPlayerGunProjectile(weapon,direction,x,y,z,velocity,targetId,mountId) {
+        const heavy = weapon.kind === 'gauss' || weapon.kind === 'mortar';
+        this.haptics?.pulse(heavy ? 65 : 35, heavy ? .22 : .04, weapon.kind === 'beam' ? .1 : .22);
         return this.spawnGunProjectile('player',weapon,new THREE.Vector3(x,y,z),direction,velocity,targetId,mountId);
     }
     spawnGunProjectile(ownerId,weapon,start,direction,velocity,targetId,mountId) {
@@ -4976,6 +4994,7 @@ export class GameSession {
             player.activeLauncherMountId = magazines[(firedIndex+1)%magazines.length].mount.id;
         }
         this.audio.play('missile');
+        this.haptics?.pulse(100, .3, .45, 1);
     }
     setLauncherFireMode(mode) {
         if (!['alternating','together','single'].includes(mode)) return false;
@@ -7258,7 +7277,7 @@ export class GameSession {
                     ship.burn.tick -= dt;
                     if (ship.burn.tick <= 0) {
                         ship.burn.tick = 0.5;
-                        this.damageShip(ship, ship.burn.dps * 0.5, ship.burn.attackerId, undefined);
+                        this.damageShip(ship, ship.burn.dps * 0.5, ship.burn.attackerId, undefined, undefined, undefined, true);
                     }
                 }
                 else
@@ -7273,8 +7292,11 @@ export class GameSession {
             ship.shieldDelay = (ship.shieldDelay ?? 0) - dt;
             if (!ship.poweredDown && ship.combatFit && !ship.capitalClass && (ship.campaignCombat || !ship.tutorialCompanion && !ship.tutorialEnemy))
                 regenerateCombatResources(ship, ship.combatFit.resources, dt, ship.shieldDelay);
-            else if (!ship.poweredDown && ship.shieldDelay <= 0)
-                ship.shield = Math.min(ship.maxShield, ship.shield + dt * passiveShieldRechargeRate(ship.shieldRegen ?? 3.8, ship.capitalClass));
+            else {
+                const shieldRateScale = combatShieldRechargeScale(ship, dt);
+                if (!ship.poweredDown && ship.shieldDelay <= 0)
+                    ship.shield = Math.min(ship.maxShield, ship.shield + dt * passiveShieldRechargeRate(ship.shieldRegen ?? 3.8, ship.capitalClass) * shieldRateScale);
+            }
             // The standoff clock runs down: once it expires the hunters open
             // fire (or they already did if the pilot shot first). A hired
             // wingman's held weapons are a standing order rather than a stale
@@ -7874,7 +7896,8 @@ export class GameSession {
     // are deliberately independent: either side can have only a vague contact.
     updateSensorAwareness(ship, dt) {
         ship.emissionHeat = stepEmissionHeat(ship.emissionHeat ?? 0, dt);
-        if (this.arena) {
+        if (this.arena?.observer) {
+            ship.playerTrackOccluded = false;
             ship.playerAwareness = 1;
             ship.playerSensorAwareness = 1;
             ship.playerIdentified = true;
@@ -7893,6 +7916,7 @@ export class GameSession {
         // result; dense fields may carry many ambient ships.
         const sensorRelevant = distance <= Math.max(playerExposureRange, playerSensorRange, SENSOR_CLOSE_VISUAL_RANGE);
         const occluded = sensorRelevant && this.lineBlocked(position, player);
+        ship.playerTrackOccluded = Boolean(occluded);
 
         ship.playerAwareness = stepSensorAwareness(
             ship.playerAwareness ?? 0,
@@ -7904,7 +7928,7 @@ export class GameSession {
         );
         if (this.playerIdentityBroadcasting() && ship.playerAwareness >= SENSOR_CONTACT_THRESHOLD)
             ship.playerIdentified = true;
-        if (ship.playerAwareness >= SENSOR_TRACK_THRESHOLD) {
+        if (ship.playerAwareness >= SENSOR_TRACK_THRESHOLD && !occluded) {
             const last = ship.lastResolvedPlayer ?? (ship.lastResolvedPlayer = [0, 0, 0]);
             last[0] = player.x;
             last[1] = player.y;
@@ -7946,7 +7970,7 @@ export class GameSession {
     // movement is the travel AI on the sweep point, not a live chase.
     updateSearchAI(ship, dt) {
         if(ship.faction==='alliance' && !ship.hostile)return false;
-        if (this.arena)
+        if (this.arena?.observer)
             return false;
         const isPatrol = ship.role === 'patrol' && !ship.hostile;
         const huntingPlayer = (ship.hostile || ship.role === 'pirate' || ship.role === 'bounty' || ship.role === 'escort') && ship.targetId === 'player';
@@ -8509,7 +8533,6 @@ export class GameSession {
     resolveShipTarget(ship) {
         const authored=this.explorationCombatTarget(ship);
         if(authored!==undefined)return authored;
-        const playerPosition = vec(this.save.player.position);
         const now = this.save.world.time;
         const observerCombat = Boolean(this.arena?.observer && ship.observerTeam);
         const hunter = ship.hostile || ship.faction==='pirates';
@@ -8530,7 +8553,7 @@ export class GameSession {
             if (!wingTarget)
                 return undefined;
             ship.npcTargetReason = 'wingman';
-            return { position: vec(wingTarget.position), velocity: vec(wingTarget.velocity) };
+            return npcTargetSnapshot(ship, wingTarget.position, wingTarget.velocity);
         }
         if (ship.surrendered || ship.standingDown || this.deferentialPilot(ship)) {
             ship.targetId = undefined;
@@ -8565,15 +8588,26 @@ export class GameSession {
         if (!selectedId) {
             let attacker;
             let bestDistSq = Infinity;
+            let currentAttacker;
+            let currentDistSq = Infinity;
             for (const entry of this.ships) {
                 if (entry.targetId !== ship.id || !npcTargetIsValid(this, ship, entry, observerCombat, true))
                     continue;
                 const distance = npcDistanceSq(ship.position, entry.position);
+                if (entry.id === ship.targetId) {
+                    currentAttacker = entry;
+                    currentDistSq = distance;
+                }
                 if (distance < bestDistSq) {
                     bestDistSq = distance;
                     attacker = entry;
                 }
             }
+            // A tiny range change must not restart the turn, motion estimate
+            // and trigger settling every frame. A substantially closer enemy
+            // still wins, and fresh incoming fire already takes priority above.
+            if (currentAttacker && currentDistSq <= bestDistSq * 1.5625)
+                attacker = currentAttacker;
             if (attacker) {
                 selectedId = attacker.id;
                 selectedReason = 'attacker';
@@ -8651,10 +8685,7 @@ export class GameSession {
                 ship.targetId = memory.id;
                 ship.npcTargetReason = 'memory';
                 ship.patrolMemoryActive = true;
-                return {
-                    position: vec(memory.position, this.tmpPatrolPosition ??= new THREE.Vector3()),
-                    velocity: (this.tmpPatrolVelocity ??= new THREE.Vector3()).set(0, 0, 0),
-                };
+                return npcTargetSnapshot(ship, memory.position);
             }
             ship.patrolMemoryActive = false;
             ship.patrolMemory = undefined;
@@ -8686,14 +8717,14 @@ export class GameSession {
             // anchor and never receives the live player vector.
             if (!this.shipTracksPlayer(ship))
                 return undefined;
-            return { position: playerPosition, velocity: vec(this.save.player.velocity) };
+            return npcTargetSnapshot(ship, this.save.player.position, this.save.player.velocity);
         }
         const target = this.ships.find((entry) => entry.id === ship.targetId && entry.hull > 0);
         if (!target) {
             ship.targetId = undefined;
             return undefined;
         }
-        return { position: vec(target.position), velocity: vec(target.velocity) };
+        return npcTargetSnapshot(ship, target.position, target.velocity);
     }
     npcFlightStats(ship) {
         if (!ship.combatFit || (ship.tutorialEnemy || ship.tutorialCompanion) && !ship.campaignCombat || ship.capitalClass || ship.race) return;
@@ -9055,6 +9086,14 @@ export class GameSession {
             navGoal = (this.tmpNavGoal ?? (this.tmpNavGoal = new THREE.Vector3())).set(position.x + desired.x * 400, position.y + desired.y * 400, position.z + desired.z * 400);
         else if (ship.covering && ship.coverPoint)
             navGoal = (this.tmpNavGoal ?? (this.tmpNavGoal = new THREE.Vector3())).set(ship.coverPoint[0], ship.coverPoint[1], ship.coverPoint[2]);
+        // Tactical terrain choices use the previous broadphase. They suggest a
+        // local route; normal hull clearance, braking and ship avoidance follow.
+        const judgment=flightStats?pilotJudgment(ship,this.save.world.time,desired,distance,closing):undefined;
+        const terrainMove=flightStats?terrainCombatManeuver(this,ship,targetPosition,lead,navOut):undefined;
+        if(terrainMove){
+            desired.copy(navOut);navGoal=terrainMove.waypoint;spiraling=false;
+            if(terrainMove.started===this.save.world.time){ship.fieldNav.until=0;ship.fieldNav.nextPlan=0;}
+        }
         const fieldNav = flightStats ? fieldCombatSteering(this,ship,navGoal,desired,dt,navOut) : undefined;
         const navBrake = fieldNav ? 1-clamp(fieldNav.speedLimit/ship.speed,0,1) : steerToward(this, ship, navGoal, {
             goalDir: desired,
@@ -9064,12 +9103,12 @@ export class GameSession {
             synthesize: ship.covering || (!evading && !ship.fleeing && ship.attackPhase === 'approach'),
         }, navOut);
         desired.copy(navOut);
-        const shipAvoidance = this.getShipAvoidance(position, velocity, ship.id);
+        const shipAvoidance = this.getShipAvoidance(position, velocity, ship);
         if (shipAvoidance)
             desired.add(shipAvoidance);
         desired.normalize();
         let aceMove;
-        if (flightStats && (ship.pilot?.tier==='ace'||ship.pilot?.tier==='veteran')) {
+        if (!judgment && !terrainMove && flightStats && (ship.pilot?.tier==='ace'||ship.pilot?.tier==='veteran'||ship.pilot?.tier==='novice')) {
             const nose=(this.tmpAceNose ??= new THREE.Vector3()).copy(FORWARD).applyQuaternion(orientation);
             const travel=(this.tmpAceTravel ??= new THREE.Vector3()).copy(velocity).normalize();
             const ahead=(this.tmpAceAhead ??= new THREE.Vector3()).copy(position).addScaledVector(velocity,Math.max(1.8,currentSpeed/flightStats.acceleration+1.6));
@@ -9078,11 +9117,20 @@ export class GameSession {
                 ship.acePathClear=!this.lineBlocked(position,ahead,ship.id);
             }
             const safe=navBrake<0.15 && !shipAvoidance && ship.acePathClear && (!fieldNav || fieldNav.safeForManeuver);
-            aceMove=aceManeuver(ship,this.save.world.time,distance,nose.dot(direct),travel.dot(direct),tactics?.range ?? ship.fireRange ?? ATTACK_FIRE_RANGE,safe,Boolean(fieldNav?.obstacles.length),nose.dot(lead),nose.dot(travel));
+            const maneuverRange=tactics?.range ?? ship.fireRange ?? ATTACK_FIRE_RANGE;
+            aceMove=aceManeuver(ship,this.save.world.time,distance,nose.dot(direct),travel.dot(direct),maneuverRange,safe,Boolean(fieldNav?.obstacles.length),nose.dot(lead),nose.dot(travel),closing);
             if (aceMove) {
-                if(aceMove.kind==='boost-reversal' && this.save.world.time-aceMove.started<0.65) desired.fromArray(aceMove.entry);
-                else if(aceMove.kind==='rolling-break' && this.save.world.time-aceMove.started<1.3) desired.fromArray(aceMove.entry).addScaledVector(UP,.45*Math.sin((this.save.world.time-aceMove.started)*Math.PI/1.3)).normalize();
-                else desired.copy(lead);
+                // Check the requested exit as well as the current momentum
+                // corridor. Only active maneuvers need this bounded 5 Hz ray.
+                const candidate=(this.tmpManeuverHeading ??= new THREE.Vector3());
+                maneuverHeading(aceMove,this.save.world.time,lead,distance,maneuverRange,candidate);
+                if(this.save.world.time >= (ship.aceManeuverClearanceAt ?? 0)) {
+                    ship.aceManeuverClearanceAt=this.save.world.time+.2;
+                    ahead.copy(position).addScaledVector(candidate,Math.max(100,currentSpeed*1.25));
+                    ship.aceManeuverPathClear=!this.lineBlocked(position,ahead,ship.id);
+                }
+                if(ship.aceManeuverPathClear){desired.copy(candidate);spiraling=false;}
+                else {aceManeuver(ship,this.save.world.time,distance,0,0,maneuverRange,false);aceMove=undefined;}
             }
         }
         // Smooth, no-roll turn toward the pursuit vector (this kills the old spin).
@@ -9097,7 +9145,7 @@ export class GameSession {
         const headingChange = clamp(bankReference.angleTo(desired), 0, 1.2);
         this.tmpL.crossVectors(desired, bankReference);
         const turnSign = Math.sign(this.tmpL.y) || 1;
-        const bankAngle = turnSign * headingChange * 0.45 + (fieldNav?.active?fieldNav.bank:0) + (aceMove?.kind==='rolling-break'?Math.sin((this.save.world.time-aceMove.started)*Math.PI/2)*1.2:0);
+        const bankAngle = turnSign * headingChange * 0.45 + (fieldNav?.active?fieldNav.bank:terrainMove?.bank??0) + maneuverBank(aceMove,this.save.world.time);
         const cosB = Math.cos(bankAngle);
         const sinB = Math.sin(bankAngle);
         this.tmpL.crossVectors(desired, right);
@@ -9159,12 +9207,18 @@ export class GameSession {
         if (flightStats) {
             desiredSpeed=combatThrottle(ship,this.save.world.time,distance,closing,targetVelocity?.dot(direct)??0,forward.dot(direct),tactics?.range??235,fieldNav.canBoost,headingChange);
             if(aceMove?.kind==='boost-reversal'&&fieldNav.canBoost){ship.burning=true;desiredSpeed=ship.afterburnSpeed;}
+            const maneuverThrottle=maneuverSpeed(aceMove,this.save.world.time,desiredSpeed,ship.speed);
+            if(maneuverThrottle<desiredSpeed)ship.burning=false;
+            desiredSpeed=maneuverThrottle;
+            desiredSpeed=judgmentSpeed(judgment,this.save.world.time,desiredSpeed,ship.speed);
+            if(judgment?.kind==='late-brake'||judgment?.kind==='hesitate')ship.burning=false;
+            if(terrainMove){desiredSpeed=Math.min(desiredSpeed,ship.speed*terrainMove.speedFactor);ship.burning=ship.burning&&terrainMove.canBoost;}
         }
         if (flightStats) {
             desiredSpeed=Math.min(desiredSpeed,fieldNav.speedLimit);
-            const moveAge=aceMove?this.save.world.time-aceMove.started:0;
-            const drifting=committedShot&&ship.combatPlan?.aimingRun&&!ship.combatPlan.overshoot&&distance>ship.combatPlan.preferredRange*.55&&Math.abs(velocity.dot(direct))<currentSpeed*.85&&fieldNav.safeForManeuver&&!shipAvoidance||aceMove?.kind==='drift-pass'||aceMove?.kind==='boost-reversal'&&moveAge>=.65&&moveAge<2.4;
-            const poweredDrift=offensiveHeading&&ship.pilot?.tier==='ace'&&ship.combatPlan?.crossfire?.outnumbered&&distance<600&&distance>60&&!ship.combatPlan?.finishing&&currentSpeed>ship.speed*.5&&fieldNav.safeForManeuver&&!shipAvoidance;
+            const moveAge=aceMove?(this.save.world.time-aceMove.started)/(aceMove.durationScale??1):0;
+            const drifting=!judgment&&!terrainMove&&(committedShot&&ship.combatPlan?.aimingRun&&!ship.combatPlan.overshoot&&distance>ship.combatPlan.preferredRange*.55&&Math.abs(velocity.dot(direct))<currentSpeed*.85&&fieldNav.safeForManeuver&&!shipAvoidance||aceMove?.kind==='drift-pass'||aceMove?.kind==='boost-reversal'&&moveAge>=.65&&moveAge<2.4);
+            const poweredDrift=!judgment&&!terrainMove&&offensiveHeading&&ship.pilot?.tier==='ace'&&ship.combatPlan?.crossfire?.outnumbered&&distance<600&&distance>60&&!ship.combatPlan?.finishing&&currentSpeed>ship.speed*.5&&fieldNav.safeForManeuver&&!shipAvoidance;
             this.integrateNpcFlight(ship,position,velocity,orientation,this.tmpQ2,poweredDrift?(velocity.dot(direct)<-currentSpeed*.25&&distance<350?0:desiredSpeed):drifting?0:desiredSpeed,ship.burning && (poweredDrift||!drifting),!drifting&&!poweredDrift,dt,!fieldNav.active&&(drifting||poweredDrift||!fieldNav.roundField&&ship.combatIntent==='hunt'));
             forward.copy(FORWARD).applyQuaternion(orientation).normalize();
         } else {
@@ -9277,7 +9331,7 @@ export class GameSession {
             route: true,
         }, navOut);
         const desired = this.tmpI.copy(navOut);
-        const shipAvoidance = this.getShipAvoidance(position, velocity, ship.id);
+        const shipAvoidance = this.getShipAvoidance(position, velocity, ship);
         if (shipAvoidance)
             desired.add(shipAvoidance);
         desired.normalize();
@@ -9371,6 +9425,7 @@ export class GameSession {
         });
         tupleInto(ship.position, position);
         tupleInto(ship.velocity, velocity);
+        if (clipped) ship.combatBumpAt = this.save.world.time;
         if (impactDamage > 0)
             this.damageShip(ship, impactDamage, 'environment', tuple(position));
         if (clipped && impactDamage > 0.5) {
@@ -9553,14 +9608,18 @@ export class GameSession {
         if(fit.lockTarget!==ship.targetId){fit.lock=0;fit.warned=false;fit.lockTarget=ship.targetId;}
         if(time<(fit.launchAt??0)){fit.lock=0;fit.warned=false;return;}
         if(!fit.launcher || fit.missiles<=0 || ship.holdFire || ship.pursuitHoldFire || ship.fleeing || ship.patrolMemoryActive || ship.combatPlan?.recovery?.active || ship.recoveryTargetHidden) {fit.lock=0;fit.warned=false;return;}
-        const start=vec(ship.position),dir=targetPosition.clone().sub(start),distance=dir.length();dir.normalize();
-        const forward=FORWARD.clone().applyQuaternion(quat(ship.rotation));
+        const aim=ship.ordnanceAim??={start:new THREE.Vector3(),direction:new THREE.Vector3(),forward:new THREE.Vector3(),rotation:new THREE.Quaternion()};
+        const start=aim.start.fromArray(ship.position),dir=aim.direction.copy(targetPosition).sub(start),distance=dir.length();dir.normalize();
+        const forward=aim.forward.copy(FORWARD).applyQuaternion(aim.rotation.fromArray(ship.rotation));
         const launcher=launcherForOutfit(fit.activeRack?.itemId)??LAUNCHERS[fit.launcher];
         if(distance<80 || distance>launcher.lockRange || forward.dot(dir)<0.93 || this.lineBlocked(start,targetPosition,ship.id)){fit.lock=0;fit.warned=false;return;}
         fit.lock=(fit.lock ?? 0)+dt;
         if(fit.lock<1.4)return;
         if(ship.targetId==='player' && !fit.warned){this.setOwnMonitorStatus(t('MISSILE LOCK — BREAK AWAY'),novice?3000:1800);fit.warned=true;fit.warnedAt=time;return;}
         if(fit.lock<lockTime || (ship.targetId==='player' && time-fit.warnedAt<(novice?2.6:1.1)))return;
+        if(!npcPlayerAttackWindow(this,ship))return;
+        // A wingmate crossing the nose delays release, without losing the lock.
+        if(friendlyFiringLaneBlocked(this,ship,start,dir,distance))return;
         if(!spendEnergy(ship,(launcher.energyCost??0)*disruptionFactor(ship,time)))return;
         const count=launcher.volley??1;
         for(let i=0;i<count;i++){
@@ -9575,6 +9634,7 @@ export class GameSession {
         fit.missiles--;if(fit.activeRack)fit.activeRack.missiles=fit.missiles;fit.lock=0;fit.warned=false;fit.launchAt=time+Math.max(gap,launcher.cooldown)*disruptionFactor(ship,time);
     }
     fireNpcGun(ship, direction, opportunity) {
+        if(!npcPlayerAttackWindow(this,ship,opportunity?.targetId??ship.targetId))return;
         const disruption=disruptionFactor(ship,this.save.world.time);
         if (ship.combatFit && (ship.campaignCombat || !ship.tutorialEnemy && !ship.tutorialCompanion) && !ship.capitalClass) {
             const fit=ship.combatFit, index=opportunity?.index??ship.combatWeaponIndex;
@@ -9768,7 +9828,7 @@ export class GameSession {
                         this.maybeHitTaunt(projectile.ownerId);
                     }
                     else if (hitKind === 'ship' && hitShip)
-                        this.damageShip(hitShip, projectile.damage, projectile.ownerId, tuple(hitPosition), WEAPONS[projectile.weaponId]??(projectile.weaponId===CRUISER_GUN.id?CRUISER_GUN:LAUNCHERS[projectile.launcherId]), sweepFrom);
+                        this.damageShip(hitShip, projectile.damage, projectile.ownerId, tuple(hitPosition), WEAPONS[projectile.weaponId]??(projectile.weaponId===CRUISER_GUN.id?CRUISER_GUN:LAUNCHERS[projectile.launcherId]), sweepFrom, true);
                     else if (hitKind === 'drone' && hitDrone)
                         hitDrone.ownerId?damageNpcDrone(this,hitDrone,projectile.damage):this.damagePdcDrone(hitDrone.id, projectile.damage, isMissile ? 'missile strike' : 'weapons fire');
                     if(projectile.kind==='mortar' || (projectile.kind==='missile'&&projectile.splashRadius>0)){
@@ -9778,7 +9838,7 @@ export class GameSession {
                             const nearest=closestHullPoint(hitPosition,actor,extents,this.tmpBlastEnd),distance=nearest.distanceTo(hitPosition);
                             if(distance>=radius||this.lineBlocked(blastOrigin,nearest))return;
                             const damage=minimum+(amount-minimum)*(1-distance/radius);
-                            if(isPlayer)this.damagePlayer(damage,'blast damage');else this.damageShip(actor,damage,projectile.ownerId,undefined);
+                            if(isPlayer)this.damagePlayer(damage,'blast damage');else this.damageShip(actor,damage,projectile.ownerId,undefined,undefined,undefined,true);
                         };
                         if(hitKind!=='player')splash(this.save.player,this.turretHullExtents(this.save.player,'player'),true);
                         for(const other of this.ships)if(other.hull>0&&!other.race&&other!==hitShip)splash(other,this.npcHullExtents(other),false);
@@ -9858,7 +9918,7 @@ export class GameSession {
         }
         return false;
     }
-    damageShip(ship, amount, attackerId, position, weapon = {}, origin) {
+    damageShip(ship, amount, attackerId, position, weapon = {}, origin, combatWeapon = false) {
         if (ship.tutorialSurrenderProtectedUntil > this.save.world.time) return;
         this.onExplorationActorHit(ship,attackerId,amount);
         this.onDistressActorHit(ship,attackerId,amount);
@@ -9869,7 +9929,8 @@ export class GameSession {
         // on !ship.surrendered / !ship.hostile, so it cannot re-engage or
         // double its bounty — only die, and drop scrap on the way out.
         const shieldBeforeHit = ship.shield;
-        const applied = activationWeaponDamage(ship, attackerId==='environment'?0:ship.maxShield, amount, weapon, this.save.world.time);
+        const applied = weaponDamage(ship.shield, amount, weapon);
+        if (amount > 0 && attackerId !== 'environment' && (combatWeapon || weapon.kind)) registerCombatShieldHit(ship);
         ship.shield -= applied.shield;
         // Confirm only the player's locked target; background battles should
         // not fill the instruments with unseen damage reports.
@@ -9878,8 +9939,8 @@ export class GameSession {
             this.setMonitorStatus(t('TARGET SHIELDS DOWN'),1800);
             (this.audio?.playCockpit ?? this.audio?.play)?.call(this.audio,'targetShieldBreak',.7);
         }
-        if (applied.activationRemaining > 0 && ship.shield > 0)
-            this.renderer.flashShield?.(ship, this.npcHullExtents(ship), applied.activationRemaining, false, position, origin);
+        if (applied.shield > 0 && ship.shield > 0)
+            this.renderer.flashShield?.(ship, this.npcHullExtents(ship), .25, false, position, origin);
 
         const remaining = applied.hull*(ship.capitalClass==='frigate'?frigateHullDamageScale(weapon):1);
         ship.hull -= remaining;
@@ -10267,6 +10328,9 @@ export class GameSession {
         const intel = [...this.save.player.position];
         const group = [lead, ...escorts].filter(Boolean);
         for (const ship of group) {
+            // The encounter already chose its opening for this entire group.
+            // Only a staged demand below may hail when the player is in range.
+            ship.mugCapable = false;
             ship.targetId = 'player';
             ship.playerIntelPosition = intel;
             if (ship.task?.kind === 'hunt') {
@@ -10620,12 +10684,14 @@ export class GameSession {
     damagePlayer(amount, source, feedback = true, weapon = {}, position, origin) {
         if (this.deathTimer > 0 || amount <= 0)
             return;
-        const incomingAmount = this.save.settings.easyMode ? amount * 0.5 : amount;
         const shieldBeforeHit = this.save.player.shield;
-        const applied = activationWeaponDamage(this.save.player, (source==='weapons fire'||source==='beam fire'||source==='missile strike'||source==='blast damage')?this.playerStats().shield:0, incomingAmount, weapon, this.save.world.time);
+        const combatWeapon = source==='weapons fire'||source==='beam fire'||source==='missile strike'||source==='blast damage';
+        const incomingAmount = amount * (this.save.settings.easyMode ? .5 : 1);
+        const applied = weaponDamage(this.save.player.shield, incomingAmount, weapon);
+        if (combatWeapon) registerCombatShieldHit(this.save.player);
         this.save.player.shield -= applied.shield;
-        if (applied.activationRemaining > 0 && this.save.player.shield > 0)
-            this.renderer.flashShield?.(this.save.player, this.playerHullExtents(), applied.activationRemaining, true, position, origin);
+        if (applied.shield > 0 && this.save.player.shield > 0)
+            this.renderer.flashShield?.(this.save.player, this.playerHullExtents(), .25, true, position, origin);
 
         const remaining = applied.hull;
         if (disruptWeapons(this.save.player, weapon, this.save.world.time, shieldBeforeHit))
@@ -10644,7 +10710,7 @@ export class GameSession {
         this.playerShieldDelay = 5.2;
         // Hits remain dangerous during spool-up, but do not cancel the escape drive.
         if (!this.autopilot && this.activeRace?.state!=='running') this.snapToCombatSpeed();
-        // Beam callers suppress vibration, not the sound of taking damage.
+        // Continuous beams still get throttled controller feedback; their phone pulses stay suppressed.
         if (applied.shield + applied.hull > 0) {
             const collapsed=shieldBeforeHit>0 && this.save.player.shield<=0;
             const announceCollapse=collapsed && this.save.world.time >= (this.shieldBreakFeedbackAt ?? -Infinity)+2;
@@ -10658,9 +10724,8 @@ export class GameSession {
             if(announceCollapse && remaining>0)
                 (this.audio?.playCockpit ?? this.audio?.play)?.call(this.audio,'hit',clamp(remaining/18,.85,1.4));
         }
-        if (feedback && amount > 1.5) {
-            if (navigator.vibrate && this.save.settings.vibration && (navigator.userActivation?.hasBeenActive ?? true))
-                navigator.vibrate(Math.min(90, 18 + amount * 2));
+        if (applied.shield + applied.hull > 0 && ((!feedback) || amount > 1.5)) {
+            this.haptics?.pulse(feedback ? Math.min(160, 45 + amount * 2) : 40, remaining > 0 ? .65 : .3, .5, feedback ? 2 : 1, feedback ? Math.min(90, 18 + amount * 2) : 0);
         }
         if(this.arena?.run)this.save.arenaRun.damage+=applied.shield+applied.hull;
         if (this.save.player.hull <= 0) {
@@ -11397,7 +11462,6 @@ export class GameSession {
             // they close on the player mid-lane (see shipAI.js). Patrols and
             // bounty hunters never shake anyone down.
             mugCapable: isHostile && faction==='pirates' && (role==='pirate'||role==='escort'),
-            nextMugAt: 0,
             smuggling: false,
             fireCooldown: randomBetween(rng, 0.2, 0.8),
             missileCooldown: randomBetween(rng, 1, 3),
@@ -11450,7 +11514,8 @@ export class GameSession {
             search: undefined,
             searchCooldownUntil: 0,
             catchCooldownUntil: 0,
-            resolvedPlayerLast: false,
+            resolvedPlayerLast: Boolean(this.arena && !this.arena.observer),
+            lastResolvedPlayer: this.arena && !this.arena.observer ? [...this.save.player.position] : undefined,
             searchHold: false,
             // Sensor awareness is staged and directional: this ship may know
             // about the player before the player resolves it, or vice versa.
@@ -11758,7 +11823,7 @@ export class GameSession {
         return Math.max(this.playerStats().radarRange * 1.45, VISUAL_LOCK_RANGE);
     }
     shipTracksPlayer(ship) {
-        return Boolean(this.arena || (ship.playerAwareness ?? 0) >= SENSOR_TRACK_THRESHOLD);
+        return Boolean(this.arena?.observer || !ship.playerTrackOccluded && (ship.playerAwareness ?? 0) >= SENSOR_TRACK_THRESHOLD);
     }
     shipContactsPlayer(ship) {
         return Boolean(this.arena || (ship.playerAwareness ?? 0) >= SENSOR_CONTACT_THRESHOLD);
@@ -12636,130 +12701,68 @@ export class GameSession {
             if (visit(cx, cy, cz)) return true;
         }
     }
-    getShipAvoidance(position, velocity, shipId, selfRadius = SHIP_AVOID_SEPARATION * 0.5) {
-        // Evasive turn away from any other ship (player included) that is closing
-        // on a course whose closest approach is inside SHIP_AVOID_SEPARATION units.
-        // Returns a steering vector scaled by urgency, or undefined if the lane is
-        // clear. The turn is perpendicular to our heading (a bank, not a brake) and
-        // biased away from the threat; dead-ahead threats fall back to the ship's
-        // local right so two head-on jousters turn on opposite sides.
-        let found = false;
-        let bestUrgency = 0;
-        const px = position.x;
-        const py = position.y;
-        const pz = position.z;
-        const vx = velocity.x;
-        const vy = velocity.y;
-        const vz = velocity.z;
-        const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
-        let selfShip;
-        let actualSelfRadius = selfRadius;
-        // All NPCs need their own hull size to plan a safe pass in time.
-        if (shipId) {
-            for (let i = 0; i < this.ships.length; i += 1) {
-                const candidate = this.ships[i];
-                if (candidate.id === shipId) {
-                    selfShip = candidate;
-                    const extents = this.npcHullExtents(candidate);
-                    actualSelfRadius = Math.max(extents[0], extents[1], extents[2]);
-                    break;
-                }
-            }
-        }
-        // Every range branch below is bounded by this, including large hulls.
-        const maxRange = Math.max(SHIP_AVOID_RANGE, NPC_SHIP_AVOID_RANGE, SHIP_AVOID_MAX_RANGE);
-        const maxRangeSq = maxRange * maxRange;
+    getShipAvoidance(position, velocity, self) {
+        // Predict where the two paths pass, then open that gap using normal
+        // steering. No position correction or velocity kick before hull contact.
+        const selfExtents = this.npcHullExtents(self);
+        const selfRadius = Math.max(selfExtents[0], selfExtents[1], selfExtents[2]);
+        const speedSq = velocity.lengthSq();
         const player = this.save.player;
-        const playerRadius = Math.max(this.playerCollisionRadius?.() ?? PLAYER_RADIUS, PLAYER_RADIUS);
-        // Player first, then live NPC tuples in array order: preserve urgency ties.
-        for (let i = -1; i < this.ships.length; i += 1) {
-            const other = i < 0 ? player : this.ships[i];
-            if (i >= 0 && (other.id === shipId || other.hull <= 0))
-                continue;
-            const op = other.position;
-            const ov = other.velocity;
-            const rx = op[0] - px;
-            const ry = op[1] - py;
-            const rz = op[2] - pz;
+        const includePlayer = !this.arena?.observer && !player.dockedAt && player.hull > 0;
+        let bestUrgency = 0;
+        for (let i = includePlayer ? -1 : 0; i < this.ships.length; i++) {
+            const npc = i >= 0;
+            const other = npc ? this.ships[i] : player;
+            if (other === self || other.hull <= 0) continue;
+            const rx = other.position[0] - position.x;
+            const ry = other.position[1] - position.y;
+            const rz = other.position[2] - position.z;
             const distSq = rx * rx + ry * ry + rz * rz;
-            if (distSq >= maxRangeSq || distSq < 0.0001)
-                continue;
-            const rvx = ov[0] - vx;
-            const rvy = ov[1] - vy;
-            const rvz = ov[2] - vz;
-            const closing = rx * rvx + ry * rvy + rz * rvz;
-            if (closing >= 0)
-                continue;
-            // Radius-independent rejects must precede the per-pair hull lookup.
-            let otherRadius = playerRadius;
-            if (i >= 0) {
-                const extents = this.npcHullExtents(other);
-                otherRadius = Math.max(extents[0], extents[1], extents[2]);
-            }
-            const npcPair = i >= 0 && Boolean(selfShip);
-            const largeHullContact = (npcPair ? actualSelfRadius : selfRadius) > SHIP_AVOID_SEPARATION * 2 || otherRadius > SHIP_AVOID_SEPARATION * 2;
-            const separation = npcPair
-                ? Math.max(SHIP_AVOID_SEPARATION, actualSelfRadius + otherRadius + NPC_SHIP_AVOID_BUFFER)
-                : largeHullContact
-                ? Math.max(SHIP_AVOID_SEPARATION, selfRadius + otherRadius + SHIP_AVOID_BUFFER)
-                : SHIP_AVOID_SEPARATION;
-            const range = npcPair
-                ? Math.max(NPC_SHIP_AVOID_RANGE, Math.min(SHIP_AVOID_MAX_RANGE, separation * 3))
-                : largeHullContact
-                ? Math.max(SHIP_AVOID_RANGE, Math.min(SHIP_AVOID_MAX_RANGE, separation * 2.2))
-                : SHIP_AVOID_RANGE;
-            if (distSq >= range * range)
-                continue;
-            const rvSq = rvx * rvx + rvy * rvy + rvz * rvz;
-            const relativeSpeed = Math.sqrt(rvSq);
-            const horizon = npcPair
-                ? Math.max(NPC_SHIP_AVOID_HORIZON, Math.min(SHIP_AVOID_MAX_HORIZON, separation / Math.max(12, relativeSpeed) * 4))
-                : largeHullContact
-                ? Math.max(SHIP_AVOID_HORIZON, Math.min(SHIP_AVOID_MAX_HORIZON, separation / Math.max(12, relativeSpeed) * 3))
-                : SHIP_AVOID_HORIZON;
-            const t = Math.min(-closing / Math.max(rvSq, 1e-4), horizon);
-            const cax = rx + rvx * t;
-            const cay = ry + rvy * t;
-            const caz = rz + rvz * t;
-            const ca = Math.sqrt(cax * cax + cay * cay + caz * caz);
-            if (ca >= separation)
-                continue;
-            const dist = Math.sqrt(distSq);
-            const urgency = (1 - ca / separation) * (1 - t / horizon) * clamp(dist / range, 0.35, 1);
-            if (urgency <= bestUrgency)
-                continue;
-            bestUrgency = urgency;
-            const invDist = 1 / dist;
-            const ax = rx * invDist;
-            const ay = ry * invDist;
-            const az = rz * invDist;
-            const fx = speed > 1e-4 ? vx / speed : 0;
-            const fy = speed > 1e-4 ? vy / speed : 0;
-            const fz = speed > 1e-4 ? vz / speed : 0;
-            const dot = ax * fx + ay * fy + az * fz;
-            // Steer away from the threat, perpendicular to our heading.
-            let ex = fx * dot - ax;
-            let ey = fy * dot - ay;
-            let ez = fz * dot - az;
-            let len = Math.sqrt(ex * ex + ey * ey + ez * ez);
-            if (len < 0.2) {
-                // Threat dead ahead: fall back to the local right vector (cross of
-                // forward with world-up), which is opposite for opposite facings.
-                ex = -fz;
-                ey = 0;
-                ez = fx;
-                len = Math.sqrt(ex * ex + ey * ey + ez * ez);
-                if (len < 0.2) {
-                    ex = 1;
-                    ey = 0;
-                    ez = 0;
-                    len = 1;
+            if (distSq >= SHIP_AVOID_MAX_RANGE ** 2 || distSq < 0.0001) continue;
+            const vx = other.velocity[0] - velocity.x;
+            const vy = other.velocity[1] - velocity.y;
+            const vz = other.velocity[2] - velocity.z;
+            const closing = -(rx * vx + ry * vy + rz * vz);
+            if (closing <= 0) continue;
+            const extents = npc ? this.npcHullExtents(other) : this.playerHullExtents();
+            const radius = Math.max(extents[0], extents[1], extents[2]);
+            const separation = Math.max(SHIP_AVOID_SEPARATION, selfRadius + radius + (npc ? NPC_SHIP_AVOID_BUFFER : SHIP_AVOID_BUFFER));
+            const range = Math.min(SHIP_AVOID_MAX_RANGE, Math.max(npc ? NPC_SHIP_AVOID_RANGE : SHIP_AVOID_RANGE, separation * 3));
+            if (distSq >= range * range) continue;
+            const relativeSpeedSq = vx * vx + vy * vy + vz * vz;
+            const t = closing / relativeSpeedSq;
+            const horizon = Math.min(SHIP_AVOID_MAX_HORIZON, Math.max(npc ? NPC_SHIP_AVOID_HORIZON : SHIP_AVOID_HORIZON, separation * 4 / Math.max(12, Math.sqrt(relativeSpeedSq))));
+            if (t >= horizon) continue;
+            let ex = -(rx + vx * t), ey = -(ry + vy * t), ez = -(rz + vz * t);
+            const missSq = ex * ex + ey * ey + ez * ez;
+            if (missSq >= separation * separation) continue;
+            const miss = Math.sqrt(missSq);
+            const urgency = (1 - miss / separation) * (1 - t / horizon);
+            if (urgency <= bestUrgency) continue;
+
+            // Opening the predicted gap steers *with* an existing safe pass,
+            // even when the other ship is currently on the opposite side.
+            // On a direct collision there is no useful miss vector. Crossing
+            // pilots peel to opposite sides of their common flight plane.
+            let length = miss;
+            if (miss < Math.min(3, separation * .1)) {
+                ex = velocity.y * vz - velocity.z * vy;
+                ey = velocity.z * vx - velocity.x * vz;
+                ez = velocity.x * vy - velocity.y * vx;
+                const normalSq = ex * ex + ey * ey + ez * ez;
+                const otherSpeedSq = other.velocity[0] ** 2 + other.velocity[1] ** 2 + other.velocity[2] ** 2;
+                if (normalSq <= .04 * speedSq * otherSpeedSq) {
+                    // Collinear traffic shares an antisymmetric passing rule,
+                    // including vertical approaches and same-lane overtakes.
+                    if (vy * vy > .9 * relativeSpeedSq) { ex = -vy; ey = vx; ez = 0; }
+                    else { ex = vz; ey = 0; ez = -vx; }
                 }
+                length = Math.hypot(ex, ey, ez);
             }
-            this.tmpShipAvoid.set(ex / len, ey / len, ez / len).multiplyScalar(urgency * (npcPair ? NPC_SHIP_AVOID_STEER : SHIP_AVOID_STEER));
-            found = true;
+            bestUrgency = urgency;
+            this.tmpShipAvoid.set(ex, ey, ez).multiplyScalar(urgency * (npc ? NPC_SHIP_AVOID_STEER : SHIP_AVOID_STEER) / length);
         }
-        return found ? this.tmpShipAvoid : undefined;
+        return bestUrgency > 0 ? this.tmpShipAvoid : undefined;
     }
     getAvoidanceVector(position, desired, range, speed = 0) {
         let ax = 0;
@@ -14090,6 +14093,14 @@ export class GameSession {
         if (key === 'music' || key === 'effects' || key === 'touchScale') {
             this.save.settings[key] = Number(value);
         }
+        else if (key === 'controllerBindings') {
+            this.save.settings.controllerBindings = normalizeControllerBindings(value);
+            this.input.configureGamepad(this.save.settings);
+        }
+        else if (key === 'controllerDeadzone' || key === 'controllerSensitivity') {
+            this.save.settings[key] = Number(value);
+            this.input.configureGamepad(this.save.settings);
+        }
         else if (key === 'tiltSensitivity') {
             this.save.settings.tiltSensitivity = Number(value);
             this.input.configureTilt({ tiltSensitivity: this.save.settings.tiltSensitivity });
@@ -14105,6 +14116,10 @@ export class GameSession {
         }
         else if (key === 'flightAssist' || key === 'aimAssist' || key === 'vibration' || key === 'reducedDamageEffects' || key === 'easyMode') {
             this.save.settings[key] = Boolean(value);
+            if (key === 'vibration') {
+                this.input.configureGamepad(this.save.settings);
+                if (!value) this.haptics?.stop();
+            }
         }
         else if (key === 'quality' && (value === 'auto' || value === 'low' || value === 'high')) {
             this.save.settings.quality = value;

@@ -9,6 +9,7 @@ import {loadoutFor,createOutfittingState,validateLoadout,HULL_HARDPOINTS,LOADOUT
 import {getEffectiveShipStats} from '../../src/game/shipStats.js';
 import {launcherMagazineEntries} from '../../src/game/weapons.js';
 import {GameUI} from '../../src/game/ui.js';
+import {equipmentBaseId} from '../../src/game/equipmentCatalog.js';
 import {setLanguage} from '../../src/game/i18n.js';
 import {DE_CATALOG} from '../../src/game/i18n-de.js';
 // A minimal root that behaves like the one ui.js sees: selectors resolve to
@@ -354,7 +355,7 @@ test('preparation screens render in both languages and every wave briefing is tr
  stage.arenaRun.wave=8;stage.arenaRun.decisions[8]=false;stage.arenaRun.hullChosen=false;stage.arenaRun.hullOffers=runHullOffers(stage);stage.arenaRun.wingmanOffers=runWingmanOffers(stage);stageUi.showArenaRun(stage);
  assert.match(stagePanel().innerHTML,/FLÜGELMANN AUSWÄHLEN/,'the current wingman stage has localized copy');
  assert.match(stagePanel().innerHTML,/Kreuzfeuer/,'the next wave briefing is localized');
- assert.match(stagePanel().innerHTML,/Freie Händler · Gemischtes Gefecht/,'the faction and encounter description is localized');
+ assert.match(stagePanel().innerHTML,/Freie Händler · Drei Veteranen greifen gemeinsam an\./,'the faction and encounter description is localized');
  for(const order of WING_ORDERS){assert.ok(DE_CATALOG[WING_ORDER_LABEL[order]],WING_ORDER_LABEL[order]);assert.ok(DE_CATALOG[WING_ORDER_HINT[order]],WING_ORDER_HINT[order]);}
  // The roster is a real choice: one button per named veteran, each with a hull.
  const roster=runWingmanOffers(stage);
@@ -455,7 +456,7 @@ test('weapon rewards fill empty shared bays first and preserve replaced equipmen
   save.player.outfitting=createOutfittingState([hull]);save.arenaRun.wave=1;save.arenaRun.hullChosen=true;save.arenaRun.rewardChosen=false;save.arenaRun.offers=['pulse-cannon'];
   const fit=loadoutFor(save.player),originalFit=JSON.parse(JSON.stringify(fit)),spec=HULL_HARDPOINTS[hull];
   const free=spec.weapons.map((_,i)=>!fit.guns[i]&&!fit.launchers[i]?i:-1).filter(i=>i>=0),plan=runRewardPlan(save,'pulse-cannon');
-  assert.ok(plan);assert.equal(plan.count,plan.changes.length);
+  assert.ok(plan);assert.equal(plan.count,2);
   if(free.length){assert.ok(plan.changes.every(change=>free.includes(change.index)));assert.deepEqual(plan.replaced,[]);}
   else assert.ok(plan.replaced.length,'a full weapon rack may replace a fitted item');
   assert.equal(chooseRunReward(save,'pulse-cannon'),true);
@@ -483,7 +484,7 @@ test('finished short runs keep their totals and active checkpoints migrate into 
 });
 test('the wave before the frigate fully services the ship, and the boss flies with four turrets',()=>{
  storage();const s=runSession(RUN_WAVES.length-2);s.startRunWave();s.tickArenaRun(3);assert.equal(s.ships.length,1);assert.equal(s.ships[0].combatFit.hullId,'lancer');
- s.save.world.time=s.save.arenaRun.startedAt+12;s.tickArenaRun(9);assert.equal(s.ships.length,2);assert.deepEqual(s.ships.map(x=>x.combatFit.hullId),['lancer','vanguard']);
+ s.save.world.time=s.save.arenaRun.startedAt+12;s.tickArenaRun(9);assert.equal(s.ships.length,3);assert.deepEqual(s.ships.map(x=>x.combatFit.hullId),['lancer','vanguard','blade']);
  s.save.player.hull=5;s.ships.forEach(x=>x.hull=0);s.tickArenaRun(0);s.save.world.time+=2;s.tickArenaRun(2);assert.equal(s.save.arenaRun.wave,RUN_WAVES.length-1);
  // The last advance serviced the pilot before the frigate stage. Complete its
  // required second-wing choice before accepting the normal wave reward.
@@ -516,9 +517,9 @@ test('staged rewards include tier-II pulse and compatible missile upgrades with 
  for(let seed=0;seed<80;seed++){
   const save=newArenaRun(false,seed);save.player.shipId='lancer';save.player.ownedShips=['lancer'];save.player.outfitting=createOutfittingState(['lancer']);
   Object.assign(save.arenaRun,{wave:6,rewardChosen:false});
-  for(const id of runOffers(save))seen.add(id);
+  for(const id of runOffers(save))if(OUTFIT_ITEMS[id]){seen.add(equipmentBaseId(id));assert.equal(OUTFIT_ITEMS[id].tier,3);}
  }
- for(const id of ['pulse-cannon-t2','swarm-launcher','torpedo-launcher'])assert.ok(seen.has(id),id);
+ for(const id of ['pulse-cannon','swarm-launcher','torpedo-launcher'])assert.ok(seen.has(id),id);
  const save=newArenaRun(false,903);save.player.shipId='lancer';save.player.ownedShips=['lancer'];save.player.outfitting=createOutfittingState(['lancer']);
  Object.assign(save.arenaRun,{wave:6,hullChosen:true,rewardChosen:false,offers:['torpedo-launcher']});
  assert.equal(chooseRunReward(save,'torpedo-launcher'),true);
@@ -530,7 +531,7 @@ test('all hulls receive a usable boss counter and damaged ships retain a repair 
   const save=newArenaRun(false,8);save.player.shipId=hull;save.player.ownedShips=[hull];save.player.outfitting=createOutfittingState([hull]);
   Object.assign(save.arenaRun,{wave:RUN_WAVES.length-1,hullChosen:true,rewardChosen:false});save.player.hull=getEffectiveShipStats(save.player).hull*.5;
   save.arenaRun.offers=runOffers(save);assert.ok(save.arenaRun.offers.includes('repair'));
-  const id=save.arenaRun.offers.find(id=>id==='mortar'||id==='torpedo-launcher'||id==='ripper');assert.ok(id,hull);assert.equal(chooseRunReward(save,id),true);assert.ok(validateLoadout(save.player,hull,loadoutFor(save.player)).ok);
+  const id=save.arenaRun.offers.find(id=>['mortar','torpedo-launcher','ripper'].includes(equipmentBaseId(id)));assert.ok(id,hull);assert.equal(chooseRunReward(save,id),true);assert.ok(validateLoadout(save.player,hull,loadoutFor(save.player)).ok);
  }
 });
 test('arena opponents fly the fit their hull authors, and the run ends on the frigate',()=>{
@@ -541,7 +542,7 @@ test('arena opponents fly the fit their hull authors, and the run ends on the fr
   const authoredGuns=runEnemyFit(spec).guns.filter(Boolean);
   assert.deepEqual(fit.guns.filter(Boolean),authoredGuns,`wave ${wave} enemy ${i} retains the authored guns in shared weapon bays`);assert.ok(fit.attackOrder.every(index=>fit.weapons[index]));
  }
- const save=newArenaRun();save.player.shipId='lancer';save.player.ownedShips=['lancer'];save.player.outfitting=createOutfittingState(['lancer']);assert.equal(runRewardPlan(save,'ion-blaster').count,1,'ion reward retains a hull-damage gun');
+ const save=newArenaRun();save.player.shipId='lancer';save.player.ownedShips=['lancer'];save.player.outfitting=createOutfittingState(['lancer']);assert.equal(runRewardPlan(save,'ion-blaster').changes.length,1,'ion reward retains a hull-damage gun');
 });
 test('the last kill gets a two-second beat before the run flips to prepare',()=>{
  storage();const s=runSession(0),r=s.save.arenaRun;

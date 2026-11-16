@@ -10,7 +10,7 @@ const {EntityStore}=await import('../../src/game/entityStore.js');
 const {combatProfile,interceptTime}=await import('../../src/game/combatTactics.js');
 const {createEnemyLoadout}=await import('../../src/game/enemyLoadouts.js');
 const {regenerateCombatResources}=await import('../../src/game/combatResources.js');
-const {WEAPONS}=await import('../../src/game/weapons.js');
+const {WEAPONS,WEAPON_DAMAGE_SCALE}=await import('../../src/game/weapons.js');
 const {rollPilot}=await import('../../src/game/pilots.js');
 const {SHIPS}=await import('../../src/game/data.js');
 const {integrateFlightTurn,integrateFlightVelocity,registerHitReaction}=await import('../../src/game/flightDynamics.js');
@@ -119,7 +119,7 @@ test('legacy rookie profiles normalize and tutorial/capital weapons retain autho
     for(const flag of ['tutorialEnemy','tutorialCompanion','capitalClass']){
         const s=fixture(),ship=spawn(s);ship[flag]=true;ship.gunDamage=3;
         assert.equal(combatProfile(ship),undefined);s.fireNpcGun(ship,new THREE.Vector3(0,0,-1));
-        assert.ok(Math.abs(s.projectiles[0].damage-2.4)<1e-9);assert.equal(s.projectiles[0].life,1.55);
+        assert.ok(Math.abs(s.projectiles[0].damage-3*WEAPON_DAMAGE_SCALE)<1e-9);assert.equal(s.projectiles[0].life,1.55);
     }
 });
 

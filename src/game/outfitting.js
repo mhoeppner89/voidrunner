@@ -78,15 +78,15 @@ const itemRecords = [
     {
         id: 'pulse-cannon', name: "Pulse Laser", category: 'gun', size: 'S', sizes: ['S', 'M'],
         price: 1200, energyCost: 3.2, weaponId: 'pulse', factoryFit: true,
-        description: "Normal-speed fire. Shares its lead with pulse, ion and scatterguns. 450 km range.", stat: '450 km · 9.2 damage · 3.2 energy',
+        description: "Normal-speed fire. Shares its lead with pulse, ion and scatterguns. 450 km range.", stat: '450 km · 12 damage · 3.2 energy',
         effects: { weaponId: 'pulse', damageMultiplier: 1 }, availability: ['helix', 'rook', 'vesper', 'azure'],
         art: './art/outfitting/pulse-cannon.webp',
     },
     {
         id: 'gauss-cannon', name: "Gauss Cannon", category: 'gun', size: 'M', sizes: ['M'],
         price: 6500, mass:6, energyCost: 14, weaponId: 'gauss', factoryFit: true,
-        description: "Very fast precision shots bypass 15% of shields. Slow firing; 600 km range.", stat: '600 km · 27.2 damage · 15% shield bypass',
-        effects: { weaponId: 'gauss', damage: 27.2 }, availability: ['helix', 'rook'],
+        description: "Very fast precision shots bypass 15% of shields. Slow firing; 600 km range.", stat: '600 km · 44.8 damage · 15% shield bypass',
+        effects: { weaponId: 'gauss', damage: 44.8 }, availability: ['helix', 'rook'],
         art: './art/outfitting/gauss-cannon.webp',
     },
     {
@@ -113,7 +113,7 @@ const itemRecords = [
     {
         id: 'mortar', name: "Sunlance Plasma Cannon", category: 'gun', size: 'M', sizes: ['M'],
         price: 10000, mass:8, energyCost: 18, weaponId: 'mortar',
-        description: "Slow plasma rewards accurate direct hits with high damage and energy efficiency. Small blast; 500 km range.", stat: '500 km · 56 direct damage · 18 energy',
+        description: "Slow plasma rewards accurate direct hits with high damage and energy efficiency. Small blast; 500 km range.", stat: '500 km · 80 direct damage · 18 energy',
         effects: { weaponId: 'mortar', splashRadius: 18 }, availability: ['rook'],
         legacyEquipmentId: 'sunlance-mortar', art: './art/outfitting/mortar.webp',
     },

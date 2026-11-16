@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "approvedLayout": "layout-05",
+  "shell": "/assets/cockpits/wayfarer-paint-atlas-v1.png",
+  "hand": "/assets/cockpits/wayfarer-hand-v1.png",
+  "reference": {
+    "width": 736,
+    "height": 338,
+    "parts": {
+      ".cockpit-screen-own": {
+        "x": 158.84031677246094,
+        "y": 243.375,
+        "width": 135.75001525878906,
+        "height": 86
+      },
+      ".cockpit-screen-radar": {
+        "x": 316.6703186035156,
+        "y": 244.15750122070312,
+        "width": 113.375,
+        "height": 81.109375
+      },
+      ".cockpit-screen-target": {
+        "x": 452.12530517578125,
+        "y": 241.96875,
+        "width": 125.828125,
+        "height": 86
+      },
+      "#hyperdrive-card": {
+        "x": 320.6078186035156,
+        "y": 208.42437744140625,
+        "width": 105.5,
+        "height": 26
+      },
+      ".touch-right": {
+        "x": 621,
+        "y": 135.8125,
+        "width": 112,
+        "height": 194.1875
+      },
+      ".touch-throttle": {
+        "x": 3,
+        "y": 82.171875,
+        "width": 52,
+        "height": 112
+      },
+      ".stick-pedestal": {
+        "x": 7.0625,
+        "y": 204.171875,
+        "width": 133.828125,
+        "height": 139.828125
+      },
+      "#pilot-hand": {
+        "x": 0.46875,
+        "y": 163.8125,
+        "width": 147,
+        "height": 217.296875
+      }
+    }
+  },
+  "atlas": {
+    "width": 1851,
+    "height": 850,
+    "rail": {
+      "x": 0,
+      "y": 126,
+      "width": 1851,
+      "height": 37
+    },
+    "well": {
+      "x": 0,
+      "y": 480,
+      "width": 352,
+      "height": 370
+    },
+    "monitors": {
+      "own": {
+        "outer": {
+          "x": 351,
+          "y": 548,
+          "width": 409,
+          "height": 302
+        },
+        "inner": {
+          "x": 411,
+          "y": 590,
+          "width": 303,
+          "height": 196
+        }
+      },
+      "radar": {
+        "outer": {
+          "x": 754,
+          "y": 549,
+          "width": 347,
+          "height": 301
+        },
+        "inner": {
+          "x": 794,
+          "y": 590,
+          "width": 258,
+          "height": 196
+        }
+      },
+      "target": {
+        "outer": {
+          "x": 1092,
+          "y": 548,
+          "width": 408,
+          "height": 302
+        },
+        "inner": {
+          "x": 1135,
+          "y": 590,
+          "width": 287,
+          "height": 196
+        }
+      }
+    }
+  }
+}

@@ -42,6 +42,7 @@ export function migratePulseRecord(record){
 }
 export const runtimeEquipmentId=id=>{
  const item=equipmentRecord(id),base=equipmentBaseId(id);
+ if(item&&String(id).startsWith('eq-arena-'))return id;
  return base==='pulse-cannon'&&(item?.tier??1)>1?`pulse-cannon-t${Math.min(3,item.tier)}`:base;
 };
 export function resolveEquipmentDefinition(base, record) {

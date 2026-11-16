@@ -38,7 +38,7 @@ let exportUrl;
 const actions = {
     throttleDelta: 0, pitch: 0, yaw: 0, roll: 0, throttleSet: .4,
     fire: false, utility: false, missile: false, targetNext: false,
-    targetNearestHostile: false, cycleMode: false, navNext: false,
+    targetNearestHostile: false, navNext: false,
     autopilot: false, scan: false, pause: false, map: false, capture: false,
     jettison: false, transponder: false, weaponCycle: false, afterburner: false,
 };

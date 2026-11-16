@@ -53,6 +53,8 @@ test('Sunlance pays its energy cost and a paired salvo cannot erase a fresh Talo
  const s=session(),p=s.save.player;p.shipId='vanguard';p.ownedShips=['vanguard'];const fit=loadoutFor(p);fit.guns=['mortar','mortar'];fit.fireGroups.activeGroup='ALL';p.outfitting.loadouts.vanguard=fit;p.energy=100;
  const victim={tutorialCompanion:true,position:[0,0,-100],hull:137,shield:58};let impacts=0;
  s.spawnPlayerGunProjectile=w=>{impacts++;s.damageShip(victim,w.damageFlat,'enemy',undefined,w);};
- s.fireMountedPlayerGuns();assert.equal(impacts,2);assert.equal(p.energy,64);assert.equal(victim.hull,137+58-2*WEAPONS.mortar.damageFlat);assert.equal(victim.shield,0);
+ s.fireMountedPlayerGuns();assert.equal(impacts,2);assert.equal(p.energy,64);
+ assert.equal(victim.hull,137-Math.max(0,2*WEAPONS.mortar.damageFlat-58));
+ assert.equal(victim.shield,Math.max(0,58-2*WEAPONS.mortar.damageFlat));
  assert.equal(WEAPONS.mortar.cooldown,1.5);assert.equal(WEAPONS.mortar.energyCost,18);
 });

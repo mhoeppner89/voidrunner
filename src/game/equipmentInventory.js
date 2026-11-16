@@ -15,7 +15,7 @@ export function registerInventoryDefinitions(inventory){
   if(base.id==='beam-emitter')record.factory=false;
   record.tier=Math.max(base.tier??1,Math.min(3,Math.floor(Number(record.tier)||1)));
   if(!EQUIPMENT_RARITIES[record.rarity])record.rarity='common';
-  if(record.rarity==='named'&&!NAMED_EQUIPMENT[record.baseId])record.rarity='rare';
+  if(record.rarity==='named'&&!NAMED_EQUIPMENT[record.baseId]&&!id.startsWith('eq-arena-'))record.rarity='rare';
   record.affixes=[...new Set((Array.isArray(record.affixes)?record.affixes:[]).filter(a=>EQUIPMENT_AFFIXES[a]?.categories.includes(base.category)))].slice(0,EQUIPMENT_RARITIES[record.rarity].affixes);
   registerEquipmentDefinition(id,resolveEquipmentDefinition(base,record));
  }
