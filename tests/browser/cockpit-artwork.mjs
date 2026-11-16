@@ -21,7 +21,7 @@ for(const [name,engine,device]of profiles){
    const A=window.AudioContext??window.webkitAudioContext;if(A)A.prototype.resume=async function(){await this.suspend();};
    window.testPad={index:0,id:'Cockpit test controller',mapping:'standard',connected:true,axes:[0,0,0,0],buttons:Array.from({length:17},()=>({pressed:false,value:0}))};Object.defineProperty(navigator,'getGamepads',{value:()=>[testPad]});
   });
-  await page.goto(`${base}/game.html?revision=0.8.2oo&startup-probe=1`);await page.waitForFunction(()=>window.__VOID_PRIVATEER__?.newGame);
+  await page.goto(`${base}/game.html?revision=0.8.2oq&startup-probe=1`);await page.waitForFunction(()=>window.__VOID_PRIVATEER__?.newGame);
   await page.evaluate(()=>__VOID_PRIVATEER__.newGame());
   await page.evaluate(async hull=>{const r=__VOID_PRIVATEER__.getRuntime();r.audio.setVolumes(0,0);r.skipTutorial();if(hull!=='wayfarer'){r.save.player.credits=10000000;const result=r.buyShip(hull);if(!result.ok)throw Error(JSON.stringify(result));}await r.launch();},hull);
   await page.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime()?.ui.cockpitArtwork?.layout);

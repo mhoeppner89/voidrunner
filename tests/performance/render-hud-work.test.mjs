@@ -251,7 +251,7 @@ test('sprite hulls use hull-matched transparent cockpit sprites and distinct mon
     assert.ok(preloaded.some(url=>url.includes('wayfarer-hand-pitch-v4.png')));
     ui.setCockpitShip('talon');
     assert.deepEqual(kitCalls.at(-1), ['activate', 'talon'], 'Mercury uses the shared cockpit renderer');
-    assert.ok(preloaded.some(url=>url.includes('talon-paint-v8.png')));
+    assert.ok(preloaded.some(url=>url.includes('talon-paint-v4.png')));
     assert.ok(!preloaded.some(url=>/cockpit-talon-sprite/.test(url)));
     ui.setCockpitShip('prospector');
     assert.deepEqual(kitCalls.at(-1), ['deactivate'], 'sprite hulls leave the kit');

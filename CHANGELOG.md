@@ -1,3 +1,8 @@
+## 0.8.2oq — Fit Mercury displays to the approved painting
+
+- Restore the original detailed v4 frame unchanged. Remove the corrective aperture stencil and fit the live glass to its measured openings in code.
+- Center readouts within those openings, with small internal margins for the beveled corners. Preserve the fixed joystick base and final 10px left adjustment.
+
 ## 0.8.2op — Final Mercury joystick fit
 
 - Shift Mercury’s hand and fixed joystick base another 10 pixels left on the shared reference grid. Preserve the touch area and all display/control geometry.

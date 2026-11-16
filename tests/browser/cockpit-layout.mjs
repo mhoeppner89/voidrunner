@@ -24,24 +24,39 @@ for(const [name,engine,device]of profiles.filter(([n])=>process.env.VR_PROFILES.
    const data=await f.evaluate(async()=>{
     const r=cockpitReview,c=r.artwork,production=await import('/src/game/cockpitArtwork.js');
     const box=s=>{const b=document.querySelector(s).getBoundingClientRect();return {x:b.x,y:b.y,w:b.width,h:b.height,right:b.right,bottom:b.bottom};};
-    return {styling:Object.fromEntries(['.cockpit-screen-radar','.screen-flight','.screen-own-weapon','.screen-target-readout','#hyperdrive-card'].map(s=>{const t=getComputedStyle(document.querySelector(s));return [s,[t.fontFamily,t.fontSize,t.lineHeight,t.borderRadius]];})),underlap:r.definition.glassUnderlap??3,sameRenderer:c instanceof production.PaintedCockpit,definition:r.definition.id,approved:production.hasPaintedCockpit(r.definition.id),layout:structuredClone(c.layout),screens:Object.fromEntries(['own','radar','target'].map(k=>[k,box('.cockpit-screen-'+k)])),frame:box('.painted-cockpit-frame'),hand:box('.painted-pilot-hand'),rail:box('.painted-throttle-rail'),throttle:box('[data-touch-throttle]'),throttleClientWidth:document.querySelector('[data-touch-throttle]').clientWidth,touch:document.querySelector('#game-shell').dataset.cockpitTouch,source:c.frame.src,error:c.loadError,canopy:JSON.parse(render_game_to_text()).canopy};
+    return {styling:Object.fromEntries(['.cockpit-screen-radar','.screen-flight','.screen-own-weapon','.screen-target-readout','#hyperdrive-card'].map(s=>{const t=getComputedStyle(document.querySelector(s));return [s,[t.fontFamily,t.fontSize,t.lineHeight,t.borderRadius]];})),referenceWidth:r.definition.width,underlap:r.definition.glassUnderlap??3,sameRenderer:c instanceof production.PaintedCockpit,definition:r.definition.id,approved:production.hasPaintedCockpit(r.definition.id),layout:structuredClone(c.layout),screens:Object.fromEntries(['own','radar','target'].map(k=>[k,box('.cockpit-screen-'+k)])),frame:box('.painted-cockpit-frame'),hand:box('.painted-pilot-hand'),rail:box('.painted-throttle-rail'),throttle:box('[data-touch-throttle]'),throttleClientWidth:document.querySelector('[data-touch-throttle]').clientWidth,touch:document.querySelector('#game-shell').dataset.cockpitTouch,source:c.frame.src,error:c.loadError,canopy:JSON.parse(render_game_to_text()).canopy};
    });
    assert.equal(data.sameRenderer,true);assert.equal(data.approved,true);assert.equal(data.error,undefined);assert.equal(data.touch,String(name!=='desktop'));
    assert.equal(await f.locator('.touch-right').isVisible(),name!=='desktop');assert.equal(await f.locator('[data-touch-throttle]').isVisible(),name!=='desktop');assert.equal(await f.locator('.painted-pilot-hand').isVisible(),true);
    assert.equal(data.frame.w,data.layout.width);assert.equal(data.frame.h,data.layout.height);assert.ok(data.hand.right<data.screens.own.x);
    if(name!=='desktop')assert.ok(Math.abs(data.rail.w/data.throttleClientWidth-.5)<.03);
    for(const [key,b]of Object.entries(data.screens)){
-    const q=data.layout.monitors[key],bleed=Math.max(1.5,data.underlap*Math.max(data.layout.width/1851,data.layout.height/850));
+    const q=data.layout.monitors[key],bleed=Math.max(1.5,data.underlap*Math.max(data.layout.width/data.referenceWidth,data.layout.height/850));
     assert.ok(Math.abs(b.x-(q.x-bleed))<.1&&Math.abs(b.y-(q.y-bleed))<.1&&Math.abs(b.w-(q.width+bleed*2))<.1,'production glass underlap matches the source opening');
    }
    assert.ok(data.canopy.triangles>0);assert.equal(data.canopy.shipId,hull);
-   if(hull==='talon'){assert.match(data.source,/talon-paint-v8.png$/);assert.equal(data.canopy.beams.length,8);
-    assert.equal(await f.evaluate(()=>getComputedStyle(cockpitReview.artwork.frame).clipPath.includes(cockpitReview.artwork.clipId)),true,'frame uses the locked glass stencil');}
+   if(hull==='talon'){assert.match(data.source,/talon-paint-v4.png$/);assert.equal(data.canopy.beams.length,8);
+    assert.equal(await f.evaluate(()=>getComputedStyle(cockpitReview.artwork.frame).clipPath),'none','original painted bevels stay intact');
+    const fit=await f.evaluate(()=>{
+     const c=cockpitReview.artwork,image=c.frame,canvas=document.createElement('canvas');canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;
+     const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data,W=canvas.width,H=canvas.height;
+     return Object.entries(c.definition.monitors).map(([id,r])=>{
+      const seen=new Uint8Array(W*H),queue=[Math.floor(r.y+r.height/2)*W+Math.floor(r.x+r.width/2)];seen[queue[0]]=1;
+      let minX=W,minY=H,maxX=0,maxY=0,sx=0,sy=0;
+      for(let i=0;i<queue.length;i++){const at=queue[i],x=at%W,y=Math.floor(at/W);minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);sx+=x;sy+=y;
+       for(const next of [at-1,at+1,at-W,at+W])if(next>=0&&next<W*H&&!seen[next]&&pixels[next*4+3]<40){seen[next]=1;queue.push(next);}
+      }
+      return {id,r,bounds:[minX,minY,maxX+1,maxY+1],center:[sx/queue.length+.5,sy/queue.length+.5]};
+     });
+    });
+    for(const {id,r,bounds:b,center:p}of fit){assert.ok(b[0]>=r.x&&b[1]>=r.y&&b[2]<=r.x+r.width&&b[3]<=r.y+r.height,`${id}: glass fills the actual transparent opening`);assert.ok(Math.abs(p[0]-(r.x+r.width/2))<2&&Math.abs(p[1]-(r.y+r.height/2))<2,`${id}: display centers on the painted opening`);}
+   }
    else assert.match(data.source,/wayfarer-paint-atlas-v2.png/);
    await page.screenshot({path:`${out}/${name}-${hull}.png`});
-   if(reports.length){for(const key of ['own','target'])assert.deepEqual(data.layout.monitors[key],reports[0].layout.monitors[key],'outer monitors retain approved geometry');
-    assert.ok(Math.abs(reports[0].layout.monitors.radar.y-data.layout.monitors.radar.y-14/850*data.layout.height)<.01,'Mercury radar is only slightly lower');
-    assert.ok(reports[0].layout.hyper.y>=560/850*data.layout.height-.1&&reports[0].layout.hyper.y+reports[0].layout.hyper.height<reports[0].layout.monitors.radar.y,'hyperdrive mounts inside its frame above radar');assert.deepEqual(data.styling,reports[0].styling,'review hull uses production shared typography and instrument styling');}
+   if(reports.length){
+    assert.ok(reports[0].layout.hyper.y>=560/850*data.layout.height-.1&&reports[0].layout.hyper.y+reports[0].layout.hyper.height<reports[0].layout.monitors.radar.y,'hyperdrive mounts inside its frame above radar');
+    for(const [key,style]of Object.entries(data.styling)){const reference=reports[0].styling[key];assert.equal(style[0],reference[0],'shared font family');assert.equal(style[3],reference[3],'shared display shape');assert.ok(Math.abs(parseFloat(style[1])-parseFloat(reference[1]))<2,'responsive type remains readable in measured apertures');}
+   }
    reports.push(data);
    // All pitch poses and full yaw preserve the exact base socket, and do not relayout.
    const pivots=await f.evaluate(()=>{

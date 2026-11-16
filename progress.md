@@ -1,5 +1,10 @@
 Original prompt: Review and revise all equipment names for ambiguity and visible tiers.
 
+Follow-up: restore Mercury original art; fit monitors in code (0.8.2oq).
+- User correctly flagged that repeated bezel regeneration degraded the art while displays still did not sit flush. Commit 285bd6a had already finished pushing to main. Prioritize this correction before Gaia.
+- Restored the original detailed v4 PNG unchanged, removed its aperture stencil and measured the alpha openings. Adjusted Mercury-only glass slots and small content insets in code; share the same renderer/readouts and keep all controls and the final joystick offset.
+- Passed 13 focused unit/HUD checks, desktop/small-phone review with full-resolution alpha flood-fill checks (actual hole coverage and centering within 2 source pixels), and Mercury live flight on desktop/Android/iPhone/small phone. Reduced own-monitor side insets from 20px to 10px after inspecting the small-phone fuel row; inspected final live phone capture with full speed/fuel values. Packaging/whitespace checks passed. No bitmap edits or image-generation calls.
+
 Follow-up: final Mercury joystick offset and release (0.8.2op).
 - User requested another 10px left, then commit/push before starting the next hull. Changed only Mercury’s reference-grid rig offset from -50 to -60; the hand and base remain anchored together and touch geometry is unchanged.
 - Passed 26 focused cockpit/HUD, target-cycle and cleanup-safety checks; desktop/small-phone shared review checks passed and final small-phone capture inspected. Source verification, packaging and whitespace checks passed. Current release also includes the previously authorized repository cleanup, target-cycle change and shared Mercury cockpit work; private lore/authoring remains ignored.

@@ -102,7 +102,8 @@ export class PaintedCockpit {
         const baseline=rect('[data-touch-stick]'),throttle=rect('[data-touch-throttle]'),corners=rect('.hud-corner-buttons');
         const {monitors,hyper,stickSize,stickTranslate,bleed}=cockpitLayout(this.definition,W,H,{jumpHeight:rect('#hyperdrive-card').height,baseline,throttle,corners});
         for(const [id,q]of Object.entries(monitors)){
-            this.style(this.root.querySelector(SCREENS[id]),{left:`${q.x-bleed}px`,top:`${q.y-bleed}px`,width:`${q.width+bleed*2}px`,height:`${q.height+bleed*2}px`,padding:`${bleed}px`,'min-height':'0','min-width':'0'});
+            const inset=this.definition.screenInsets?.[id],px=(inset?.x??0)/this.definition.width*W,py=(inset?.y??0)/this.definition.height*H;
+            this.style(this.root.querySelector(SCREENS[id]),{left:`${q.x-bleed}px`,top:`${q.y-bleed}px`,width:`${q.width+bleed*2}px`,height:`${q.height+bleed*2}px`,padding:`${bleed+py}px ${bleed+px}px`,'min-height':'0','min-width':'0'});
         }
         this.style(this.root.querySelector('#hyperdrive-card'),{left:`${hyper.x}px`,top:`${hyper.y}px`,bottom:'auto',width:`${hyper.width}px`,transform:'none',translate:'none'});
         this.style(stick,{width:`${stickSize}px`,height:`${stickSize}px`,translate:`${stickTranslate}px 0`});

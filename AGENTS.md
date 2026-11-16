@@ -80,5 +80,5 @@
 ## Shared cockpit authoring
 
 - `src/game/cockpitDefinitions.js` is the geometry/approval authority. The live game and isolated review both use `PaintedCockpit`; do not add a separate review layout or hand renderer. `assets/cockpits/wayfarer-v4.json` is a generated export.
-- Mercury (`talon`) is approved for flight. It shares the starter instrument geometry except for the approved 14px lower radar and raised hyperdrive forehead. Its hand/base rig shifts 60 source pixels left onto the console top, keeping its touch area unchanged. The current artwork review and model-informed geometry are in `tools/playtest/cockpit-layout`; see its README for the pipeline.
+- Mercury (`talon`) is approved for flight. It reuses the starter instruments/controls, with live glass fitted in code to the actual openings of the original v4 painting. Do not regenerate the painting to chase minor display alignment errors. Its hand/base rig shifts 60 source pixels left onto the console top, keeping its touch area unchanged. The current artwork review and model-informed geometry are in `tools/playtest/cockpit-layout`; see its README for the pipeline.
 - Review phone/desktop presets run in real inner viewports. Keep those media-query sizes and production CSS; do not simulate phone layout by resizing only a div.

@@ -12,8 +12,14 @@ export const APPROVED_COCKPIT_LAYOUT=deepFreeze({
 
 export const COCKPITS=deepFreeze({
     wayfarer:{...APPROVED_COCKPIT_LAYOUT,id:'wayfarer',name:'Hestia / Wanderer',status:'approved',shell:asset('wayfarer-paint-atlas-v2.png')},
-    // Mercury retains the approved instrument slots and shared pilot rig.
-    talon:{...APPROVED_COCKPIT_LAYOUT,monitors:{...APPROVED_COCKPIT_LAYOUT.monitors,radar:{...APPROVED_COCKPIT_LAYOUT.monitors.radar,y:641}},housingTops:{radar:560},hyperdriveBottom:633,id:'talon',name:'Mercury',status:'approved',shell:asset('talon-paint-v8.png'),artworkSize:[1850,850],apertureClip:true,glassUnderlap:3,handOffsetX:-60},
+    // Fit live glass to the approved v4 painting. Never repaint it to chase a
+    // subpixel DOM alignment error. Insets keep readouts clear of bevel corners.
+    talon:{...APPROVED_COCKPIT_LAYOUT,width:1850,
+        monitors:{own:{x:423,y:634,width:299,height:161},radar:{x:799,y:653,width:255,height:161},target:{x:1129,y:634,width:294,height:161}},
+        screenInsets:{own:{x:10,y:6},radar:{x:5,y:5},target:{x:20,y:6}},
+        housingTops:{radar:560},hyperdriveBottom:633,stickClearanceX:416,
+        id:'talon',name:'Mercury',status:'approved',shell:asset('talon-paint-v4.png'),
+        artworkSize:[1850,850],glassUnderlap:3,handOffsetX:-60},
 });
 export const STARTER_COCKPIT=COCKPITS.wayfarer;
 export const getCockpitDefinition=(id,{review=false}={})=>{
@@ -38,7 +44,7 @@ export function cockpitLayout(c,W,H,{jumpHeight,baseline,throttle,corners}){
     const monitors=Object.fromEntries(Object.entries(c.monitors).map(([id,a])=>[id,{x:a.x/c.width*W,y:a.y/c.height*H,width:a.width/c.width*W,height:a.height/c.height*H}]));
     const hyperWidth=Math.max(104,Math.min(monitors.radar.width*.96,200));
     const hyper={x:monitors.radar.x+(monitors.radar.width-hyperWidth)/2,y:H*(c.hyperdriveBottom??c.housingTop)/c.height-jumpHeight,width:hyperWidth,height:jumpHeight};
-    const edge=monitors.own.x-W*.012,stickSize=Math.max(baseline.width,Math.min(230,edge-24,baseline.width+Math.max(0,throttle.y-corners.bottom-8)));
+    const edge=(c.stickClearanceX??c.monitors.own.x)/c.width*W-W*.012,stickSize=Math.max(baseline.width,Math.min(230,edge-24,baseline.width+Math.max(0,throttle.y-corners.bottom-8)));
     return {monitors,hyper,stickSize,stickTranslate:(edge-stickSize)/2-baseline.x,bleed:Math.max(1.5,(c.glassUnderlap??3)*Math.max(W/c.width,H/c.height))};
 }
 
