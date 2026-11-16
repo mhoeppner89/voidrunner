@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 
 const base=(process.env.VR_BASE_URL??'http://127.0.0.1:4192').replace(/\/$/,'');
-const out='output/offline-startup';await mkdir(out,{recursive:true});
+const hull=process.env.VR_COCKPIT_HULL??'wayfarer';
+const out=`output/offline-startup/${hull}`;await mkdir(out,{recursive:true});
 const currentCache=(await readFile(new URL('../../sw.js',import.meta.url),'utf8')).match(/const CACHE = '([^']+)'/)[1];
 await writeFile(`${out}/report-fixture.html`,'<!doctype html><title>Cached QA report</title><h1>Cached QA report</h1>');
 const profiles=[['desktop',chromium,{viewport:{width:1440,height:900}}],['android',chromium,devices['Pixel 7 landscape']],['iphone',webkit,devices['iPhone 13 landscape']]].filter(([name])=>!process.env.VR_PROFILES||process.env.VR_PROFILES.split(',').includes(name));
@@ -42,6 +43,7 @@ for(const [name,engine,device] of profiles){
   // proxied/software-rendered startup can exceed the normal click timeout.
   await page.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime()?.flightPrepared&&document.querySelector('#loading-screen')?.classList.contains('is-hidden'),null,{timeout:120000});
   await page.waitForFunction(()=>window.__VOID_PRIVATEER__?.getRuntime()?.save.player.dockedAt==='helix');
+  if(hull!=='wayfarer')await page.evaluate(hull=>{const r=__VOID_PRIVATEER__.getRuntime();r.save.player.credits=10000000;const result=r.buyShip(hull);if(!result.ok)throw Error(JSON.stringify(result));},hull);
   const imagesReady=async()=>{
    await page.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime()?.flightPrepared&&document.querySelector('#loading-screen')?.classList.contains('is-hidden'));
    // The shader-ready veil can finish before lazy ship textures. Let their
@@ -61,7 +63,8 @@ for(const [name,engine,device] of profiles){
    assert.ok(await page.evaluate(()=>[...document.fonts].some(f=>f.family==='Void VGA Text'&&f.status==='loaded')),'Current bundled text font must load online and offline');
    return page.evaluate(()=>[...document.querySelectorAll('#dock-screen img')].filter(i=>i.getClientRects().length).map(i=>({src:i.dataset.retroSource??i.getAttribute('src'),width:i.naturalWidth,height:i.naturalHeight})));
   };
-  const online=await imagesReady();await page.screenshot({path:`${out}/${name}-online-helix.png`});
+  const online=await imagesReady();
+  assert.equal(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().save.player.shipId),hull);await page.screenshot({path:`${out}/${name}-online-helix.png`});
   // A request that never finishes must still use this release's cached flight
   // module, rather than holding a mobile career on its loading screen forever.
   await page.waitForFunction(async()=>Boolean(await(await caches.open((await caches.keys()).find(n=>n.startsWith('voidrunner-')))).match(new URL('src/game/game.js',document.baseURI))));
@@ -69,7 +72,7 @@ for(const [name,engine,device] of profiles){
   const recovered=await page.evaluate(async()=>{const start=performance.now(),response=await fetch('src/game/game.js');return{ok:response.ok,elapsed:performance.now()-start,text:(await response.text()).slice(0,80)};});
   origin.stallGameModule(false);assert.ok(recovered.ok&&recovered.elapsed<10000&&recovered.text.includes('import'),JSON.stringify(recovered));
   const chapterCount=await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().tutorialSummary().chapterCount);assert.equal(chapterCount,6);
-  await page.waitForFunction(async name=>{if(!(await caches.keys()).includes(name))return false;const c=await caches.open(name);return(await Promise.all(['art/locations/simplified/helix-hd-v1.webp','art/portraits/simplified/rin-vek-hd-v1.webp','assets/models/ships/wayfarer.glb','assets/fonts/void-vga-text.ttf','assets/cockpits/wayfarer-paint-atlas-v2.png','assets/cockpits/wayfarer-hand-pitch-v4.png','assets/cockpits/wayfarer-stick-base-v1.png','src/game/cockpitArtwork.js','src/game/retroDisplay.js','src/game/pixelResolve.js','src/game/illustratedLighting.js'].map(p=>c.match(new URL(p,document.baseURI))))).every(Boolean);},currentCache);
+  await page.waitForFunction(async ({name,hull})=>{if(!(await caches.keys()).includes(name))return false;const c=await caches.open(name);return(await Promise.all(['art/locations/simplified/helix-hd-v1.webp','art/portraits/simplified/rin-vek-hd-v1.webp',`assets/models/ships/${hull}.glb`,'assets/fonts/void-vga-text.ttf',hull==='talon'?'assets/cockpits/talon-paint-v8.png':'assets/cockpits/wayfarer-paint-atlas-v2.png','assets/cockpits/wayfarer-hand-pitch-v4.png','assets/cockpits/wayfarer-stick-base-v1.png','src/game/cockpitArtwork.js','src/game/cockpitDefinitions.js','src/game/retroDisplay.js','src/game/pixelResolve.js','src/game/illustratedLighting.js'].map(p=>c.match(new URL(p,document.baseURI))))).every(Boolean);},{name:currentCache,hull});
   // Cache a real report, then prove an unvisited report is not the game.
   phase='report navigation';await page.goto(`${origin.url}/${out}/report-fixture.html`);await page.locator('h1').filter({hasText:'Cached QA report'}).waitFor();
   await page.waitForFunction(async name=>Boolean(await(await caches.open(name)).match(location.href)),currentCache);

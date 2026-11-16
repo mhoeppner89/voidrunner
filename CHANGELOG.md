@@ -1,3 +1,41 @@
+## 0.8.2op — Final Mercury joystick fit
+
+- Shift Mercury’s hand and fixed joystick base another 10 pixels left on the shared reference grid. Preserve the touch area and all display/control geometry.
+
+## 0.8.2oo — Mercury live cockpit and monitor fit
+
+- Integrate the approved Mercury frame in flight and ship warming, sharing the starter’s hand, fixed base, instruments and controls.
+- Give its locked display apertures dark seals with the ivory rims outside the glass, preserving display sizes and positions.
+- Move Mercury’s hand and fixed joystick base together onto the left console top, clear of its sloped edge. Preserve the generous touch area and neutral first contact.
+
+## 0.8.2on — Mercury cockpit hardware and swept cowl
+
+- Give Mercury recessed switch/trim clusters, status lamps, layered bezels, vents, mounted conduit runs and canopy latches. Shape the hyperdrive cowl with swept shoulders and a receding sloped roof.
+- Preserve display/control geometry and the approved hand/base. Refine the lower radar bezel to fit its lower glass opening. Keep the added detail in the same static frame image and retain artwork-review status.
+
+## 0.8.2om — Mercury console depth and hyperdrive mounting
+
+- Replace the ambiguous flat corner guide with a shaded, perspective-projected blockout: deck tops, inner cabinet walls and bevels meet the monitor bank as distinct surfaces. Generate a new Mercury frame from that guide.
+- Lower Mercury’s radar opening by 14 source pixels while retaining its size. Raise its housing forehead and mount hyperdrive there with a gap above the radar glass. Keep outer monitors, hand/base and other controls fixed.
+- Retain the isolated artwork review and add a shaded mockup view; live Mercury activation still awaits composition approval.
+
+## 0.8.2ol — Mercury cockpit artwork review
+
+- Generate Mercury’s transparent frame around the approved curved canopy, sloped corner supports and fixed display layout. Correct the lower-panel perspective and reuse the existing navy/white hand and joystick base.
+- Keep monitor/control geometry unchanged; apply a static clip at the locked glass openings rather than moving readouts to fit generated bezel edges. Preserve the intact source image.
+- Show the assembled artwork in the isolated review, with Mercury still excluded from live flight pending composition approval.
+
+## 0.8.2ok — Shared cockpit definitions and Mercury layout review
+
+- Use one cockpit registry, approved instrument geometry and anchored pilot renderer in live flight and the isolated authoring review. Reuse decoded alpha resources across hull changes and derive preloading/export metadata from the same definitions.
+- Add Mercury's unpainted, model-informed canopy proposal with the approved monitor/control arrangement. Its layout-review status prevents activation in live flight; artwork generation awaits approval.
+- Give review presets real inner viewport dimensions so phone CSS behaves correctly on desktop. Keep career saves/settings untouched and retain the starter as a comparison.
+
+## 0.8.2oj — Target-cycle idle reset
+
+- Start target cycling from the current highest-priority/nearest contact after two seconds without a cycle selection. Quick repeated taps retain a stable order, with each selection extending that two-second window.
+- Skip vanished contacts and duplicate mission/ship entries; reset the burst on a manual/automatic target selection or cleared lock. Keep sensor visibility, surrender handling and mission navigation priorities. Use the input clock without per-frame timers or simulation work.
+
 ## 0.8.2oi — Painted joystick base
 
 - Replace the code-drawn starter joystick mount with a transparent navy/ivory gimbal sprite, matched to the hand and cockpit. Align its socket to the existing shaft pivot and keep it stationary beneath every hand pose.

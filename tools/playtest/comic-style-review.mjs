@@ -39,7 +39,7 @@ html=html.replace('<html lang="de">','<html lang="de" data-test-build="comic-sty
  Storage.prototype.clear=function(){memory.clear();};
  </script><script type="module" src="/src/main.js"></script><script type="module" src="/output/comic-style-review/capture.js"></script><script type="module" src="/output/comic-style-review/finish.js"></script>`);
 await writeFile(`${out}/capture.html`,html);
-await copyFile('tools/playtest/pixel-grid-review/capture.js',`${out}/capture.js`);
+await copyFile('tools/playtest/shared/scene-capture.js',`${out}/capture.js`);
 await copyFile('tools/playtest/comic-style-review/finish.js',`${out}/finish.js`);
 await copyFile('tools/playtest/comic-style-review/gallery.html',`${out}/index.html`);
 

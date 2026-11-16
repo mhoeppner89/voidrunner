@@ -365,7 +365,7 @@ export class InputManager {
                 knob.style.top = '50%';
             };
             this.cancelStick = centerStick;
-            // A cockpit-kit stick is a large invisible zone: the drag starts
+            // The painted cockpit stick is a large invisible zone: the drag starts
             // where the thumb lands and travel comes from data-travel.
             let origin;
             const moveStick = (event) => {

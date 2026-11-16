@@ -1,49 +1,56 @@
-// Keep the generated structure intact. Live readouts sit inside its holes;
-// the only separate structural part is the small fixed stick mount.
-const NS='http://www.w3.org/2000/svg';
-const element=(tag,attributes={})=>{const node=document.createElementNS(NS,tag);for(const [key,value]of Object.entries(attributes))node.setAttribute(key,value);return node;};
-const PIVOT={x:175,y:190};
-
-export async function mountArtwork(host,manifest){
-    for(const path of [manifest.shell,manifest.handStrip?.path??manifest.hand,manifest.stickBase.path]){
-        const img=new Image();img.src=path;await img.decode();
+import {consoleSurfaces,consoleMarkup} from './consoleGeometry.js';
+// Code-only structure. Art generation still waits for layout approval.
+const points=line=>line.map(p=>p.map(v=>Number(v.toFixed(2))).join(',')).join(' ');
+// Cardinal spline through the surveyed pane ring: one continuous bow, with
+// matching tangents at every former facet, rather than eight straight pieces.
+function curvedBow(bow){
+    let path=`M ${points([bow[0]])}`;
+    for(let i=0;i<bow.length-1;i++){
+        const a=bow[Math.max(0,i-1)],b=bow[i],c=bow[i+1],d=bow[Math.min(bow.length-1,i+2)];
+        path+=` C ${points([b.map((v,k)=>v+(c[k]-a[k])/6),c.map((v,k)=>v-(d[k]-b[k])/6),c])}`;
     }
-    const frame=new Image();frame.id='cockpit-frame-sprite';frame.src=manifest.shell;frame.alt='';frame.setAttribute('aria-hidden','true');host.append(frame);
-    const mount=element('svg',{id:'stick-mount','aria-hidden':'true',preserveAspectRatio:'none'});host.append(mount);
-    const baseImage=element('image',{href:manifest.stickBase.path,preserveAspectRatio:'none'});mount.append(baseImage);
-    const rig=host.querySelector('#hand-rig');
-    const pose=element('g',{id:'hand-pose'});rig.append(pose);
-    const crop=element('svg',{id:'hand-pose-crop',overflow:'hidden',preserveAspectRatio:'none'});pose.append(crop);
-    const image=element('image',{id:'painted-pilot-hand',href:manifest.handStrip?.path??manifest.hand,width:320,height:240,preserveAspectRatio:'none'});crop.append(image);
-    let visible=true,currentFrame=-1,lastYaw=NaN;
-    function layout(){
-        const width=host.offsetWidth,height=host.offsetHeight,origin=host.getBoundingClientRect(),scale=origin.width/width||1;
-        const hand=host.querySelector('#pilot-hand').getBoundingClientRect();
-        const cx=(hand.x-origin.x)/scale+hand.width/scale*PIVOT.x/320,cy=(hand.y-origin.y)/scale+hand.height/scale*PIVOT.y/240;
-        const base=manifest.stickBase,s=hand.width/scale/320*base.renderWidth/base.bounds.width;
-        mount.setAttribute('viewBox',`0 0 ${width} ${height}`);
-        for(const [key,value]of Object.entries({x:cx-base.socket[0]*s,y:cy-base.socket[1]*s,width:base.width*s,height:base.height*s}))baseImage.setAttribute(key,value);
-        host.dataset.stickPivot=`${cx},${cy}`;
-    }
-    function updateStick(yaw=0,pitch=0){
-        const poses=manifest.handStrip?.frames;
-        const index=poses?(pitch<-.33?0:pitch>.33?2:1):0;
-        if(index!==currentFrame){
-            currentFrame=index;
-            if(poses){
-                const f=poses[index],sheet=manifest.handStrip,s=sheet.renderWidth/sheet.frameWidth;
-                image.setAttribute('href',sheet.path);image.setAttribute('width',sheet.width);image.setAttribute('height',sheet.height);
-                crop.setAttribute('width',sheet.frameWidth);crop.setAttribute('height',sheet.height);crop.setAttribute('viewBox',`${f.x} 0 ${sheet.frameWidth} ${sheet.height}`);
-                pose.setAttribute('transform',`translate(${PIVOT.x-f.pivot[0]*s} ${PIVOT.y-f.pivot[1]*s}) scale(${s})`);
-            }else{
-                crop.setAttribute('width',320);crop.setAttribute('height',240);crop.setAttribute('viewBox','0 0 320 240');
-            }
-            rig.dataset.pitchPose=String(index);
-        }
-        const angle=Math.round(Math.max(-1,Math.min(1,yaw))*11*10)/10;
-        if(angle!==lastYaw){lastYaw=angle;rig.setAttribute('transform',`rotate(${angle} ${PIVOT.x} ${PIVOT.y})`);}
-    }
-    function setVisible(value){visible=Boolean(value);host.classList.toggle('has-cockpit-paint',visible);}
-    updateStick();layout();setVisible(true);
-    return {layout,setVisible,updateStick,get visible(){return visible;},manifest,pivot:PIVOT};
+    return path;
+}
+export function cockpitStructure(definition,canopy){
+    const {width:W,height:H,monitors}=definition;
+    const beams=canopy.beams.map(line=>line.map(([x,y])=>[x/1600*W,y/900*H]));
+    const own=monitors.own,target=monitors.target;
+    const ends=[beams[0]?.[0],beams.at(-1)?.[1]];
+    const anchors=[[own.x-18,definition.housingTop],[target.x+target.width+18,definition.housingTop]];
+    const rails=ends.flatMap((point,i)=>point?[[point,anchors[i]]]:[]);
+    rails.push(anchors);
+    const bow=[beams[0][0],...beams.map(line=>line[1])];
+    const surfaces=consoleSurfaces(definition);
+    const panels=surfaces.filter(s=>s.kind==='deck-top').map(s=>s.points);
+    const continuous=definition.id==='talon';
+    return {width:W,height:H,beams:[...beams,...rails],bowPath:continuous?curvedBow(bow):null,rails:continuous?rails:[...beams,...rails],panels,surfaces,monitors};
+}
+// Raised radar cowl blends into the neighboring console with swept shoulders,
+// rather than standing up as a square box. Live button/glass geometry is fixed.
+export function monitorHousings(definition){
+    const {monitors,housingTop}=definition;
+    return Object.entries(monitors).map(([id,r])=>{
+        const roof=definition.housingTops?.[id]??housingTop,bottom=r.y+r.height+18;
+        const swept=id==='radar'&&roof<housingTop;
+        const outline=swept?[
+            [monitors.own.x+monitors.own.width+18,housingTop],
+            [r.x,roof],[r.x+r.width,roof],
+            [monitors.target.x-18,housingTop],
+            [r.x+r.width+18,housingTop+20],[r.x+r.width+18,bottom],
+            [r.x-18,bottom],[r.x-18,housingTop+20],
+        ]:[[r.x-18,roof],[r.x+r.width+18,roof],[r.x+r.width+18,bottom],[r.x-18,bottom]];
+        const roofFace=swept?[[r.x,roof],[r.x+r.width,roof],[r.x+r.width+8,roof+10],[r.x-8,roof+10]]:null;
+        return {id,glass:r,outline,roofFace};
+    });
+}
+export function greyboxFrame(definition,canopy){
+    const {width:W,height:H,bowPath,rails,panels,surfaces,monitors}=cockpitStructure(definition,canopy);
+    const lines=(bowPath?`<path class="canopy-bow" d="${bowPath}"/>`:'')+rails.map(line=>`<polyline points="${points(line)}"/>`).join('');
+    const sides=consoleMarkup(surfaces);
+    const surrounds=monitorHousings(definition).map(({glass:r,outline,roofFace})=>{
+        const outer=`M ${points(outline)} Z`,inner=`M ${r.x} ${r.y} v ${r.height} h ${r.width} v ${-r.height} Z`;
+        return `<path fill-rule="evenodd" d="${outer} ${inner}"/>`+(roofFace?`<polygon points="${points(roofFace)}" fill="#b0bec1"/>`:'');
+    }).join('');
+    const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${sides}<g fill="none" stroke="#263f4d" stroke-width="13" stroke-linejoin="round">${lines}</g><g fill="none" stroke="#82979f" stroke-width="2" stroke-linejoin="round">${lines}</g><g fill="#263f4d" stroke="#82979f" stroke-width="2">${surrounds}</g></svg>`;
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }

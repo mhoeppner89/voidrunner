@@ -18,7 +18,7 @@ harness=harness.replace('<head>','<head><base href="/">')
  Storage.prototype.removeItem=function(k){memory.delete(String(k));};
  Storage.prototype.clear=function(){memory.clear();};
  </script><script type="module" src="/src/main.js"></script><script type="module" src="/__illustrated-performance-capture.js"></script>`);
-const capture=await readFile('tools/playtest/pixel-grid-review/capture.js','utf8');
+const capture=await readFile('tools/playtest/shared/scene-capture.js','utf8');
 assert.ok(harness.includes('/__illustrated-performance-capture.js'),'game entry point changed');
 const profiles=[
  {name:'desktop',viewport:{width:1440,height:810},isMobile:false,hasTouch:false},

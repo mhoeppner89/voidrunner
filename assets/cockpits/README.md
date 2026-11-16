@@ -1,10 +1,10 @@
 # Starter cockpit artwork · 04
 
-Current isolated review: `/output/cockpit-layout/index.html?revision=cockpit-art-04`. Build with `node tools/playtest/cockpit-layout.mjs`.
+Approved starter comparison: `/output/cockpit-layout/index.html?hull=wayfarer`. Mercury’s artwork review is `?hull=talon`; layout approval preceded generation. Build with `node tools/playtest/cockpit-layout.mjs`.
 
 - `wayfarer-paint-atlas-v2.png` is now rendered **whole**, despite its historical filename. This 1851×850 RGBA image is byte-identical to the user's `ChatGPT Image Nov 16, 2026, 10_25_52 AM.png`. No rails or monitor borders are reassembled. The hand and live controls are separate.
 - `wayfarer-hand-pitch-v4.png`: navy glove and flight sleeve with white piping/cuff accents, extending below and left of the viewport. One jointly edited strip, 2172×724 RGBA, containing three 724px-wide forward/neutral/back left-hand views. Built-in imagegen, no API/CLI fallback.
-- `wayfarer-v4.json`: complete-frame dimensions, actual display apertures, strip cells and shaft-end pivots. All poses share one scale and fixed gimbal anchor. Source pixels/alpha are unchanged; SVG cropping/transforms perform placement.
+- `wayfarer-v4.json`: generated export of `src/game/cockpitDefinitions.js`, containing complete-frame dimensions, actual display apertures, strip cells and shaft-end pivots. Edit the shared definitions, then rebuild the review; do not maintain a second layout here. All poses share one scale and fixed gimbal anchor. Source pixels/alpha are unchanged; SVG cropping/transforms perform placement.
 - `wayfarer-stick-base-v1.png`: separate 2172×724 transparent navy/ivory gimbal mount, positioned by its source socket anchor. The base stays fixed behind all three hand poses. Exact built-in generation prompt: [STICK-BASE-PROMPT.md](STICK-BASE-PROMPT.md).
 - `PROMPTS.md`: exact generation prompts and input roles, including earlier revisions.
 
@@ -12,4 +12,12 @@ The frame, hand strip and fixed base are each decoded once. The frame and monito
 
 The review enables the existing touch-relative stick mode: first contact is neutral; drag offsets set steering. Afterburner has a 28px transparent hit extension above and left, and launcher selection has one to the left. Painted button sizes and placement are unchanged. The upper corner controls use the same muted housing design.
 
-The approved v4 frame/hand and the separate base sprite are integrated into the starter Wayfarer in live flight as of 0.8.2og (`src/game/cockpitArtwork.js`). Other hulls retain their current cockpits. Older manifests and hand images remain for provenance; v4 selects the current composition. The standalone review remains available for further art work.
+The approved v4 frame/hand were integrated into the starter Wayfarer in 0.8.2og; the separate fixed base sprite followed in 0.8.2oi (`src/game/cockpitArtwork.js`). Mercury joined the shared renderer in 0.8.2oo. Other hulls retain their current cockpits. Superseded manifests and artwork are available in Git history; only the current composition remains in this folder. The standalone review remains available for further art work.
+
+## Mercury live cockpit
+
+`talon-paint-v8.png` is the selected transparent full frame, generated with built-in imagegen from the shaded, projected `talon-layout-guide-v3.png` and the approved starter's finish. The side deck tops and dark vertical cabinet returns meet the monitor bank as distinct planes. The radar is 14 source pixels lower, with a raised frame forehead for hyperdrive; its size and the outer monitors/other controls are unchanged. The smooth canopy and three fixed display openings use the approved layout. Exact original/correction prompts and output provenance: [TALON-PROMPT.md](TALON-PROMPT.md).
+
+Mercury is approved and active in live flight, session warming and the authoring review. The isolated review assembles the new frame with the existing hand/base and shipping controls. The full frame uses a static aperture clip so generated bezel pixels cannot intrude into the locked display rectangles. Its broad plain gaskets surround the exact stencil, keeping the ivory rims outside the glass without changing content bounds. No monitor movement or scaling adjustments are introduced.
+
+The v4 hardware pass adds recessed switch groups, trim knobs, small lamps, deeper monitor frames, vents, mounted conduit runs and canopy latches. Its hyperdrive cowl has swept shoulders and a sloped roof. Exact detail/fit prompts and selected output: [TALON-DETAIL-PROMPT.md](TALON-DETAIL-PROMPT.md). The fixed hand/base source art is unchanged. Mercury’s assembled rig sits 60 source pixels farther left, fully on its console top; the touch area and all instrument/control geometry remain unchanged. Alignment edits and exact generation prompts: [TALON-ALIGNMENT-PROMPT.md](TALON-ALIGNMENT-PROMPT.md).

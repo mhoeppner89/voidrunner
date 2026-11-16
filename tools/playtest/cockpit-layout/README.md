@@ -1,20 +1,44 @@
-# Starter cockpit artwork review · 04
+# Shared cockpit layout review
 
-Build with `node tools/playtest/cockpit-layout.mjs`; serve the repository and open `/output/cockpit-layout/index.html?revision=cockpit-art-04`.
+Build with `npm run review:cockpit`; serve the repository and open:
 
-This is a silent isolated artwork review, using simulated flight/readouts. It does not load a career, write settings/saves or change physics. Its approved v4 frame/hand are now integrated into the starter Wayfarer in the live game as of 0.8.2og.
+- Mercury artwork: `/output/cockpit-layout/index.html?hull=talon`
+- Approved starter reference: `/output/cockpit-layout/index.html?hull=wayfarer`
 
-- The entire supplied frame sprite renders as one image. Its beams, joints, lamps and connected monitor housings are preserved. `wayfarer-v3.json` records its actual transparent display apertures; original `GameUI` readouts fit those openings. Independent eight-slice bezels and rebuilt canopy rails are removed.
-- No flat dashboard filler planes or old painted bezels remain behind the frame.
-- The separate covered navy left hand with white accents is visible for every input method. Three jointly generated pitch poses show forward/neutral/back grip perspective. One common scale and per-frame shaft-end anchors align all poses to a fixed gimbal point. The extended forearm reaches past the viewport through full yaw/pitch. Yaw rotates around the fixed base; neither axis translates it. `artwork.updateStick()` changes the pitch frame only when needed and quantises yaw rotation.
-- The mobile button bank has its earlier full-size layout and the approved muted navy/grey colours. Buttons and throttle are hidden/inert for desktop flight. The phone review preset also enables them for inspection on desktop.
-- Transparent hit extensions enlarge afterburner 28px above/left and launcher selection 28px left. The painted controls stay unchanged. First contact anywhere in the steering area is neutral; subsequent drag is relative to that contact. This uses the existing `InputManager` touch-origin mode.
-- The throttle has a half-width visible rail inside the unchanged wider drag target. The hand also remains smaller than the steering hit area. Tilt is off; existing keyboard/controller bindings are used.
-- Comms remain centred at the top. Wingman card aligns with pause/fullscreen; all three upper control housings match the lower bank's muted navy/grey bevels. The 3D hull/canopy reference renders only while its review dialog is open.
-- **Show generated cockpit frame** hides the single structural image without moving live readouts. The hand remains visible.
+This is a silent isolated review with simulated flight/readouts. It never loads a career or writes saves/settings. **Mercury’s layout and artwork are approved and active in live flight.**
 
-Controls: WASD/arrows steer, Q/E roll, R/F thrust, Space fires, M launches, T targets, J preview jump, P/Escape pauses. Touch uses the existing `InputManager`. Cancelling a touch or losing focus releases it.
+## Shared implementation
 
-Verify with `node tests/browser/cockpit-layout.mjs` (or `VR_BASE_URL` for another server). Checks cover desktop Chrome, Android Chrome and iPhone WebKit, source-aperture alignment, fixed shaft anchors through pitch/yaw, mobile visibility, wide throttle margins, simultaneous steering/fire, saved controller bindings, readout fit, frame comparison and untouched storage. Screenshots/reports are in ignored `output/cockpit-layout/checks`.
+`src/game/cockpitDefinitions.js` owns the approved source dimensions, measured monitor apertures, hand poses/base anchors and approval registry. `cockpitLayout()` computes the monitor, hyperdrive and stick geometry. Both live flight and this review instantiate `PaintedCockpit` from `src/game/cockpitArtwork.js`, with the shipping `GameUI` DOM, readout renderers, fonts and CSS. The review no longer has separate monitor/hand placement or button styling.
 
-Generated art and exact prompts are in `assets/cockpits`. The current whole frame is byte-identical to the user's supplied PNG. The live integration is in `src/game/cockpitArtwork.js`; other hulls are outside this pass.
+The approved starter PNG stays intact. Live glass underlaps its apertures; only the small hand layer animates. Cached alpha resources survive hull switches. Unapproved definitions are available only through explicit review mode; live selection/preloading accepts approved hulls only. `wayfarer-v4.json` is a generated export for external art tools, refreshed by the review builder.
+
+The outer page supplies review controls. An inner viewport runs the actual cockpit. The desktop and phone presets therefore use their own real media-query dimensions (1440×900 / 844×390), even when scaled down for the surrounding browser. On real phones choose “This screen.” The hand stays visible on every device; buttons/throttle are mobile only. Touch starts neutral at the first contact, then steers relative to that contact.
+
+## Mercury canopy proposal
+
+`canopy.js` loads the actual `talon.glb` glazing primitives, selecting the `VR_Canopy` material rather than a packed mesh or its painted trim. The model reference highlights only the original glass. The proposed pilot eye is `[0.15, -0.03, 0]`, looking along native +X at 64° vertical FOV. It is a proposed seat, not an authored interior marker.
+
+The visible bow follows the x=0.27 pane ring. Its interior projection is widened 2.6× horizontally to protect sightlines; the shared 1851×850 authored frame stretches with the approved starter layout. The upper bow is one smooth curve through the surveyed ring. Thin lower jambs connect it to the monitor bank; low sloped side panels support the stick and outer housings. These are proposed console structures. These adaptations are explicit rather than presented as a literal interior supplied by the exterior model. The 3D comparison renders only while its dialog is open.
+
+The bow, sightlines and sloped console connections were approved before painting. The current review uses `talon-paint-v8.png`, generated from a shaded perspective blockout with deck tops and inner cabinet walls and the reused navy/white hand and fixed base. A static aperture stencil keeps generated bezel edges outside the unchanged monitor rectangles. Mercury’s radar is 14 source pixels lower, with a housing forehead starting at y560 and the hyperdrive button ending at y633 above its y641 glass. The other monitors/controls remain fixed. The live composition includes the fixed hand/base shifted 60 source pixels left onto its console. Add `&mockup=1` to inspect the shaded geometry instead of the artwork.
+
+## Repeatable hull pipeline
+
+1. Inspect the current GLB's glazing, orientation, frame topology and paint identity. Record the proposed eye/look/FOV and any interior adaptation.
+2. Add a `layout-review` registry definition reusing the shared instruments and pilot rig. Add its model-informed canopy survey; build a code-only plate.
+3. Review on desktop, real phone-sized viewports and small phones. Inspect sightlines, hand reach, all steering extremes, control hit areas, comms and monitor readability. **Obtain the user's layout approval.**
+4. Export only the monitor/beam guide (`VR_COCKPIT_HULL=talon node tools/playtest/cockpit-art-guide.mjs`). Give image generation that guide plus hull/style references. Keep controls, readouts and the reusable hand out of the generated frame.
+5. Check the intact PNG's actual alpha apertures against the locked geometry. Correct the image if needed; do not stretch instruments to disguise inaccurate artwork. **Obtain composition approval.**
+6. Verify source alignment, alpha occlusion, resource reuse, input methods, phone performance and browser paint costs. Keep the frame static and the hand in its small contained region.
+7. Mark the finished hull approved, add its source frame to the registry, and follow the runtime/SW release protocol. Integrate one approved hull at a time. Gaia and Atlas are useful next shape/size tests.
+
+## Verification
+
+`npm run test:browser:cockpit-review` covers Mercury and the starter on desktop Chrome, Android Chrome, iPhone WebKit and a small phone. Checks include the actual shared renderer, identical source-aperture geometry, fixed shaft anchors, keyboard/touch/controller steering, phone-only controls, neutral touch start, expanded afterburner input, real phone preview dimensions, model reference and untouched storage. Captures/reports go under ignored `output/cockpit-layout/checks`.
+
+`npm run test:browser:cockpit` checks the approved cockpit in live flight, including canvas dimensions, stationary readouts, occlusion, restricted hand painting and switching back to legacy hulls. Source geometry/approval regressions are in `tests/unit/cockpitArtwork.test.mjs`.
+
+The current side-console mockup is projected from 3D points in `consoleGeometry.js`: deck tops share one plane, while their dark cabinet returns continue below the decks and attach to the upright monitor fascia. The guide exporter shades each face and includes foreshortening lines. `?hull=talon&mockup=1` renders this blockout with the same live hand/control overlays for direct comparison.
+
+The v4 painted frame adds hardware density around the fixed openings, using `monitorHousings()` to guide swept shoulders on the raised hyperdrive cowl. Its layout guide excludes live controls/hand, while the Wing Commander reference supplies hardware/depth examples only. New hardware is painted into the single static sprite; readouts and hand/base retain the shipping renderer.

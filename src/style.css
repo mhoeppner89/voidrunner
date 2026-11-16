@@ -64,15 +64,6 @@
   --retro-amber-hi: #ffe89a;
   --retro-green: #75e7c8;
   --retro-red: #ff5e57;
-  /* Code-drawn cockpit kit: DOM chrome that sits on the rendered cockpit
-     (frame palette lives in cockpitScene.js). */
-  --kit-outline: #03060f;
-  --kit-trim: #d8cdae;
-  --kit-trim-hi: #f2e9cf;
-  --kit-trim-lo: #8a7d60;
-  --kit-lcd-ink: #ffb83d;
-  --kit-glass: #030c22;
-  --kit-glass-glow: rgba(40, 140, 220, 0.16);
   --pixel-font: "Void VGA Text", "Lucida Console", "Courier New", ui-monospace, monospace;
   --display-font: Impact, "Arial Narrow", Haettenschweiler, sans-serif;
   /* Docked UI type floors. Station interfaces scroll or reflow before these
@@ -15329,8 +15320,8 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   left:var(--cockpit-target-left,65.9%); top:var(--cockpit-target-top,73.5%);
   width:var(--cockpit-target-width,18.9%); height:var(--cockpit-target-height,21%);
 }
-#game-shell:is([data-cockpit-ship="talon"],[data-cockpit-ship="prospector"],[data-cockpit-ship="atlas"],[data-cockpit-ship="speedster"],[data-cockpit-ship="andromeda"],[data-cockpit-ship="torsas"],[data-cockpit-ship="astra"]) .cockpit-screen-radar,
-#game-shell:is([data-cockpit-ship="talon"],[data-cockpit-ship="prospector"],[data-cockpit-ship="atlas"],[data-cockpit-ship="speedster"],[data-cockpit-ship="andromeda"],[data-cockpit-ship="torsas"],[data-cockpit-ship="astra"]) .cockpit-screen-radar::after {
+#game-shell:where(:not([data-cockpit-paint])):is([data-cockpit-ship="talon"],[data-cockpit-ship="prospector"],[data-cockpit-ship="atlas"],[data-cockpit-ship="speedster"],[data-cockpit-ship="andromeda"],[data-cockpit-ship="torsas"],[data-cockpit-ship="astra"]) .cockpit-screen-radar,
+#game-shell:where(:not([data-cockpit-paint])):is([data-cockpit-ship="talon"],[data-cockpit-ship="prospector"],[data-cockpit-ship="atlas"],[data-cockpit-ship="speedster"],[data-cockpit-ship="andromeda"],[data-cockpit-ship="torsas"],[data-cockpit-ship="astra"]) .cockpit-screen-radar::after {
   border-radius:50%;
 }
 @media (max-width:900px), (pointer:coarse) { .cockpit-instruments { inset:-2.4%; } }
@@ -15959,58 +15950,58 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 /* Ship-specific instrument housings. These occupy the original console mounts,
    extending their bezels where the painted openings cannot hold readable type. */
 #game-shell { --instrument-frame:#8e9392; --instrument-edge:#d9d4bd; }
-#game-shell[data-cockpit-ship="vanguard"] { --instrument-frame:#244a70; --instrument-edge:#7397b6; }
-#game-shell[data-cockpit-ship="talon"] { --instrument-frame:#383c42; --instrument-edge:#9b9f9e; }
-#game-shell[data-cockpit-ship="prospector"] { --instrument-frame:#595e3c; --instrument-edge:#aaa67c; }
-#game-shell[data-cockpit-ship="lancer"] { --instrument-frame:#878782; --instrument-edge:#d6d0bd; }
-#game-shell[data-cockpit-ship="atlas"] { --instrument-frame:#536578; --instrument-edge:#b0c0cb; }
-#game-shell[data-cockpit-ship="speedster"] { --instrument-frame:#5d6669; --instrument-edge:#d5d4c5; }
-#game-shell[data-cockpit-ship="legionary"] { --instrument-frame:#646b75; --instrument-edge:#cbd0ce; }
-#game-shell[data-cockpit-ship="torsas"] { --instrument-frame:#686764; --instrument-edge:#d7d4c1; }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="vanguard"] { --instrument-frame:#244a70; --instrument-edge:#7397b6; }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="talon"] { --instrument-frame:#383c42; --instrument-edge:#9b9f9e; }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="prospector"] { --instrument-frame:#595e3c; --instrument-edge:#aaa67c; }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="lancer"] { --instrument-frame:#878782; --instrument-edge:#d6d0bd; }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="atlas"] { --instrument-frame:#536578; --instrument-edge:#b0c0cb; }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="speedster"] { --instrument-frame:#5d6669; --instrument-edge:#d5d4c5; }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="legionary"] { --instrument-frame:#646b75; --instrument-edge:#cbd0ce; }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="torsas"] { --instrument-frame:#686764; --instrument-edge:#d7d4c1; }
 #game-shell .cockpit-instruments #hyperdrive-card {
   left:var(--cockpit-hyperdrive-left); top:var(--cockpit-hyperdrive-top);
   width:var(--cockpit-hyperdrive-width); height:var(--cockpit-hyperdrive-height);
   max-width:none; min-width:0;
 }
-#game-shell:not([data-cockpit-ship="wayfarer"]) #hyperdrive-card {
+#game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) #hyperdrive-card {
   border-color:var(--instrument-frame);
   box-shadow:0 0 0 2px var(--instrument-edge),0 2px 0 4px #18202b,inset 0 0 6px #000;
 }
 /* The artwork can vary, but critical readings must not scale with its tiny
    decorative lettering. Use a clear instrument face with restrained bloom. */
-#game-shell:not([data-cockpit-ship="wayfarer"]) .cockpit-screen { font-family:var(--pixel-font); text-shadow:none; }
-#game-shell:not([data-cockpit-ship="wayfarer"]) .screen-bars > div,
-#game-shell:not([data-cockpit-ship="wayfarer"]) .screen-flight,
-#game-shell:not([data-cockpit-ship="wayfarer"]) .screen-own-weapon { font-size:clamp(11px,.9vw,14px); }
-#game-shell:not([data-cockpit-ship="wayfarer"]) .screen-heading > span { display:none; }
-#game-shell:not([data-cockpit-ship="wayfarer"]) .screen-heading b { width:100%; text-align:center; font-size:clamp(11px,1vw,15px); }
+#game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .cockpit-screen { font-family:var(--pixel-font); text-shadow:none; }
+#game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .screen-bars > div,
+#game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .screen-flight,
+#game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .screen-own-weapon { font-size:clamp(11px,.9vw,14px); }
+#game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .screen-heading > span { display:none; }
+#game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .screen-heading b { width:100%; text-align:center; font-size:clamp(11px,1vw,15px); }
 @media (max-height:520px) and (orientation:landscape) {
-  #game-shell:not([data-cockpit-ship="wayfarer"]) .cockpit-instruments { inset:0; }
-  #game-shell:not([data-cockpit-ship="wayfarer"]) .cockpit-screen-own {
+  #game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .cockpit-instruments { inset:0; }
+  #game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .cockpit-screen-own {
     left:var(--cockpit-own-phone-left); top:var(--cockpit-own-phone-top);
     width:var(--cockpit-own-phone-width); height:var(--cockpit-own-phone-height);
   }
-  #game-shell:not([data-cockpit-ship="wayfarer"]) .cockpit-screen-target {
+  #game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .cockpit-screen-target {
     left:var(--cockpit-target-phone-left); top:var(--cockpit-target-phone-top);
     width:var(--cockpit-target-phone-width); height:var(--cockpit-target-phone-height);
   }
-  #game-shell:not([data-cockpit-ship="wayfarer"]) .cockpit-screen-radar {
+  #game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .cockpit-screen-radar {
     left:var(--cockpit-radar-phone-left); top:var(--cockpit-radar-phone-top);
     width:var(--cockpit-radar-phone-width); height:var(--cockpit-radar-phone-height);
   }
-  #game-shell:not([data-cockpit-ship="wayfarer"]) .cockpit-instruments #hyperdrive-card {
+  #game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .cockpit-instruments #hyperdrive-card {
     left:var(--cockpit-hyperdrive-phone-left); top:var(--cockpit-hyperdrive-phone-top);
     width:var(--cockpit-hyperdrive-phone-width); height:var(--cockpit-hyperdrive-phone-height);
   }
-  #game-shell:not([data-cockpit-ship="wayfarer"]) .screen-flight > div {
+  #game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .screen-flight > div {
     display:flex; gap:2px; justify-content:space-between;
   }
-  #game-shell:not([data-cockpit-ship="wayfarer"]) .screen-flight small { display:none; }
-  #game-shell:not([data-cockpit-ship="wayfarer"]) .screen-ship-layout { padding:3px; }
-  #game-shell:not([data-cockpit-ship="wayfarer"]) .screen-bars > div { grid-template-columns:2ch minmax(12px,1fr) 3ch; gap:2px; }
-  #game-shell:not([data-cockpit-ship="wayfarer"]) .screen-bars em { width:auto; }
-  #game-shell:not([data-cockpit-ship="wayfarer"]) .screen-target-layout { padding:0 3px 3px; }
-  #game-shell:not([data-cockpit-ship="wayfarer"]) .screen-target-readout { letter-spacing:0; }
+  #game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .screen-flight small { display:none; }
+  #game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .screen-ship-layout { padding:3px; }
+  #game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .screen-bars > div { grid-template-columns:2ch minmax(12px,1fr) 3ch; gap:2px; }
+  #game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .screen-bars em { width:auto; }
+  #game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .screen-target-layout { padding:0 3px 3px; }
+  #game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .screen-target-readout { letter-spacing:0; }
 }
 /* Resized native bezels preserve each ship's painted material and silhouette. */
 .cockpit-bezel { position:absolute; z-index:2; pointer-events:none; }
@@ -16018,28 +16009,28 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 .cockpit-bezel-own { left:var(--cockpit-own-left); top:var(--cockpit-own-top); width:var(--cockpit-own-width); height:var(--cockpit-own-height); }
 .cockpit-bezel-radar { left:var(--cockpit-radar-left); top:var(--cockpit-radar-top); width:var(--cockpit-radar-width); height:var(--cockpit-radar-height); }
 .cockpit-bezel-target { left:var(--cockpit-target-left); top:var(--cockpit-target-top); width:var(--cockpit-target-width); height:var(--cockpit-target-height); }
-#game-shell[data-cockpit-ship="wayfarer"] .cockpit-bezel { display:none; }
-#game-shell:not([data-cockpit-ship="wayfarer"]) .cockpit-screen {
+#game-shell:is([data-cockpit-ship="wayfarer"],[data-cockpit-paint]) .cockpit-bezel { display:none; }
+#game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .cockpit-screen {
   background-color:#03152d; animation:none; opacity:1;
   border:2px solid var(--instrument-frame); border-radius:2px;
   box-shadow:inset 0 0 0 1px #070c15,0 0 0 1px #08121d;
 }
-#game-shell:not([data-cockpit-ship="wayfarer"]) .cockpit-screen-radar { border-radius:20%; }
+#game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .cockpit-screen-radar { border-radius:20%; }
 @media (max-height:520px) and (orientation:landscape) {
  .cockpit-bezel-own { left:var(--cockpit-own-phone-left); top:var(--cockpit-own-phone-top); width:var(--cockpit-own-phone-width); height:var(--cockpit-own-phone-height); }
  .cockpit-bezel-radar { left:var(--cockpit-radar-phone-left); top:var(--cockpit-radar-phone-top); width:var(--cockpit-radar-phone-width); height:var(--cockpit-radar-phone-height); }
  .cockpit-bezel-target { left:var(--cockpit-target-phone-left); top:var(--cockpit-target-phone-top); width:var(--cockpit-target-phone-width); height:var(--cockpit-target-phone-height); }
 }
-#game-shell[data-cockpit-ship="astra"] #hyperdrive-card { padding:2px 4px; }
-#game-shell[data-cockpit-ship="astra"] #hyperdrive-card b { letter-spacing:0; }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="astra"] #hyperdrive-card { padding:2px 4px; }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="astra"] #hyperdrive-card b { letter-spacing:0; }
 .cockpit-bezel::before { clip-path:polygon(8% 0,92% 0,100% 10%,100% 90%,92% 100%,8% 100%,0 90%,0 10%); }
-#game-shell:is([data-cockpit-ship="talon"],[data-cockpit-ship="prospector"],[data-cockpit-ship="atlas"],[data-cockpit-ship="speedster"],[data-cockpit-ship="andromeda"],[data-cockpit-ship="torsas"],[data-cockpit-ship="astra"]) .cockpit-screen-radar { border-radius:50%; }
-#game-shell:is([data-cockpit-ship="talon"],[data-cockpit-ship="prospector"],[data-cockpit-ship="atlas"],[data-cockpit-ship="speedster"],[data-cockpit-ship="andromeda"],[data-cockpit-ship="torsas"],[data-cockpit-ship="astra"]) .cockpit-bezel-radar::before { clip-path:ellipse(50% 50%); }
-#game-shell[data-cockpit-ship="wayfarer"] .cockpit-instruments #hyperdrive-card { height:clamp(26px,5.8vh,32px); }
-#game-shell[data-cockpit-ship="talon"] .cockpit-instruments #hyperdrive-card { top:86%; }
+#game-shell:where(:not([data-cockpit-paint])):is([data-cockpit-ship="talon"],[data-cockpit-ship="prospector"],[data-cockpit-ship="atlas"],[data-cockpit-ship="speedster"],[data-cockpit-ship="andromeda"],[data-cockpit-ship="torsas"],[data-cockpit-ship="astra"]) .cockpit-screen-radar { border-radius:50%; }
+#game-shell:where(:not([data-cockpit-paint])):is([data-cockpit-ship="talon"],[data-cockpit-ship="prospector"],[data-cockpit-ship="atlas"],[data-cockpit-ship="speedster"],[data-cockpit-ship="andromeda"],[data-cockpit-ship="torsas"],[data-cockpit-ship="astra"]) .cockpit-bezel-radar::before { clip-path:ellipse(50% 50%); }
+#game-shell:is([data-cockpit-ship="wayfarer"],[data-cockpit-paint]) .cockpit-instruments #hyperdrive-card { height:clamp(26px,5.8vh,32px); }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="talon"] .cockpit-instruments #hyperdrive-card { top:86%; }
 /* Navigation markers remain on the glass, behind the physical consoles. */
 .cockpit-instruments { z-index:5; }
-#game-shell:not([data-cockpit-ship="wayfarer"]) .screen-flight { column-gap:8px; }
+#game-shell:not([data-cockpit-ship="wayfarer"]):where(:not([data-cockpit-paint])) .screen-flight { column-gap:8px; }
 
 .target-bracket,.target-edge-pointer { z-index:4; }
 /* The edge cue must clear the transformed cockpit-instruments stacking
@@ -16049,16 +16040,16 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 /* Incoming comms grow inside each cockpit's free area, clear of monitors,
    touch controls and the aiming lane. Idle uses a compact hull-specific anchor. */
 #game-shell { --comms-width:min(480px,39vw); --comms-left-limit:60vw; --comms-height:28dvh; --comms-top:var(--safe-top); --comms-right:var(--safe-right); --comms-text-inset:15px; --comms-line-height:17px; }
-#game-shell[data-cockpit-ship="vanguard"] { --comms-top:34dvh; --comms-width:min(480px,32vw); --comms-height:30dvh; }
-#game-shell[data-cockpit-ship="talon"] { --comms-width:min(480px,36vw); --comms-left-limit:62vw; --comms-height:24dvh; }
-#game-shell[data-cockpit-ship="prospector"] { --comms-width:min(480px,38vw); --comms-left-limit:62vw; }
-#game-shell[data-cockpit-ship="lancer"] { --comms-right:28vw; --comms-idle-right:28vw; --comms-width:44vw; --comms-left-limit:26vw; --comms-height:30dvh; }
-#game-shell[data-cockpit-ship="atlas"] { --comms-width:min(480px,36vw); --comms-left-limit:63vw; --comms-height:18dvh; }
-#game-shell[data-cockpit-ship="speedster"] { --comms-right:28vw; --comms-idle-right:28vw; --comms-width:44vw; --comms-left-limit:26vw; }
-#game-shell[data-cockpit-ship="legionary"] { --comms-width:min(480px,37vw); --comms-left-limit:62vw; }
-#game-shell[data-cockpit-ship="andromeda"] { --comms-width:min(480px,36vw); --comms-height:24dvh; }
-#game-shell[data-cockpit-ship="torsas"] { --comms-top:12dvh; --comms-right:21vw; --comms-width:44vw; --comms-left-limit:32vw; --comms-height:18dvh; }
-#game-shell[data-cockpit-ship="astra"] { --comms-width:min(480px,38vw); }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="vanguard"] { --comms-top:34dvh; --comms-width:min(480px,32vw); --comms-height:30dvh; }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="talon"] { --comms-width:min(480px,36vw); --comms-left-limit:62vw; --comms-height:24dvh; }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="prospector"] { --comms-width:min(480px,38vw); --comms-left-limit:62vw; }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="lancer"] { --comms-right:28vw; --comms-idle-right:28vw; --comms-width:44vw; --comms-left-limit:26vw; --comms-height:30dvh; }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="atlas"] { --comms-width:min(480px,36vw); --comms-left-limit:63vw; --comms-height:18dvh; }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="speedster"] { --comms-right:28vw; --comms-idle-right:28vw; --comms-width:44vw; --comms-left-limit:26vw; }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="legionary"] { --comms-width:min(480px,37vw); --comms-left-limit:62vw; }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="andromeda"] { --comms-width:min(480px,36vw); --comms-height:24dvh; }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="torsas"] { --comms-top:12dvh; --comms-right:21vw; --comms-width:44vw; --comms-left-limit:32vw; --comms-height:18dvh; }
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="astra"] { --comms-width:min(480px,38vw); }
 .comms-channel {
   --comms-wing-gap:0px;
   position:absolute; z-index:6; top:var(--comms-idle-top,var(--safe-top)); right:calc(var(--comms-idle-right,var(--safe-right)) + var(--comms-wing-gap));
@@ -16082,7 +16073,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 #chat-panel .comms-row > b { white-space:normal; overflow-wrap:anywhere; }
 /* Thin the Lancer's inner canopy struts without stretching the exterior art.
    The cutout follows the existing opening; native outer rails stay intact. */
-#game-shell[data-cockpit-ship="lancer"] .cockpit-art {
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="lancer"] .cockpit-art {
   mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath fill='white' fill-rule='evenodd' d='M0 0H100V100H0Z M10 49L15 27L43 7L47 6L50 12L53 6L57 7L85 27L90 49L82 63L66 68L50 64L34 68L18 63Z'/%3E%3C/svg%3E");
   mask-size:100% 100%; mask-repeat:no-repeat;
 }
@@ -16276,52 +16267,52 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 
 /* Mount drive switches against the console rim. Account for the switch's
    26px minimum height on short phones instead of overlapping the first row. */
-#game-shell:is([data-cockpit-ship="andromeda"],[data-cockpit-ship="lancer"]) .cockpit-instruments #hyperdrive-card {
+#game-shell:where(:not([data-cockpit-paint])):is([data-cockpit-ship="andromeda"],[data-cockpit-ship="lancer"]) .cockpit-instruments #hyperdrive-card {
   top:calc(var(--cockpit-own-top) - max(26px,var(--cockpit-hyperdrive-height)) - 5px);
 }
 
 @media (max-height:520px) and (orientation:landscape) {
-  #game-shell:is([data-cockpit-ship="andromeda"],[data-cockpit-ship="lancer"]) .cockpit-instruments #hyperdrive-card {
+  #game-shell:where(:not([data-cockpit-paint])):is([data-cockpit-ship="andromeda"],[data-cockpit-ship="lancer"]) .cockpit-instruments #hyperdrive-card {
     top:calc(var(--cockpit-own-phone-top) - max(26px,var(--cockpit-hyperdrive-phone-height)) - 5px);
   }
 
 }
-#game-shell[data-cockpit-ship="speedster"] .cockpit-instruments #hyperdrive-card {
+#game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="speedster"] .cockpit-instruments #hyperdrive-card {
   top:calc(var(--cockpit-radar-top) - max(26px,var(--cockpit-hyperdrive-height)) - 5px);
 }
 @media (max-height:520px) and (orientation:landscape) {
-  #game-shell[data-cockpit-ship="speedster"] .cockpit-instruments #hyperdrive-card {
+  #game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="speedster"] .cockpit-instruments #hyperdrive-card {
     top:calc(var(--cockpit-radar-phone-top) - max(26px,var(--cockpit-hyperdrive-phone-height)) - 5px);
   }
 }
 
 @media (max-height:520px) and (orientation:landscape) {
-  #game-shell[data-cockpit-ship="astra"] #hyperdrive-card b { font-size:9px; }
+  #game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="astra"] #hyperdrive-card b { font-size:9px; }
 }
 
 /* These native round apertures already fit the radar. Keep their painted
    rings intact instead of layering a resized crop over the same housing. */
-#game-shell:is([data-cockpit-ship="prospector"],[data-cockpit-ship="atlas"],[data-cockpit-ship="torsas"]) .cockpit-bezel-radar { display:none; }
-#game-shell:is([data-cockpit-ship="prospector"],[data-cockpit-ship="atlas"],[data-cockpit-ship="torsas"]) .cockpit-screen-radar {
+#game-shell:where(:not([data-cockpit-paint])):is([data-cockpit-ship="prospector"],[data-cockpit-ship="atlas"],[data-cockpit-ship="torsas"]) .cockpit-bezel-radar { display:none; }
+#game-shell:where(:not([data-cockpit-paint])):is([data-cockpit-ship="prospector"],[data-cockpit-ship="atlas"],[data-cockpit-ship="torsas"]) .cockpit-screen-radar {
   border:0; box-shadow:none; background:transparent; outline:0;
 }
 
 /* Wayfarer's native console stays in place; its smaller apertures use the
    same essential readouts, without the decorative ship silhouette. */
-#game-shell[data-cockpit-ship="wayfarer"] .screen-heading > span { display:none; }
-#game-shell[data-cockpit-ship="wayfarer"] .screen-flight > div { display:flex; justify-content:space-between; gap:2px; }
-#game-shell[data-cockpit-ship="wayfarer"] .screen-flight small { display:none; }
-#game-shell[data-cockpit-ship="wayfarer"] .screen-bars > div { grid-template-columns:2ch minmax(12px,56px) 3ch; gap:2px; }
-#game-shell[data-cockpit-ship="wayfarer"] .screen-bars > div,
-#game-shell[data-cockpit-ship="wayfarer"] .screen-flight,
-#game-shell[data-cockpit-ship="wayfarer"] .screen-own-weapon { font-size:clamp(11px,.9vw,14px); }
+#game-shell:is([data-cockpit-ship="wayfarer"],[data-cockpit-paint]) .screen-heading > span { display:none; }
+#game-shell:is([data-cockpit-ship="wayfarer"],[data-cockpit-paint]) .screen-flight > div { display:flex; justify-content:space-between; gap:2px; }
+#game-shell:is([data-cockpit-ship="wayfarer"],[data-cockpit-paint]) .screen-flight small { display:none; }
+#game-shell:is([data-cockpit-ship="wayfarer"],[data-cockpit-paint]) .screen-bars > div { grid-template-columns:2ch minmax(12px,56px) 3ch; gap:2px; }
+#game-shell:is([data-cockpit-ship="wayfarer"],[data-cockpit-paint]) .screen-bars > div,
+#game-shell:is([data-cockpit-ship="wayfarer"],[data-cockpit-paint]) .screen-flight,
+#game-shell:is([data-cockpit-ship="wayfarer"],[data-cockpit-paint]) .screen-own-weapon { font-size:clamp(11px,.9vw,14px); }
 @media (max-height:520px) and (orientation:landscape) {
- #game-shell[data-cockpit-ship="wayfarer"] .screen-bars > div,
- #game-shell[data-cockpit-ship="wayfarer"] .screen-flight,
- #game-shell[data-cockpit-ship="wayfarer"] .screen-own-weapon,
- #game-shell[data-cockpit-ship="wayfarer"] .screen-flight span[data-short]::before,
- #game-shell[data-cockpit-ship="wayfarer"] .screen-bars span[data-short]::before { font-size:10px; }
- #game-shell[data-cockpit-ship="wayfarer"] .screen-ship-layout { padding:2px 3px; grid-template-rows:auto auto auto 8px; }
+ #game-shell:is([data-cockpit-ship="wayfarer"],[data-cockpit-paint]) .screen-bars > div,
+ #game-shell:is([data-cockpit-ship="wayfarer"],[data-cockpit-paint]) .screen-flight,
+ #game-shell:is([data-cockpit-ship="wayfarer"],[data-cockpit-paint]) .screen-own-weapon,
+ #game-shell:is([data-cockpit-ship="wayfarer"],[data-cockpit-paint]) .screen-flight span[data-short]::before,
+ #game-shell:is([data-cockpit-ship="wayfarer"],[data-cockpit-paint]) .screen-bars span[data-short]::before { font-size:10px; }
+ #game-shell:is([data-cockpit-ship="wayfarer"],[data-cockpit-paint]) .screen-ship-layout { padding:2px 3px; grid-template-rows:auto auto auto 8px; }
 }
 
 /* Phone weapon bank: both utility keys retain full-size touch targets.
@@ -16338,19 +16329,19 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 @media (max-height:520px) and (orientation:landscape) {
   /* Keep the Wayfarer's readouts inside its painted aperture, clear of the
      larger outer weapon bank; the cockpit artwork retains the full bezel. */
-  #game-shell[data-cockpit-ship="wayfarer"] .cockpit-screen-target {
+  #game-shell:is([data-cockpit-ship="wayfarer"],[data-cockpit-paint]) .cockpit-screen-target {
     width:calc(var(--cockpit-target-width) - 2.5vw);
   }
 }
 @media (max-height:520px) and (orientation:landscape) {
   #game-shell { --comms-line-height:14px; --comms-text-inset:11px; }
   .comms-channel { width:96px; }
-  #game-shell[data-cockpit-ship="vanguard"] { --comms-top:34dvh; --comms-right:58vw; --comms-idle-top:34dvh; --comms-idle-right:58vw; --comms-width:33vw; --comms-left-limit:9vw; --comms-height:32dvh; }
-  #game-shell[data-cockpit-ship="talon"] { --comms-top:env(safe-area-inset-top,0px); --comms-width:calc(38vw - var(--safe-right)); --comms-height:23dvh; }
-  #game-shell[data-cockpit-ship="lancer"] { --comms-right:31vw; --comms-idle-right:31vw; --comms-width:40vw; }
-  #game-shell[data-cockpit-ship="atlas"] { --comms-top:env(safe-area-inset-top,0px); --comms-width:38vw; --comms-left-limit:62vw; --comms-height:20.8dvh; }
-  #game-shell[data-cockpit-ship="andromeda"] { --comms-height:calc(24dvh - var(--safe-top)); }
-  #game-shell[data-cockpit-ship="torsas"] { --comms-top:12.8dvh; --comms-right:20vw; --comms-idle-right:20vw; --comms-width:48vw; --comms-height:17.2dvh; }
+  #game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="vanguard"] { --comms-top:34dvh; --comms-right:58vw; --comms-idle-top:34dvh; --comms-idle-right:58vw; --comms-width:33vw; --comms-left-limit:9vw; --comms-height:32dvh; }
+  #game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="talon"] { --comms-top:env(safe-area-inset-top,0px); --comms-width:calc(38vw - var(--safe-right)); --comms-height:23dvh; }
+  #game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="lancer"] { --comms-right:31vw; --comms-idle-right:31vw; --comms-width:40vw; }
+  #game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="atlas"] { --comms-top:env(safe-area-inset-top,0px); --comms-width:38vw; --comms-left-limit:62vw; --comms-height:20.8dvh; }
+  #game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="andromeda"] { --comms-height:calc(24dvh - var(--safe-top)); }
+  #game-shell:where(:not([data-cockpit-paint]))[data-cockpit-ship="torsas"] { --comms-top:12.8dvh; --comms-right:20vw; --comms-idle-right:20vw; --comms-width:48vw; --comms-height:17.2dvh; }
   #game-shell .comms-channel #comms-bar { font-size:12px; }
   #game-shell .comms-channel #comms-bar.active { height:auto; padding:4px 6px; }
 }
@@ -17767,165 +17758,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 @media(max-width:760px) { .controller-binding-rows { grid-template-columns:1fr; } }
 @media(max-width:440px) { .controller-bind-row { grid-template-columns:minmax(0,1fr) 105px 30px; font-size:13px; } }
 
-/* ===== Code-drawn cockpit kit =====================================================
-   Active when GameUI sets data-cockpit-kit (hulls in COCKPIT_SCENES). CockpitKit
-   renders the 3D cockpit into pixel canvases (.kit-layer) and places the live
-   monitors and touch hit areas with inline px rects on the same grid
-   (--kit-unit CSS px per art pixel). The touch elements are invisible hit
-   areas over the painted controls; canvases, monitors and controls share one
-   banking transform. */
-.kit-layer {
-  position: absolute;
-  left: 0;
-  top: 0;
-  pointer-events: none;
-  image-rendering: crisp-edges;
-  image-rendering: pixelated;
-}
-.kit-frame { z-index: 1; }
-.kit-hand { z-index: 2; }
-.kit-safe-probe {
-  position: absolute;
-  visibility: hidden;
-  pointer-events: none;
-  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
-}
-#game-shell:not([data-cockpit-kit]) .kit-layer { display: none; }
-#game-shell[data-cockpit-kit] .cockpit-art,
-#game-shell[data-cockpit-kit] .cockpit-bezel { display: none; }
-#game-shell[data-cockpit-kit] .cockpit-instruments,
-#game-shell[data-cockpit-kit] .touch-controls {
-  inset: 0;
-  /* No zoom: the kit is solved for the exact viewport, so scaling would push
-     controls past the screen edges. Head motion keeps the sway and bank. */
-  transform: translate3d(var(--cockpit-shift-x), var(--cockpit-shift-y), 0) rotate(var(--cockpit-roll));
-  transform-origin: 50% 72%;
-}
-
-/* Monitor glass: the housing is rendered; the DOM element is only the screen. */
-#game-shell[data-cockpit-kit] .cockpit-screen {
-  min-width: 0;
-  min-height: 0;
-  border: 0;
-  border-radius: 0;
-  transform: none;
-  background:
-    repeating-linear-gradient(180deg, transparent 0 calc(var(--kit-unit) * 2), rgba(0, 0, 0, 0.18) calc(var(--kit-unit) * 2) calc(var(--kit-unit) * 3)),
-    radial-gradient(ellipse at 50% 40%, #0a2350, var(--kit-glass) 72%);
-  box-shadow: inset 0 0 calc(var(--kit-unit) * 8) var(--kit-glass-glow), inset 0 0 0 var(--kit-unit) #02040a;
-}
-#game-shell[data-cockpit-kit] .cockpit-screen::after { inset: calc(var(--kit-unit) * 2); border-color: rgba(79, 205, 231, 0.18); }
-
-/* Hyperdrive: a pixel plate on its projector housing. */
-#game-shell[data-cockpit-kit] #hyperdrive-card {
-  max-width: none;
-  min-width: 0;
-  min-height: 0;
-  padding: 0;
-  border: var(--kit-unit) solid var(--kit-trim-lo);
-  border-top-color: var(--kit-trim);
-  border-radius: 0;
-  background: #050c1a;
-  box-shadow: 0 0 0 var(--kit-unit) var(--kit-outline), inset 0 calc(var(--kit-unit) * -1) 0 #0d1b33;
-  filter: none;
-}
-#game-shell[data-cockpit-kit] #hyperdrive-card b { color: #a87a3a; text-shadow: none; letter-spacing: 0.14em; }
-#game-shell[data-cockpit-kit] #hyperdrive-card[data-hyperdrive-ready="true"] {
-  border-color: var(--retro-amber);
-  border-top-color: var(--retro-amber-hi);
-  box-shadow: 0 0 0 var(--kit-unit) var(--kit-outline), 0 0 calc(var(--kit-unit) * 6) rgba(255, 184, 61, 0.45);
-}
-#game-shell[data-cockpit-kit] #hyperdrive-card[data-hyperdrive-ready="true"] b { color: var(--retro-amber-hi); text-shadow: 0 0 calc(var(--kit-unit) * 3) rgba(255, 184, 61, 0.7); }
-
-/* Controls exist on every device (mouse works too). Each element is only a
-   hit area, larger than the rendered cap/lever/stick it sits over. */
-#game-shell[data-cockpit-kit] .touch-controls { display: block; }
-#game-shell[data-cockpit-kit] .touch-left,
-#game-shell[data-cockpit-kit] .touch-right {
-  position: absolute;
-  inset: 0;
-  display: block;
-  gap: 0;
-  transform: none;
-  pointer-events: none;
-}
-#game-shell[data-cockpit-kit] .touch-secondary-row { display: contents; }
-#game-shell[data-cockpit-kit] .touch-boost-left { display: none; }
-#game-shell[data-cockpit-kit] :is(.touch-stick, .touch-throttle) {
-  position: absolute;
-  display: block;
-  min-width: 0;
-  min-height: 0;
-  margin: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  pointer-events: auto;
-}
-#game-shell[data-cockpit-kit] :is(.touch-stick-rings, .touch-stick-knob, .touch-throttle-fill, .touch-throttle-thumb, .touch-throttle-label),
-#game-shell[data-cockpit-kit] .touch-throttle::before { opacity: 0; }
-#game-shell[data-cockpit-kit] .touch-controls :is(.touch-fire, .touch-missile, .touch-launcher-cycle, .touch-boost-right) {
-  position: absolute;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  gap: calc(var(--kit-unit) * 3);
-  min-width: 0;
-  min-height: 0;
-  margin: 0;
-  border: 0;
-  border-radius: 0;
-  color: transparent;
-  background: transparent;
-  box-shadow: none;
-  opacity: 1;
-  filter: none;
-  overflow: visible;
-}
-#game-shell[data-cockpit-kit] .touch-controls :is(.touch-fire, .touch-missile, .touch-boost-right) svg,
-#game-shell[data-cockpit-kit] .touch-controls #touch-drone-label { display: none; }
-#game-shell[data-cockpit-kit] .touch-controls :is(.touch-fire, .touch-missile, .touch-launcher-cycle, .touch-boost-right):is(:hover, :active, .is-active, .is-engaged) {
-  background: transparent;
-  box-shadow: none;
-  filter: none;
-  transform: none;
-}
-#game-shell[data-cockpit-kit] .touch-controls :is(.touch-fire, .touch-missile, .touch-launcher-cycle, .touch-boost-right):focus-visible { outline: 1px dashed var(--retro-amber); outline-offset: 0; }
-/* The rack display: live text on the rendered LCD. */
-#game-shell[data-cockpit-kit] .touch-controls .touch-launcher-cycle { font: 700 clamp(9px, calc(var(--cap-h) * 0.5), 15px) / 1 var(--pixel-font); }
-#game-shell[data-cockpit-kit] .touch-controls .touch-launcher-cycle span { color: #c98a2a; font-size: 0.82em; letter-spacing: 0.06em; }
-#game-shell[data-cockpit-kit] .touch-controls .touch-launcher-cycle b { color: var(--kit-lcd-ink); font-size: 1em; }
-#game-shell[data-cockpit-kit] .touch-controls .touch-launcher-cycle.is-empty b { color: var(--retro-red); }
-#game-shell[data-cockpit-kit] .touch-controls .touch-launcher-cycle:disabled { opacity: 1; }
-/* Drone states keep an engraved label under the missile cap (MINE, RECALL …). */
-#game-shell[data-cockpit-kit] .touch-controls .touch-utility-label {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(var(--cap-y) + var(--cap-h) + var(--kit-unit) * 3);
-  margin: 0;
-  color: var(--kit-trim);
-  font: 700 clamp(8px, calc(var(--kit-unit) * 6), 12px) / 1 var(--pixel-font);
-  letter-spacing: 0.08em;
-  text-align: center;
-  text-shadow: 0 var(--kit-unit) 0 var(--kit-outline);
-  pointer-events: none;
-}
-/* Pause / fullscreen become small console keys in the header corner. */
-#game-shell[data-cockpit-kit] .hud-corner-buttons button {
-  border: var(--kit-unit) solid var(--kit-trim-lo);
-  border-top-color: var(--kit-trim);
-  border-radius: 0;
-  color: var(--kit-trim-hi);
-  background: #0b1830;
-  box-shadow: 0 0 0 var(--kit-unit) var(--kit-outline), 0 calc(var(--kit-unit) * 2) 0 var(--kit-unit) rgba(0, 0, 0, 0.4);
-  opacity: 1;
-}
-#game-shell[data-cockpit-kit] .hud-corner-buttons button:active { transform: translateY(var(--kit-unit)); box-shadow: 0 0 0 var(--kit-unit) var(--kit-outline); }
-
-/* Approved starter cockpit artwork. Scope every override to this hull so
+/* Approved shared cockpit artwork. Scope every override to active painted hulls so
    switching ships restores the existing cockpit and control layouts. */
 .painted-cockpit-frame,.painted-pilot-hand,.painted-stick-mount,.painted-hand-layer{display:none}
 .painted-throttle-rail{display:contents}

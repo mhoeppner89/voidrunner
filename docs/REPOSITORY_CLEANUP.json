@@ -1,26 +1,93 @@
 {
-  "date": "2026-10-14",
-  "runtime": "0.8.2ft",
-  "baselineApproxGiB": 15,
-  "finalKiB": 5778824,
-  "gitKiB": 4803256,
+  "date": "2026-11-16",
+  "runtime": "0.8.2oi",
+  "maintenanceOnly": true,
   "gitHistoryRewritten": false,
-  "preservedHullDroneSources": 21,
-  "additionalNativeLibraries": 6,
-  "fullSuiteTests": 684,
-  "fullSuiteFailures": 0,
-  "browserPlatforms": [
-    "desktop Chrome",
-    "Android Chrome emulation",
-    "iPhone WebKit emulation"
+  "registeredExtraWorktrees": 0,
+  "mergedLocalBranchesRemoved": 10,
+  "uniqueBranchesPreserved": 7,
+  "obsoleteFilesRemoved": 65,
+  "obsoleteFileBytes": 42425903,
+  "generatedFilesRemoved": 11994,
+  "generatedBytesRemoved": 3982076839,
+  "retainedOutputFiles": 5626,
+  "retainedOutputArchive": ".workbench/generated-archives/output-2026-11-16T12-56-18-602Z-78357.tar.gz",
+  "retainedOutputArchiveBytes": 143195662,
+  "fullSuiteTests": 1330,
+  "fullSuitePasses": 1316,
+  "fullSuiteFailures": 14,
+  "remainingFailures": [
+    {
+      "file": "tests/integration/npc-station-landing.test.mjs",
+      "name": "NPC hard collisions use visible station surfaces without a docking exemption"
+    },
+    {
+      "file": "tests/integration/phone-dock.test.mjs",
+      "name": "phone inventory installs the gifted reactor without a charge in both languages"
+    },
+    {
+      "file": "tests/integration/phone-dock.test.mjs",
+      "name": "phone shop disables an unaffordable radar purchase and never treats it as owned stock"
+    },
+    {
+      "file": "tests/integration/phone-dock.test.mjs",
+      "name": "equipment navigation names remote storage, hides empty sections and clears mount filters"
+    },
+    {
+      "file": "tests/integration/ship-collider-fit.test.mjs",
+      "name": "all player hulls and NPC hulls clear every actual station landing and departure route"
+    },
+    {
+      "file": "tests/integration/ship-collision.test.mjs",
+      "name": "Rin and the tutorial pirate keep flying through a close-range duel"
+    },
+    {
+      "file": "tests/integration/station-models.test.mjs",
+      "name": "landing spaces have solid floors and the expected open sky or enclosing roof"
+    },
+    {
+      "file": "tests/integration/station-models.test.mjs",
+      "name": "the inspection doorway and factory rear opening continue into the larger station"
+    },
+    {
+      "file": "tests/integration/station-models.test.mjs",
+      "name": "Helix preserves its circular decks and Rook closes the marked underside gap"
+    },
+    {
+      "file": "tests/integration/station-models.test.mjs",
+      "name": "Rook central upper slot is covered by a continuous armored roof"
+    },
+    {
+      "file": "tests/unit/careerMetrics.test.mjs",
+      "name": "career upgrades use outfitting compatibility for size-less utility mounts"
+    },
+    {
+      "file": "tests/unit/droneFormation.test.mjs",
+      "name": "tests/unit/droneFormation.test.mjs"
+    },
+    {
+      "file": "tests/unit/economy.test.mjs",
+      "name": "tests/unit/economy.test.mjs"
+    },
+    {
+      "file": "tests/unit/playerStrength.test.mjs",
+      "name": "combat-strength proxy uses full hull and equipment value, half cash, and no cargo"
+    }
   ],
-  "spectatorHullCount": 19,
-  "browserErrors": [],
-  "offlineShellVerified": true,
-  "notes": [
-    "Fresh clean-folder suite and runtime packaging passed without ignored authoring sources or old development output.",
-    "Shared test constructors were extracted so importing them does not register whole suites.",
-    "Historical rebuild-construction checks were replaced by current shipping geometry and local source integrity checks.",
-    "Title-shell cache dependencies were completed, including both Three.js modules and essential cockpit art."
-  ]
+  "sourceVerification": "34 model sources + 6 libraries passed",
+  "build": "passed",
+  "browserCockpit": "desktop/Android/iPhone/small phone passed",
+  "offlineStartup": "Android normal startup/decoded images/offline resume/reconnect passed",
+  "rebuiltDistBytes": 376513420,
+  "regeneratedOutputBytes": 9268635,
+  "netApproxBytesFreed": 3495525025,
+  "browserEditor": "desktop passed",
+  "translationValuesUnchanged": true,
+  "gitLooseObjectsCompacted": true,
+  "gitConnectivity": "passed",
+  "preservedBranchTipsUnchanged": true,
+  "inactiveGitTemporariesArchivedAndRemoved": 3,
+  "recentGitTemporariesRetained": 2,
+  "gitKiB": 3667940,
+  "retainedNativeSourcesUntouched": true
 }

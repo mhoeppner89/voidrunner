@@ -1,0 +1,41 @@
+# Mercury hardware/detail pass · v4
+
+## Lower radar-bezel fit correction
+
+The first detailed output is retained only in ignored `output/cockpit-art/talon-detail-v4-candidate.png`. Its lower centre bezel aligned with the outer monitors despite the lower radar opening. A targeted built-in edit retains the hardware and extends only that lower rim. Input 2 remains the same geometry guide.
+
+Exact correction prompt:
+
+> Use case: precise-object-edit. This is a small fit correction to Image 1, a completed transparent Mercury cockpit overlay. Image 2 is the fixed geometry guide.
+> Preserve the excellent new switches, vents, conduit bundles, canopy latches, materials, side-console perspective, swept cowl and all other artwork. Do not redesign or simplify anything. Keep the same canvas, alpha, crop, scale, framing and pixel-art treatment.
+> CHANGE ONLY THE LOWER EDGE OF THE CENTRE RADAR HOUSING. Its top and sides are already in place, but its bottom was accidentally kept level with the two outer screens. The actual centre radar opening is 14 pixels LOWER than the two outer displays and must therefore have its lower rim 14 pixels lower too.
+> Extend the centre opening DOWNWARD by exactly 14 pixels; translate its bottom inner ivory bezel, lower corner fittings and lower cabinet rim downward with it. The centre opening's top edge and upper cowl MUST NOT move. Its width must not change. The two outer screens and ALL surrounding hardware MUST NOT move or change.
+> Canonical layout on this ~1851x850 canvas: outer display bottoms y809; centre radar bottom y823, exactly14 pixels lower. Centre opening x800..1070, y641..823. Match the taller/lower centre opening in Image 2. The radar's ivory bottom rim must remain visible below that opening. Its lower cabinet edge can continue to the bottom crop. Do not squeeze the radar back into the same height as the outer screens.
+> No text, new controls, hand, joystick or base, readouts, background or other objects. All display interiors remain transparent. Leave the corrected sloping cowl and its clear blank hyperdrive mounting face intact. Return the complete intact frame with only this small centre lower-bezel adjustment.
+
+## Hardware generation
+
+Built-in imagegen, transparent background. Input 1: `talon-layout-guide-v3.png` (fixed geometry, projected decks and swept hyperdrive cowl). Input 2: `output/cockpit-art/talon-paint-v3.png` (previous Mercury finish/identity). Input 3: the user-supplied Wing Commander hardware-density reference, captured in `output/cockpit-layout/reference/wing-commander.png`, originally https://www.pcgames.de/screenshots/1280x/2019/12/wingcommander04-buffed.jpg. Only layout guide 1 controls positions.
+
+Exact prompt:
+
+> Use case: sketch-to-render / cockpit hardware detail pass.
+> Create a SUBSTANTIALLY RICHER, beautifully detailed Mercury fighter cockpit structural overlay, with the purposeful hardware density, depth and character of classic Wing Commander cockpits.
+> INPUT ROLES: Image 1 is the strict current geometry/perspective guide and has highest priority. Image 2 is the existing Mercury artwork: preserve its identity, materials, open sightline and basic architecture, but enrich its empty surfaces. Image 3 is ONLY a reference for the richness of cockpit hardware, layered instrument construction and pixel-art readability. Do not copy its display arrangement, colours of readouts, text, extra canopy bars, hands, knees or background.
+> PRIMARY CHANGE: populate the existing structural surfaces with coherent aviation/spacecraft hardware. The last Mercury image is too bare. Add several distinct, thoughtfully arranged clusters: a small recessed aft-left deck subpanel with guarded miniature toggles and grouped amber/cyan indicators; an aft-right deck cluster with small switches and rotary trim knobs; properly inset ventilation grilles and heat-sink slots on the inner cabinet walls; bundled electrical conduits held by straps and disappearing into the monitor housings; layered monitor bezels with inner seals, captive fasteners, corner mounts and a few tiny status lamps; small canopy hinge/latch mechanisms at the existing joints. Make the consoles feel serviceable and actually built, with clear front/top/side planes, inset cavities, convincing contact shadows, bevels and overlapping mechanical layers. Hardware must sit on and follow the perspective of the surface supporting it. No floating parts or wires.
+> Important distinction: SMALL STATIC COCKPIT HARDWARE IS WANTED. Do not mistake “no baked-in live flight controls” for “no cockpit detail.” Add visible purposeful hardware, not random dots or just more scratches. Use readable medium-size pixel clusters and several designed groups, with calm metal between groups; no noisy microtexture.
+> HYPERDRIVE COWL: Image 1 replaces the old square raised central box with broad SWEPT/SLOPING SHOULDERS merging into the adjacent monitor bank, plus a sloping/bevelled roof receding toward the windshield. Follow that contour exactly. It should feel like part of the fighter's low angular console, not a little upright tower. Leave its central mounting face x800..1070, y568..633 clear dark metal for the separately rendered live hyperdrive button. Hardware belongs on the surrounding slopes/edges, not on that face. No painted hyperdrive label or button.
+> PERSPECTIVE: preserve the projected horizontal side-deck tops and darker vertical inner cabinet walls in Image 1. They meet the upright monitor fascia in real corner joints. Keep this improved geometry. No broad flat triangular front-facing plates, no frame-like border drawn around a triangle. Keep the fore-left grip landing area around x150..285,y760..850 relatively quiet; the approved separate hand and joystick base will sit there.
+> LOCKED LAYOUT: 1851x850 wide landscape canvas, same crop and framing. Slim continuous curved canopy bow and thin diagonal jambs; no additional canopy bars or enlarged frame occluding space. Keep the three rectangular transparent display holes EXACTLY: LEFT x416 y625 width318 height184; CENTRE x800 y641 width270 height182; RIGHT x1135 y625 width304 height184. Do not move, resize, tilt, fill or add displays. Centre housing roof is y560, outer bank roof y584. Use Image 1 for the sloped cowl outline. Preserve its mounting clearances.
+> FINISH: polished handcrafted high-definition Wing Commander-era pixel art, deep navy/charcoal metal, restrained warm ivory bezel trims, slate highlights, small local amber/cyan/red hardware lamps, selective mild edge wear. Strong legible forms, dimensional lighting from upper left, tactile switches and mechanisms. No blur, film grain, heavy stipple, noisy dithering, photorealism, sprawling greebles or excessive exposed pipes. Tiny lights may glow locally, but the metal itself must not glow.
+> TRANSPARENCY: actual alpha in the entire windshield, outside structural surfaces and inside all three display holes. No glass tint/reflections, space scene, stars, planet or black backdrop. The structural panels remain opaque.
+> DO NOT BAKE IN: the player's hand, arms, legs, joystick, joystick base, throttle slider, large fire/missile/boost control pads, reticle, radar, screen readouts, words, numbers, logos or watermark. They are existing live overlays, fixed in position. No extra screens. Return ONE intact transparent structural frame, not an atlas.
+
+
+## Selected output
+
+`talon-paint-v4.png`, 1850×850 RGBA, copied byte-for-byte from built-in output `exec-bea652d2-1f69-4709-8811-8851d3ad5105.png`. No programmatic bitmap changes. The initial detailed draft remains under ignored output; the previous v3 frame is archived there as well.
+
+The selected frame adds painted guarded switch/trim clusters, grouped lamps, layered bezels, vents, restrained conduit bundles with mounts, and canopy latch assemblies. The hyperdrive cowl has swept shoulders and a receding sloped roof. The centre lower bezel was extended to retain a visible rim below the lower radar opening.
+
+The fixed live display/control rectangles and existing aperture stencil are unchanged. The original navy/white hand strip and joystick base are reused without edits. All added hardware is part of the same static frame texture; no new animated layers, render passes or per-frame image processing. Mercury remains in artwork review until composition approval.

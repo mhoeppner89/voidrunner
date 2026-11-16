@@ -196,7 +196,7 @@ test('cockpit images are preloaded on ship changes, not every HUD update', t => 
 test('sprite hulls use hull-matched transparent cockpit sprites and distinct monitor layouts', async t => {
     const { readFile } = await import('node:fs/promises');
     // The starter has its approved frame/hand; other hulls keep their matched plates.
-    const shipIds = ['vanguard', 'talon', 'prospector', 'lancer', 'atlas',
+    const shipIds = ['vanguard', 'prospector', 'lancer', 'atlas',
         'speedster', 'legionary', 'andromeda', 'torsas', 'astra'];
     const artByShip = {
         vanguard:'cockpit-vanguard-sprite-v7.png', talon:'cockpit-talon-sprite-v6.png',
@@ -250,6 +250,10 @@ test('sprite hulls use hull-matched transparent cockpit sprites and distinct mon
     assert.ok(preloaded.some(url=>url.includes('wayfarer-paint-atlas-v2.png')));
     assert.ok(preloaded.some(url=>url.includes('wayfarer-hand-pitch-v4.png')));
     ui.setCockpitShip('talon');
+    assert.deepEqual(kitCalls.at(-1), ['activate', 'talon'], 'Mercury uses the shared cockpit renderer');
+    assert.ok(preloaded.some(url=>url.includes('talon-paint-v8.png')));
+    assert.ok(!preloaded.some(url=>/cockpit-talon-sprite/.test(url)));
+    ui.setCockpitShip('prospector');
     assert.deepEqual(kitCalls.at(-1), ['deactivate'], 'sprite hulls leave the kit');
     assert.equal(layouts.size, shipIds.length, 'every hull has its own monitor layout');
     assert.equal(artUrls.size, shipIds.length, 'every hull has its own cockpit sprite');

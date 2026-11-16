@@ -1,3 +1,4 @@
+import {getCockpitDefinition} from './cockpitDefinitions.js';
 import { CONTROLLER_ACTIONS, CONTROLLER_BUTTON_LABELS, defaultControllerBindings, normalizeControllerBindings, rebindController, requiredMenuBinding } from './controllerBindings.js';
 import {UI_TERMS,socialVenueKey,missionBoardKey} from './interfaceTerms.js';
 import {explorationDialogue,explorationJournal,explorationText} from './explorationData.js';
@@ -475,7 +476,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2oi';
+const GAME_VERSION = '0.8.2op';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -1010,15 +1011,15 @@ export class GameUI {
         this.save = save;
         this.setCockpitShip(save?.player?.shipId);
     }
-    setCockpitShip(shipId = 'wayfarer') {
-        const nextId = shipId === 'blade' ? 'legionary' : COCKPIT_ART_BY_SHIP[shipId] ? shipId : 'wayfarer';
+    setCockpitShip(shipId = 'wayfarer', {review = false, shell} = {}) {
+        const nextId = getCockpitDefinition(shipId,{review}) ? shipId : shipId === 'blade' ? 'legionary' : COCKPIT_ART_BY_SHIP[shipId] ? shipId : 'wayfarer';
         if (this.cockpitShipId === nextId && this.root.dataset.cockpitShip === nextId)
             return;
         // The approved starter frame and hand replace its legacy cockpit plate.
-        const kit = hasPaintedCockpit(nextId);
+        const kit = Boolean(getCockpitDefinition(nextId,{review}));
         void this.preloadImageSet('flight-core', kit ? [...paintedCockpitAssets(nextId), ...FLIGHT_SCREEN_ART] : [COCKPIT_ART_BY_SHIP[nextId], ...FLIGHT_SCREEN_ART], { priority: 'high' });
         this.cockpitShipId = nextId;
-        if (kit) this.cockpitArtwork?.activate(nextId);
+        if (kit) this.cockpitArtwork?.activate(nextId,{review,shell});
         else this.cockpitArtwork?.deactivate();
         this.radarLayoutDirty = true;
         this.cockpitVisibilityDirty = true;
@@ -1029,7 +1030,7 @@ export class GameUI {
         }
         const instruments = this.el('.cockpit-instruments');
         instruments?.removeAttribute('style');
-        for (const [screen, layout] of Object.entries(COCKPIT_LAYOUT_BY_SHIP[nextId])) {
+        for (const [screen, layout] of Object.entries(COCKPIT_LAYOUT_BY_SHIP[kit ? 'wayfarer' : nextId])) {
             for (const [property, value] of Object.entries(layout))
                 instruments?.style?.setProperty?.('--cockpit-' + screen.replace('Phone', '-phone') + '-' + property, value);
         }

@@ -1,3 +1,4 @@
+import {paintedCockpitAssets} from './game/cockpitDefinitions.js';
 import { normalizeControllerBindings } from './game/controllerBindings.js';
 import {newArenaRun,readArenaRun,arenaRecord} from './game/arenaRun.js';
 import { AudioManager } from './game/audio.js';
@@ -99,9 +100,9 @@ const SHIP_WARM_ASSETS = Object.freeze({
     torsas: ['./assets/models/ships/torsas.glb', './assets/remaster/cockpit-torsas-sprite-v4.png'],
     astra: ['./assets/models/ships/astra.glb', './assets/remaster/cockpit-astra-sprite-v2.png'],
     // Warm the approved starter frame and its anchored hand strip before flight.
-    wayfarer: ['./assets/models/ships/wayfarer.glb', './assets/cockpits/wayfarer-paint-atlas-v2.png', './assets/cockpits/wayfarer-hand-pitch-v4.png', './assets/cockpits/wayfarer-stick-base-v1.png'],
+    wayfarer: ['./assets/models/ships/wayfarer.glb', ...paintedCockpitAssets('wayfarer')],
     vanguard: ['./assets/models/ships/vanguard.glb', './assets/remaster/cockpit-vanguard-sprite-v7.png'],
-    talon: ['./assets/models/ships/talon.glb', './assets/remaster/cockpit-talon-sprite-v6.png'],
+    talon: ['./assets/models/ships/talon.glb', ...paintedCockpitAssets('talon')],
     prospector: ['./assets/models/ships/prospector.glb', './assets/remaster/cockpit-prospector-sprite-v3.png'],
     lancer: ['./assets/models/ships/lancer.glb', './assets/remaster/cockpit-lancer-sprite-v2.png'],
     atlas: ['./assets/models/ships/atlas.glb', './assets/remaster/cockpit-atlas-sprite-v4.png'],

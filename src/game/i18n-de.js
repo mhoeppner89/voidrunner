@@ -3408,9 +3408,8 @@ export const DE_CATALOG = {
     ...{ MAGRAIL: 'GAUSSKANONE' },
     // ── Generated: tutorial copy (single source of truth) ─────────────────────
     ...TUTORIAL_TRANSLATIONS,
-};
 
-Object.assign(DE_CATALOG, {
+    // Arena formation notices.
     'Reinforcement ahead in {seconds} seconds.':'Verstärkung voraus in {seconds} Sekunden.',
     'Reinforcement approaching ahead.':'Verstärkung nähert sich von vorn.',
     'Three veterans converge.':'Drei Veteranen greifen gemeinsam an.',
@@ -3424,4 +3423,4 @@ Object.assign(DE_CATALOG, {
     'Two heavies and a courier.':'Zwei schwere Jäger und ein Kurier.',
     'Three aces.':'Drei Fliegerasse.',
     'Elite heavy wing.':'Schwerer Eliteverband.',
-});
+};

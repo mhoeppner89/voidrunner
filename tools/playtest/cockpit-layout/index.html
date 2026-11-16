@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Wanderer · Cockpit artwork 04</title>
+  <title>Mercury · Cockpit layout review</title>
   <link rel="icon" href="/favicon.svg">
   <link rel="stylesheet" href="/src/style.css">
   <link rel="stylesheet" href="./style.css">
@@ -11,25 +11,26 @@
 </head>
 <body>
   <header class="review-bar">
-    <span class="review-title">WANDERER <small>COCKPIT ART · 04</small></span>
+    <span class="review-title">MERCURY <small>ARTWORK · AWAITING APPROVAL</small></span>
     <button id="review-open" aria-expanded="false" aria-controls="review-options">Review controls</button>
     <button id="fullscreen" aria-label="Toggle fullscreen">⛶</button>
   </header>
   <aside id="review-options" hidden>
     <h1>Starter cockpit / structure first</h1>
-    <p>Generated cockpit artwork on the approved layout. Readouts and flight are simulated; your career is untouched. Sound is off.</p>
+    <p>Mercury artwork on the approved monitor and control layout. The existing hand and joystick base remain separate overlays. Readouts and flight are simulated; your career is untouched. Sound is off.</p>
+    <label>Hull <select id="hull"><option value="talon">Mercury · artwork</option><option value="wayfarer">Hestia / Wanderer · approved</option></select></label>
     <label>Viewport <select id="review-viewport"><option value="fit">This screen</option><option value="desktop">Desktop · 16:10</option><option value="phone">Phone · landscape</option></select></label>
     <label>Situation <select id="scene"><option value="navigation">Navigation</option><option value="combat">Combat</option><option value="salvage">Salvage</option></select></label>
     <label><input id="guides" type="checkbox"> Show touch areas and layout measurements</label>
-    <label><input id="artwork-enabled" type="checkbox" checked> Show generated cockpit frame</label>
+    <label><input id="artwork-enabled" type="checkbox" checked> <span id="artwork-label">Show unpainted structure</span></label>
     <button id="model-open">Compare with the actual canopy</button>
     <button id="reset">Reset view</button>
     <p>Drag the left-hand grip, or use your current keyboard/controller bindings. R/F adjusts thrust; Space fires. Tap the displays to try their pages.</p>
-    <p>The complete frame sprite defines the canopy and monitor openings. Mobile controls keep their earlier sizes; the hand stays visible on every device.</p>
+    <p>Review the painted frame and its fit around the approved layout. The monitor openings, control sizes and anchored hand use the same definitions and renderer as live flight.</p>
     <button id="review-close">Back to cockpit</button>
   </aside>
   <main id="viewport-host">
-    <section id="cockpit" aria-label="Interactive starter cockpit mockup">
+    <section id="cockpit" aria-label="Interactive cockpit layout review">
       <canvas id="space" aria-label="Simulated space view"></canvas>
       <svg id="canopy-shell" viewBox="0 0 1600 900" preserveAspectRatio="none" aria-hidden="true">
         <defs>
@@ -40,7 +41,7 @@
         <g id="canopy-edges" fill="none" stroke="#9cadb5" stroke-width="2" opacity=".5"/>
       </svg>
       <div id="hit-flash" aria-hidden="true"></div>
-      <svg id="pilot-hand" viewBox="0 0 320 240" aria-hidden="true"><g id="hand-rig"/></svg>
+
       <span class="guide-label canopy-guide">MODEL-INFORMED CANOPY · SLIM INTERIOR TRIM</span>
       <div id="portrait-hint" hidden>Turn your phone sideways to review the flight layout.</div>
     </section>
@@ -48,7 +49,7 @@
   <dialog id="model-dialog">
     <header><b>Actual starter hull / canopy</b><button id="model-close">Close</button></header>
     <div id="model-stage"></div>
-    <footer><p>Cyan: original glazing. Gold: proposed pilot eye and forward direction. Drag to orbit; scroll to zoom.</p><p>Pane directions follow this model. Slim interior trim, console and hand are proposed additions.</p><button id="model-front">Canopy close-up</button><button id="model-whole">Whole ship</button></footer>
+    <footer><p>Cyan: original glazing. Gold: proposed pilot eye and forward direction. Drag to orbit; scroll to zoom.</p><p>The proposed eye is inside the glazing. The thin interior bow follows the exterior pane ring, widened for visibility; console connections are proposed. This exterior model has no authored seat or complete interior.</p><button id="model-front">Canopy close-up</button><button id="model-whole">Whole ship</button></footer>
   </dialog>
   <script type="module" src="./review.js"></script>
 </body>

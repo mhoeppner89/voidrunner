@@ -640,6 +640,7 @@ const MAP_CLAIM_CONTACT_RANGE = 1000;
 const MAP_WRECK_CONTACT_RANGE = 600;
 const MAP_WRECK_CONTACT_LIMIT = 48;
 const TARGET_TAP_DRIFT = 14;
+const TARGET_CYCLE_WINDOW_MS = 2000;
 // Fixed-timestep simulation: the sim advances in exact 1/60s steps regardless of
 // render rate, so combat feel is frame-rate independent and headless probes are
 // deterministic. Leftover frame time is carried in simAccumulator and the render
@@ -6267,13 +6268,29 @@ export class GameSession {
             this.setMonitorStatus(t('NO TARGETS IN SENSOR RANGE'));
             return;
         }
-        let currentIndex = candidates.findIndex((entry) => entry.id === this.save.player.currentTargetId);
-        // A ship that just surrendered drops out of the hostile tier, so the next
-        // press restarts selection at the top of the hierarchy (closest remaining
-        // threat) instead of stepping into the non-hostile contact list.
-        if (this.ships.some((entry) => entry.id === this.save.player.currentTargetId && entry.surrendered))
-            currentIndex = -1;
-        const next = candidates[(currentIndex + 1) % candidates.length];
+        // This is an input gesture, so its idle window uses real elapsed time,
+        // independent of simulation speed, pause or frame rate. Keep a stable
+        // order through rapid taps; the next burst ranks current distances anew.
+        const now = performance.now(), previous = this.targetCycle;
+        const live = new Map();
+        for (const entry of candidates) {
+            const key = `${entry.kind}:${entry.id}`;
+            if (!live.has(key)) live.set(key, entry); // highest-priority occurrence wins
+        }
+        const surrendered = this.ships.some(entry => entry.id === this.save.player.currentTargetId && entry.surrendered);
+        const restart = !previous || previous.targetId !== this.save.player.currentTargetId
+            || now - previous.selectedAt >= TARGET_CYCLE_WINDOW_MS || now < previous.selectedAt || surrendered;
+        let keys = restart ? [...live.keys()] : previous.keys;
+        let index = restart ? 0 : (previous.index + 1) % keys.length;
+        let next;
+        for (let checked = 0; checked < keys.length; checked++, index = (index + 1) % keys.length) {
+            next = live.get(keys[index]);
+            if (next) break; // destroyed, hidden or otherwise unavailable contacts are skipped
+        }
+        if (!next) {
+            keys = [...live.keys()]; index = 0; next = live.get(keys[0]);
+        }
+        const cycle = { keys, index, selectedAt: now, targetId: next.id };
         // Mode follows the selected target so the touch pads and radar filters match.
         if (next.kind === 'ship')
             this.save.player.mode = 'combat';
@@ -6285,8 +6302,10 @@ export class GameSession {
         if (next.kind === 'location') {
             if (next.remoteDestinationId) {
                 const destination = LOCATIONS[next.remoteDestinationId];
-                if (destination && this.plotSystemRoute(destination.systemId, destination.id))
+                if (destination && this.plotSystemRoute(destination.systemId, destination.id)) {
+                    this.targetCycle = cycle;
                     return;
+                }
             }
             this.changeNavTarget(next.id);
             this.updateAssetWarmup(true);
@@ -6295,7 +6314,10 @@ export class GameSession {
             this.changeNavTarget(next.destinationId);
             this.updateAssetWarmup(true);
         }
-        this.applyTarget(next);
+        // Keeping the nearest lock must not clear its readout or restart the
+        // short obstruction grace just because the pilot checked it again.
+        if (next.id !== this.save.player.currentTargetId) this.applyTarget(next);
+        this.targetCycle = cycle;
         this.handleTutorialEvent('flight-lesson',{id:'target-monitor'});
     }
     targetNearestHostile() {
@@ -6596,6 +6618,8 @@ export class GameSession {
         // autoScanTarget, so selection needs no manual scan gate here.
     }
     applyTarget(target) {
+        // Map/world selection or an automatic lock starts a new cycle gesture.
+        this.targetCycle = undefined;
         if(this.autopilot&&this.hyperdriveWaypoint&&target.id!==this.hyperdriveWaypoint.id)this.disengageHyperdrive();
         this.save.player.currentTargetId = target.id;
         if (target.kind === 'ship') {
@@ -6618,6 +6642,7 @@ export class GameSession {
         this.audio.play('ui');
     }
     clearTarget() {
+        this.targetCycle = undefined;
         if(this.autopilot&&this.hyperdriveWaypoint)this.disengageHyperdrive();
         this.save.player.currentTargetId = undefined;
         this.renderer.setTarget();

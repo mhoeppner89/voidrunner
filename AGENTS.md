@@ -35,14 +35,14 @@
 
 ## Approved starter cockpit (cockpitArtwork.js)
 
-- The user approved the complete frame and navy/white hand from cockpit review 04 and requested live integration. The starter `wayfarer` now uses `PaintedCockpit` in `cockpitArtwork.js`; other hulls retain their existing plates. This supersedes the earlier code-drawn-only direction for the starter hull.
+- The user approved the complete frame and navy/white hand from cockpit review 04 and requested live integration. The starter `wayfarer` and Mercury `talon` now use `PaintedCockpit` in `cockpitArtwork.js`; other hulls retain their existing plates. This supersedes the earlier code-drawn-only direction for the starter hull.
 - Render the complete approved frame as one image. Live monitor rectangles follow the actual transparent apertures. Never cut its beams/bezels into independently rebuilt parts or restore the flat filler panels.
 - The hand uses three pitch views, one common scale and source shaft anchors aligned to a fixed pivot. Yaw rotates around that pivot. Never translate the base or crop the extended sleeve into view. Three images (frame, hand, fixed base) are decoded; the frame is static and flight updates only change a quantised hand transform/pose. Keep layout reads and alpha-map construction out of the frame loop.
 - The joystick base is a separate transparent sprite behind the hand; its source socket anchor must match the fixed shaft pivot. Never rotate or translate the base with steering.
 - Mobile controls retain the approved visible sizes and positions; transparent hit extensions enlarge afterburner above/left and launcher selection left. Throttle art is half-width inside the original drag area. Enable the existing `data-origin=touch` mode so initial contact is neutral. The animated hand stays visible on desktop/controllers; right controls and throttle are mobile only.
 - Live glass underlaps the measured transparent openings; the whole frame is above it. Keep this cockpit stationary during flight (no inherited shift/roll/zoom), and confine hand painting to its small `contain:strict` layer. Monitor canvas backing dimensions must match their actual CSS dimensions, with no independent per-axis minimums or transformed bounding-box sizing.
 - Runtime CSS is scoped to `#game-shell[data-cockpit-paint]`. Deactivation restores inline geometry, touch origin and inert state for other hulls. Canopy cracks use the frame's inverse alpha mask, and HUD-marker visibility samples cached alpha plus monitor/control bounds.
-- `node tests/browser/cockpit-kit.mjs` now verifies the approved art in live career flight on desktop, Android, iPhone and a small phone. `tests/browser/cockpit-layout.mjs` covers the isolated review. The earlier `cockpitKit*.js`/`cockpitScene.js`/`pixel3d.js` experiment remains for authoring/unit tests but is no longer loaded by the live UI.
+- `npm run test:browser:cockpit` now verifies the approved art in live career flight on desktop, Android, iPhone and a small phone. `tests/browser/cockpit-layout.mjs` covers the isolated review. The rejected procedural cockpit experiment and its tests have been removed; keep the current artwork checks. The live `GameUI.updateCockpitKit` hook retains its historical name and still drives `PaintedCockpit`.
 
 ## Theme / CSS rules
 
@@ -54,6 +54,13 @@
 
 - The obstacle grid (`game.js`) uses a numeric packed cell key (3×13 bits) instead of `"x,y,z"` strings — the string version was the top GC/CPU cost (DDA checks 26 neighbours per cell). Keep it numeric; cell coords must stay within ±4096.
 - Instanced asteroids/debris upload only drifting pieces per frame (`addUpdateRange`); static rocks are composed once. Don't recompose all instances every frame.
+
+## Repository housekeeping
+
+- `npm run clean:generated` previews cleanup; `npm run clean:generated -- --apply` archives non-raster output (including dialogue exports, native drafts and source snapshots) locally before removing `output/`, `dist/` and Python caches under `tools/`. The archive is ignored under `.workbench/generated-archives/`; keep it until its retained files are no longer needed.
+- Preserve current `authoring/models`, `authoring/references`, private lore and unique branch commits. Remove local branches only after verifying their tips are ancestors of main; never rewrite published history for routine cleanup.
+- Keep `DE_CATALOG` as one table; do not append translation assignment blocks. The catalog test checks duplicates and placeholder preservation.
+- Remove tests for discarded implementations with those implementations. Keep tests for current behavior, including failing tests; document failures in `docs/REPOSITORY_CLEANUP.md` rather than hiding them.
 
 ## Release protocol
 
@@ -67,5 +74,11 @@
 - No floating HUD cards over the 3D view: all telemetry (SPD/THR/FUEL/MSL/HOLD/LOAD/HND/CR, shields/armor/hull) lives on the cockpit monitors. The bottom-left/right cards were scrapped for good.
 - Touch pads are contextual: asteroid → yellow MINE + SCAN, wreck → teal SALVAGE + SCAN, else FIRE/MISSILE; the second pad runs a scan on deposits.
 - The flight stick is always present on every device (Wing Commander 2 style: the pilot's gloved left hand on the stick, bottom-left, moving with every input source). Tilt may return later only as an option. Hyperdrive engages by tapping the target monitor when a location is locked (hint reads "ACTIVATE HYPERDRIVE"), pause/fullscreen buttons top-left, thrust is a drag lever.
-- The starter cockpit uses the approved full frame and anchored hand strip; other hulls keep their current art. Preserve the approved control layout and generous invisible touch areas.
+- The starter and Mercury cockpits use approved full frames and the shared anchored hand strip; other hulls keep their current art. Preserve the approved control layout and generous invisible touch areas.
 - Docking/landing is automatic when slow and close (no button); AI fights WW2-style with strafing runs, and encounters never stack on an active one.
+
+## Shared cockpit authoring
+
+- `src/game/cockpitDefinitions.js` is the geometry/approval authority. The live game and isolated review both use `PaintedCockpit`; do not add a separate review layout or hand renderer. `assets/cockpits/wayfarer-v4.json` is a generated export.
+- Mercury (`talon`) is approved for flight. It shares the starter instrument geometry except for the approved 14px lower radar and raised hyperdrive forehead. Its hand/base rig shifts 60 source pixels left onto the console top, keeping its touch area unchanged. The current artwork review and model-informed geometry are in `tools/playtest/cockpit-layout`; see its README for the pipeline.
+- Review phone/desktop presets run in real inner viewports. Keep those media-query sizes and production CSS; do not simulate phone layout by resizing only a div.
