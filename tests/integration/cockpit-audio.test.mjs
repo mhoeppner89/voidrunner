@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {session} from '../helpers/session.mjs';
 import {AudioManager} from '../../src/game/audio.js';
+import {SOUND_EVENTS} from '../../src/game/soundEvents.js';
 import {loadoutFor} from '../../src/game/outfitting.js';
 import {fillLauncherMagazines,launcherMagazineEntries} from '../../src/game/weapons.js';
 test('small impacts and beam hits remain audible without vibration feedback',()=>{
@@ -67,23 +68,44 @@ test('only a player hit collapsing the locked target shield gets confirmation',(
  }
 });
 
-test('collapse, target confirmation and dry capacitor cues have distinct envelopes',()=>{
- const a=new AudioManager(),voices=[];a.playTone=v=>voices.push(v);
- a.playShieldBreak(0,1,{});assert.equal(voices.length,2);assert.ok(voices[0].endFrequency<voices[0].frequency);assert.ok(voices[0].duration>.3);
- voices.length=0;a.playTargetShieldBreak(0,1,{});assert.equal(voices.length,2);assert.ok(voices[1].frequency>voices[0].frequency);
- voices.length=0;a.playCapacitorEmpty(0,1,{});assert.equal(voices.length,2);assert.ok(voices.every(v=>v.duration<.1&&v.frequency<200));
- for(const effect of ['shieldBreak','targetShieldBreak','capacitorEmpty'])assert.doesNotThrow(()=>a.playCockpit(effect));
+test('collapse, target confirmation and dry capacitor are distinct, dedicated cues',()=>{
+ const cues=['shieldBreak','targetShieldBreak','capacitorEmpty'].map(id=>SOUND_EVENTS[id]);
+ for(const cue of cues){assert.ok(cue,'cue must not fall back to the generic impact');assert.ok(cue.spacing>=1.5,'status cues are throttled');}
+ assert.equal(new Set(cues.map(cue=>cue.layers[0][0])).size,3,'each cue has its own designed sound');
+ // Losing your own shields is a physical event; the target confirmation is HUD-only.
+ assert.ok(SOUND_EVENTS.shieldBreak.duck&&SOUND_EVENTS.shieldBreak.muffle>0);assert.equal(SOUND_EVENTS.targetShieldBreak.bus,'ui');
+ assert.ok(!cues.some(cue=>cue.layers.some(([id])=>SOUND_EVENTS.hit.layers[0][0]===id)),'a status cue never reuses the hull-hit body');
+ const a=new AudioManager();for(const effect of ['shieldBreak','targetShieldBreak','capacitorEmpty'])assert.doesNotThrow(()=>a.playCockpit(effect));
 });
 
-test('new cues route explicitly and throttle before creating audio nodes',()=>{
- const a=new AudioManager(),routed=[];let chains=0;
- const node=()=>({gain:{value:0},connect(){},disconnect(){}});
- a.context={currentTime:10,createGain:node};a.effectsGain=node();a.effectsReverbGain=node();a.reverbInput=node();a.enabled=true;a.effectsVolume=1;
- a.eventChain=()=>{chains++;return{input:node(),filter:node(),output:node()};};
- a.playShieldBreak=()=>routed.push('shieldBreak');a.playTargetShieldBreak=()=>routed.push('targetShieldBreak');a.playCapacitorEmpty=()=>routed.push('capacitorEmpty');a.playImpact=()=>assert.fail('new cue fell back to impact');
- for(const effect of ['shieldBreak','targetShieldBreak','capacitorEmpty']){a.playCockpit(effect);a.playCockpit(effect);}
- assert.deepEqual(routed,['shieldBreak','targetShieldBreak','capacitorEmpty']);assert.equal(chains,3);
- for(const release of a.effectReleases)release();assert.equal(a.effectReleases.size,0);
+test('cues throttle before creating audio nodes and release every node they made',()=>{
+ let created=0,disconnected=0;const sources=[];
+ const node=()=>{created++;return{gain:{value:0},pan:{value:0},frequency:{value:0},Q:{value:0},playbackRate:{value:1},connect(){},disconnect(){disconnected++;},start(){sources.push(this);}};};
+ const a=new AudioManager(),bus=()=>({connect(){},disconnect(){}}),effects=[];
+ Object.assign(a,{context:{currentTime:10,createGain:node,createBufferSource:node,createBiquadFilter:node,createStereoPanner:node},enabled:true,effectsVolume:1,
+  effectsGain:bus(),cockpitBus:bus(),uiBus:bus(),worldBus:bus(),roomSend:bus(),effectsReverbGain:bus(),effectTimes:new Map(),effectReleases:new Set(),
+  bank:{buffer:()=>({duration:.3})},duck:()=>effects.push('duck'),concuss:()=>effects.push('muffle')});
+ for(const effect of ['shieldBreak','targetShieldBreak','capacitorEmpty']){
+  a.playCockpit(effect);const afterFirst=created;assert.ok(afterFirst>0);
+  a.playCockpit(effect);assert.equal(created,afterFirst,`${effect}: the throttled repeat allocates nothing`);
+  created=0;
+ }
+ assert.equal(a.activeVoices,3);assert.equal(a.effectReleases.size,3);assert.deepEqual(effects,['duck','muffle'],'only the shield collapse shakes the mix');
+ // A cue whose sounds have not loaded yet leaves nothing behind.
+ const loaded=a.bank;a.bank={buffer:()=>undefined};a.context.currentTime=20;a.playCockpit('hit');assert.equal(a.activeVoices,3);a.bank=loaded;
+ // The longest layer ending releases the voice exactly once.
+ for(const source of sources){source.onended?.();source.onended?.();}
+ assert.equal(a.activeVoices,0);assert.equal(a.effectReleases.size,0);assert.ok(disconnected>0);
+});
+
+test('distant fire is panned, delayed by range and dropped beyond earshot',()=>{
+ const a=new AudioManager(),calls=[];Object.assign(a,{context:{currentTime:0},enabled:true,effectsVolume:1,effectsGain:{},trigger:(...args)=>calls.push(args)});
+ a.playAtDirection('explosion',1,5000,10,0);assert.equal(calls.length,0,'out of range');
+ a.playAtDirection('explosion',1,450,300,0);a.playAtDirection('explosion',1,450,-300,400);a.playAtDirection('laser',NaN,NaN,NaN,NaN);
+ const [right,leftBehind,invalid]=calls;
+ assert.ok(right[2]>0&&leftBehind[2]<0,'pan follows the side');assert.equal(right[5],0);assert.ok(leftBehind[5]>0,'sources behind the ship are marked rear');
+ assert.ok(right[6]>0.15&&right[6]<=0.45,'far blasts arrive after the flash');assert.ok(right[1]<0.5,'distance costs level');
+ assert.equal(invalid,undefined,'non-finite input stays silent instead of reaching the graph');
 });
 
 

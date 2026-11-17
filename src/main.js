@@ -527,6 +527,29 @@ const pauseFlightOnFocusLoss = () => {
     ui.showPause();
     return true;
 };
+// Interface feedback: every menu control answers a press, tabs and sliders
+// tick, and a mouse gliding over controls brushes them. Flight controls stay
+// silent — in the cockpit the ship itself is the feedback.
+const MENU_CONTROLS = 'button, [role="tab"], [data-ui-command], select, summary, input[type="checkbox"], input[type="range"], a[href]';
+const menuControl = (event) => {
+    if (!session?.audio?.enabled || (!session.save.player.dockedAt && !ui.isModalOpen))
+        return null;
+    const control = event.target?.closest?.(MENU_CONTROLS);
+    return control && !control.disabled && control.getAttribute('aria-disabled') !== 'true' ? control : null;
+};
+let hoveredControl = null;
+document.addEventListener('click', (event) => {
+    const control = menuControl(event);
+    if (control) session.audio.play(control.matches('[role="tab"]') ? 'uiTab' : 'ui', 0.8);
+}, true);
+document.addEventListener('pointerover', (event) => {
+    const control = event.pointerType === 'mouse' ? menuControl(event) : null;
+    if (control && control !== hoveredControl) session.audio.play('uiHover', 0.8);
+    hoveredControl = control;
+}, true);
+document.addEventListener('input', (event) => {
+    if (event.target?.matches?.('input[type="range"]') && menuControl(event)) session.audio.play('uiHover', 1);
+}, true);
 window.addEventListener('blur', pauseFlightOnFocusLoss);
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden' && session) {

@@ -177,7 +177,7 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
                         const distance=offset.length();offset.applyQuaternion(state.turn.fromArray(session.save.player.rotation).invert());
                         const sound = pdc ? 'pdc' : 'beam';
                         if (player) session.audio?.playCockpit?.(sound, pdc ? .9 : .8);
-                        else session.audio?.playAtDirection?.(sound, .4, distance, offset.x);
+                        else session.audio?.playAtDirection?.(sound, .4, distance, offset.x, offset.z);
                         state.soundAt=now+(pdc ? .07 : .2);
                     }
                 }

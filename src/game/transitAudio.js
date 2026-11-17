@@ -1,4 +1,3 @@
-import {sampleBufferFor} from './sampleSfx.js';
 const clamp=t=>Math.max(0,Math.min(1,t));
 const ramp=(a,b,t)=>{const x=clamp((t-a)/(b-a));return x*x*(3-2*x);};
 // Animation progress drives the mix. No wall-clock timers schedule future
@@ -29,7 +28,7 @@ export function createTransitVoice(manager,phase,kind,progress=0){
  engineFilter.type='lowpass';engineFilter.Q.value=.65;engineGain.gain.value=0;engineFilter.connect(engineGain);engineGain.connect(bus);
  washFilter.type='lowpass';washFilter.frequency.value=750;washGain.gain.value=0;washFilter.connect(washGain);washGain.connect(bus);
  windFilter.type='bandpass';windFilter.frequency.value=680;windFilter.Q.value=.65;windGain.gain.value=0;windFilter.connect(windGain);windGain.connect(bus);
- const nodes=[bus,pan,wet,engineGain,engineFilter,washGain,windGain,washFilter,windFilter],sources=[],cues=new Set(),mix={},sample=sampleBufferFor(manager,'engine-thrust');let engine;
+ const nodes=[bus,pan,wet,engineGain,engineFilter,washGain,windGain,washFilter,windFilter],sources=[],cues=new Set(),mix={},sample=manager.bank?.buffer('engine-thrust');let engine;
  if(sample){engine=c.createBufferSource();engine.buffer=sample;engine.loop=true;engine.connect(engineFilter);sources.push(engine);}
  else{
   engine=c.createOscillator();engine.type='triangle';engine.frequency.value=67;engine.connect(engineFilter);sources.push(engine);

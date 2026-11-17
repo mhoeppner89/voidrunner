@@ -2886,14 +2886,28 @@ export class GameSession {
             const px = this.save.player.position[0];
             const py = this.save.player.position[1];
             const pz = this.save.player.position[2];
+            const velocity = this.save.player.velocity, passes = (this.flybyDistance ??= new WeakMap()), passedAt = (this.flybyAt ??= new WeakMap()), opening = (this.flybyOpening ??= new WeakSet());
             for (const ship of this.ships) {
-                if ((ship.hostile || ship.role === 'pirate' || ship.role === 'bounty') && ship.targetId === 'player') {
-                    const dx = px - ship.position[0];
-                    const dy = py - ship.position[1];
-                    const dz = pz - ship.position[2];
-                    if (dx * dx + dy * dy + dz * dz < 625 * 625)
-                        nearbyEnemies += 1;
+                const dx = px - ship.position[0];
+                const dy = py - ship.position[1];
+                const dz = pz - ship.position[2];
+                const distanceSq = dx * dx + dy * dy + dz * dz;
+                if ((ship.hostile || ship.role === 'pirate' || ship.role === 'bounty') && ship.targetId === 'player' && distanceSq < 625 * 625)
+                    nearbyEnemies += 1;
+                // Fly-by: a ship that was closing and is now opening, close and fast.
+                if (distanceSq < 190 * 190 && ship.hull > 0 && !ship.capitalClass) {
+                    const previous = passes.get(ship);
+                    passes.set(ship, distanceSq);
+                    if (previous !== undefined && distanceSq > previous && !opening.has(ship)) {
+                        const closing = Math.hypot(ship.velocity[0] - velocity[0], ship.velocity[1] - velocity[1], ship.velocity[2] - velocity[2]);
+                        if (closing > 45 && this.save.world.time - (passedAt.get(ship) ?? -10) > 2.5) {
+                            passedAt.set(ship, this.save.world.time);
+                            this.playWorldSound('flyby', clamp(closing / 160, 0.45, 1.1), ship.position[0], ship.position[1], ship.position[2]);
+                        }
+                    }
+                    if (previous !== undefined && distanceSq > previous) opening.add(ship); else opening.delete(ship);
                 }
+                else if (passes.has(ship)) { passes.delete(ship); opening.delete(ship); }
             }
         }
         // Ambient music context by nearest region: planets, the belt and the
@@ -2922,7 +2936,34 @@ export class GameSession {
             }
         }
         musicContext=this.tutorialMusicContext()??musicContext;
-        this.audio.update(dt, throttle, flying && this.afterburning, damage, nearbyEnemies, musicContext, this.activeRace?.state==='running'&&this.afterburning?Math.min(1,Math.hypot(...this.save.player.velocity)/Math.max(1,this.playerStats().afterburnSpeed)):0);
+        // Flight state for the mixer (one reused object: speed, manoeuvre load,
+        // shields, drive state, nearest inbound missile, what we are docked at).
+        const flight = (this.audioFlight ??= { speed: 0, turn: 0, yaw: 0, shield: 1, hyper: false, missileThreat: 0, dockKind: undefined });
+        const spin = this.save.player.angularVelocity, velocity = this.save.player.velocity;
+        flight.speed = flying ? clamp(Math.hypot(velocity[0], velocity[1], velocity[2]) / Math.max(1, stats.maxSpeed), 0, 1.4) || 0 : 0;
+        flight.turn = flying && spin ? clamp(Math.hypot(spin[0], spin[1], spin[2]) / 1.4, 0, 1) || 0 : 0;
+        flight.yaw = spin ? clamp(spin[1] / 1.2, -1, 1) || 0 : 0;
+        flight.shield = stats.shield > 0 ? clamp(this.save.player.shield / stats.shield, 0, 1) || 0 : 1;
+        flight.hyper = this.hyperdriveFx === 'active' || this.hyperdriveFx === 'gate';
+        flight.dockKind = LOCATIONS[this.save.player.dockedAt]?.kind;
+        let missileThreat = 0;
+        if (flying && this.projectiles) {
+            for (const projectile of this.projectiles) {
+                if (projectile.targetId !== 'player' || projectile.life <= 0 || (projectile.kind !== 'missile' && projectile.kind !== 'torpedo')) continue;
+                const i = projectile.slot * 3, source = this.projStore.pos, position = this.save.player.position;
+                const range = Math.hypot(source[i] - position[0], source[i + 1] - position[1], source[i + 2] - position[2]);
+                missileThreat = Math.max(missileThreat, clamp(1 - range / 700, 0.05, 1));
+            }
+        }
+        flight.missileThreat = missileThreat;
+        // Opening the pause menu, map or ship console in flight steps out of the cockpit.
+        const modalOpen = flying && Boolean(this.ui.isModalOpen);
+        if (modalOpen !== Boolean(this.audioModalOpen)) {
+            this.audioModalOpen = modalOpen;
+            this.audio.play?.(modalOpen ? 'uiOpen' : 'uiClose', 0.8);
+            this.audio.setPaused?.(modalOpen);
+        }
+        this.audio.update(dt, throttle, flying && this.afterburning, damage, nearbyEnemies, musicContext, this.activeRace?.state==='running'&&this.afterburning?Math.min(1,Math.hypot(...this.save.player.velocity)/Math.max(1,this.playerStats().afterburnSpeed)):0, flight);
         if (!flying || this.ui.isModalOpen || this.ui.planetTransitOverlay?.dataset.awaitingFlight === 'true') this.resetQualitySample();
         // A renderer prepared behind the initial career gate must stay idle at
         // the dock. It exists solely to make Launch instant, not to burn GPU
@@ -3571,7 +3612,7 @@ export class GameSession {
             if (remaining !== race.lastCountdown && remaining <= 3) {
                 race.lastCountdown = remaining;
                 this.ui.pushSensor(t('{count}…', { count: remaining }), 'info', 900);
-                this.audio.play('ui', 0.8);
+                this.audio.play('countdown', 0.8);
             }
             return;
         }
@@ -3581,7 +3622,7 @@ export class GameSession {
             player.prevPosition?.set?.(player.position);
             this.syncRaceCourse(race);
             this.ui.pushEvent(t('GO · PASS ALL {count} GATES', { count: race.course.gates.length }), 'success', 3200);
-            this.audio.play('success', 1.2);
+            this.audio.play('raceGo', 1);
         }
         const previous = player.prevPosition ?? player.position;
         // Rivals keep authored race fits and shared boost resources. No
@@ -3737,7 +3778,7 @@ export class GameSession {
         this.renderer.pulseRaceGate?.(Math.max(0, race.course.gates.length - 1), { centered: true, finish: true });
         this.ui.pushSensor(t('FINISH LINE · RESULTS LOCKED'), 'success', 1800);
         this.ui.pushEvent(t('{course} FINISHED · {rank} · {amount}', { course: race.course.title.toUpperCase(), rank: raceRankLabel(rank), amount: `${payout >= 0 ? '+' : ''}${formatCredits(payout)}` }), payout >= 0 ? 'success' : 'danger', 8000);
-        this.audio.play(payout >= 0 ? 'success' : 'warning', 1.1);
+        this.audio.play(payout >= 0 ? 'reward' : 'warning', 1);
         this.persistSave();
     }
     failRace(message) {
@@ -4516,7 +4557,7 @@ export class GameSession {
             this.gunCooldown = Math.max(this.gunCooldown, 0.12);
             if (weapon)
                 this.setOwnMonitorStatus(t('WEAPON · {name}', { name: t(weapon.nameKey) }), 1600);
-            this.audio.play('ui', 0.7);
+            this.audio.play('weaponSwitch', 0.8);
             if (selection !== previousGroup) this.handleTutorialEvent('weapon-switched',{group:selection});
             return;
         }
@@ -4533,7 +4574,7 @@ export class GameSession {
             }
             if (!selectedGroup) {
                 this.setOwnMonitorStatus(t('{weapon} NOT INSTALLED', { weapon: t(weapon.nameKey) }), 2000);
-                this.audio.play('warning', 0.5);
+                this.audio.play('deny', 0.7);
                 return;
             }
             loadout.fireGroups ??= { activeGroup: 'A', assignments: {} };
@@ -4542,14 +4583,14 @@ export class GameSession {
         }
         else if (!weaponOwned(player, weapon.id)) {
             this.setOwnMonitorStatus(t('{weapon} NOT INSTALLED', { weapon: t(weapon.nameKey) }), 2000);
-            this.audio.play('warning', 0.5);
+            this.audio.play('deny', 0.7);
             return;
         }
         player.weaponId = weapon.id;
         this.gunCooldown = Math.max(this.gunCooldown, 0.12);
         this.setOwnMonitorStatus(t('WEAPON · {name}', { name: t(weapon.nameKey) }), 1600);
         this.ui.pushEvent(`${t('WEAPON · {name}', { name: t(weapon.nameKey) })} — ${t(weapon.envelopeKey, { range: Math.round(weaponRange(weapon)) })}`, 'info', 4200);
-        this.audio.play('ui', 0.7);
+        this.audio.play('weaponSwitch', 0.8);
         if (this.activeFireGroup() !== previousGroup) this.handleTutorialEvent('weapon-switched',{group:this.activeFireGroup()});
     }
     // Tap the weapon readout (or press X / gamepad cycle). Prefer the two
@@ -4585,7 +4626,7 @@ export class GameSession {
         });
         this.setOwnMonitorStatus(message, 2200);
         this.ui.pushEvent(message, next.rounds > 0 ? 'info' : 'warning', 3600);
-        this.audio.play('ui', 0.7);
+        this.audio.play('weaponSwitch', 0.8);
     }
     // 2D cone spread with a gaussian-clumped center: the old single-axis tilt
     // fanned pellets vertically only (the roll around the direction axis was
@@ -5838,7 +5879,7 @@ export class GameSession {
         this.save.player.cargo.gold = (this.save.player.cargo.gold ?? 0) + grant;
         this.ui.queueSpacePickup?.({kind:'cargo',commodity:'gold',quantity:grant});
         this.ui.pushEvent(t('Gold pocket struck: +{amount} GOLD.', { amount: grant }), 'success', 5600);
-        this.audio.play('success', 1.35);
+        this.audio.play('reward', 1);
     }
     recordExtractionProgress(source, amount) {
         if (source === 'mining') {
@@ -5937,7 +5978,7 @@ export class GameSession {
         this.stageHunterGroup(rival, [], { forceTrack: true });
         this.sayPilotLine(rival, CLAIM_DISPUTE_LINES[Math.floor(rng() * CLAIM_DISPUTE_LINES.length)]);
         this.ui.pushEvent(t('Claim dispute: a rival prospector contests {claim}.', { claim: mission?.claimName ?? t('your staked rock') }), 'warning', 5600);
-        this.audio.play('warning');
+        this.audio.play('threat');
         this.threatAcquireTarget();
     }
     claimDisputePosition(node, rng) {
@@ -6020,7 +6061,7 @@ export class GameSession {
             this.ui.pushEvent(t('Salvage claim challenged: hostile drives inbound.'), 'danger', 5200);
         }
         this.threatAcquireTarget();
-        this.audio.play('warning');
+        this.audio.play('threat');
     }
     spawnPickup(commodity, origin, source, amount = 1) {
         const rng = seededRandom(`${this.save.world.seed}:pickup:${++this.pickupCounter}:${this.save.world.time}`);
@@ -6639,7 +6680,7 @@ export class GameSession {
         this.renderer.setTarget(target.kind === 'ship' ? target.id : undefined, target.kind === 'asteroid' ? target.id : undefined, target.kind === 'wreck' ? target.id : undefined, target.kind === 'location' ? target.id : undefined, target.kind === 'pickup' ? target.id : undefined);
         // No selection pop-up: the target monitor already shows the lock, and
         // the distance readout lives in its heading (below the label row).
-        this.audio.play('ui');
+        this.audio.play('targetCycle');
     }
     clearTarget() {
         this.targetCycle = undefined;
@@ -6891,17 +6932,17 @@ export class GameSession {
         const apertureRadius = jumpPoint.radius * 0.515;
         if (radialSq > apertureRadius * apertureRadius) {
             this.setHyperdriveStatus(t('MISSED APERTURE · TURN AND PASS THROUGH THE GATE'), 3200);
-            this.audio.play('warning');
+            this.audio.play('deny');
             return false;
         }
         if (driveRecoveryRemaining(this) > 0) {
             this.setHyperdriveStatus(t('DRIVE RECOVERY · {seconds}s', {seconds:Math.ceil(driveRecoveryRemaining(this))}), 2000);
-            this.audio.play('warning');
+            this.audio.play('deny');
             return false;
         }
         if (this.activeRace) {
             this.setHyperdriveStatus(t('Finish or abandon the active race before jumping systems.'), 3800);
-            this.audio.play('warning');
+            this.audio.play('deny');
             return false;
         }
         return this.beginGalaxyGateTransition(jumpPoint);
@@ -6965,7 +7006,7 @@ export class GameSession {
             });
         else
             this.ui.pushSensor(t('Raiders detected around the jump point.'), 'danger', 5200);
-        this.audio.play('warning');
+        this.audio.play('threat');
         return true;
     }
     finishGalaxyJump(jump, announce = true, spawnTraffic = true, rollPiracy = true) {
@@ -7126,7 +7167,7 @@ export class GameSession {
         if (block) {
             this.setHyperdriveStatus(block.message, block.duration ?? 3000);
             if (block.kind !== 'info')
-                this.audio.play('warning');
+                this.audio.play('deny');
             return;
         }
         const player = vec(this.save.player.position);
@@ -7269,7 +7310,7 @@ export class GameSession {
         else
             this.ui.pushSensor(t('Pirate intercept. Weapons free.'), 'danger', 4800);
         this.threatAcquireTarget();
-        this.audio.play('warning');
+        this.audio.play('threat');
     }
     resolveHyperdriveIntercept(ship) {
         if (!this.hyperdriveInterceptIds.delete(ship.id) || this.hyperdriveInterceptIds.size > 0)
@@ -7785,7 +7826,7 @@ export class GameSession {
         this.sayPilotLine(patrol, line);
         this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + PATROL_REPLY_REP, -100, 100);
         this.ui.pushEvent(t('Acknowledged by {name}. Concord courtesy +{rep}.', { name: patrol.name, rep: PATROL_REPLY_REP }), 'success', 4200);
-        this.audio.play('ui', 0.6);
+        this.audio.play('confirm', 0.8);
         return true;
     }
     // A pilot the player has beaten before recognizes them on a later
@@ -8164,7 +8205,7 @@ export class GameSession {
         const line = PATROL_INSPECTION_LINES.hail[Math.floor(ship.proxRng() * PATROL_INSPECTION_LINES.hail.length)];
         this.sayPilotLine(ship, t(line, { name: ship.name, speed: PATROL_INSPECTION_SPEED }));
         this.ui.pushSensor(t('PATROL HAIL · TRANSMIT ID · SLOW BELOW {speed}', { speed: PATROL_INSPECTION_SPEED }), 'warning', 5200);
-        this.audio.play('warning');
+        this.audio.play('alert');
         return true;
     }
     clearPatrolInspection(ship, cooldown = SEARCH_COOLDOWN) {
@@ -8228,7 +8269,7 @@ export class GameSession {
                     this.sayPilotLine(ship, lines[Math.floor(ship.proxRng() * lines.length)]);
                     this.ui.pushSensor(t('INSPECTION COMPLETE · MANIFEST CLEAR'), 'success', 4200);
                     this.clearPatrolInspection(ship);
-                    this.audio.play('success');
+                    this.audio.play('confirm');
                 }
                 return false;
             }
@@ -9640,7 +9681,7 @@ export class GameSession {
         if(distance<80 || distance>launcher.lockRange || forward.dot(dir)<0.93 || this.lineBlocked(start,targetPosition,ship.id)){fit.lock=0;fit.warned=false;return;}
         fit.lock=(fit.lock ?? 0)+dt;
         if(fit.lock<1.4)return;
-        if(ship.targetId==='player' && !fit.warned){this.setOwnMonitorStatus(t('MISSILE LOCK — BREAK AWAY'),novice?3000:1800);fit.warned=true;fit.warnedAt=time;return;}
+        if(ship.targetId==='player' && !fit.warned){this.setOwnMonitorStatus(t('MISSILE LOCK — BREAK AWAY'),novice?3000:1800);this.audio?.playCockpit?.('lockWarning',.9);fit.warned=true;fit.warnedAt=time;return;}
         if(fit.lock<lockTime || (ship.targetId==='player' && time-fit.warnedAt<(novice?2.6:1.1)))return;
         if(!npcPlayerAttackWindow(this,ship))return;
         // A wingmate crossing the nose delays release, without losing the lock.
@@ -9656,6 +9697,8 @@ export class GameSession {
                 targetId:ship.targetId,faction:ship.faction,launcherId:launcher.id,homingSpeed:launcher.homingSpeed,homingTurn:launcher.homingTurn,
                 shield:launcher.projectileShield,acceleration:launcher.acceleration,splashRadius:launcher.splashRadius,splashMin:launcher.splashMin});
         }
+        this.playWorldSound('missile',.8,start.x,start.y,start.z);
+        if(ship.targetId==='player')this.audio?.playCockpit?.('missileAlert',.9);
         fit.missiles--;if(fit.activeRack)fit.activeRack.missiles=fit.missiles;fit.lock=0;fit.warned=false;fit.launchAt=time+Math.max(gap,launcher.cooldown)*disruptionFactor(ship,time);
     }
     fireNpcGun(ship, direction, opportunity) {
@@ -9691,6 +9734,7 @@ export class GameSession {
                 }
                 this.renderer.spawnMuzzleFlash(start.x,start.y,start.z,0xff6540);
             }
+            this.playWorldSound(weapon.audioKey ?? 'laser', 0.55, start.x, start.y, start.z);
             ship.fireCooldown=0;
             return;
         }
@@ -9722,12 +9766,22 @@ export class GameSession {
             faction: ship.faction,
             visualScale: ship.projectileVisualScale,
         });
+        this.playWorldSound(this.projectiles[this.projectiles.length - 1].kind, ship.capitalClass ? 0.8 : 0.55, position.x, position.y, position.z);
         ship.emissionHeat = addEmissionHeat(ship.emissionHeat ?? 0, ship.capitalClass ? 180 : 90);
         // Fire rate scales with aim: aces keep the trigger down, novices wait.
         ship.fireCooldown = (ship.fireInterval ?? tactics?.interval ?? (ship.role === 'bounty' ? 0.28 : ship.role === 'pirate' ? 0.38 : 0.46)) * (1 + (1 - aim) * 0.7) * disruption;
     }
     tmpBlastStart = new THREE.Vector3();
     tmpBlastEnd = new THREE.Vector3();
+    // Plays a world-positioned sound: converts the source into ship space so
+    // the mixer can pan it, place it in front or behind, and delay it by range.
+    playWorldSound(effect, intensity, x, y, z) {
+        const player = this.save.player.position;
+        const local = (this.tmpSoundLocal ??= new THREE.Vector3()).set(x - player[0], y - player[1], z - player[2]);
+        const distance = local.length();
+        local.applyQuaternion((this.tmpSoundOrientation ??= new THREE.Quaternion()).fromArray(this.save.player.rotation).invert());
+        this.audio?.playAtDirection?.(effect, intensity, distance, local.x, local.z);
+    }
     updateProjectiles(dt) {
         const units = droneUnits(this);
         const player = this.save.player;
@@ -9881,17 +9935,17 @@ export class GameSession {
                     }
                     else if (projectile.kind === 'missile') {
                         this.renderer.spawnExplosion(tuple(hitPosition), projectile.faction === 'pirates', 0.65);
-                        this.audio.playAtDirection('explosion', 0.8, playerPosition.distanceTo(hitPosition), localHit.x);
+                        this.audio.playAtDirection('explosion', 0.8, playerPosition.distanceTo(hitPosition), localHit.x, localHit.z);
                     }
                     else if (hitKind === 'obstacle' && hitObstacle?.shape === 'asteroid') {
                         // Belt rock: the impact spark PLUS a matte chip/dust
                         // burst knocked off the surface, and a dry gravel
                         // crunch instead of the hull-impact crack.
                         this.renderer.spawnRockImpact(tuple(hitPosition), [hitObstacle.x, hitObstacle.y, hitObstacle.z]);
-                        this.audio.playAtDirection('rock', projectile.kind === 'gauss' ? 0.6 : projectile.kind === 'ripper' || projectile.kind === 'pdc' ? 0.3 : 0.45, playerPosition.distanceTo(hitPosition), localHit.x);
+                        this.audio.playAtDirection('rock', projectile.kind === 'gauss' ? 0.6 : projectile.kind === 'ripper' || projectile.kind === 'pdc' ? 0.3 : 0.45, playerPosition.distanceTo(hitPosition), localHit.x, localHit.z);
                     }
                     else
-                        this.audio.playAtDirection('impact', projectile.kind === 'gauss' ? 0.6 : projectile.kind === 'ripper' || projectile.kind === 'pdc' ? 0.3 : 0.45, playerPosition.distanceTo(hitPosition), localHit.x);
+                        this.audio.playAtDirection('impact', projectile.kind === 'gauss' ? 0.6 : projectile.kind === 'ripper' || projectile.kind === 'pdc' ? 0.3 : 0.45, playerPosition.distanceTo(hitPosition), localHit.x, localHit.z);
                     if(projectile.ownerId==='player' && hitKind==='obstacle' && hitObstacle?.shape==='wreck-node-mesh')
                         this.hitSalvageWreck(hitObstacle.id,projectile.damage,tuple(hitPosition),{x:velocity.x,y:velocity.y,z:velocity.z});
                     // Over-penetration: punch through the ship and keep the
@@ -9909,6 +9963,14 @@ export class GameSession {
                 }
                 else {
                     this.projStore.setPosV(projectile.slot, end);
+                    // Hostile fire that passes the canopy and is now receding: one whizz per round.
+                    if (!projectile.whizzed && projectile.ownerId !== 'player' && !isMissile) {
+                        const dx = end.x - playerPos.x, dy = end.y - playerPos.y, dz = end.z - playerPos.z;
+                        if (dx * dx + dy * dy + dz * dz < 26 * 26 && dx * velocity.x + dy * velocity.y + dz * velocity.z > 0) {
+                            projectile.whizzed = true;
+                            this.playWorldSound('whizz', 0.8, end.x, end.y, end.z);
+                        }
+                    }
                 }
                 break;
             }
@@ -10049,7 +10111,7 @@ export class GameSession {
                     ship.nextDistressCallAt = this.save.world.time + DISTRESS_CALL_REPEAT;
                     const distance = Math.round(vec(ship.position).distanceTo(vec(this.save.player.position)));
                     this.ui.pushSensor(t('DISTRESS CALL — {name} at {distance} km.', { name: ship.name, distance }), 'danger', 5200);
-                    this.audio.play('warning');
+                    this.audio.play('alert');
                     const distressPool = PILOT_LINES.timid.distress;
                     if (distressPool?.length && this.chatterOpen())
                         this.sayPilotLine(ship, distressPool[Math.floor(ship.aiRng() * distressPool.length)]);
@@ -10529,7 +10591,7 @@ export class GameSession {
         recordSortieCredit(this.save, -amount, 'fees');
         this.standDownMug(mugger);
         this.ui.pushEvent(t('Toll paid ({credits}). Pirates break off.', { credits: formatCredits(amount) }), 'info', 5200, t('Toll paid'));
-        this.audio.play('ui', 0.6);
+        this.audio.play('purchase', 0.8);
         return true;
     }
     // The same persistent container is used for equipment and loose cargo.
@@ -10632,7 +10694,7 @@ export class GameSession {
         this.save.player.credits = (this.save.player.credits ?? 0) + tip;
         recordSortieCredit(this.save, tip, 'rescues');
         this.ui.pushEvent(t('{name} sends their thanks — {credits} tip wired.', { name: victim.name, credits: formatCredits(tip) }), 'success', 4200, t('Rescue rewarded'));
-        this.audio.play('success');
+        this.audio.play('purchase');
     }
     // `position` defaults to the dying ship's own coordinates: mortar splash and
     // burn ticks call damageShip without a hit position, so a killing blow used
@@ -10657,8 +10719,9 @@ export class GameSession {
         blastDirection.x -= this.save.player.position[0];blastDirection.y -= this.save.player.position[1];blastDirection.z -= this.save.player.position[2];
         const blastDistance = blastDirection.length();
         blastDirection.applyQuaternion((this.audioDirectionQ ??= new THREE.Quaternion()).fromArray(this.save.player.rotation).invert());
-        this.audio.playAtDirection(ship.capitalClass ? 'capitalExplosion' : 'explosion', 1.1, blastDistance, blastDirection.x);
+        this.audio.playAtDirection(ship.capitalClass ? 'capitalExplosion' : 'explosion', 1.1, blastDistance, blastDirection.x, blastDirection.z);
         if (ship.hostile && attackerId === 'player') {
+            this.audio?.play?.('kill', 0.8);
             // Just fought off a threat: calm the lanes for a while.
             this.lastCombatAt = this.save.world.time;
             // The mark that hostile was hitting is safe now — acknowledge the save.
@@ -10761,6 +10824,7 @@ export class GameSession {
             this.renderer.spawnExplosion(this.save.player.position, false, 1.55);
             this.ui.pushEvent(t('SHIP LOST: {source}. Emergency beacon transmitting.', { source }), 'danger', 6500);
             this.audio.play('explosion', 1.6);
+            this.audio?.stinger?.('death');
         }
     }
     updateRegeneration(dt) {
@@ -10897,7 +10961,7 @@ export class GameSession {
                 escort.playerIdentified = true;
             this.threatAcquireTarget();
             this.ui.pushEvent(t('Warrant target detected: {name}', { name: mission.targetName }), 'danger', 5600, t('Target detected'));
-            this.audio.play('warning');
+            this.audio.play('threat');
         }
     }
     missionEncounterPressure() {
@@ -10989,7 +11053,7 @@ export class GameSession {
             this.stageHunterGroup(lead, escorts, { forceTrack: true });
             recordSortieEncounter(this.save, 'mission', missionPressure.kind);
             this.ui.pushSensor(missionPressure.message, 'danger', 5200);
-            this.audio.play('warning');
+            this.audio.play('threat');
             this.nextEncounterAt = this.save.world.time + encounterDelay(region, rng);
             return;
         }
@@ -11041,7 +11105,7 @@ export class GameSession {
                     this.ui.pushSensor(t('Pirates closing — then breaking off: the beam lit the field but the hold is empty.'), 'info', 4800);
                 }
                 this.threatAcquireTarget();
-                this.audio.play('warning');
+                this.audio.play('alert');
                 this.nextEncounterAt = this.save.world.time + encounterDelay(region, rng);
                 return;
             }
@@ -11086,7 +11150,7 @@ export class GameSession {
                 this.ui.pushSensor(t('Pirates closing — then breaking off: nothing worth the risk.'), 'info', 4800);
             }
             this.threatAcquireTarget();
-            this.audio.play('warning');
+            this.audio.play('alert');
             this.nextEncounterAt = this.save.world.time + encounterDelay(region, rng);
             return;
         }
@@ -11120,7 +11184,7 @@ export class GameSession {
                 const pirate = this.spawnCareerRaider('pirate', this.encounterPosition(rng, 850), region, rng);
                 pirate.targetId = trader.id;
                 this.ui.pushSensor(t('Distress traffic: pirates attacking a civilian vessel.'), 'danger', 5200);
-                this.audio.play('warning');
+                this.audio.play('alert');
             }
             else {
                 recordSortieEncounter(this.save, 'ambient', 'trader');
@@ -11653,7 +11717,7 @@ export class GameSession {
             if (player.distanceTo(vec(location.position)) <= discoveryRadius && !this.save.player.discovered.includes(id)) {
                 this.save.player.discovered.push(id);
                 this.ui.pushSensor(t('NAV DISCOVERY: {name}', { name: location.name }), 'success', 4600);
-                this.audio.play('success');
+                this.audio.play('discovery');
             }
         }
     }
@@ -11994,7 +12058,7 @@ export class GameSession {
         const fee = pending.fee;
         if (this.save.player.credits < fee) {
             this.ui.showToast(t('The syndicate wants {credits} — not enough credits.', { credits: formatCredits(fee) }), 'warning', 4600);
-            this.audio.play('warning');
+            this.audio.play('deny');
             return false;
         }
         this.save.player.credits -= fee;
@@ -12007,7 +12071,7 @@ export class GameSession {
         this.save.world.syndicateArrival = { locationId: pending.locationId, fee, at: this.save.world.time };
         delete this.save.world.syndicatePending;
         this.ui.pushEvent(t('Syndicate berth paid: {credits}.', { credits: formatCredits(fee) }), 'warning', 4200);
-        this.audio.play('ui');
+        this.audio.play('purchase');
         this.persistSave();
         // Re-render the dock so the payment card leaves and the receipt notice
         // takes its place.
@@ -13286,7 +13350,7 @@ export class GameSession {
         this.changeNavTarget(locationId);
         this.updateAssetWarmup(true);
         this.ui.pushSensor(t('NAV set: {name}.', { name: LOCATIONS[locationId].name }), 'info');
-        this.audio.play('ui');
+        this.audio.play('uiTab');
         return true;
     }
     trade(kind, commodityId, quantity) {
@@ -13303,7 +13367,7 @@ export class GameSession {
             && (this.save.player.cargo.food ?? 0) - quantity < (getTutorialQuest(this.save)?.flags.deliveryRequired??TUTORIAL_REQUIRED_SUPPLIES)) {
             const message = t('Keep the delivery cargo aboard until you sell it at Vesper.');
             this.ui.showToast(message, 'warning', 4200);
-            this.audio.play('warning', 0.55);
+            this.audio.play('deny', 0.8);
             return { ok: false, message };
         }
         const den = kind === 'den-buy' || kind === 'den-sell';
@@ -13315,7 +13379,7 @@ export class GameSession {
             price = denPrice(dock, commodityId, this.save.world.market[dock][commodityId], this.save.world.seed, this.save.world.economyClock);
             if (price === undefined) {
                 this.ui.showToast(t('The den does not trade legal goods.'), 'warning');
-                this.audio.play('warning', 0.55);
+                this.audio.play('deny', 0.8);
                 return;
             }
         }
@@ -13340,7 +13404,7 @@ export class GameSession {
             this.ui.pushEvent(result.message + ` ${formatCredits(result.total)}.${holdNote}${denNote}`, 'success');
             if(goldHeatNote)this.ui.showToast(goldHeatNote.trim(),'warning');
         }else this.ui.showToast(result.message,'warning');
-        this.audio.play(result.ok ? 'ui' : 'warning', 0.55);
+        this.audio.play(result.ok ? 'purchase' : 'deny', 0.8);
         this.ui.refreshDock(this.save);
         this.showTutorialDockBriefing();
         this.persistSave();
@@ -13362,7 +13426,7 @@ export class GameSession {
             this.handleTutorialEvent('mission-accepted',{missionId});
         }
         if (!result.ok) this.ui.showToast(result.message, 'warning', 3200);
-        this.audio.play(result.ok ? 'success' : 'warning', 0.7);
+        this.audio.play(result.ok ? 'confirm' : 'deny', 0.9);
         this.ui.refreshDock(this.save);
         this.persistSave();
         return result;
@@ -13376,7 +13440,7 @@ export class GameSession {
         }
         const result = discardActiveMission(this.save, missionId);
         this.ui.showToast(result.message, result.ok ? 'warning' : 'danger', result.ok ? 4300 : 3200);
-        this.audio.play('warning', 0.7);
+        this.audio.play('deny', 0.8);
         this.ui.refreshDock(this.save);
         this.persistSave();
         return result;
@@ -13594,7 +13658,7 @@ export class GameSession {
         recordSortieCredit(this.save, -cost, 'repair');
         this.save.player.hull = stats.hull;
         this.ui.pushEvent(t('Repair complete. {credits} charged.', { credits: formatCredits(cost) }), 'success');
-        this.audio.play('success');
+        this.audio.play('purchase');
         this.ui.refreshDock(this.save);
         this.persistSave();
     }
@@ -13633,7 +13697,7 @@ export class GameSession {
             }
         }
         this.ui.pushEvent(t('Fuel and ordnance loaded. {credits} charged.', { credits: formatCredits(cost) }), 'success');
-        this.audio.play('success');
+        this.audio.play('purchase');
         this.ui.refreshDock(this.save);
         this.persistSave();
     }
@@ -13924,7 +13988,7 @@ export class GameSession {
         this.save.player.turretRuntime=[];
         this.ui.showToast?.(t('Outfitting applied.'), 'success');
         this.ui.refreshDock?.(this.save);
-        this.audio.play('success');
+        this.audio.play('equip');
         this.persistSave();
         if(!this.save.player.weaponGroupHelpSeen && quote.afterLoadout.guns.some((id,index)=>id && id!==quote.beforeLoadout.guns[index])) {
             this.save.player.weaponGroupHelpSeen=true;
@@ -14003,7 +14067,7 @@ export class GameSession {
         else normalizeLauncherMagazines(this.save.player);
         this.syncWeaponProjection();
         // The new hull, wallet and stored-ship list show the completed trade.
-        this.audio.play('success', 1.4);
+        this.audio.play('reward', 1);
         this.ui.refreshDock(this.save);
         this.persistSave();
         return { ok: true, code: 'traded', shipId, quote: result.quote };
@@ -14015,7 +14079,7 @@ export class GameSession {
         const result = joinGuild(this.save, guildId, this.save.player.dockedAt);
         if(result.ok)this.ui.pushEvent(result.message,'success');
         else this.ui.showToast(result.message,'warning');
-        this.audio.play(result.ok ? 'success' : 'warning', 0.7);
+        this.audio.play(result.ok ? 'reward' : 'deny', 0.9);
         this.ui.refreshDock(this.save);
         this.persistSave();
         return result;
@@ -14064,7 +14128,7 @@ export class GameSession {
         this.ui.pushSensor(dark
             ? t('Identity offline. Cut thrust and avoid weapons or beams to cool your signature.')
             : t('Identity online. Sensors can resolve your ship at full range.'), dark ? 'warning' : 'success', 4200);
-        this.audio.play('ui');
+        this.audio.play('uiTab');
         this.persistSave();
     }
     saveNow() {

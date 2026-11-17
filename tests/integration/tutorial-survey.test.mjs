@@ -5,6 +5,7 @@ import {tutorialFixture} from '../helpers/tutorial.mjs';
 import {GameSession} from '../../src/game/game.js';
 import {SpaceRenderer} from '../../src/game/render.js';
 import {AudioManager} from '../../src/game/audio.js';
+import {MusicDirector} from '../../src/game/audioMusic.js';
 import {LOCATIONS,hyperdriveArrivalRadius} from '../../src/game/data.js';
 import {generateGraveyardPieces} from '../../src/game/worldData.js';
 import {tutorialWreckPoint} from '../../src/game/tutorialRuntime.js';
@@ -98,9 +99,13 @@ test('Paul resumes formation after a real scenery contact clears his route',()=>
 test('stealth score yields to actual aggression and uses the audio context transition',()=>{
  const {session:s,save}=tutorialFixture('hide-patrol');save.player.dockedAt=undefined;s.ships=[{tutorialPatrol:true,hull:50,holdFire:true,targetId:undefined}];assert.equal(s.tutorialMusicContext(),'stealth');
  s.ships[0].targetId='player';s.ships[0].holdFire=false;assert.equal(s.tutorialMusicContext(),'combat');
- const a=Object.create(AudioManager.prototype),changes=[];Object.assign(a,{context:{currentTime:0},enabled:true,musicContext:'graveyard',currentContext:'graveyard',dangerLevel:.8,musicTimer:100,musicVolume:0,effectsVolume:0,swapMusicBus(){},crossfadeContext(){changes.push(this.currentContext);},stopDrones(){},startDrones(){},updateCombatTier(){}});
+ // The manager resolves stealth/combat/ambient and hands the result to the score.
+ const a=Object.create(AudioManager.prototype),changes=[];Object.assign(a,{context:{currentTime:0},enabled:true,stationMode:false,musicContext:'graveyard',currentContext:'graveyard',dangerLevel:.8,musicVolume:0,effectsVolume:0,engine:{update(){}},ambience:{update(){}},music:{update(dt,context){if(changes.at(-1)!==context)changes.push(context);}}});
  a.update(1/60,0,false,0,0,'stealth');assert.equal(a.currentContext,'stealth');a.update(1/60,0,false,0,1,'stealth');assert.equal(a.currentContext,'combat');a.dangerLevel=0;a.update(1/60,0,false,0,0,'graveyard');assert.deepEqual(changes,['stealth','combat','graveyard']);
- const notes=[];a.musicNote=(...args)=>notes.push(args);for(let bar=0;bar<4;bar++)a.playStealthBar(0,bar);assert.ok(notes.length>=10);for(const args of notes)for(const value of Object.values(args[0]))if(typeof value==='number')assert.ok(Number.isFinite(value));
+ // The stealth theme stays sparse and every scheduled value is finite.
+ const d=Object.create(MusicDirector.prototype),notes=[];Object.assign(d,{seed:7,beat:60/72,barSeconds:240/72,drum:(...args)=>notes.push(args),pad:(...args)=>notes.push(args)});
+ for(let bar=0;bar<4;bar++){d.bar=bar;d.stealthBar(bar*d.barSeconds);}
+ assert.ok(notes.length>=10);for(const args of notes)for(const value of args.flatMap(v=>typeof v==='object'?Object.values(v):[v]))if(typeof value==='number')assert.ok(Number.isFinite(value));
 });
 test('both languages explain genuine transponder controls and station access matches the lesson',()=>{
  for(const language of ['de','en']){

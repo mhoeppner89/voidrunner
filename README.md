@@ -1,6 +1,6 @@
 # Voidrunner
 
-A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2oq**.
+A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2ou**.
 
 Controller support covers flight, combat, cockpit menus, career dialogue and Arena rewards. Connect an Xbox/PlayStation-style controller and press a button. In **Options → Controls**, adjust the stick deadzone, sensitivity and inversion. **Button assignments** lets you assign flight and menu buttons, swap occupied bindings, test live input and restore your defaults. Bindings persist across careers; stick axes remain fixed. Menus use the D-pad/left stick, A/✕ to confirm, B/○ to go back, X/□ to cycle controls, bumpers to switch tabs and the right stick/triggers to scroll. The approved flight layout uses the left stick to steer, right stick for roll/throttle, A/✕ to fire, X/□ for missiles/capture/mining drones and RT/R2 for boost. B/○ cycles targets, LT/L2 cycles fire groups, LB/L1 cycles launchers, RB/R1 gives wing orders, and D-pad left toggles the transponder. Full bindings are in the same Controls screen. Combat, mining and salvage context follows the selected target automatically; there is no manual activity switch. Disconnecting an active controller pauses flight; keyboard and touch remain available. Controller rumble responds to firing and damage when supported; **Options → Controls → Test vibration** checks the connected device. Turning vibration off stops both controller rumble and phone feedback.
 
@@ -98,6 +98,12 @@ New and resumed docked careers start with the ship already parked. Location butt
 
 Selected targets keep their original colours. Asteroid surfaces stay natural after scanning, and targeting pickups does not brighten their glow. Brackets and cockpit instruments identify the current target.
 
+Sound is mixed as a layered, positional scene. Every event stacks a recorded body with designed layers (recoil, transient, tail, debris) and picks fresh variants and pitch on each trigger. Own-ship sounds sit in a short cockpit room; everything outside is panned, darkened and delayed by range, and sounds behind the ship are muffled. Other ships' gunfire, close passes and near misses are audible, incoming missiles raise a lock tone and a pulse that quickens as they close, and a critical hull sounds its alarm. Heavy hits and nearby detonations briefly duck the score and muffle the world. The drive is a layered instrument: reactor sub, a turbine that audibly spools, a wide afterburner with ignition and flame-out, slipstream tied to real speed and thruster hiss in hard turns. Cockpit, station hangar, planetside pad, belt, graveyard and deep space each have a quiet bed with sparse random detail.
+
+The score is generated bar by bar on the audio clock: seven contexts (deep space, planets, the belt, the graveyard, stealth, docked, combat) with their own tempo, harmony and instruments. Combat opens with a hit, escalates in three tiers as hostiles close in and resolves when the fight ends; threats, kills and losing the ship have their own accents. Menus share one interface voice in the score's key: clicks, tabs, purchases, refusals and rewards are distinct, and opening a menu in flight drops the world behind glass.
+
+Open `/tools/playtest/sound-review/index.html` on the local server to audition every event, the engine model, each ambience and the score with sliders, outside the game.
+
 Landing and departure sound follows the actual animation: engine passes, planetary air, hangar room tone, lift-off spool, landing gear and contact. Skipping or hiding a film stops its sound. The isolated landing review has an optional Sound checkbox, off by default. Mining drones retain their hidden render resources between deliveries, avoiding repeated shader compilation.
 
 The illustrated finish adds fine depth-based outlines and gently stepped direct lighting to 3D models. It reuses the scene's existing render targets and retains the original paint colours, cockpit artwork and readable instrument text. Landing backgrounds and ships share a crisp pixel grid; there is no added dithering or palette reduction.
@@ -171,6 +177,10 @@ npm ci
 npx playwright install chromium webkit
 VR_BASE_URL=http://127.0.0.1:4192 npm run test:browser
 ```
+
+`npm run test:browser:sound` boots a real flight with the audio engine running (muted), stages a fight and checks the bank, voices, score state, master level and teardown on desktop Chrome and iPhone/WebKit.
+
+The designed sound layers in `assets/audio/fx` are rendered by `npm run audio:forge` (pure Node synthesis plus ffmpeg; recipes in `tools/audio/forge/`). `npm run audio:mix` renders scripted flight scenarios through the real mixer offline and reports loudness and peaks under `output/audio-mix/`.
 
 Browser checks mute sound and write screenshots/results under `output/`. On this Mac they use installed Chrome; on other hosts Playwright's Chromium is used. iPhone and Android checks are browser emulation, not native device simulations.
 

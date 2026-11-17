@@ -81,7 +81,7 @@ function pay(session, active, reward) {
     if (amount > 0) {
         session.save.player.credits = Math.max(0, Number(session.save.player.credits) || 0) + amount;
         session.setOwnMonitorStatus?.(`+${formatCredits(amount)}`, 3400);
-        session.audio?.play?.('success');
+        session.audio?.play?.('purchase');
     }
     active.settlement.state = amount > 0 ? 'paid' : active.settlement.state;
     active.settlement.reward = amount;
@@ -345,7 +345,7 @@ export const DistressMethods = {
         // reads the transmission before the drive carries them past it. No
         // portrait — a face would identify the caller before the ship arrives.
         this.ui?.showStoryLine?.(active.caller, distressPickupLine(active), 'neutral', active.id);
-        this.audio?.play?.('warning');
+        this.audio?.play?.('alert');
         this.persistSave?.();
         return true;
     },
@@ -878,7 +878,7 @@ export const DistressMethods = {
         }
         this.ui?.pushEvent?.(distressText([`Funkkontakt · ${active.caller}`, `Comms contact · ${active.caller}`]), 'info', 5200);
         this.setDistressMonitor(active);
-        this.audio?.play?.('warning');
+        this.audio?.play?.('alert');
         this.persistSave?.();
     },
 
@@ -987,7 +987,7 @@ export const DistressMethods = {
                 }
                 if (spawned.length) {
                     this.ui?.pushSensor?.(distressText(['Die Schiffe sind zurück. Sie haben dich gesehen.', 'The ships are back. They have seen you.']), 'danger', 5200);
-                    this.audio?.play?.('warning');
+                    this.audio?.play?.('threat');
                 }
             }
         }
@@ -1910,7 +1910,7 @@ export const DistressMethods = {
         this.save.world.distress.history.unshift({id: 'distress-survivors', variant: 'wreck', setup: 0, outcome: 'survivors-delivered', at: nowOf(this), reward});
         this.save.world.distress.history = this.save.world.distress.history.slice(0, 8);
         this.ui?.pushEvent?.(distressText([`${units} ${units === 1 ? 'Überlebender' : 'Überlebende'} abgeliefert · ${formatCredits(reward)}`, `${units} ${units === 1 ? 'survivor' : 'survivors'} delivered · ${formatCredits(reward)}`]), 'success', 5600, distressText(['Überlebende', 'Survivors']));
-        this.audio?.play?.('success');
+        this.audio?.play?.('reward');
         this.persistSave?.();
         return reward;
     },

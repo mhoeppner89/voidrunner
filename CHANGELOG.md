@@ -1,3 +1,15 @@
+## 0.8.2ou — Sound design overhaul
+
+- Replace the flat one-sample-per-effect playback with layered sound events: recorded bodies plus designed recoil, transient, tail and debris layers, with fresh variants and pitch on every trigger.
+- Add a real mix: separate cockpit, world, engine, ambience, interface and music buses; a short cockpit room and a long exterior tail; glue compression, soft clipping and a limiter; score ducking and a brief concussion filter on heavy hits and close detonations; a pause filter while a menu is open in flight.
+- Place the world: distant events are panned, darkened, delayed by range and mostly tail; sources behind the ship are muffled. Other ships' gunfire and missile launches, close fly-bys and near misses are now audible.
+- Rebuild the drive as a layered instrument with reactor sub, spooling turbine, wide afterburner, ignition and flame-out, speed-linked slipstream, manoeuvring-thruster hiss and misfires on a damaged hull.
+- Add cockpit feedback: enemy lock warning, inbound-missile pulse that quickens with range, hull alarm, shield collapse and restore, target-shield confirmation, kill confirmation, stressed-structure creaks, arcing and quiet avionics chatter.
+- Add ambience for the cockpit, station hangars, planetside pads, the belt, the graveyard and deep space: quiet continuous beds with sparse random detail.
+- Replace the oscillator score with a generated arrangement on the audio clock: seven contexts with their own tempo, harmony and instruments; three combat tiers; opening, resolving, threat, kill and ship-lost accents.
+- Give menus one interface voice in the score's key: press, hover, tab, open, close, confirm, refuse, purchase, equip and reward are distinct, and every menu control responds.
+- Add the sound forge (`npm run audio:forge`), offline mix renders (`npm run audio:mix`), a sound review stand (`/tools/playtest/sound-review/`) and a live browser check (`npm run test:browser:sound`). Retire four superseded interface samples and the unused procedural Foley module.
+
 ## 0.8.2oq — Fit Mercury displays to the approved painting
 
 - Restore the original detailed v4 frame unchanged. Remove the corrective aperture stencil and fit the live glass to its measured openings in code.

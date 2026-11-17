@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v669-0-8-2oq-mercury-original-fit';
+const CACHE = 'voidrunner-v673-0-8-2ou-sound-design';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -80,8 +80,12 @@ const CORE_ASSETS = [
   './src/game/battleshipModelData.js',
   './src/game/carrierModels.js',
   './src/game/carrierModelData.js',
-  './src/game/sampleSfx.js',
-  './src/game/sampleSfxManifest.js',
+  './src/game/soundBank.js',
+  './src/game/soundBankManifest.js',
+  './src/game/soundEvents.js',
+  './src/game/audioEngine.js',
+  './src/game/audioAmbience.js',
+  './src/game/audioMusic.js',
   './src/game/repairSites.js',
   './src/game/repairDrones.js',
   './src/game/capitalCombat.js',

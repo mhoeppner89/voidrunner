@@ -73,7 +73,10 @@
     "review:finish": "node tools/playtest/comic-style-review.mjs",
     "test:browser:target-cycling": "node tests/browser/target-cycling.mjs",
     "review:cockpit": "node tools/playtest/cockpit-layout.mjs",
-    "test:browser:cockpit-review": "node tests/browser/cockpit-layout.mjs"
+    "test:browser:cockpit-review": "node tests/browser/cockpit-layout.mjs",
+    "audio:forge": "node tools/audio/forge.mjs",
+    "audio:mix": "node tools/audio/render-mix.mjs",
+    "test:browser:sound": "node tests/browser/sound-design.mjs && node tests/browser/transit-audio.mjs"
   },
   "version": "0.8.2-a",
   "devDependencies": {

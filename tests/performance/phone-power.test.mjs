@@ -8,6 +8,7 @@ const {SpaceRenderer,isAppleTouchDevice,renderBaseWidth,sceneQualityForDevice,IO
 const {FrameBudget,flightFrameRate}=await import('../../src/game/frameBudget.js');
 const {createRingVolume}=await import('../../src/game/ringVolume.js');
 const {AudioManager}=await import('../../src/game/audio.js');
+const {ShipEngineAudio}=await import('../../src/game/audioEngine.js');
 const {createNewSave,hydrateSave}=await import('../../src/game/save.js');
 const {LOCATIONS}=await import('../../src/game/data.js');
 
@@ -173,18 +174,24 @@ test('ring bounds reject offscreen ray marching and keep overhead and inside-rin
     calls=0;r.camera.position.set(200,0,0);r.camera.lookAt(200,100,0);r.render();assert.equal(calls,6,'horizontal inside-ring view retains its volume');
     r.ringVolumeTarget?.dispose();volume.mesh.geometry.dispose();volume.mesh.material.dispose();
 });
-test('constant engine settings stop adding duplicate audio automation, changes still apply',()=>{
-    const a=Object.create(AudioManager.prototype);a.context={currentTime:0};a.enabled=true;a.musicContext='open';a.currentContext='open';
-    a.dangerLevel=0;a.musicTimer=100;a.musicVolume=0;a.effectsVolume=0.68;
+test('steady engine settings stop adding audio automation, changes still apply',()=>{
     let calls=0;const parameter=()=>({setTargetAtTime(){calls++;},cancelScheduledValues(){}});
-    for(const name of ['engineGain','engineWashGain','stationGain'])a[name]={gain:parameter()};
-    for(const name of ['engineOscA','engineOscB','engineSub','engineFilter','engineWashFilter'])a[name]={frequency:parameter()};
-    for(let i=0;i<600;i++){a.context.currentTime=i/60;a.update(1/60,0.5,false,0,0,'open');}
-    assert.equal(calls,8,'one target per AudioParam rather than 4,800 duplicate calls');
-    a.update(1/60,0.8,true,0,0,'open');assert.equal(calls,15);
-    a.stationMode=true;a.currentContext='station';a.update(1/60,0.8,true,0,0,'open');
-    const stopped=calls;assert.ok(stopped>15);
-    a.stationMode=false;a.currentContext='open';a.update(1/60,0.8,true,0,0,'open');assert.ok(calls>stopped);
+    const manager=Object.create(AudioManager.prototype);Object.assign(manager,{context:{currentTime:0},stationMode:false,play(){},bank:{loopSource(){}}});
+    const engine=Object.create(ShipEngineAudio.prototype);
+    Object.assign(engine,{manager,spool:0,burn:0,turnLevel:0,lastTurn:0,voices:Array.from({length:8},()=>({gain:{gain:parameter()},source:{playbackRate:parameter()}})),
+        filter:{frequency:parameter()},rushGain:{gain:parameter()},rushFilter:{frequency:parameter()},hissGain:{gain:parameter()},hissPan:{pan:parameter()}});
+    const flight={speed:0.5,turn:0,yaw:0,hyper:false};
+    const run=(frames,throttle,burn)=>{for(let i=0;i<frames;i++){manager.context.currentTime+=1/60;engine.update(1/60,throttle,burn,0,0,flight);}};
+    // The reactor spools up, then every layer holds its level: no further scheduling.
+    run(900,0.5,false);const settled=calls;assert.ok(settled>0&&settled<900,'spool-up schedules a bounded number of targets');
+    run(600,0.5,false);assert.equal(calls,settled,'steady flight adds no audio automation');
+    run(1,0.9,true);assert.ok(calls>settled,'throttle and afterburner changes still reach the graph');
+    // Hostile input (negative or NaN steps, NaN flight state) never reaches an AudioParam.
+    const seen=[];for(const voice of engine.voices)voice.gain.gain.setTargetAtTime=value=>{calls++;seen.push(value);};
+    engine.update(-0.02,NaN,true,NaN,NaN,{speed:NaN,turn:NaN,yaw:NaN});engine.update(NaN,2,false,5,-3,undefined);
+    assert.ok(seen.every(Number.isFinite));assert.ok(engine.spool>=0&&engine.spool<=1&&engine.burn>=0&&engine.burn<=1);
+    // Docking silences every continuous layer at once.
+    const before=calls;manager.stationMode=true;engine.silence();assert.ok(calls>=before+10);
 });
 
 
