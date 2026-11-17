@@ -1,3 +1,36 @@
+## 0.8.2pb — More music: rotation, system signatures and docked themes
+
+- Restructure the adaptive score into a catalogue of pieces with a director that plays them: rotating contexts (open space, planets, belts, graveyard) close each piece with a cadence after a few minutes and rest in silence (30–90 s in open space) before choosing another, never the same twice running.
+- Write 41 new pieces in the existing style and loudness targets: two shared and ten system-signature open-space pieces (two each for Helios Verge, Meridian, Redwake, Pale Ring and Acheron), three each for planets and belts, seven for combat, two each for the graveyard and stealth, and twelve docked themes so every station and planet has its own (Gatehouse Twelve, Torchwell and Shepherd Relay share with a sibling; the shipworks share one).
+- Four of the combat pieces are drum-led, in 5/4, half-time 4/4, 9/8 and 6/8: taiko and o-daiko ensembles, steel-pipe junk metal, low synth pulses, a duduk-like reed and a wailing voice at the top tier.
+- Add formant choir (with a vocal scoop), bowed strings, mallets, pulse/reed/organ/brass voices and nine forged percussion recipes (frame drum, hand drum, clap, brush, woodblock, gong, o-daiko, goblet-drum tek, steel pipe); bells, plucks and mallets stay below C6 with soft attacks.
+- Gate new pieces behind approval on the new music review page (`tools/playtest/sound-review/music.html`). All 41 new pieces are approved after review and play in the game; Broadside was rewritten in darker harmony (minor chords sliding by semitone, low brass, a semitone string ostinato and a minor final chord) before approval. The original themes are ported unchanged.
+- Fix region scoring: every belt and the Pale Rings now get belt music instead of the graveyard lament, and jump points count as open space.
+- Add per-piece offline renders (`npm run audio:mix -- --pieces`), a strict headless Web Audio test for every piece and tier, and a muted browser check of the review page.
+
+## 0.8.2pa — Consistent beam voice and deeper scattergun
+
+- Restore the beam's original recorded body alone at fixed pitch. Remove added sizzle and random pitch changes so overlapping emitters share the same voice.
+- Add a deeper, longer pressure body and low-mid concussion to the scattergun, with a stronger initial blast and lower recoil sound.
+- Preserve magrail/missile revisions, weapon balance and firing cadence.
+
+## 0.8.2oz — Weapon sound review revisions
+
+- Give the magrail the previous missile/torpedo sound, preserving its original layers. Replace missile launch concussion with soft ejection and a rising exhaust wash.
+- Remove the beam's pitched recorded layer and humming carrier; use a short, unpitched electrical discharge. Give the scattergun a stronger opening blast and recoil body.
+- Apply the changes through the shared sound events for player and NPC weapons. Keep weapon stats, cadence and the incoming-missile alarm unchanged.
+
+## 0.8.2oy — Remove ringing lock tone; weapon sound review
+
+- Remove the telephone-like missile-lock sample, trigger and its reuse in the general threat cue. Preserve the visual lock warning, pre-launch reaction time and separate incoming-missile alert.
+- Add an isolated weapon-sound review using the live mixer and weapon registry: all gun/launcher/turret sound families, single shots, normal firing patterns, cockpit/nearby/distant listening and exportable notes. Label shared samples clearly; no weapon sound redesign or balance changes.
+
+## 0.8.2ox — Paul’s closing conversation and departure
+
+- Keep the optional Paul escort present after the final tutorial battle. Deliver his existing German/English goodbye through the protected campaign dialogue, including queued and resumed return flights.
+- After the conversation is finished, recall his repair drones, let him fly out of formation, then show a hyperdrive departure. Remember his departure across saves; Rin stays on the return wing.
+- Preserve the wing’s actual position when the fight ends instead of snapping it to formation. Players who declined Paul get no extra escort or conversation.
+
 ## 0.8.2ow — All tier-III cockpits in live flight
 
 - Activate the approved Bellona, Artemis, Atlas Hauler, Victoria and Odin cockpit frames in career and Arena. Keep their distinct model-informed structures, exact monitor/control positions, navy/white pilot hand and fixed joystick-base sprite.

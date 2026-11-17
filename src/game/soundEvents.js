@@ -23,13 +23,15 @@
 export const SOUND_EVENTS = {
     // ------------------------------------------------------------- weapons
     laser: { bus: 'cockpit', room: 0.2, space: 0.1, layers: [['laser', 0.8, { vary: 0.035 }], ['laser-snap', 0.26, { vary: 0.06, prox: 0.9 }], ['energy-tail', 0.36, { vary: 0.08 }], ['thump', 0.22, { vary: 0.05, prox: 0.9 }]] },
-    beam: { bus: 'cockpit', room: 0.16, space: 0.08, layers: [['beam', 0.8, { vary: 0.03 }], ['beam-sizzle', 0.5, { vary: 0.05 }]] },
-    gauss: { bus: 'cockpit', room: 0.22, space: 0.22, duck: [0.8, 0.05, 0.3], priority: 2, layers: [['gauss', 0.8, { vary: 0.03 }], ['rail-crack', 0.62, { vary: 0.04 }], ['thump', 0.5, { prox: 0.9 }], ['mech-clack', 0.3, { delay: 0.16, prox: 0.9, vary: 0.05 }]] },
+    // One original body at a fixed pitch: overlapping emitters must not form chords.
+    beam: { bus: 'cockpit', room: 0.16, space: 0.08, layers: [['beam', 0.8]] },
+    // The former missile launch, preserved intact for the magrail.
+    gauss: { bus: 'cockpit', room: 0.16, space: 0.22, priority: 2, layers: [['missile', 0.75, { vary: 0.04 }], ['missile-ignite', 0.62, { vary: 0.05 }], ['thump', 0.3, { prox: 0.9 }], ['mech-clack', 0.3, { prox: 0.9, rate: 0.8 }]] },
     pdc: { bus: 'cockpit', room: 0.1, space: 0.05, spacing: 0.035, layers: [['pdc', 0.75, { vary: 0.05 }], ['pdc-tick', 0.34, { vary: 0.08 }]] },
-    ripper: { bus: 'cockpit', room: 0.2, space: 0.14, priority: 2, layers: [['ripper', 0.8, { vary: 0.04 }], ['ripper-blast', 0.5, { vary: 0.05 }], ['thump', 0.36, { prox: 0.9 }], ['mech-clack', 0.26, { delay: 0.12, prox: 0.9, vary: 0.05 }]] },
+    ripper: { bus: 'cockpit', room: 0.2, space: 0.14, priority: 2, layers: [['ripper', 0.8, { vary: 0.04 }], ['ripper-blast', 0.95, { vary: 0.025 }], ['thump', 0.7, { prox: 0.9, rate: 0.85 }], ['mech-clack', 0.26, { delay: 0.12, prox: 0.9, vary: 0.05 }]] },
     ion: { bus: 'cockpit', room: 0.18, space: 0.12, layers: [['ion', 0.8, { vary: 0.04 }], ['ion-sizzle', 0.5, { vary: 0.06 }], ['thump', 0.16, { prox: 0.9, rate: 1.2 }]] },
     mortar: { bus: 'cockpit', room: 0.2, space: 0.2, duck: [0.8, 0.05, 0.3], priority: 2, layers: [['mortar', 0.8, { vary: 0.04 }], ['plasma-whoosh', 0.6, { vary: 0.05 }], ['thump', 0.45, { prox: 0.9, rate: 0.85 }]] },
-    missile: { bus: 'cockpit', room: 0.16, space: 0.22, priority: 2, layers: [['missile', 0.75, { vary: 0.04 }], ['missile-ignite', 0.62, { vary: 0.05 }], ['thump', 0.3, { prox: 0.9 }], ['mech-clack', 0.3, { prox: 0.9, rate: 0.8 }]] },
+    missile: { bus: 'cockpit', room: 0.12, space: 0.22, priority: 2, layers: [['missile-exhaust', 0.78, { vary: 0.04 }], ['mech-clack', 0.12, { prox: 0.9, rate: 0.8 }]] },
     capacitorEmpty: { bus: 'cockpit', room: 0.1, spacing: 2, priority: 2, layers: [['capacitor-empty', 1]] },
 
     // ------------------------------------------------------ taking damage
@@ -82,12 +84,11 @@ export const SOUND_EVENTS = {
     weaponSwitch: { bus: 'ui', spacing: 0.08, layers: [['mech-clack', 0.5, { rate: 0.8, vary: 0.04 }], ['ui-tab', 0.8]] },
     targetCycle: { bus: 'ui', spacing: 0.05, layers: [['target-cycle', 1]] },
     targetLock: { bus: 'ui', spacing: 0.4, priority: 2, layers: [['target-lock', 1]] },
-    lockWarning: { bus: 'ui', spacing: 1.2, priority: 3, layers: [['lock-warning', 1]] },
     missileAlert: { bus: 'ui', spacing: 0.3, priority: 3, layers: [['missile-alert', 1]] },
     alert: { bus: 'ui', spacing: 0.65, priority: 2, layers: [['alert', 1]] },
     // The generic caution keeps its name: dozens of gameplay systems raise it.
     warning: { bus: 'ui', spacing: 0.65, priority: 2, layers: [['alert', 1]] },
-    threat: { bus: 'ui', spacing: 1.5, priority: 3, layers: [['alert', 0.9], ['lock-warning', 0.25, { rate: 0.5 }]] },
+    threat: { bus: 'ui', spacing: 1.5, priority: 3, layers: [['alert', 0.9]] },
     success: { bus: 'ui', spacing: 0.2, priority: 2, layers: [['ui-confirm', 1]] },
     reward: { bus: 'ui', spacing: 0.6, priority: 2, layers: [['success-sting', 1]] },
     discovery: { bus: 'ui', spacing: 0.6, priority: 2, layers: [['scan-ping', 0.6, { rate: 1.12 }], ['ui-confirm', 0.8, { delay: 0.12 }]] },

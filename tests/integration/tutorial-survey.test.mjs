@@ -6,6 +6,7 @@ import {GameSession} from '../../src/game/game.js';
 import {SpaceRenderer} from '../../src/game/render.js';
 import {AudioManager} from '../../src/game/audio.js';
 import {MusicDirector} from '../../src/game/audioMusic.js';
+import {PIECE_BY_ID} from '../../src/game/musicScore.js';
 import {LOCATIONS,hyperdriveArrivalRadius} from '../../src/game/data.js';
 import {generateGraveyardPieces} from '../../src/game/worldData.js';
 import {tutorialWreckPoint} from '../../src/game/tutorialRuntime.js';
@@ -104,7 +105,7 @@ test('stealth score yields to actual aggression and uses the audio context trans
  a.update(1/60,0,false,0,0,'stealth');assert.equal(a.currentContext,'stealth');a.update(1/60,0,false,0,1,'stealth');assert.equal(a.currentContext,'combat');a.dangerLevel=0;a.update(1/60,0,false,0,0,'graveyard');assert.deepEqual(changes,['stealth','combat','graveyard']);
  // The stealth theme stays sparse and every scheduled value is finite.
  const d=Object.create(MusicDirector.prototype),notes=[];Object.assign(d,{seed:7,beat:60/72,barSeconds:240/72,drum:(...args)=>notes.push(args),pad:(...args)=>notes.push(args)});
- for(let bar=0;bar<4;bar++){d.bar=bar;d.stealthBar(bar*d.barSeconds);}
+ for(let bar=0;bar<4;bar++){d.bar=bar;PIECE_BY_ID['stealth-heart'].bar(d,bar*d.barSeconds,{state:{}});}
  assert.ok(notes.length>=10);for(const args of notes)for(const value of args.flatMap(v=>typeof v==='object'?Object.values(v):[v]))if(typeof value==='number')assert.ok(Number.isFinite(value));
 });
 test('both languages explain genuine transponder controls and station access matches the lesson',()=>{

@@ -1,51 +1,51 @@
 import { clamp } from './random.js';
+import { hz, weightedIndex } from './musicKit.js';
+import { PIECE_BY_ID, PIECES_BY_CONTEXT, ROTATION, isApproved, dockThemeFor, pieceWeight } from './musicScore.js';
 
-// Adaptive score.
+// Adaptive score director.
 //
-// Seven contexts, each with its own tempo, harmony and band, generated bar by
-// bar so it never loops identically. Bars are scheduled against the audio
-// clock with a short look-ahead (not the frame timer), so rhythm stays tight
-// through frame hitches. Every context owns a voice group; a context change
-// crossfades groups, which lets long tails ring out instead of being cut.
+// The music itself lives in the score modules (musicSpace.js, musicFlight.js,
+// musicDocked.js) as pieces: each one has a context, tempo, meter and a
+// `bar()` function that writes one bar at a time, so nothing ever loops
+// identically. The director decides which piece plays and runs it:
+//
+// - Bars are scheduled against the audio clock with a short look-ahead (not
+//   the frame timer), so rhythm stays tight through frame hitches.
+// - Every piece owns a voice group; a change crossfades groups, which lets
+//   long tails ring out instead of being cut.
+// - Rotating contexts (open space, planets, fields, the graveyard) play a
+//   piece for a few minutes, close it with a cadence and then rest in
+//   silence before the next one. Choices are weighted by star system and
+//   nearby region and avoid the most recent pieces.
+// - Docked, the theme belongs to the station or planet.
+// - Only approved pieces reach the game; the music review page can audition
+//   any piece through `audition`.
 //
 // Instruments: detuned wavetable pads through a stereo chorus, soft FM keys
-// and bells into a tempo-synced ping-pong delay, monophonic bass and ostinato
-// synths (persistent oscillators, sequenced by automation: no per-note
-// nodes), and a forged percussion kit from the sound bank (group 'music').
-const TEMPO = { open: 60, station: 84, planet: 66, field: 100, graveyard: 48, stealth: 72, combat: 132 };
-// Seconds for the outgoing group to fade when entering each context.
+// and bells into a tempo-synced ping-pong delay, formant choir, bowed string
+// ensemble, mallets, monophonic synths (persistent oscillators, sequenced by
+// automation: no per-note nodes), and a forged percussion kit from the sound
+// bank (group 'music').
 const FADE_IN_TO = { combat: 0.35, station: 1.2, stealth: 0.8 };
-// Per-context trim so every theme lands at its intended loudness (see tools/audio/render-mix.mjs).
-const TRIM = { field: 1.8 };
 const LOOKAHEAD = 0.22;
-const hz = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
-
-//  bass, pad voicing
-const OPEN = [
-    [33, [45, 52, 55, 59, 60]], [29, [41, 48, 52, 57, 60]], [36, [48, 55, 62, 64]], [31, [43, 50, 55, 60]],
-    [33, [45, 55, 60, 64, 71]], [38, [50, 57, 60, 64, 65]], [29, [41, 57, 60, 64, 71]], [28, [40, 47, 50, 55, 59]],
-];
-const STATION = [
-    [36, [52, 55, 59, 62]], [33, [55, 59, 60, 64]], [41, [57, 60, 64, 67]], [43, [53, 57, 60, 64]],
-    [40, [55, 59, 62]], [33, [55, 60, 64]], [38, [53, 57, 60, 64]], [31, [53, 60, 62]],
-];
-const PLANET = [
-    [38, [45, 50, 53, 60, 64]], [34, [46, 50, 53, 57]], [31, [43, 46, 50, 53, 57]], [33, [45, 48, 52, 55]],
-];
-const GRAVEYARD = [
-    [38, [45, 50, 53, 57]], [34, [46, 50, 53]], [33, [45, 48, 53]], [36, [43, 48, 52]],
-    [31, [43, 46, 50]], [29, [41, 45, 50]], [33, [45, 50, 52]], [33, [45, 49, 52]],
-];
-// Combat: root, third (15 = minor tenth, 16 = major) — two bars per chord.
-const COMBAT = [[40, 15], [36, 16], [38, 16], [35, 15], [40, 15], [38, 16], [33, 15], [36, 16]];
-const PENTATONIC = [69, 72, 74, 76, 79, 81, 84];
-const PLANET_SCALE = [50, 53, 55, 57, 60, 62, 65, 67];
+// Formants as [frequency, gain, Q]: soft vowels only.
+const VOWELS = {
+    oo: [[310, 1, 3.5], [870, 0.32, 6], [2250, 0.08, 9]],
+    oh: [[450, 1, 3.5], [820, 0.55, 6], [2700, 0.1, 9]],
+    ah: [[720, 1, 3.5], [1100, 0.5, 6], [2500, 0.12, 9]],
+    mm: [[260, 1, 2.5], [600, 0.18, 4], [1800, 0.03, 6]],
+};
+// Level compensation so the same `level` argument sounds equally loud on
+// every sustained instrument (measured offline against `pad`).
+const CHOIR_GAIN = 3.8;
+const STRINGS_GAIN = 1.4;
 
 // A persistent two-oscillator mono synth. Notes are automation events on its
 // pitch, filter and level, so a 16th-note ostinato costs no node churn.
 class MonoSynth {
-    constructor(director, target, { type = 'sawtooth', wave, detune = 9, q = 0.9 } = {}) {
+    constructor(director, target, { type = 'sawtooth', wave, detune = 9, q = 0.9, attack = 0.006, release = 0.035, vibrato = 0, rate = 5 } = {}) {
         const context = director.context;
+        this.attack = attack; this.release = release;
         this.oscillators = [-detune, detune].map((cents) => {
             const oscillator = context.createOscillator();
             if (wave) oscillator.setPeriodicWave(wave); else oscillator.type = type;
@@ -57,28 +57,51 @@ class MonoSynth {
         this.gain = context.createGain();
         this.gain.gain.value = 0;
         for (const oscillator of this.oscillators) { oscillator.connect(this.filter); oscillator.start(); }
+        if (vibrato > 0) {
+            this.lfo = context.createOscillator(); this.lfo.frequency.value = rate;
+            const depth = context.createGain(); depth.gain.value = vibrato;
+            this.lfo.connect(depth);
+            for (const oscillator of this.oscillators) depth.connect(oscillator.detune);
+            this.lfo.start();
+        }
         this.filter.connect(this.gain); this.gain.connect(target);
     }
-    note(at, midi, seconds, level, cutoff) {
+    // `glide` > 0 slides into the pitch (portamento time constant, seconds).
+    note(at, midi, seconds, level, cutoff, glide = 0) {
         const frequency = hz(midi);
-        for (const oscillator of this.oscillators) oscillator.frequency.setValueAtTime(frequency, at);
+        for (const oscillator of this.oscillators) {
+            if (glide > 0) oscillator.frequency.setTargetAtTime(frequency, at, glide);
+            else oscillator.frequency.setValueAtTime(frequency, at);
+        }
         this.filter.frequency.setValueAtTime(cutoff * 2.2, at);
         this.filter.frequency.setTargetAtTime(cutoff, at, 0.07);
-        this.gain.gain.setTargetAtTime(level, at, 0.006);
-        this.gain.gain.setTargetAtTime(0, at + seconds, 0.035);
+        this.gain.gain.setTargetAtTime(level, at, this.attack);
+        this.gain.gain.setTargetAtTime(0, at + seconds, this.release);
     }
     stop(at) {
-        for (const oscillator of this.oscillators) { try { oscillator.stop(at); } catch { /* already stopped */ } }
+        for (const oscillator of [...this.oscillators, this.lfo]) { try { oscillator?.stop(at); } catch { /* already stopped */ } }
     }
 }
 
 export class MusicDirector {
-    current = null;
+    current = null; // context being scored
+    piece = null; // piece playing, null while resting
+    slot = ''; // context (+ dock) that chose the piece
     group = null;
     bar = 0;
     nextBar = 0;
+    length = Infinity; // bars until the piece closes
+    restUntil = 0;
     tier = 0;
     intensity = 0.8;
+    systemId = undefined;
+    regionId = undefined;
+    dockId = undefined;
+    // Review page only: { id, bars?, rest? } plays that piece (approved or
+    // not) whenever its own context is scored; `pace` = { bars, rest }
+    // shortens every rotating piece so the rotation can be heard quickly.
+    audition = null;
+    pace = null;
     constructor(manager) {
         this.manager = manager;
         const context = this.context = manager.context;
@@ -105,8 +128,8 @@ export class MusicDirector {
         this.echoLeft.connect(left); left.connect(this.out);
         this.echoLeft.connect(this.echoRight); this.echoRight.connect(right); right.connect(this.out);
         this.echoRight.connect(gain(0.32, this.echoLeft));
-        // Stingers live outside the context groups so a context change never cuts them.
-        this.sting = { bus: gain(1, this.out), pad: gain(1, this.padIn), echo: gain(1, this.echoIn), wet: gain(1, manager.musicReverbGain) };
+        // Stingers and cadences live outside the piece groups so a change never cuts them.
+        this.sting = { bus: gain(1, this.out), pad: gain(1, this.padIn), echo: gain(1, this.echoIn), wet: gain(1, manager.musicReverbGain), trim: 1 };
         const table = (count, amplitude) => {
             const real = new Float32Array(count + 1), imag = new Float32Array(count + 1);
             for (let n = 1; n <= count; n += 1) imag[n] = amplitude(n);
@@ -117,9 +140,18 @@ export class MusicDirector {
             glass: table(12, (n) => (n % 2 ? 1 : 0.35) / Math.pow(n, 1.9)),
             pluck: table(32, (n) => 1 / Math.pow(n, 1.15)),
             bass: table(16, (n) => (n === 1 ? 1.4 : 1) / Math.pow(n, 1.35)),
+            // Hollow, square-ish: pulse basses and arpeggios.
+            pulse: table(24, (n) => (n % 2 ? 1 : 0.22) / n),
+            // Clarinet-like: odd partials lead, for solo lines.
+            reed: table(18, (n) => (n % 2 ? 1 : 0.3) / Math.pow(n, 1.25)),
+            // Soft drawbar organ.
+            organ: table(16, (n) => ({ 1: 1, 2: 0.55, 3: 0.35, 4: 0.22, 6: 0.12, 8: 0.1 })[n] ?? 0),
+            // Brassy: a saw with the top rolled off by the filter.
+            brass: table(28, (n) => 1 / Math.pow(n, 1.05)),
         };
         // Session-seeded xorshift: varied between sessions, cheap, allocation free.
         this.seed = (Date.now() & 0x7fffffff) || 1;
+        this.history = new Map();
     }
 
     random() {
@@ -132,58 +164,117 @@ export class MusicDirector {
     pick(list) { return list[Math.floor(this.random() * list.length)]; }
     chance(probability) { return this.random() < probability; }
 
-    update(dt, context, danger) {
+    // `place` is the caller's flight scratch: { systemId, regionId, dockId }.
+    update(dt, context, danger, place) {
         const { manager } = this, now = this.context.currentTime;
         if (manager.musicVolume <= 0.01) {
-            if (this.group) { this.retire(this.group, 0.3); this.group = null; this.current = null; }
+            if (this.group) this.retire(this.group, 0.3);
+            this.group = null; this.piece = null; this.current = null; this.slot = '';
             return;
         }
         this.sweep(now);
         if (now < (this.holdUntil ?? 0)) return;
-        if (context !== this.current) this.enter(context, now);
+        if (place) { this.systemId = place.systemId; this.regionId = place.regionId; this.dockId = place.dockId; }
+        const slot = context === 'station' ? `station:${this.dockId ?? ''}` : context;
+        if (slot !== this.slot) this.enter(context, slot, now);
+        else if (!this.piece) {
+            if (now < this.restUntil) return;
+            this.begin(this.choose(context), now, 'rest');
+        }
+        if (!this.piece) return;
         if (context === 'combat') this.updateTier(danger, now);
         // After a stall (hidden tab, long frame) rejoin the clock instead of bursting.
         if (this.nextBar < now - 0.05) this.nextBar = now + 0.06;
-        while (this.nextBar < now + LOOKAHEAD) {
+        while (this.piece && this.nextBar < now + LOOKAHEAD) {
+            if (this.bar >= this.length) { this.finish(this.nextBar); break; }
             this.playBar(this.nextBar);
             this.nextBar += this.barSeconds;
             this.bar += 1;
         }
     }
 
-    enter(context, now) {
-        const previous = this.current, fade = previous === 'combat' ? 2.2 : FADE_IN_TO[context] ?? 1.6;
-        if (this.group) this.retire(this.group, fade);
-        this.current = context;
-        this.beat = 60 / TEMPO[context];
-        this.barSeconds = this.beat * 4;
+    // A new place: fade out whatever plays and start that place's music.
+    enter(context, slot, now) {
+        const previous = this.current;
+        if (this.group) this.retire(this.group, previous === 'combat' ? 2.2 : FADE_IN_TO[context] ?? 1.6);
+        this.group = null;
+        this.current = context; this.slot = slot;
+        const outgoing = this.piece;
+        this.piece = null;
+        this.begin(this.choose(context), now, previous, outgoing);
+    }
+
+    // Which piece plays here. Weighted by system/region, never the same
+    // piece twice running when the pool allows it.
+    choose(context) {
+        const audition = this.audition && PIECE_BY_ID[this.audition.id];
+        if (audition?.context === context) return audition;
+        if (context === 'station') return dockThemeFor(this.dockId);
+        const pool = (PIECES_BY_CONTEXT[context] ?? PIECES_BY_CONTEXT.open).filter(isApproved);
+        if (pool.length <= 1) return pool[0];
+        const recent = this.history.get(context) ?? [];
+        const weights = pool.map((piece) => pieceWeight(piece, this.systemId, this.regionId));
+        if (!weights.some((weight) => weight > 0)) weights.fill(1);
+        const fresh = weights.map((weight, index) => (recent.includes(pool[index].id) ? 0 : weight));
+        const index = weightedIndex(fresh.some((weight) => weight > 0) ? fresh : weights, this.random());
+        return pool[Math.max(0, index)];
+    }
+
+    begin(piece, now, previous, outgoing) {
+        if (!piece) return;
+        const context = this.current;
+        this.piece = piece;
+        this.beat = 60 / piece.tempo;
+        this.barSeconds = this.beat * (piece.beats ?? 4);
         this.bar = 0; this.tier = 0;
-        const fresh = (target, level = 1) => { const node = this.context.createGain(); node.gain.value = level; node.connect(target); return node; };
-        const trim = TRIM[context] ?? 1;
-        const group = this.group = { bus: fresh(this.out, trim), pad: fresh(this.padIn, trim), echo: fresh(this.echoIn, trim), wet: fresh(this.manager.musicReverbGain, trim), synths: [], nodes: [] };
-        group.nodes.push(group.bus, group.pad, group.echo, group.wet);
-        // Ambient themes swell in under the outgoing tail; combat lands at once.
-        if (context !== 'combat' && previous) {
-            for (const node of group.nodes) { node.gain.setValueAtTime(0.0001, now); node.gain.linearRampToValueAtTime(trim, now + Math.min(2.5, fade + 0.6)); }
+        const rotation = ROTATION[context];
+        const bars = this.audition?.id === piece.id ? this.audition.bars : rotation && this.pace?.bars;
+        if (bars) this.length = bars;
+        else if (rotation) {
+            const [lo, hi] = piece.minutes ?? rotation.minutes;
+            this.length = Math.max(8, Math.round(this.range(lo, hi) * 60 / this.barSeconds / 4) * 4);
         }
-        this.echoLeft.delayTime.setTargetAtTime(this.beat * 0.75, now, 0.05);
-        this.echoRight.delayTime.setTargetAtTime(this.beat * 0.75, now, 0.05);
-        if (context === 'combat') {
-            group.bass = this.synth(group, group.bus, { wave: this.waves.bass, detune: 5 });
-            group.ostinato = this.synth(group, group.pad, { type: 'sawtooth', detune: 11 });
-            group.lead = this.synth(group, group.pad, { wave: this.waves.warm, detune: 7 });
+        else this.length = Infinity;
+        const trim = piece.trim ?? 1;
+        const fresh = (target) => { const node = this.context.createGain(); node.gain.value = trim; node.connect(target); return node; };
+        const group = this.group = { bus: fresh(this.out), pad: fresh(this.padIn), echo: fresh(this.echoIn), wet: fresh(this.manager.musicReverbGain), synths: [], nodes: [], trim, state: {} };
+        group.nodes.push(group.bus, group.pad, group.echo, group.wet);
+        const combat = context === 'combat';
+        // Ambient themes swell in under the outgoing tail (or out of a rest);
+        // combat lands at once.
+        if (!combat && previous) {
+            const swell = previous === 'rest' ? 3 : Math.min(2.5, (previous === 'combat' ? 2.2 : FADE_IN_TO[context] ?? 1.6) + 0.6);
+            for (const node of group.nodes) { node.gain.setValueAtTime(0.0001, now); node.gain.linearRampToValueAtTime(trim, now + swell); }
+        }
+        const echo = this.beat * (piece.echo ?? 0.75);
+        this.echoLeft.delayTime.setTargetAtTime(echo, now, 0.05);
+        this.echoRight.delayTime.setTargetAtTime(echo, now, 0.05);
+        piece.setup?.(this, group);
+        if (combat) {
             // The fight opens with a hit, not a fade.
             this.drum(now + 0.02, 'm-impact', 0.6, { wet: 0.6 }, this.sting);
             this.drum(now + 0.02, 'm-sub-drop', 0.35, {}, this.sting);
             this.nextBar = now + 0.06;
         }
         else {
-            if (context === 'field') group.bass = this.synth(group, group.bus, { type: 'sawtooth', detune: 6, q: 2 });
-            if (context === 'station') group.bass = this.synth(group, group.bus, { wave: this.waves.bass, detune: 3 });
-            if (previous === 'combat') this.resolveCombat(now);
-            this.nextBar = now + (previous ? 0.5 : 0.1);
+            if (previous === 'combat') this.resolveCombat(now, outgoing);
+            this.nextBar = now + (previous && previous !== 'rest' ? 0.5 : 0.1);
         }
     }
+
+    // The piece has run its length: a closing cadence, then silence.
+    finish(at) {
+        const piece = this.piece, rotation = ROTATION[this.current] ?? { rest: [20, 40] };
+        piece.end?.(this, at, this.sting);
+        this.retire(this.group, Math.min(4, this.barSeconds * 1.2));
+        this.group = null; this.piece = null;
+        const recent = this.history.get(this.current) ?? [];
+        recent.unshift(piece.id); recent.length = Math.min(recent.length, 2);
+        this.history.set(this.current, recent);
+        const rest = this.audition?.id === piece.id ? this.audition.rest ?? 4 : this.pace?.rest ?? this.range(...rotation.rest);
+        this.restUntil = at + rest;
+    }
+
     synth(group, target, options) {
         const synth = new MonoSynth(this, target, options);
         group.synths.push(synth);
@@ -220,22 +311,21 @@ export class MusicDirector {
         const phrase = this.bar % 8;
         // Eight-bar breathing: four bars build, four relax.
         this.intensity = phrase < 4 ? 0.72 + phrase * 0.09 : 0.99 - (phrase - 3) * 0.075;
-        switch (this.current) {
-            case 'combat': this.combatBar(at); break;
-            case 'station': this.stationBar(at); break;
-            case 'planet': this.planetBar(at); break;
-            case 'field': this.fieldBar(at); break;
-            case 'graveyard': this.graveyardBar(at); break;
-            case 'stealth': this.stealthBar(at); break;
-            default: this.openBar(at);
-        }
+        this.piece.bar(this, at, this.group);
+    }
+
+    // What the review page shows.
+    nowPlaying() {
+        const now = this.context?.currentTime ?? 0;
+        return { id: this.piece?.id ?? null, title: this.piece?.title ?? null, context: this.current, bar: this.bar, length: this.length, resting: !this.piece && now < this.restUntil, restLeft: Math.max(0, this.restUntil - now) };
     }
 
     // ------------------------------------------------------------ instruments
 
     // Sustained ensemble voice: two detuned wavetable oscillators through a
     // filter that opens with the swell.
-    pad(at, midi, seconds, level, { cutoff = 1400, attack = 0.9, release = 1.6, pan = 0, wave = 'warm', detune = 7, wet = 0.5, bend = 0 } = {}, group = this.group) {
+    // `bend` rises and returns; `fall` slides away for the whole note.
+    pad(at, midi, seconds, level, { cutoff = 1400, attack = 0.9, release = 1.6, pan = 0, wave = 'warm', detune = 7, wet = 0.5, bend = 0, fall = 0 } = {}, group = this.group) {
         const context = this.context, filter = context.createBiquadFilter(), gain = context.createGain(), frequency = hz(midi);
         const end = at + Math.max(seconds, attack) + release;
         for (const cents of [-detune, detune]) {
@@ -246,6 +336,7 @@ export class MusicDirector {
                 oscillator.frequency.exponentialRampToValueAtTime(frequency * Math.pow(2, bend / 12), at + seconds * 0.45);
                 oscillator.frequency.exponentialRampToValueAtTime(frequency, at + seconds);
             }
+            else if (fall) oscillator.frequency.exponentialRampToValueAtTime(frequency * Math.pow(2, fall / 12), at + seconds);
             oscillator.detune.value = cents;
             oscillator.connect(filter); oscillator.start(at); oscillator.stop(end + 0.05);
         }
@@ -258,6 +349,87 @@ export class MusicDirector {
         gain.gain.setTargetAtTime(0.0001, at + Math.max(seconds, attack), release / 5);
         filter.connect(gain);
         this.route(gain, pan, group.pad, wet, 0, group);
+    }
+
+    // Wordless choir: a detuned saw pair through three vowel formants, with
+    // vibrato that blooms after the attack. Keep it in the low-mid register.
+    // `scoop` (semitones, usually negative) slides up into the note: a wail.
+    choir(at, midi, seconds, level, { vowel = 'oo', attack = 1.4, release = 2.2, pan = 0, wet = 0.7, detune = 8, vibrato = 14, scoop = 0 } = {}, group = this.group) {
+        const context = this.context, frequency = hz(midi), hold = Math.max(seconds, attack), end = at + hold + release + 0.05;
+        const envelope = context.createGain();
+        envelope.gain.setValueAtTime(0.0001, at);
+        envelope.gain.linearRampToValueAtTime(level * CHOIR_GAIN, at + attack);
+        envelope.gain.setTargetAtTime(0.0001, at + hold, release / 5);
+        const lfo = context.createOscillator(), depth = context.createGain();
+        lfo.frequency.value = this.range(4.4, 5.4);
+        depth.gain.setValueAtTime(0, at);
+        depth.gain.linearRampToValueAtTime(vibrato, at + attack);
+        lfo.connect(depth); lfo.start(at); lfo.stop(end);
+        // Lower voices sit on slightly lower formants.
+        const shift = midi < 50 ? 0.86 : midi < 57 ? 0.93 : 1;
+        const filters = VOWELS[vowel].map(([formant, weight, q]) => {
+            const filter = context.createBiquadFilter(), amount = context.createGain();
+            filter.type = 'bandpass'; filter.frequency.value = formant * shift; filter.Q.value = q;
+            amount.gain.value = weight;
+            filter.connect(amount); amount.connect(envelope);
+            return filter;
+        });
+        for (const cents of [-detune, detune]) {
+            const oscillator = context.createOscillator();
+            oscillator.type = 'sawtooth'; oscillator.detune.value = cents;
+            oscillator.frequency.setValueAtTime(frequency * Math.pow(2, scoop / 12), at);
+            if (scoop) oscillator.frequency.exponentialRampToValueAtTime(frequency, at + Math.min(attack, 0.8) * 0.7);
+            depth.connect(oscillator.detune);
+            for (const filter of filters) oscillator.connect(filter);
+            oscillator.start(at); oscillator.stop(end);
+        }
+        this.route(envelope, pan, group.pad, wet, 0, group);
+    }
+
+    // Bowed string section: three detuned saws, a filter that opens with the
+    // bow and vibrato that arrives late. Short attacks give brass-like swells.
+    strings(at, midi, seconds, level, { attack = 0.9, release = 1.6, cutoff = 2200, pan = 0, wet = 0.55, detune = 9, vibrato = 10, wave } = {}, group = this.group) {
+        const context = this.context, frequency = hz(midi), hold = Math.max(seconds, attack), end = at + hold + release + 0.05;
+        const filter = context.createBiquadFilter(), envelope = context.createGain();
+        filter.type = 'lowpass'; filter.Q.value = 0.5;
+        filter.frequency.setValueAtTime(cutoff * 0.35, at);
+        filter.frequency.linearRampToValueAtTime(cutoff, at + attack);
+        filter.frequency.setTargetAtTime(cutoff * 0.75, at + attack, Math.max(0.3, seconds * 0.5));
+        envelope.gain.setValueAtTime(0.0001, at);
+        envelope.gain.linearRampToValueAtTime(level * STRINGS_GAIN, at + attack);
+        envelope.gain.setTargetAtTime(0.0001, at + hold, release / 5);
+        const lfo = context.createOscillator(), depth = context.createGain();
+        lfo.frequency.value = this.range(4.8, 5.6);
+        depth.gain.setValueAtTime(0, at);
+        depth.gain.setValueAtTime(0, at + attack * 0.6);
+        depth.gain.linearRampToValueAtTime(vibrato, at + attack + 0.8);
+        lfo.connect(depth); lfo.start(at); lfo.stop(end);
+        for (const cents of [-detune, 0, detune]) {
+            const oscillator = context.createOscillator();
+            if (wave) oscillator.setPeriodicWave(this.waves[wave]); else oscillator.type = 'sawtooth';
+            oscillator.frequency.value = frequency; oscillator.detune.value = cents;
+            depth.connect(oscillator.detune);
+            oscillator.connect(filter); oscillator.start(at); oscillator.stop(end);
+        }
+        filter.connect(envelope);
+        this.route(envelope, pan, group.pad, wet, 0, group);
+    }
+
+    // Marimba-like mallet: a sine body and a quickly fading fourth partial.
+    // Woody rather than bright; stays below C6.
+    mallet(at, midi, level, { decay = 1.1, pan = 0, echo = 0.2, wet = 0.4, hard = 0.25 } = {}, group = this.group) {
+        const context = this.context, frequency = hz(midi), envelope = context.createGain(), overtone = context.createGain();
+        const body = context.createOscillator(), partial = context.createOscillator();
+        body.frequency.value = frequency; partial.frequency.value = frequency * 3.93;
+        envelope.gain.setValueAtTime(0.0001, at);
+        envelope.gain.linearRampToValueAtTime(level, at + 0.01);
+        envelope.gain.exponentialRampToValueAtTime(0.0001, at + 0.01 + decay);
+        overtone.gain.setValueAtTime(hard, at);
+        overtone.gain.exponentialRampToValueAtTime(0.0001, at + 0.01 + decay * 0.22);
+        partial.connect(overtone); overtone.connect(envelope); body.connect(envelope);
+        const end = at + decay + 0.06;
+        body.start(at); partial.start(at); body.stop(end); partial.stop(end);
+        this.route(envelope, pan, group.bus, wet, echo, group);
     }
 
     // FM voice. ratio 1 with a low index is a mellow electric piano; ratio
@@ -337,177 +509,18 @@ export class MusicDirector {
     }
 
     // Briefly dips the pad bus on a kick so the low end punches through.
-    pump(at, depth = 0.55) {
-        const gain = this.group.pad.gain, full = TRIM[this.current] ?? 1;
+    pump(at, depth = 0.55, group = this.group) {
+        const gain = group.pad.gain, full = group.trim ?? 1;
         gain.setValueAtTime(depth * full, at);
         gain.linearRampToValueAtTime(full, at + this.beat * 0.5);
     }
 
-    // --------------------------------------------------------------- contexts
-
-    // Deep space: wide slow chords, a low root, and the occasional far-off
-    // soft bell answered by the delay. The emptiest, most patient bed.
-    openBar(at) {
-        const [bass, chord] = OPEN[this.bar % OPEN.length], level = this.intensity, bar = this.barSeconds;
-        this.pad(at, bass, bar * 1.05, 0.085 * level, { cutoff: 320, attack: 1.4, release: 2.4, wave: 'bass', wet: 0.3, detune: 4 });
-        chord.forEach((midi, voice) => {
-            if (voice > 1 && this.chance(0.14)) return; // thin the chord now and then
-            this.pad(at + voice * 0.22, midi, bar * 1.02, this.range(0.026, 0.036) * level, {
-                cutoff: this.range(900, 1500) * (0.8 + 0.3 * level), attack: this.range(1.4, 2), release: 2.6,
-                pan: [-0.5, 0.35, -0.2, 0.5, 0][voice], wet: 0.7,
-            });
-        });
-        if (this.chance(0.5)) {
-            const count = this.chance(0.3) ? 2 : 1;
-            for (let i = 0; i < count; i += 1)
-                this.bell(at + this.range(0.6, 3) + i * this.beat * 0.75, this.pick(PENTATONIC), this.range(0.014, 0.022) * level, { decay: this.range(2.4, 3.6), attack: 0.14, index: 1.1, pan: this.range(-0.6, 0.6), echo: 0.6, wet: 0.9 });
-        }
-        if (this.bar % 4 === 2)
-            this.pad(at + 1, this.pick([76, 81, 83]), bar * 1.4, 0.011 * level, { cutoff: 2600, attack: 2.2, release: 3, wave: 'glass', pan: this.range(-0.4, 0.4), wet: 0.9 });
-    }
-
-    // Docked: a warm, unhurried lounge. Mellow keys roll through the chord,
-    // a round bass walks underneath, brushed percussion keeps time.
-    stationBar(at) {
-        const index = this.bar % STATION.length, [bass, chord] = STATION[index], beat = this.beat, group = this.group;
-        chord.forEach((midi, voice) => this.pad(at, midi, this.barSeconds, 0.021, { cutoff: 1100, attack: 0.6, release: 1.2, pan: [-0.4, 0.4, -0.15, 0.2][voice], wet: 0.45 }));
-        // Eighth-note keys with a light swing; three shapes rotate and breathe.
-        const shapes = [[0, 2, 1, 3, 2, 1, 3, 2], [3, 2, 1, 0, 1, 2, 3, 1], [0, 1, 2, 3, 2, 3, 1, 2]], shape = shapes[(this.bar >> 1) % shapes.length];
-        for (let step = 0; step < 8; step += 1) {
-            if (step > 0 && this.chance(0.22)) continue;
-            const midi = Math.min(chord[shape[step] % chord.length], 67);
-            const time = at + (step >> 1) * beat + (step % 2 ? beat * 0.58 : 0);
-            this.bell(time, midi, this.range(0.03, 0.042) * (step % 2 ? 0.8 : 1), { decay: this.range(0.9, 1.3), attack: 0.035, ratio: 1, index: 1.0, pan: [-0.35, 0.1, 0.35, -0.1][step % 4], echo: 0.18, wet: 0.35 });
-        }
-        group.bass.note(at, bass, beat * 1.4, 0.13, 420);
-        group.bass.note(at + beat * 2.5, bass + (this.chance(0.5) ? 7 : 12), beat * 0.45, 0.085, 480);
-        if (this.chance(0.55)) group.bass.note(at + beat * 3.5, STATION[(index + 1) % STATION.length][0] + (this.chance(0.5) ? 2 : -1), beat * 0.4, 0.075, 460);
-        for (let step = 0; step < 8; step += 1)
-            if (step % 2 || this.chance(0.25)) this.drum(at + step * beat * 0.5 + (step % 2 ? beat * 0.08 : 0), 'm-shaker', this.range(0.05, 0.075), { pan: 0.3, rate: this.range(0.95, 1.05) });
-        this.drum(at + beat, 'm-rim', 0.07, { pan: -0.25, wet: 0.3 });
-        this.drum(at + beat * 3, 'm-rim', 0.08, { pan: -0.25, wet: 0.3 });
-        this.drum(at, 'm-heart', 0.16);
-    }
-
-    // Planets: a low drone, warm plucked phrases that repeat and mutate, a
-    // frame drum far away, wind between the notes.
-    planetBar(at) {
-        const index = this.bar % PLANET.length, [bass, chord] = PLANET[index], beat = this.beat, level = this.intensity;
-        this.pad(at, bass, this.barSeconds, 0.09 * level, { cutoff: 300, attack: 1, release: 1.8, wave: 'bass', wet: 0.3, detune: 4 });
-        chord.forEach((midi, voice) => this.pad(at + voice * 0.15, midi, this.barSeconds, 0.022 * level, { cutoff: 1000, attack: 1.2, release: 2, pan: [-0.45, 0.3, -0.15, 0.45, 0][voice], wet: 0.6 }));
-        // A four-bar motif is written once, then varied: repetition is what makes it a tune.
-        if (!this.motif || (this.bar % 8 === 0 && this.chance(0.6)))
-            this.motif = Array.from({ length: 4 }, () => Array.from({ length: 8 }, () => (this.chance(0.42) ? Math.floor(this.random() * PLANET_SCALE.length) : -1)));
-        this.motif[index].forEach((degree, step) => {
-            if (degree < 0 || this.chance(0.12)) return;
-            const midi = PLANET_SCALE[this.chance(0.15) ? clamp(degree + (this.chance(0.5) ? 1 : -1), 0, PLANET_SCALE.length - 1) : degree];
-            this.pluck(at + step * beat * 0.5, midi, this.range(0.036, 0.05) * level, { decay: this.range(1.2, 1.8), attack: 0.035, cutoff: 1500, pan: [-0.5, 0.2, 0.5, -0.3][step % 4], echo: 0.4, wet: 0.5 });
-        });
-        if (this.bar % 2 === 0) {
-            this.drum(at, 'm-taiko', 0.11 * level, { rate: 1.12, wet: 0.7, pan: -0.2 });
-            this.air(at + beat, this.barSeconds * 1.2, this.range(0.03, 0.045), { frequency: this.range(380, 620), pan: this.range(-0.4, 0.4) });
-        }
-        if (this.chance(0.5)) this.drum(at + beat * 2.5, 'm-tom', 0.06, { rate: 0.9, wet: 0.6, pan: 0.3 });
-    }
-
-    // The belt: a nervous low pulse, struck steel ringing through the delay,
-    // semitone clusters hanging overhead.
-    fieldBar(at) {
-        const beat = this.beat, group = this.group, level = this.intensity;
-        const accents = [1, 0, 0.7, 0.55, 0, 0.8, 0, 0.6];
-        accents.forEach((accent, step) => {
-            if (!accent && this.chance(0.75)) return;
-            const midi = step === 7 && this.chance(0.4) ? 29 : step === 4 && this.chance(0.2) ? 26 : 28;
-            group.bass.note(at + step * beat * 0.5, midi + 12, beat * 0.28, (0.05 + 0.05 * accent) * level, 240 + 260 * accent);
-        });
-        if (this.bar % 2 === 0) {
-            const cluster = this.pick([[52, 53, 59], [52, 55, 58], [50, 53, 57], [52, 54, 59]]);
-            cluster.forEach((midi, voice) => this.pad(at, midi + 12, this.barSeconds * 2, 0.017 * level, { cutoff: 1900, attack: 1.3, release: 2, wave: 'glass', pan: [-0.5, 0.5, 0][voice], wet: 0.8 }));
-        }
-        for (let hits = this.chance(0.45) ? 2 : 1; hits > 0; hits -= 1)
-            this.drum(at + Math.floor(this.random() * 16) * beat * 0.25, 'm-anvil', this.range(0.07, 0.12) * level, { rate: this.pick([1, 1.189, 1.335, 0.891, 0.75]), pan: this.range(-0.7, 0.7), wet: 0.6, echo: 0.55 });
-        for (let step = 0; step < 16; step += 1)
-            if (this.chance(0.3)) this.drum(at + step * beat * 0.25, 'm-rim', this.range(0.03, 0.055), { pan: step % 2 ? 0.45 : -0.45, rate: this.range(0.9, 1.2), echo: 0.2 });
-        for (const step of [1, 3, 5, 7]) this.drum(at + step * beat * 0.5, 'm-hat', 0.035, { pan: 0.2 });
-        this.drum(at, 'm-heart', 0.2 * level); this.drum(at + beat * 2, 'm-heart', 0.15 * level);
-    }
-
-    // The graveyard: a slow lament. Dark chords, a far-off drum, and a voice
-    // that bends up and falls back.
-    graveyardBar(at) {
-        const [bass, chord] = GRAVEYARD[this.bar % GRAVEYARD.length], bar = this.barSeconds, level = this.intensity;
-        this.pad(at, bass, bar, 0.08 * level, { cutoff: 260, attack: 1.8, release: 2.6, wave: 'bass', wet: 0.4, detune: 4 });
-        chord.forEach((midi, voice) => this.pad(at + voice * 0.3, midi, bar, (voice === 0 ? 0.034 : 0.024) * level, { cutoff: 720, attack: 2.2, release: 3, pan: [-0.4, 0.3, -0.1, 0.4][voice], wet: 0.8 }));
-        if (this.chance(0.55))
-            this.pad(at + this.range(0.4, 1.4), this.pick([57, 60, 62, 65]), this.range(2.6, 3.4), this.range(0.013, 0.019), { cutoff: 1300, attack: 1.1, release: 1.6, wave: 'glass', bend: this.range(2, 5), pan: this.range(-0.55, 0.55), wet: 1 });
-        if (this.bar % 2 === 0) this.drum(at, 'm-taiko', 0.14 * level, { rate: 0.8, wet: 1, pan: this.range(-0.3, 0.3) });
-        if (this.bar % 8 === 7) this.drum(at + bar * 0.5, 'm-sub-drop', 0.12);
-    }
-
-    // Running dark: a muffled heartbeat and almost nothing else.
-    stealthBar(at) {
-        const beat = this.beat, root = [33, 33, 31, 32][(this.bar >> 1) % 4];
-        this.drum(at, 'm-heart', 0.3); this.drum(at + beat * 0.34, 'm-heart', 0.2, { rate: 0.94 });
-        this.drum(at + beat * 2, 'm-heart', 0.24); this.drum(at + beat * 2.34, 'm-heart', 0.15, { rate: 0.94 });
-        if (this.bar % 2 === 0) this.pad(at, root, this.barSeconds * 2, 0.05, { cutoff: 240, attack: 1.2, release: 1.6, wave: 'bass', wet: 0.3 });
-        if (this.bar % 2 === 0) this.pad(at + beat, root + 36, this.barSeconds * 1.5, 0.011, { cutoff: 900, attack: 1.4, release: 1.8, wave: 'glass', pan: this.bar % 4 ? 0.35 : -0.35, wet: 0.9 });
-        if (this.bar % 4 === 3) this.pad(at + beat * 1.5, root + 37, this.barSeconds, 0.008, { cutoff: 900, attack: 1.2, release: 1.6, wave: 'glass', pan: -0.2, wet: 0.9 });
-        if (this.chance(0.3)) this.drum(at + beat * this.pick([1.5, 3, 3.5]), 'm-rim', 0.035, { pan: this.range(-0.5, 0.5), echo: 0.4, wet: 0.5 });
-    }
-
-    // Combat: drums carry the fight. Tier 0 is taiko, kick and a driving
-    // bass/string ostinato; tier 1 adds the backbeat, brass-like stabs and
-    // fills; tier 2 gallops, opens the hats and brings in the lead line.
-    combatBar(at) {
-        const beat = this.beat, group = this.group, tier = this.tier, level = 0.85 + 0.15 * this.intensity;
-        const chordIndex = (this.bar >> 1) % COMBAT.length, [root, third] = COMBAT[chordIndex], second = this.bar % 2 === 1, phrase = this.bar % 8;
-        // Bass: relentless eighths with octave kicks.
-        [0, 0, 12, 0, 0, 12, 0, 7].forEach((offset, step) =>
-            group.bass.note(at + step * beat * 0.5, root + offset, beat * 0.36, (step % 2 ? 0.085 : 0.11) * level, 300 + tier * 110));
-        // Spiccato ostinato: eighths at rest, sixteenths once the fight escalates.
-        const figure = [0, 7, 12, 7, 0, 7, third, 7], steps = tier >= 1 ? 16 : 8;
-        for (let step = 0; step < steps; step += 1) {
-            const offset = figure[(tier >= 1 ? step >> 1 : step) % figure.length] + (tier >= 1 && step % 2 ? 12 : 0);
-            const accent = step % (steps / 4) === 0;
-            group.ostinato.note(at + step * beat * (4 / steps), root + 12 + offset, beat * (2.2 / steps), (accent ? 0.05 : 0.034) * level, 1300 + tier * 500 + (accent ? 400 : 0));
-        }
-        // Brass-weight stabs on the chord change and a syncopated answer.
-        if (tier >= 1 && (!second || this.chance(0.6))) {
-            const time = second ? at + beat * 2.5 : at;
-            [0, 7, third].forEach((offset, voice) => this.pad(time, root + 12 + offset, beat * 0.8, 0.036 * level, { cutoff: 1700 + tier * 700, attack: 0.025, release: 0.5, pan: [-0.35, 0.35, 0][voice], wet: 0.4, detune: 10 }));
-        }
-        // Lead line at full escalation: a four-note cell, answered every other bar.
-        if (tier >= 2) {
-            const cell = second ? [third + 12, 19, 14, 12] : [12, third + 12, 19, 24];
-            cell.forEach((offset, i) => group.lead.note(at + i * beat, root + 24 + offset, beat * 0.9, 0.03 * level, 2400));
-        }
-
-        // Drums.
-        const kicks = tier >= 2 ? [0, 1, 2, 3] : [0, 2];
-        for (const hit of kicks) { this.drum(at + hit * beat, 'm-kick', 0.42 * level); this.pump(at + hit * beat, tier >= 2 ? 0.5 : 0.62); }
-        const taiko = tier >= 2 ? [0, 0.75, 1.5, 2.5, 3, 3.5] : tier === 1 ? [0, 2.5, 3.75] : [0, 2.5];
-        taiko.forEach((hit, i) => this.drum(at + hit * beat, 'm-taiko', (i === 0 ? 0.5 : 0.36) * level, { rate: i % 2 ? 1.06 : 1, pan: i % 2 ? 0.25 : -0.25, wet: 0.35 }));
-        if (tier >= 1) {
-            this.drum(at + beat, 'm-snare', 0.3 * level, { pan: 0.1, wet: 0.25 });
-            this.drum(at + beat * 3, 'm-snare', 0.33 * level, { pan: 0.1, wet: 0.25 });
-        }
-        for (let step = 0; step < 8; step += 1) {
-            const open = tier >= 2 && step % 2 === 1;
-            this.drum(at + step * beat * 0.5, 'm-hat', (step % 2 ? 0.075 : 0.05) * (open ? 0.8 : 1), { pan: 0.3, rate: open ? 0.92 : this.range(0.97, 1.04) });
-        }
-        if (this.chance(0.3)) this.drum(at + beat * this.pick([1.75, 2.25, 3.25]), 'm-hat', 0.05, { pan: -0.3 });
-        // Fill into every fourth bar; riser and a hit across the phrase boundary.
-        if (tier >= 1 && this.bar % 4 === 3)
-            for (let i = 0; i < 4; i += 1) this.drum(at + beat * (3 + i * 0.25), 'm-tom', (0.3 + i * 0.03) * level, { rate: [1.2, 1.1, 1, 0.9][i], pan: [-0.5, -0.2, 0.2, 0.5][i], wet: 0.3 });
-        if (phrase === 7) this.drum(at + this.barSeconds - 1.6, 'm-rev-cym', 0.3, { wet: 0.4 });
-        if (phrase === 0 && this.bar > 0 && tier >= 1) this.drum(at, 'm-impact', 0.34, { wet: 0.5 });
-        if (tier >= 2 && !second) this.drum(at, 'm-anvil', 0.12, { rate: 0.75, pan: 0.5, wet: 0.5, echo: 0.3 });
-    }
-
-    // The fight is over: one last hit, then the chord finally resolves.
-    resolveCombat(now) {
+    // The fight is over: one last hit, then the chord finally resolves into
+    // the outgoing combat piece's home key.
+    resolveCombat(now, outgoing) {
+        const chord = outgoing?.resolve ?? [40, 47, 52, 56, 59];
         this.drum(now + 0.05, 'm-taiko', 0.4, { rate: 0.85, wet: 0.8 }, this.sting);
-        [40, 47, 52, 56, 59].forEach((midi, voice) => this.pad(now + 0.1 + voice * 0.05, midi, 2.2, 0.03, { cutoff: 1500, attack: 0.5, release: 2.4, pan: [-0.4, 0.4, -0.2, 0.2, 0][voice], wet: 0.8 }, this.sting));
+        chord.forEach((midi, voice) => this.pad(now + 0.1 + voice * 0.05, midi, 2.2, 0.03, { cutoff: 1500, attack: 0.5, release: 2.4, pan: [-0.4, 0.4, -0.2, 0.2, 0][voice] ?? 0, wet: 0.8 }, this.sting));
     }
 
     // Short accents on top of whatever is playing.
@@ -527,7 +540,8 @@ export class MusicDirector {
             [52, 59, 64, 66].forEach((midi, voice) => this.pad(now, midi, 0.5, 0.03, { cutoff: 2600, attack: 0.02, release: 0.8, pan: [-0.4, 0.4, -0.15, 0.15][voice], wet: 0.6, detune: 10 }, sting));
         }
         else if (name === 'death') {
-            if (this.group) this.retire(this.group, 1.2), this.group = null, this.current = null;
+            if (this.group) this.retire(this.group, 1.2);
+            this.group = null; this.piece = null; this.current = null; this.slot = '';
             this.drum(now, 'm-impact', 0.8, { wet: 0.7 }, sting);
             this.drum(now, 'm-sub-drop', 0.5, {}, sting);
             [52, 51, 46, 40].forEach((midi, voice) => this.pad(now + voice * 0.35, midi, 3.5, 0.035, { cutoff: 700, attack: 1.2, release: 3, pan: [-0.4, 0.4, -0.2, 0.2][voice], wet: 0.9 }, sting));
@@ -540,6 +554,6 @@ export class MusicDirector {
         const now = this.context.currentTime;
         for (const synth of this.group?.synths ?? []) synth.stop(now);
         for (const lfo of this.lfos) { try { lfo.stop(); } catch { /* already stopped */ } }
-        this.group = null; this.current = null;
+        this.group = null; this.piece = null; this.current = null; this.slot = '';
     }
 }

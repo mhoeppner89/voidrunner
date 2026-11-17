@@ -5,6 +5,9 @@
 //   node tools/audio/render-mix.mjs                 all scenarios
 //   node tools/audio/render-mix.mjs dogfight dock   named scenarios
 //   VR_AUDIO_MODULE=/output/audio-ref/src/game/audio.js   render another build for comparison
+//   node tools/audio/render-mix.mjs --pieces        every score piece, music only (output/audio-mix/music)
+//   node tools/audio/render-mix.mjs --pieces open-pale-rime dock-nacre
+//   VR_PIECE_SECONDS=60  length of each piece render (default 48)
 //
 // Needs the repository served (VR_BASE_URL, default http://127.0.0.1:4192) and ffmpeg.
 import { chromium } from 'playwright';
@@ -13,8 +16,9 @@ import { spawnSync } from 'node:child_process';
 
 const base = process.env.VR_BASE_URL ?? 'http://127.0.0.1:4192';
 const moduleUrl = process.env.VR_AUDIO_MODULE ?? '/src/game/audio.js';
-const out = process.env.VR_AUDIO_OUT ?? 'output/audio-mix';
-const only = process.argv.slice(2);
+const pieceMode = process.argv.includes('--pieces');
+const out = process.env.VR_AUDIO_OUT ?? (pieceMode ? 'output/audio-mix/music' : 'output/audio-mix');
+const only = process.argv.slice(2).filter((arg) => !arg.startsWith('--'));
 await mkdir(out, { recursive: true });
 
 // Each scenario: seconds, a per-frame state(t) and timed one-shot actions.
@@ -33,7 +37,18 @@ const SCENARIOS = {
             list.push([18, (a) => a.playCockpit('shieldBreak', 1)]);
             for (const t of [12, 21, 27, 33]) list.push([t, (a) => { a.playAtDirection('explosion', 1.1, 140, 80, -60); a.play('kill', 0.8); a.stinger?.('kill'); }]);
             for (let t = 10; t < 32; t += 3.3) list.push([t, (a) => a.playAtDirection('flyby', 0.9, 40, t % 2 ? 30 : -30, 0)]);
-            list.push([15, (a) => a.play('missile')], [16, (a) => a.play('lockWarning')], [25.5, (a) => a.playCockpit('targetShieldBreak', 0.7)]);
+            list.push([15, (a) => a.play('missile')], [25.5, (a) => a.playCockpit('targetShieldBreak', 0.7)]);
+            return list; })()`,
+    },
+    beamScatter: {
+        seconds: 12, effectsOnly: true, noMusic: true, state: `() => ({})`,
+        actions: `(() => { const list = [];
+            for (let t = 1; t < 8; t += 0.2) {
+                list.push([t, (a) => a.play('beam', 0.72)]);
+                list.push([t + 0.07, (a) => a.playAtDirection('beam', 0.55, 100, -60, -80)]);
+                list.push([t + 0.14, (a) => a.playAtDirection('beam', 0.55, 120, 80, -90)]);
+            }
+            for (let t = 1.5; t < 8; t += 0.9) list.push([t, (a) => a.play('ripper', 0.72)]);
             return list; })()`,
     },
     hyper: { seconds: 22, context: 'open', state: `(t) => ({ throttle: 0.7, speed: t > 4 && t < 14 ? 1.3 : 0.6, hyper: t > 4 && t < 14 })`, actions: `[[2, (a) => a.play('hyperSpool')], [4, (a) => a.play('hyperActive')], [14, (a) => a.play('hyperDrop')], [16, (a) => a.play('dock')]]` },
@@ -47,6 +62,22 @@ const SCENARIOS = {
     openMusic: { seconds: 40, context: 'open', musicOnly: true, state: `() => ({ throttle: 0 })`, actions: `[]` },
     stationMusic: { seconds: 30, docked: true, musicOnly: true, state: `() => ({})`, actions: `[]` },
 };
+
+// Score pieces: each rendered on its own through the review page's audition
+// hook, docked at its first location; combat climbs through all three tiers.
+if (pieceMode) {
+    const { MUSIC_PIECES } = await import('../../src/game/musicScore.js');
+    for (const key of Object.keys(SCENARIOS)) delete SCENARIOS[key];
+    const seconds = Number(process.env.VR_PIECE_SECONDS) || 48;
+    for (const piece of MUSIC_PIECES) {
+        const combat = piece.context === 'combat';
+        SCENARIOS[piece.id] = {
+            seconds, musicOnly: true, piece: piece.id, docked: piece.context === 'station', dockId: piece.locations?.[0],
+            context: combat ? 'open' : piece.context === 'station' ? 'open' : piece.context,
+            state: combat ? `(t) => ({ enemies: t < ${seconds / 3} ? 1 : t < ${seconds * 2 / 3} ? 2 : 4 })` : `() => ({})`, actions: `[]`,
+        };
+    }
+}
 
 const browser = await chromium.launch({ headless: true, executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', args: ['--no-sandbox', '--disable-gpu-sandbox', '--mute-audio'] });
 const rows = [];
@@ -78,16 +109,18 @@ try {
             await audio.samplesReady;
             if (audio.bank) { await audio.bank.load('music'); await audio.bank.load('dock'); }
             if (scenario.musicOnly) audio.effectsVolume = 0;
+            if (scenario.piece) audio.music.audition = { id: scenario.piece, bars: 1e6 };
             const state = eval(scenario.state), actions = eval(scenario.actions).sort((a, b) => a[0] - b[0]);
             audio.setStationMode(Boolean(scenario.docked));
+            if (scenario.effectsOnly) audio.engine?.silence();
             const flight = {}, baseline = created;
             let next = 0, steady = 0;
             for (let frame = 0; frame < scenario.seconds * 60; frame += 1) {
                 clock = frame / 60;
                 const s = state(clock);
-                Object.assign(flight, { speed: s.speed ?? 0, turn: s.turn ?? 0, yaw: s.turn ?? 0, shield: s.shield ?? 1, hyper: Boolean(s.hyper), missileThreat: 0, dockKind: scenario.dockKind });
+                Object.assign(flight, { speed: s.speed ?? 0, turn: s.turn ?? 0, yaw: s.turn ?? 0, shield: s.shield ?? 1, hyper: Boolean(s.hyper), missileThreat: 0, dockKind: scenario.dockKind, dockId: scenario.dockId, systemId: 'helios-verge' });
                 while (next < actions.length && actions[next][0] <= clock) { actions[next][1](audio); next += 1; }
-                audio.update(1 / 60, s.throttle ?? 0, Boolean(s.burn), s.damage ?? 0, s.enemies ?? 0, scenario.context, 0, flight);
+                if (!scenario.effectsOnly) audio.update(1 / 60, s.throttle ?? 0, Boolean(s.burn), s.damage ?? 0, s.enemies ?? 0, scenario.context, 0, flight);
             }
             const buffer = await real.startRendering();
             const frames = buffer.length, left = buffer.getChannelData(0), right = buffer.getChannelData(1);

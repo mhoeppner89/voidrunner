@@ -54,3 +54,11 @@ test('an audio manager that never received a user gesture stays inert',()=>{
  for(const id of Object.keys(SOUND_EVENTS)){assert.doesNotThrow(()=>a.play(id));assert.doesNotThrow(()=>a.playAtDirection(id,1,100,10,10));}
  assert.doesNotThrow(()=>{a.update(1/60,1,true,.9,3,'field',0,{speed:1});a.stinger('kill');a.setStationMode(false);a.setVolumes(1,1);a.playComms('timid');a.cinematicSound('stop');a.dispose();});
 });
+
+
+test('the retired telephone-like lock tone cannot be loaded or reached by any event',()=>{
+ assert.equal(SOUND_EVENTS.lockWarning,undefined);assert.equal(SOUNDS['lock-warning'],undefined);
+ assert.ok(!Object.values(SOUND_EVENTS).some(event=>event.layers.some(([id])=>id==='lock-warning')));
+ assert.ok(SOUND_EVENTS.missileAlert,'the separate incoming-missile warning stays available');
+ assert.ok(!source('game.js').includes("'lockWarning'"));
+});

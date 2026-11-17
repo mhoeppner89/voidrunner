@@ -102,14 +102,6 @@ export default {
         variants: 1, peak: -7, group: 'flight',
         make: () => sequence(0.5, [[beep(NOTE.A6, 0.34, { release: 0.12 }), 0, 1], [key(NOTE.E6, 0.4, { tau: 0.12 }), 0, 0.5], [key(NOTE.A5, 0.4, { tau: 0.12 }), 0, 0.5]])[0],
     },
-    // An enemy seeker has you: dissonant warble, impossible to ignore.
-    'lock-warning': {
-        variants: 1, peak: -7, group: 'flight',
-        make: () => {
-            const T = 0.9, pitch = d.curve(T, (t) => (Math.floor(t * 20) % 2 ? 1108.7 : 880));
-            return d.drive(d.mul(d.bandpass(d.osc(T, pitch, 'saw'), 1500, 1.5), d.curve(T, (t) => Math.min(1, t / 0.004) * Math.min(1, (T - t) / 0.03) * (0.75 + 0.25 * Math.sign(Math.sin(2 * Math.PI * 10 * t))))), 1.6);
-        },
-    },
     // A missile is in the air: four urgent pips.
     'missile-alert': {
         variants: 1, peak: -6, group: 'flight',
@@ -353,5 +345,78 @@ export default {
     'm-heart': {
         variants: 1, peak: -6, group: 'music',
         make: () => d.lowpass(thud(0.28, 62, 40, { sweep: 0.05, tau: 0.08, push: 1.3 }), 200),
+    },
+    // Hand frame drum (bendir): warm low skin with a breath of buzz. Variants
+    // stay close in pitch because the bank picks them at random; the score
+    // sets the pitch with playbackRate.
+    'm-frame': {
+        variants: 3, peak: -3, group: 'music', mono: true,
+        make: (v, R) => {
+            const f0 = [88, 92, 96][v];
+            const skin = strike(R, 0.9, [1, 1.52, 1.98, 2.44, 2.9].map((ratio, i) => ({ f: f0 * ratio, t60: [0.7, 0.35, 0.25, 0.18, 0.12][i], gain: 1 / (1 + i * 0.7), bend: i === 0 ? 0.12 : 0.04 })), { hard: 2200, ms: 6, click: 0.25 });
+            const buzz = d.mul(d.bandpass(d.noise(0.35, R, 'pink'), 900, 1.2), d.perc(0.35, 0.002, 0.07));
+            return d.reverb(blend([skin, 1], [buzz, 0.18]), { time: 1.1, mix: 0.2, damp: 0.5, seed: 361 + v });
+        },
+    },
+    // Open hand-drum tone (conga/djembe body) for the warmer docked themes.
+    'm-hand': {
+        variants: 3, peak: -5, group: 'music', mono: true,
+        make: (v, R) => {
+            const f0 = [190, 196, 202][v];
+            const tone = strike(R, 0.5, [1, 1.6, 2.3, 2.9].map((ratio, i) => ({ f: f0 * ratio, t60: [0.32, 0.18, 0.11, 0.08][i], gain: 1 / (1 + i * 0.8), bend: i === 0 ? 0.08 : 0 })), { hard: 3500, ms: 3, click: 0.45 });
+            return d.reverb(tone, { time: 0.7, mix: 0.15, seed: 391 + v });
+        },
+    },
+    // Soft clap: three smeared bursts and a short room. Backbeat for grooves.
+    'm-clap': {
+        variants: 2, peak: -6, group: 'music',
+        make: (v, R) => {
+            const hit = () => d.mul(d.bandpass(d.noise(0.2, R), 1300 + v * 150, 1.4), d.perc(0.2, 0.0008, 0.012));
+            const tail = d.mul(d.bandpass(d.noise(0.3, R), 1100 + v * 120, 0.9), d.perc(0.3, 0.001, 0.07));
+            return room(sequence(0.36, [[hit(), 0, 0.8, -0.1], [hit(), 0.011, 0.7, 0.1], [hit(), 0.022, 0.9, 0], [tail, 0.024, 0.8, 0]]), 371 + v, 0.22, 0.6);
+        },
+    },
+    // Brush sweep across a snare head: the lounge themes' timekeeper.
+    'm-brush': {
+        variants: 2, peak: -12, group: 'music',
+        make: (v, R) => {
+            const T = [0.42, 0.5][v];
+            return d.widen(d.mul(d.bandpass(d.noise(T, R, 'pink'), d.line(T, [[0, 2600], [T, 4200]]), 0.7), d.swell(T, T * 0.55, 1.5, 2)), R, 0.5);
+        },
+    },
+    // Low log drum / woodblock: dry and hollow, never bright.
+    'm-wood': {
+        variants: 2, peak: -8, group: 'music', mono: true,
+        make: (v, R) => strike(R, 0.35, modes([300, 312][v], [1, 2.71, 4.1], { t60: 0.16, falloff: 1.2, tilt: 0.8 }), { hard: 3000, ms: 2, click: 0.3 }),
+    },
+    // O-daiko: the huge low drum under the drum-led combat pieces.
+    'm-odaiko': {
+        variants: 2, peak: -1.5, group: 'music', mono: true,
+        make: (v, R) => {
+            const f0 = [48, 51][v];
+            const skin = strike(R, 2.2, [1, 1.52, 2.04, 2.5, 3.1].map((ratio, i) => ({ f: f0 * ratio, t60: [1.8, 0.9, 0.6, 0.4, 0.25][i], gain: 1 / (1 + i * 0.6), bend: i === 0 ? 0.3 : 0.1 })), { hard: 1800, ms: 8, click: 0.3 });
+            const thump = thud(0.6, f0 * 2.2, f0 * 0.9, { tau: 0.18, sweep: 0.04 });
+            return d.reverb(d.widen(d.drive(blend([skin, 1], [thump, 0.7]), 1.6), R, 0.35), { time: 2.4, mix: 0.32, damp: 0.5, seed: 401 + v });
+        },
+    },
+    // Goblet-drum "tek": a dry rim crack between the big hits.
+    'm-tek': {
+        variants: 2, peak: -6, group: 'music', mono: true,
+        make: (v, R) => d.reverb(strike(R, 0.18, [{ f: 820 + v * 40, t60: 0.05 }, { f: 1430 + v * 60, t60: 0.035, gain: 0.6 }, { f: 2350, t60: 0.02, gain: 0.3 }], { hard: 7000, ms: 1.5, click: 0.8 }), { time: 0.5, mix: 0.12, seed: 421 + v }),
+    },
+    // Struck steel pipe: low, inharmonic junk-metal percussion.
+    'm-pipe': {
+        variants: 2, peak: -7, group: 'music',
+        make: (v, R) => d.reverb(d.widen(strike(R, 1.6, modes([190, 197][v], [1, 2.76, 5.4, 8.93], { t60: 1.2, falloff: 0.6, detune: 0.01, R }), { hard: 5000 }), R, 0.4), { time: 1.2, mix: 0.25, seed: 411 + v }),
+    },
+    // Dark tam-tam bloom: low inharmonic metal that swells after the strike.
+    'm-gong': {
+        variants: 1, peak: -6, group: 'music',
+        make: (v, R) => {
+            const T = 5.5;
+            const body = strike(R, T, modes(62, [1, 1.42, 1.83, 2.31, 2.76, 3.25, 3.9, 4.6, 5.4], { t60: 5, falloff: 0.25, tilt: 0.5, detune: 0.012, R }), { hard: 900, ms: 18, click: 0.05 });
+            const bloom = d.mul(d.lowpass(body, d.curve(T, (t) => 500 + 1400 * Math.min(1, t / 0.9) * Math.exp(-t / 2.6))), d.curve(T, (t) => Math.min(1, t / 0.35)));
+            return d.reverb(d.widen(bloom, R, 0.6), { time: 3, mix: 0.35, damp: 0.55, seed: 381 });
+        },
     },
 };

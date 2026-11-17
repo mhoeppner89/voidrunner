@@ -72,7 +72,7 @@ export const TutorialRuntimeMethods={
         const q=getTutorialQuest(this.save);if(!this.renderer||this.save.player.dockedAt||!isTutorialActive(this.save))return;
         const people=[];
         if(rinSteps.has(q.stepId))people.push('rin');
-        if(paulSteps.has(q.stepId)&&!(q.stepId==='rescue-paul'&&this.activeInstanceId!=='mourning-line')||(q.flags.paulInvited&&['salvage-black-box','black-box-fight'].includes(q.stepId)))people.push('paul');
+        if(paulSteps.has(q.stepId)&&!(q.stepId==='rescue-paul'&&this.activeInstanceId!=='mourning-line')||(q.flags.paulInvited&&(['salvage-black-box','black-box-fight'].includes(q.stepId)||q.stepId==='deliver-black-box'&&!q.flags.paulDeparted)))people.push('paul');
         for(const ship of this.ships)if(ship.tutorialCompanion&&!people.includes(ship.storyPersonId))ship.hull=-1;
         let first;
         for(const person of people){
@@ -86,7 +86,7 @@ export const TutorialRuntimeMethods={
                 this.renderer.ensureGlbShipModel?.(hull);
             }
             if(person==='paul'&&ship.combatFit.droneTypes?.[0]!=='repair'){ship.combatFit.droneTypes=['repair','repair'];ship.combatFit.droneCount=2;}
-            ship.repairDronesHeld=q.stepId==='hide-patrol';
+            ship.repairDronesHeld=q.stepId==='hide-patrol'||person==='paul'&&q.stepId==='deliver-black-box'&&Boolean(q.flags['briefingRead-paul-farewell']);
             if(forcePosition&&!ship.poweredDown){ship.position.splice(0,3,...goal.toArray());ship.velocity.splice(0,3,...this.save.player.velocity);ship.rotation.splice(0,4,...this.save.player.rotation);}
             first??=ship;
         }
@@ -100,6 +100,25 @@ export const TutorialRuntimeMethods={
             if(this.campaignOpponentsInFight().length){ship.quietSince=undefined;}else ship.quietSince??=this.save.world.time;
             if(ship.quietSince!==undefined&&this.save.world.time-ship.quietSince>=8){this.powerUpEssentialCompanion(ship);actorState(q,ship);}
             else{ship.holdFire=true;ship.pursuitHoldFire=true;ship.targetId=undefined;for(let a=0;a<3;a++){ship.velocity[a]*=Math.max(0,1-dt*.6);ship.position[a]+=ship.velocity[a]*dt;}this.publishCampaignWing();return;}
+        }
+        if(ship.storyPersonId==='paul'&&q.stepId==='deliver-black-box'&&q.flags['briefingRead-paul-farewell']){
+            // The closing conversation finishes before Paul breaks formation.
+            // Reuse travel avoidance, then show an ordinary NPC jump departure.
+            ship.holdFire=true;ship.pursuitHoldFire=true;ship.targetId=undefined;ship.repairDronesHeld=true;
+            if(!ship.tutorialDepartureGoal){
+                const forward=this.tmpTutorialForward.set(0,0,-1).applyQuaternion(this.tmpQ2.fromArray(ship.rotation));
+                ship.tutorialDepartureGoal=[ship.position[0]+forward.x*1200,ship.position[1]+forward.y*1200+120,ship.position[2]+forward.z*1200];
+                ship.tutorialDepartureAt=this.save.world.time;
+            }
+            ship.destination=ship.tutorialDepartureGoal;
+            this.updateTravelAI(ship,dt);
+            if(this.save.world.time-ship.tutorialDepartureAt>=6){
+                this.renderer.spawnHyperdriveStreak?.(ship.position,ship.velocity);
+                ship.hull=-1;q.flags.paulDeparted=true;
+                if(this.save.player.currentTargetId===ship.id)this.clearTarget();
+                this.persistSave();
+            }
+            this.publishCampaignWing();return;
         }
         const peaceful=['raider-standoff','talk-paul','carrier-wait'].includes(q.stepId)||(q.stepId==='hide-patrol'&&!this.ships.some(s=>s.tutorialPatrol&&s.hull>0&&s.targetId==='player'&&!s.holdFire));
         const order=peaceful?{order:'defensive',target:undefined}:this.applyCampaignWingOrder(ship);
@@ -335,12 +354,12 @@ export const TutorialRuntimeMethods={
         if(s==='hide-patrol'){this.ensureTutorialHidePosition();this.playTutorialBriefing('paul-hide');}
         if(s==='meet-cairn'){delete q.flags['actor-rin'];delete q.flags['actor-paul'];}
         if(s==='meet-cairn')this.playTutorialBriefing('mara-cairn');
-        if(s==='deliver-black-box'&&q.flags.paulInvited)this.ui.showPilotLine?.('Paul',t('You have the recorder. Take it to Mara. We are even now — safe flying.'),'ally',10000,true);
+        if(s==='deliver-black-box'&&q.flags.paulInvited&&!q.flags.paulDeparted)this.playTutorialBriefing('paul-farewell');
         if(s==='salvage-black-box')this.ensureTutorialFieldTarget();
         if(s==='black-box-fight'&&!this.save.player.sealedCargo.some(c=>c.missionId==='tutorial-black-box')){const node=this.wreckNodes.find(n=>n.id===q.flags.blackBoxTargetId);if(node)this.save.player.cargo[node.salvage]=Math.max(0,(this.save.player.cargo[node.salvage]??0)-1);this.save.player.sealedCargo.push({missionId:'tutorial-black-box',label:'Encrypted flight recorder',units:1,mass:node?COMMODITIES[node.salvage].mass:1});}
         if(s==='complete'){this.ui.setTutorialHint?.();this.renderer?.setMissionMarker?.();this.ui.showPilotLine?.('Rin Vek',t('I will scout ahead. Keep your eyes open too; we will compare notes when Mara has decoded the recorder.'),'ally',15000,true);}
         if(s==='complete')this.save.player.sealedCargo=this.save.player.sealedCargo.filter(c=>c.missionId!=='tutorial-black-box');
-        if(!this.save.player.dockedAt){this.ensureTutorialCompanion(s!=='return-mining');if(['survey-graveyard','survey-carrier','carrier-wait','hide-patrol'].includes(s))this.ensureTutorialFieldTarget();}
+        if(!this.save.player.dockedAt){this.ensureTutorialCompanion(!['return-mining','deliver-black-box'].includes(s));if(['survey-graveyard','survey-carrier','carrier-wait','hide-patrol'].includes(s))this.ensureTutorialFieldTarget();}
     },
     restoreTutorialRuntime(){
         migrateTutorialCampaign(this.save);const q=getTutorialQuest(this.save);if(!isTutorialActive(this.save))return this.tutorialSummary();
@@ -349,6 +368,7 @@ export const TutorialRuntimeMethods={
         this.ensureTutorialEquipment();this.ensureTutorialDelivery();this.ensureTutorialMiningContract();
         if(!this.save.player.dockedAt){if(!['earn-standing','raider-standoff','defeat-raider','hide-patrol','talk-paul','return-mining'].includes(q.stepId))this.setTutorialDestination(this.tutorialSummary().destinationId);this.ensureTutorialCompanion();this.ensureTutorialEnemy();if(q.stepId==='hide-patrol')this.ensureTutorialHidePosition();this.ensureTutorialFieldTarget();if(q.stepId==='talk-paul')this.playTutorialBriefing('paul-rescue');if(q.stepId==='defeat-raider')this.playTutorialBriefing(q.flags.firstRaiderSurrendered?'surrender':'combat');if(q.stepId==='land-mining'&&this.save.world.combatWrecks?.[q.flags.tutorialLootWreckId])this.playTutorialBriefing(q.flags.firstRaiderKilledAfterSurrender?'loot-surrender-killed':'loot');}
         if(!this.save.player.dockedAt&&['hide-patrol','return-helix'].includes(q.stepId))this.playTutorialBriefing(q.stepId==='hide-patrol'?'paul-hide':'paul-clear');
+        if(!this.save.player.dockedAt&&q.stepId==='deliver-black-box'&&q.flags.paulInvited&&!q.flags.paulDeparted)this.playTutorialBriefing('paul-farewell');
         this.queueTutorialMaraCall();return this.tutorialSummary();
     },
     queueTutorialMaraCall(){
@@ -473,6 +493,7 @@ export const TutorialRuntimeMethods={
             if(marker&&distance(p.position,marker.position)<=500){q.flags.carrierRemark=true;this.ui.showPilotLine?.('Paul',t('A Concord carrier. Still huge, even as a wreck.'),'story-friend',10000,true);}
         }
         if(this.updateTutorialSurveyProgress())return;
+        if(s==='deliver-black-box'&&q.flags.paulInvited&&!q.flags.paulDeparted)this.playTutorialBriefing('paul-farewell');
         if(s==='return-helix'&&!q.flags['briefingShown-paul-clear'])this.playTutorialBriefing('paul-clear');
         if(s==='carrier-wait'){
             this.handleTutorialEvent('patrol-arrived');

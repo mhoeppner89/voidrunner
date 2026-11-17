@@ -132,13 +132,13 @@ test('novices lock slowly and every subsequent missile requires a fresh warned l
  for(const tier of ['novice','veteran','ace']){
   const s=session(),ship=s.spawnShip('pirate',[0,0,180],undefined,undefined,{tier,temperament:'steady'});
   ship.rotation=[0,0,0,1];ship.targetId='player';ship.combatFit=createEnemyLoadout(ship,0);ship.combatFit.missiles=2;ship.combatFit.racks?.forEach(r=>r.missiles=2);
-  const warnings=[],launches=[];s.setOwnMonitorStatus=()=>warnings.push(s.save.world.time);
+  const warnings=[],launches=[],sounds=[];s.setOwnMonitorStatus=()=>warnings.push(s.save.world.time);s.audio.playCockpit=(id)=>sounds.push([id,s.save.world.time]);
   for(let i=0;i<2400;i++){
    s.save.world.time=i/60;const before=s.projectiles.length;
    s.updateNpcOrdnance(ship,new THREE.Vector3(),1/60);
    if(s.projectiles.length>before)launches.push(s.save.world.time);
   }
-  assert.equal(launches.length,2);assert.equal(warnings.length,2);
+  assert.equal(launches.length,2);assert.equal(warnings.length,2);assert.deepEqual(sounds.map(([id])=>id),['missileAlert','missileAlert'],'locking stays visual; only launched missiles raise the incoming warning');
   const lock=tier==='novice'?4:2.5,gap=tier==='novice'?10:6;
   assert.ok(launches[0]>=lock-.02);assert.ok(launches[0]<lock+.1);
   assert.ok(launches[1]-launches[0]>=gap+lock-.02);

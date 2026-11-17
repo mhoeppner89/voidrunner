@@ -94,6 +94,8 @@ import {leagueTrafficChance,factionsOpposed} from './leagueContent.js';
 import { PLAYER_FLYABLE_HULLS, observerRoleFor } from './shipPool.js';
 import { paletteForFaction, playerShipVariant, shipVariantForRole } from './voxelModels.js';
 import { SENSOR_CLOSE_VISUAL_RANGE, SENSOR_CONTACT_THRESHOLD, SENSOR_HORIZON, SENSOR_IDENTIFY_THRESHOLD, SENSOR_TRACK_THRESHOLD, addEmissionHeat, awarenessState, npcPhysicalSignatureRangeValues, physicalSignatureRangeValues, signatureBand, stepDriveHeat, stepEmissionHeat, stepSensorAwareness } from './sensors.js';
+// Location kinds that carry their own music when you fly near them.
+const MUSIC_REGION_CONTEXT = Object.freeze({ planet: 'planet', field: 'field', rings: 'field', graveyard: 'graveyard' });
 const FORWARD = new THREE.Vector3(0, 0, -1);
 const UP = new THREE.Vector3(0, 1, 0);
 const RIGHT = new THREE.Vector3(1, 0, 0);
@@ -2910,19 +2912,20 @@ export class GameSession {
                 else if (passes.has(ship)) { passes.delete(ship); opening.delete(ship); }
             }
         }
-        // Ambient music context by nearest region: planets, the belt and the
-        // graveyard each get their own ambience; everything else is open space.
-        // Combat music overrides it inside the audio manager while hostiles
-        // are close.
-        let musicContext = 'open';
+        // Ambient music context by nearest region: planets, the belts and
+        // rings, and the graveyard each get their own score; stations, jump
+        // points and everything else are open space. The nearest region also
+        // weights which piece plays. Combat music overrides it inside the
+        // audio manager while hostiles are close.
+        let musicContext = 'open', musicRegion;
         if (!this.save.player.dockedAt) {
             const px = this.save.player.position[0];
             const py = this.save.player.position[1];
             const pz = this.save.player.position[2];
             let bestSq = Infinity;
             for (const id of this.currentNavLocationIds()) {
-                const location = LOCATIONS[id];
-                if (location.kind === 'station')
+                const location = LOCATIONS[id], context = MUSIC_REGION_CONTEXT[location.kind];
+                if (!context)
                     continue;
                 const near = location.kind === 'planet' ? location.radius * 3 : location.radius * 2.2;
                 const dx = px - location.position[0];
@@ -2931,14 +2934,15 @@ export class GameSession {
                 const distSq = dx * dx + dy * dy + dz * dz;
                 if (distSq < near * near && distSq < bestSq) {
                     bestSq = distSq;
-                    musicContext = location.kind === 'planet' ? 'planet' : (id === 'shardbelt' ? 'field' : 'graveyard');
+                    musicContext = context;
+                    musicRegion = id;
                 }
             }
         }
         musicContext=this.tutorialMusicContext()??musicContext;
         // Flight state for the mixer (one reused object: speed, manoeuvre load,
         // shields, drive state, nearest inbound missile, what we are docked at).
-        const flight = (this.audioFlight ??= { speed: 0, turn: 0, yaw: 0, shield: 1, hyper: false, missileThreat: 0, dockKind: undefined });
+        const flight = (this.audioFlight ??= { speed: 0, turn: 0, yaw: 0, shield: 1, hyper: false, missileThreat: 0, dockKind: undefined, dockId: undefined, systemId: undefined, regionId: undefined });
         const spin = this.save.player.angularVelocity, velocity = this.save.player.velocity;
         flight.speed = flying ? clamp(Math.hypot(velocity[0], velocity[1], velocity[2]) / Math.max(1, stats.maxSpeed), 0, 1.4) || 0 : 0;
         flight.turn = flying && spin ? clamp(Math.hypot(spin[0], spin[1], spin[2]) / 1.4, 0, 1) || 0 : 0;
@@ -2946,6 +2950,9 @@ export class GameSession {
         flight.shield = stats.shield > 0 ? clamp(this.save.player.shield / stats.shield, 0, 1) || 0 : 1;
         flight.hyper = this.hyperdriveFx === 'active' || this.hyperdriveFx === 'gate';
         flight.dockKind = LOCATIONS[this.save.player.dockedAt]?.kind;
+        flight.dockId = this.save.player.dockedAt || undefined;
+        flight.systemId = this.save.player.systemId;
+        flight.regionId = musicRegion;
         let missileThreat = 0;
         if (flying && this.projectiles) {
             for (const projectile of this.projectiles) {
@@ -9699,7 +9706,7 @@ export class GameSession {
         if(distance<80 || distance>launcher.lockRange || forward.dot(dir)<0.93 || this.lineBlocked(start,targetPosition,ship.id)){fit.lock=0;fit.warned=false;return;}
         fit.lock=(fit.lock ?? 0)+dt;
         if(fit.lock<1.4)return;
-        if(ship.targetId==='player' && !fit.warned){this.setOwnMonitorStatus(t('MISSILE LOCK — BREAK AWAY'),novice?3000:1800);this.audio?.playCockpit?.('lockWarning',.9);fit.warned=true;fit.warnedAt=time;return;}
+        if(ship.targetId==='player' && !fit.warned){this.setOwnMonitorStatus(t('MISSILE LOCK — BREAK AWAY'),novice?3000:1800);fit.warned=true;fit.warnedAt=time;return;}
         if(fit.lock<lockTime || (ship.targetId==='player' && time-fit.warnedAt<(novice?2.6:1.1)))return;
         if(!npcPlayerAttackWindow(this,ship))return;
         // A wingmate crossing the nose delays release, without losing the lock.

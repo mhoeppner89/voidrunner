@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v676-0-8-2ow-tier3-cockpits';
+const CACHE = 'voidrunner-v681-0-8-2pb-music-variety';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -99,6 +99,11 @@ const CORE_ASSETS = [
   './src/game/audioEngine.js',
   './src/game/audioAmbience.js',
   './src/game/audioMusic.js',
+  './src/game/musicKit.js',
+  './src/game/musicScore.js',
+  './src/game/musicSpace.js',
+  './src/game/musicFlight.js',
+  './src/game/musicDocked.js',
   './src/game/repairSites.js',
   './src/game/repairDrones.js',
   './src/game/capitalCombat.js',

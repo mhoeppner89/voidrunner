@@ -12,7 +12,7 @@ const GROUPS = [
     ['Taking damage', ['shield', 'hit', 'shieldBreak', 'shieldRestore', 'targetShieldBreak', 'hullAlarm', 'spark', 'creak']],
     ['World', ['impact', 'rock', 'explosion', 'capitalExplosion', 'flyby', 'whizz']],
     ['Ship systems', ['afterburnerOn', 'afterburnerOff', 'scan', 'dock', 'pickup', 'salvage', 'mining', 'repair', 'hyperSpool', 'hyperActive', 'hyperDrop', 'slipstream']],
-    ['Targeting & alerts', ['targetCycle', 'targetLock', 'lockWarning', 'missileAlert', 'alert', 'threat', 'kill', 'countdown', 'raceGo', 'commsOpen', 'commsClose', 'chatter']],
+    ['Targeting & alerts', ['targetCycle', 'targetLock', 'missileAlert', 'alert', 'threat', 'kill', 'countdown', 'raceGo', 'commsOpen', 'commsClose', 'chatter']],
     ['Menus', ['ui', 'uiHover', 'uiTab', 'uiOpen', 'uiClose', 'confirm', 'deny', 'purchase', 'equip', 'weaponSwitch', 'success', 'reward', 'discovery']],
     ['Ambience details', ['clank', 'pneumatic', 'paChirp', 'rockKnock', 'metalGroan', 'voidWhisper']],
 ];

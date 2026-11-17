@@ -65,6 +65,8 @@
 - Loudness is tuned by measurement: after changing levels, run `npm run audio:mix` (optionally `VR_STEM=music` / `VR_STEM=effects`) and compare against the targets — cruise about −25 LUFS, a dogfight about −19 with peaks under −1 dBFS, ambient themes about −30, combat score about −25 (all at the default sliders).
 - Earlier revisions of the ambient score were corrected for bright, fast-attack repeating notes ("dings"): station and planet voices stay in the low-mid register with soft attacks. Keep that when adding instruments.
 - Audition changes on `/tools/playtest/sound-review/index.html`; `npm run test:browser:sound` is the live check (desktop Chrome runs the graph behind `--mute-audio`, WebKit keeps the context suspended).
+- The score is a catalogue: `audioMusic.js` is the director and instrument set, pieces live in `musicSpace.js` (open space), `musicFlight.js` (planet/field/graveyard/stealth/combat) and `musicDocked.js` (docked themes by location), registered in `musicScore.js`. Add music as a new piece object, never as a branch inside the director. Only ids in `APPROVED_PIECES` reach the game; new pieces stay there unapproved until the user approves them on `/tools/playtest/sound-review/music.html`.
+- Match every new piece to its context's loudness with `npm run audio:mix -- --pieces <id>` (music only; open/planet/field/graveyard about −30, stealth about −32.6, combat about −25.3, docked about −28.8) and set its `trim`. `tests/unit/musicScore.test.mjs` runs every piece through a strict fake Web Audio graph (non-finite values, register cap at C6 for bells/plucks/mallets, node churn).
 
 ## Repository housekeeping
 

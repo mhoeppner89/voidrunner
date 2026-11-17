@@ -91,13 +91,16 @@ export default {
         variants: 3, peak: -4, group: 'flight',
         make: (v, R) => d.drive(blend([thud(0.08, 250 - v * 20, 105, { sweep: 0.012, tau: 0.014 }), 1], [burst(R, 0.05, { from: 6000, to: 1800, tau: 0.007, mode: 'bp', q: 1.2 }), 0.7]), 2),
     },
-    // Ripper scatter blast: a wide low blast and the pellet spread behind it.
+    // Scatter blast: a chesty opening concussion, then the wide pellet spray.
     'ripper-blast': {
         variants: 2, peak: -2, group: 'flight',
         make: (v, R) => {
             const blast = blend([burst(R, 0.42, { from: 7500, to: 500, sweep: 0.09, tau: 0.07 }), 1], [d.mul(d.bandpass(d.noise(0.3, R), 1200, 0.9), d.perc(0.3, 0.001, 0.06)), 0.7]);
             const pellets = scatter(R, 0.3, 7, (r) => tick(r, { hz: 3200, ms: 2 }), { span: 0.09, shape: 1, spread: 0.8, fall: 0.4 });
-            const mono = d.drive(blend([blast, 1], [thud(0.3, 122 - v * 10, 44, { tau: 0.08 }), 0.45]), 2.2);
+            // Longer 40 Hz pressure body plus low-mid concussion that survives phone speakers.
+            const pressure = thud(0.38, 148 - v * 8, 40, { sweep: 0.025, tau: 0.12, attack: 0.001, push: 2.2 });
+            const chest = burst(R, 0.24, { color: 'pink', from: 650, to: 120, sweep: 0.035, tau: 0.085, attack: 0.001 });
+            const mono = d.drive(blend([blast, 1], [pressure, 1.65], [chest, 0.65]), 2.2);
             const out = d.canvas(0.45);
             d.place(out, d.widen(mono, R, 0.45)); d.place(out, pellets, 0.012, 0.35);
             return d.reverb(out, { time: 0.6, mix: 0.15, seed: 51 + v });
@@ -116,16 +119,31 @@ export default {
             return d.reverb(d.widen(mono, R, 0.5), { time: 1.4, mix: 0.22, seed: 61 + v });
         },
     },
-    // Sustained beam: a humming carrier with a gated sizzle on top.
+    // Soft missile ejection followed by motor wash; no launch concussion.
+    // Keep missile-ignite unchanged: the magrail now uses that original sound.
+    'missile-exhaust': {
+        variants: 2, peak: -5, group: 'flight',
+        make: (v, R) => {
+            const T = 1.5, turbulence = d.wander(T, R, 26);
+            const envelope = d.curve(T, (t) => Math.min(1, t / 0.18) * Math.exp(-Math.max(0, t - 0.18) / 0.46) * (0.82 + 0.18 * turbulence[Math.floor(t * d.SR)]));
+            const roar = d.mul(d.bandpass(d.noise(T, R, 'pink'), d.line(T, [[0, 500], [0.2, 1500 + v * 180], [T, 480]], 'exp'), 0.85), envelope);
+            const air = d.mul(d.highpass(d.noise(T, R), 3500), d.perc(T, 0.07, 0.22));
+            const mono = d.drive(blend([roar, 1], [air, 0.2]), 1.3);
+            return d.reverb(d.widen(mono, R, 0.5), { time: 1.1, mix: 0.16, seed: 65 + v });
+        },
+    },
+    // Unpitched electrical discharge: no carrier notes or regular modulation.
     'beam-sizzle': {
         variants: 2, peak: -6, group: 'flight',
         make: (v, R) => {
-            const T = 0.55, base = 110 + v * 13;
-            const hum = d.bandpass(d.sum(d.osc(T, base, 'saw'), d.osc(T, base * 2.007, 'saw')), 1250, 1.1);
-            const tremolo = d.curve(T, (t) => 0.7 + 0.3 * Math.sin(2 * Math.PI * 52 * t));
-            const sizzle = d.mul(d.highpass(d.noise(T, R), 5200), d.curve(T, (t) => Math.pow(Math.abs(Math.sin(Math.PI * 104 * t)), 3)));
-            const mono = d.mul(blend([d.mul(hum, tremolo), 1], [sizzle, 0.5]), d.curve(T, (t) => Math.min(1, t / 0.012) * Math.min(1, (T - t) / 0.2)));
-            return d.widen(mono, R, 0.6);
+            const T = 0.38, drift = d.wander(T, R, 31);
+            const cutoff = d.curve(T, (t) => 1600 + v * 160 + 380 * drift[Math.floor(t * d.SR)]);
+            const body = d.bandpass(d.noise(T, R, 'pink'), cutoff, 0.65);
+            const air = d.highpass(d.noise(T, R), 4600);
+            const flutter = d.curve(T, (t) => 0.82 + 0.18 * drift[Math.floor(t * d.SR)]);
+            const envelope = d.curve(T, (t) => Math.min(1, t / 0.006) * Math.exp(-t / 0.105) * Math.min(1, (T - t) / 0.06));
+            const mono = d.mul(d.mul(blend([body, 1], [air, 0.3]), flutter), envelope);
+            return d.widen(d.drive(mono, 1.25), R, 0.4);
         },
     },
 

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Voidrunner · Music review</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="./weapons.css"><link rel="stylesheet" href="./music.css">
+</head>
+<body><main>
+<header><div><span class="eyebrow">VOIDRUNNER · AUDIO REVIEW</span><h1>Music</h1><p>Every piece of the adaptive score, played live by the game’s own music director. No two plays are identical, because each piece writes its bars as it goes. New pieces reach the game only once they are approved here. Verdicts and notes stay in this browser until you export them.</p></div><a href="./index.html">Full sound review ↗</a></header>
+<section class="toolbar" aria-label="Playback controls">
+<button id="enable" class="primary">Enable audio</button>
+<label>Music volume <input id="volume" type="range" min="0" max="1" step=".01" value=".34"><output id="volume-value">34%</output></label>
+<button id="stop" disabled>Stop</button>
+<button id="export">Export verdicts</button>
+<button id="copy-approved">Copy approved ids</button>
+<p id="status" role="status" aria-live="polite">Nothing plays until you enable audio.</p>
+<div id="now" hidden><span id="now-title"></span><span id="now-progress"></span><div class="progress"><i id="now-bar"></i></div></div>
+</section>
+<section aria-labelledby="rotation-heading" class="rotation">
+<h2 id="rotation-heading">Hear the game’s choices</h2>
+<p>This runs the real selection without picking a piece yourself: open space, planets, the belts and the graveyard rotate pieces with silence between them, weighted by star system and nearby region. Docked themes follow the station.</p>
+<div class="rotation-controls">
+<label>Star system <select id="rot-system"></select></label>
+<label>Place <select id="rot-place"></select></label>
+<label><input type="checkbox" id="rot-pending" checked> Include pieces awaiting review</label>
+<label><input type="checkbox" id="rot-short" checked> Short pieces (16 bars, 6 s rests)</label>
+<button id="rot-play" data-needs-audio disabled>Play the game’s choice</button>
+<button id="rot-combat" data-needs-audio disabled>Start a fight</button>
+<button id="rot-calm" data-needs-audio disabled>End the fight</button>
+</div>
+</section>
+<div id="catalog"></div>
+<footer>Combat pieces open with one hostile (tier 1). “Three hostiles” escalates to tier 2, and “End the fight” lets the danger fade through tier 0 into the resolve chord. “Hear the ending” shortens a rotating piece to eight bars so you can hear its closing cadence and the rest that follows.</footer>
+</main><script type="module" src="./music.js"></script></body></html>

@@ -101,7 +101,6 @@ export const TUTORIAL_TRANSLATIONS = {
     "Five contacts. Too many. Transponder off, thrust down. Hide inside the carrier hangar and hold fire.": "Fünf Kontakte. Zu viele. Transponder aus, Schub runter. Versteck dich im Trägerhangar und halte das Feuer zurück.",
     "The lane is clear. Transponder on. Let us head to Helix; Mara will want your survey.": "Die Route ist frei. Transponder an. Fliegen wir nach Helix; Mara wartet auf deine Kartierung.",
     "Rin is back at Cairn. She has a lead on your parents. Go meet her there.": "Rin ist zurück in Cairn. Sie hat eine Spur zu deinen Eltern. Triff sie dort.",
-    "You have the recorder. Take it to Mara. We are even now — safe flying.": "Du hast den Rekorder. Bring ihn zu Mara. Wir sind jetzt quitt — guten Flug.",
     "Good. The hull blocks their sensors. I used to haul supplies through this hangar before the evacuation. Now we wait.": "Gut. Die Hülle blockiert ihre Sensoren. Vor der Evakuierung habe ich Fracht durch diesen Hangar geflogen. Jetzt warten wir.",
     "I see you outside, but I need you at the hangar. Select Helix, reduce thrust and approach the landing marker.": "Ich sehe dich draußen, aber ich brauche dich am Hangar. Wähle Helix, reduziere den Schub und fliege zum Landemarker.",
     "Rin replaced the lost delivery cargo.": "Rin hat die verlorene Lieferfracht ersetzt.",

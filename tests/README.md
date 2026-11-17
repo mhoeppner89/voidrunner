@@ -21,6 +21,8 @@ VR_BASE_URL=http://127.0.0.1:4212 npm run test:browser:controller
 
 The main browser group covers startup and player actions; specialized commands cover tutorials, equipment, rendering, stations and exploration. Run only the groups affected by a change. Browser checks mute sound and report under ignored `output/`. Android and iPhone profiles are browser emulation; physical-device performance still requires a device check. `AGENTS.md` documents the simulation hooks and Chrome flags.
 
+The score has a headless check (`tests/unit/musicScore.test.mjs`): every piece runs for dozens of bars, at every combat tier, through a strict fake Web Audio graph from `tests/helpers/fake-audio.mjs`. `npm run test:browser:sound` adds the music review page (`tests/browser/music-review.mjs`) on desktop and Android.
+
 `offline-startup.mjs` must retain service workers and the normal entry URL. Startup probes alone cannot verify cache installation, decoded opening art or offline resume.
 
 Tests for rejected palette/grid reviews and the retired procedural cockpit have been removed with their implementations. Current cockpit coverage lives in `cockpit-artwork.mjs`; shader coverage remains in `pixel-display.test.mjs`, `visual-shaders.mjs` and `illustrated-finish.mjs`. The shared shader capture is under `tools/playtest/shared`.

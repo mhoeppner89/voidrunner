@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Voidrunner · Weapon sound review</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="./weapons.css">
+</head>
+<body><main>
+<header><div><span class="eyebrow">VOIDRUNNER · AUDIO REVIEW</span><h1>Weapon sounds</h1><p>The live game mix, isolated from engines and music. Select a weapon to hear its firing rhythm. Weapons sharing a sound are grouped together.</p></div><a href="./index.html">Full sound review ↗</a></header>
+<section class="toolbar" aria-label="Playback controls">
+<button id="enable" class="primary">Enable audio</button>
+<label>Volume <input id="volume" type="range" min="0" max="1" step=".01" value=".68"><output id="volume-value">68%</output></label>
+<label>Listen from <select id="perspective"><option value="cockpit">Own cockpit</option><option value="near">Nearby ship · 100 km</option><option value="far">Distant ship · 300 km</option></select></label>
+<button id="play-all" data-play disabled>Play all weapon sounds</button><button id="stop" disabled>Stop</button><button id="export">Export notes</button>
+<p id="status" role="status" aria-live="polite">Nothing plays until you enable audio.</p>
+</section>
+<section aria-labelledby="weapons-heading"><h2 id="weapons-heading">Guns and launchers <span id="coverage"></span></h2><div id="weapons" class="cards"></div></section>
+<section aria-labelledby="effects-heading"><h2 id="effects-heading">Impacts and weapon feedback</h2><p>Related sounds heard during firing and combat. The telephone-like lock tone has been removed; the incoming-missile alert remains.</p><div id="effects" class="cards compact"></div></section>
+<footer>Single shots and bursts use the same layered sounds, variation, distance filtering and mixer as the game. Notes are stored only for this review.</footer>
+</main><script type="module" src="./weapons.js"></script></body></html>

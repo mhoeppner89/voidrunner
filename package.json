@@ -11,6 +11,7 @@
     "test:browser:controller-setup": "node tests/browser/controller-setup.mjs",
     "test:browser:controller": "node tests/browser/controller.mjs",
     "test:browser": "node tests/browser/gameplay-smoke.mjs && node tests/browser/player-actions.mjs && node tests/browser/offline-startup.mjs",
+    "test:browser:paul-farewell": "node tests/browser/tutorial-paul-farewell.mjs",
     "test:browser:tutorial": "node tests/browser/tutorial-departure.mjs && node tests/browser/tutorial-guidance.mjs && node tests/browser/tutorial-campaign.mjs && node tests/browser/vesper-lessons.mjs && node tests/browser/story-menus.mjs && node tests/browser/tutorial-mining.mjs",
     "test:browser:wrecks": "node tests/browser/ship-wrecks.mjs",
     "test:browser:weapons": "node tests/browser/weapon-groups.mjs",
@@ -77,7 +78,8 @@
     "test:browser:cockpit-review": "node tests/browser/cockpit-layout.mjs",
     "audio:forge": "node tools/audio/forge.mjs",
     "audio:mix": "node tools/audio/render-mix.mjs",
-    "test:browser:sound": "node tests/browser/sound-design.mjs && node tests/browser/transit-audio.mjs"
+    "test:browser:weapon-sound-review": "node tests/browser/weapon-sound-review.mjs",
+    "test:browser:sound": "node tests/browser/sound-design.mjs && node tests/browser/transit-audio.mjs && node tests/browser/music-review.mjs"
   },
   "version": "0.8.2-a",
   "devDependencies": {

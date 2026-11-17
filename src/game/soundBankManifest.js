@@ -77,6 +77,13 @@ export const FORGED_SOUNDS = {
   ],
   "group": "flight"
  },
+ "missile-exhaust": {
+  "files": [
+   "fx/missile-exhaust-0.mp3",
+   "fx/missile-exhaust-1.mp3"
+  ],
+  "group": "flight"
+ },
  "beam-sizzle": {
   "files": [
    "fx/beam-sizzle-0.mp3",
@@ -364,12 +371,6 @@ export const FORGED_SOUNDS = {
   ],
   "group": "flight"
  },
- "lock-warning": {
-  "files": [
-   "fx/lock-warning-0.mp3"
-  ],
-  "group": "flight"
- },
  "missile-alert": {
   "files": [
    "fx/missile-alert-0.mp3"
@@ -582,6 +583,70 @@ export const FORGED_SOUNDS = {
  "m-heart": {
   "files": [
    "fx/m-heart-0.mp3"
+  ],
+  "group": "music"
+ },
+ "m-frame": {
+  "files": [
+   "fx/m-frame-0.mp3",
+   "fx/m-frame-1.mp3",
+   "fx/m-frame-2.mp3"
+  ],
+  "group": "music"
+ },
+ "m-hand": {
+  "files": [
+   "fx/m-hand-0.mp3",
+   "fx/m-hand-1.mp3",
+   "fx/m-hand-2.mp3"
+  ],
+  "group": "music"
+ },
+ "m-clap": {
+  "files": [
+   "fx/m-clap-0.mp3",
+   "fx/m-clap-1.mp3"
+  ],
+  "group": "music"
+ },
+ "m-brush": {
+  "files": [
+   "fx/m-brush-0.mp3",
+   "fx/m-brush-1.mp3"
+  ],
+  "group": "music"
+ },
+ "m-wood": {
+  "files": [
+   "fx/m-wood-0.mp3",
+   "fx/m-wood-1.mp3"
+  ],
+  "group": "music"
+ },
+ "m-odaiko": {
+  "files": [
+   "fx/m-odaiko-0.mp3",
+   "fx/m-odaiko-1.mp3"
+  ],
+  "group": "music"
+ },
+ "m-tek": {
+  "files": [
+   "fx/m-tek-0.mp3",
+   "fx/m-tek-1.mp3"
+  ],
+  "group": "music"
+ },
+ "m-pipe": {
+  "files": [
+   "fx/m-pipe-0.mp3",
+   "fx/m-pipe-1.mp3"
+  ],
+  "group": "music"
+ },
+ "m-gong": {
+  "files": [
+   "fx/m-gong-0.mp3"
   ],
   "group": "music"
  }

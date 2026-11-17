@@ -257,7 +257,8 @@ export class AudioManager {
     }
 
     // Per-frame mix state. `flight` is an optional, caller-owned scratch
-    // object: { speed, turn, yaw, shield, hyper, missileThreat, dockKind }.
+    // object: { speed, turn, yaw, shield, hyper, missileThreat, dockKind,
+    // dockId, systemId, regionId } (the last three choose the music).
     update(dt, throttle, afterburner, damage = 0, nearbyEnemies = 0, musicContext, raceIntensity = 0, flight) {
         if (!this.context || !this.enabled)
             return;
@@ -275,7 +276,7 @@ export class AudioManager {
         // Combat overrides the location ambience while hostiles are close;
         // station mode wins over both (you are safe on the pad).
         this.currentContext = this.stationMode ? 'station' : (this.musicContext === 'stealth' && nearbyEnemies === 0 ? 'stealth' : this.dangerLevel > 0.2 ? 'combat' : this.musicContext);
-        this.music.update(dt, this.currentContext, this.dangerLevel);
+        this.music.update(dt, this.currentContext, this.dangerLevel, flight);
         this.ambience.update(dt, this.currentContext, flight?.dockKind);
         if (flying) this.updateCockpit(dt, afterburner, damage, flight);
         else this.alarmCycles = 0;
