@@ -3,8 +3,9 @@ import {COCKPITS} from '/src/game/cockpitDefinitions.js';
 import {SHIPS} from '/src/game/data.js';
 
 const $=s=>document.querySelector(s),params=new URLSearchParams(location.search);
-const hulls=Object.values(SHIPS).filter(s=>s.tier===2&&COCKPITS[s.id]).sort((a,b)=>a.name.localeCompare(b.name));
-let selected=hulls.find(s=>s.id===params.get('hull'))??hulls.find(s=>s.id==='prospector')??hulls[0];
+const tier=Number(document.body.dataset.tier??2),tierName=tier===3?'III':'II';
+const hulls=Object.values(SHIPS).filter(s=>s.tier===tier&&COCKPITS[s.id]).sort((a,b)=>a.name.localeCompare(b.name));
+let selected=hulls.find(s=>s.id===params.get('hull'))??hulls.find(s=>s.id===(tier===3?'vanguard':'prospector'))??hulls[0];
 const frame=document.createElement('iframe');frame.id='preview';frame.title='Interactive cockpit';frame.allow='fullscreen; gamepad';$('#stage').append(frame);
 const preview=()=>frame.contentWindow;
 $('#forward-hull').checked=params.get('hull-view')==='1';
@@ -26,7 +27,7 @@ $('#scene').value=['navigation','combat','salvage'].includes(params.get('scene')
 for(const ship of hulls){
     const button=document.createElement('button');button.type='button';button.dataset.hull=ship.id;
     const name=document.createElement('b'),status=document.createElement('small');name.textContent=ship.name;
-    status.textContent=COCKPITS[ship.id].status==='approved'?'In game':'Artwork review';button.append(name,status);
+    status.textContent=COCKPITS[ship.id].status==='approved'?'In game':COCKPITS[ship.id].shell?'Artwork review':'Layout review';button.append(name,status);
     button.onclick=()=>{selected=ship;load();};$('#ships').append(button);
 }
 function resize(){
@@ -48,7 +49,7 @@ function address(){
 function load(){
     window.ready=false;window.reviewError=undefined;$('#error').hidden=true;
     for(const button of $('#ships').children)button.setAttribute('aria-pressed',String(button.dataset.hull===selected.id));
-    $('#status').textContent=`Loading ${selected.name}…`;document.title=`${selected.name} · Tier II cockpit review`;frame.title=`${selected.name} interactive cockpit`;
+    $('#status').textContent=`Loading ${selected.name}…`;document.title=`${selected.name} · Tier ${tierName} cockpit review`;frame.title=`${selected.name} interactive cockpit`;
     const url=new URL('./index.html',location.href);url.searchParams.set('embedded','1');url.searchParams.set('hull',selected.id);url.searchParams.set('scene',$('#scene').value);
     const hasHull=hasForwardHullBlockout(selected.id);$('#forward-label').hidden=!hasHull;viewControls();
     if(hasHull&&$('#forward-hull').checked){url.searchParams.set('hull-view','1');url.searchParams.set('view-forward',$('#forward-view').value);url.searchParams.set('hull-outward',$('#outward-view').value);if($('#painted-hull').checked)url.searchParams.set('hull-art','1');}
@@ -69,7 +70,7 @@ window.addEventListener('message',event=>{
     if(preview().cockpitReview?.definition.id!==selected.id)return;
     sendControl('scene');sendControl('guides');window.ready=true;
     if(preview().cockpitReview.forwardHull)updateView();
-    $('#status').textContent=preview().cockpitReview.forwardHull?(preview().cockpitReview.forwardHull.kind==='painted-hull-review'?'Painted hull · 13% forward / 18% outward · approved / in game':'Hand-drawn shapes · placement approved at 13% / 18%'):COCKPITS[selected.id].status==='approved'?`${selected.name} · approved / in game`:`${selected.name} · finished artwork / awaiting approval`;
+    $('#status').textContent=preview().cockpitReview.forwardHull?(preview().cockpitReview.forwardHull.kind==='painted-hull-review'?'Painted hull · 13% forward / 18% outward · approved / in game':'Hand-drawn shapes · placement approved at 13% / 18%'):COCKPITS[selected.id].status==='approved'?`${selected.name} · approved / in game`:`${selected.name} · ${COCKPITS[selected.id].shell?'finished artwork':'unpainted layout'} / awaiting approval`;
 });
 $('#previous').onclick=()=>{selected=hulls[(hulls.indexOf(selected)+hulls.length-1)%hulls.length];load();};
 $('#next').onclick=()=>{selected=hulls[(hulls.indexOf(selected)+1)%hulls.length];load();};

@@ -36,7 +36,7 @@
 
 ## Approved starter cockpit (cockpitArtwork.js)
 
-- The user approved the complete frame and navy/white hand from cockpit review 04 and requested live integration. All tier-I and tier-II hulls now use `PaintedCockpit` in `cockpitArtwork.js`; tier-III hulls retain their existing plates. This supersedes the earlier code-drawn-only direction for the starter hull.
+- The user approved the complete frame and navy/white hand from cockpit review 04 and requested live integration. All tier-I, tier-II and tier-III hulls now use approved full frames through `PaintedCockpit` in `cockpitArtwork.js`. This supersedes the earlier code-drawn-only direction for the starter hull.
 - Render the complete approved frame as one image. Live monitor rectangles follow the actual transparent apertures. Never cut its beams/bezels into independently rebuilt parts or restore the flat filler panels.
 - The hand uses three pitch views, one common scale and source shaft anchors aligned to a fixed pivot. Yaw rotates around that pivot. Never translate the base or crop the extended sleeve into view. Three images (frame, hand, fixed base) are decoded; the frame is static and flight updates only change a quantised hand transform/pose. Keep layout reads and alpha-map construction out of the frame loop.
 - The joystick base is a separate transparent sprite behind the hand; its source socket anchor must match the fixed shaft pivot. Never rotate or translate the base with steering.
@@ -85,7 +85,7 @@
 - No floating HUD cards over the 3D view: all telemetry (SPD/THR/FUEL/MSL/HOLD/LOAD/HND/CR, shields/armor/hull) lives on the cockpit monitors. The bottom-left/right cards were scrapped for good.
 - Touch pads are contextual: asteroid → yellow MINE + SCAN, wreck → teal SALVAGE + SCAN, else FIRE/MISSILE; the second pad runs a scan on deposits.
 - The flight stick is always present on every device (Wing Commander 2 style: the pilot's gloved left hand on the stick, bottom-left, moving with every input source). Tilt may return later only as an option. Hyperdrive engages by tapping the target monitor when a location is locked (hint reads "ACTIVATE HYPERDRIVE"), pause/fullscreen buttons top-left, thrust is a drag lever.
-- All tier-I and tier-II cockpits use approved full frames and the shared anchored hand strip; tier-III hulls keep their current art. Preserve the approved control layout and generous invisible touch areas.
+- All tier-I, tier-II and tier-III cockpits use approved full frames and the shared anchored hand strip. Preserve the approved control layout and generous invisible touch areas.
 - Docking/landing is automatic when slow and close (no button); AI fights WW2-style with strafing runs, and encounters never stack on an active one.
 
 ## Shared cockpit authoring

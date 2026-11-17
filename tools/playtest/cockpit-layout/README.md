@@ -2,6 +2,8 @@
 
 Build with `npm run review:cockpit`; serve the repository and open:
 
+- **Five tier-III unpainted layouts:** `/output/cockpit-layout/tier-3.html` — Bellona, Artemis, Atlas Hauler, Victoria and Odin, with actual model comparison and desktop/phone presets. Layout approval is required before artwork.
+
 - **All seven tier-II cockpits:** `/output/cockpit-layout/tier-2.html` — one active production cockpit, ship tabs, desktop/phone presets, navigation/combat/salvage, model reference and focus mode. All seven compositions are approved and integrated in live flight. Career saves and settings are untouched.
 
 - Balor approved live artwork: `/output/cockpit-layout/index.html?hull=scrapper`
@@ -92,3 +94,48 @@ On 2026-11-17 the user selected **13% forward / 18% outward**. Those values supe
 Open `/output/cockpit-layout/tier-2.html?hull=demon&profile=desktop&hull-view=1&view-forward=13&hull-outward=18&hull-art=1`. **Painted hull** compares the generated sprite against the manual study. While enabled, both sliders are fixed at the approved sprite placement; uncheck to edit the manual geometry again. The sprite is decoded before the review reports ready. The user subsequently approved this composition for live activation: the shipping definition now owns this optional sprite and placement, warming includes it, HUD visibility uses the cached union of frame and hull alpha, and canopy damage masks both. The editable manual layer remains authoring-only.
 
 Focused muted desktop/phone checks passed for painted/manual switching, exact placement, 98.55% alpha-mask overlap with the input silhouette, an entirely clear central view, unchanged frame/monitors/hand/base, URL reload and Mercury exclusion. Captures inspected under ignored `output/cockpit-layout/forward-hull/morrigan-fit/painted-*.png`; details in `painted-report.json`.
+
+
+## Tier-III unpainted layouts — 2026-11-17
+
+The current request covers all five tier-III entries from `SHIPS`, including the League hulls: Bellona (`vanguard`), Artemis (`lancer`), Atlas Hauler (`atlas`), Victoria (`blade`) and Odin (`astra`). Each has a draft factory under `src/game/cockpits/` and a native-space canopy survey under this tool’s `hulls/`. The registry exposes these only with `review:true`; no shell, image-generation output, live activation or image warming is supplied. Their source modules are present in the SW source list so a future runtime package remains complete. This authoring change does not publish or bump the game release.
+
+The single collection controller supports tier-III selection through `tier-3.html`, with five tabs and the same production iframe, real desktop/phone sizes, scenes, focus and 3D canopy reference. Shared monitor sizes and own/target positions are unchanged. Every draft lowers the central radar to source y647 and retains the sloped hyperdrive cowl above it, identical perspective side decks, unchanged navy/white hand strip and fixed base, −60px socket offset and shipping control/hit geometry. Hull-specific framing derives from each actual glazing surface; projection stretch is documented explicitly per hull. The exterior models have closed parts and no authored cockpit interior; the proposed seats and trim are interior adaptations, not claims that the full exterior mesh can be rendered unchanged around the player.
+
+Atlas selects only its upper three-window bridge (six triangles), excluding the separate broad observation band. Bellona uses 72 glazing triangles; Artemis 52; Victoria 132; Odin 384, including thickened surfaces. Cyan reference highlights exactly the selected real triangles. All five model files remain unchanged. No extra noses or side structures were invented. Evidence and read-only source surveys are under ignored `output/cockpit-layout/tier-3-survey/`; per-hull documentation records hashes, coordinates, measured profiles and approval boundaries.
+
+
+Tier-III layout verification passed all five hulls on desktop Chrome and a small touch phone using the existing production-renderer/input harness, plus collection captures in true 1440×900 / 844×390 inner viewports and all five actual model references. Navigation/combat/salvage, fixed pilot pivots, keyboard/touch/controller, touch-neutral contact, boost hit area, cargo view and untouched saves/settings pass. Eighteen focused source/HUD checks and packaging pass. Use the fresh review origin on port 4214 if an installed game service worker on another origin still serves the approved previous registry. Layout approval remains the next step; do not generate artwork yet.
+
+
+### Distinct tier-III structural bases
+
+In response to the first review, the five drafts now differ beyond their pane outlines: Bellona has a heavy recessed bulkhead; Artemis has independent light pods and exposed supports; Atlas has a service bridge with stepped pedestals; Victoria has swept faceted shoulders and a center spine; Odin has a rounded pressure cradle with a smooth double canopy seal. Per-hull `structure` metadata owns the rims, housing geometry and perspective console proportions. `structureVariants.js` adds only proposed neutral cabinetry/supports, never live buttons or telemetry. These are still code-drawn layout guides, not generated artwork.
+
+All monitor rectangles, the radar/hyperdrive arrangement, input areas and shared hand/base placement remain fixed. Cabinetry masks out every live screen aperture. Raised hardware is physically rooted on the projected decks, with the complete joystick base supported. Desktop/phone root/alpha checks, all nine fixed-pivot poses and existing desktop/small-phone keyboard/touch/controller regressions pass; 18 focused source/HUD checks and packaging pass. Approved tier-I/tier-II frames are unaffected. Layout approval still precedes imagegen.
+
+
+### Architecture revision 3 — after the second similarity rejection
+
+The earlier changes preserved too much of the common dashboard silhouette. The current draft uses custom instrument mounts and complete console forms instead: Bellona’s enclosed tub and roof rib; Artemis’s open pods/outriggers; Atlas’s level workbench and three-pane bridge; Victoria’s asymmetric tactical saddle/keel; Odin’s panoramic bubble, separate capsules and oval central binnacle. Monitor glass and all input/hand/base geometry remain fixed. Narrow decks are clipped to their intended pedestal shapes, with a dark lower footwell rather than stars beneath the instrument supports. Canopy roots meet the actual new pod or cabinet crowns. Only Atlas retains the raised service-case fixtures; shared decorative boxes were removed from the other profiles.
+
+Odin’s explicitly adapted projection is now 1.25×/.45×; Atlas’s bridge frame is segmented around its three selected panes. These remain proposals around the measured glazing, not authored interiors or newly approved art. Current local same-scale comparison: `/output/cockpit-layout/tier-3-comparison.html` (generated review captures, no animation). Interactive review: `/output/cockpit-layout/tier-3.html?revision=architecture-3`.
+
+All ten desktop/phone geometry cases pass: base supported both geometrically and by visible frame alpha, service-case roots supported, all three display apertures and central aim clear, and all nine fixed-pivot poses. The existing five-hull desktop/small-phone input suite also passes. Eighteen focused source/HUD checks pass. No live activation or image generation.
+
+
+### Victoria revision 4
+
+The user’s next review rejected Victoria specifically. The asymmetric block/pod arrangement is replaced by a low, symmetric fighter console with a continuous fascia, folded coaming, flush monitor recesses and integrated hyperdrive forehead. Stray overhead diagonals and the separate pointed keel are removed. The canopy itself and all approved shared instrument/control/rig coordinates are retained. Both side ledges match, the base is supported, and the jambs meet the rear coaming corners. Other hulls are unchanged. Victoria desktop/phone geometry and nine-pose checks, desktop/small shared input checks and all18 source/HUD checks pass. Review `?hull=blade&revision=victoria-4`; layout approval still precedes artwork.
+
+
+### Tier-III painted composition review — 2026-11-17
+
+The user approved all five final layouts, including Victoria revision 4, and authorized image generation. Generated separate transparent frames from each clean guide and an actual exterior reference. No hand, base or live controls were supplied as painting instructions. Bellona uses armored steel and charcoal molded impact padding; Artemis thin titanium/carbon pods; Atlas an ochre industrial workbench; Victoria a low navy fighter console; Odin pearl ceramic and petrol-green pressure housings. Originals and exact prompts are indexed in `assets/cockpits/TIER-3-ARTWORK.md`. Odin received one focused aperture correction; both versions are retained.
+
+Current definitions are `art-review`, with shell paths, measured content insets and glass underlap. All approved monitor rectangles, control/hit areas and shared hand/base geometry remain fixed. Production selection and preloading stay gated off until composition approval. Review `/output/cockpit-layout/tier-3.html?revision=tier3-art-1` on the fresh port 4214 origin. This supersedes the earlier unpainted-only status above; `mockup=1` remains available in the detailed review for the original structural guide. No live release bump or commit/push is part of artwork authoring.
+
+
+### Tier-III approved live integration — 0.8.2ow
+
+The user approved all five painted compositions and requested integration, commit and push. Bellona v2, Artemis v1, Atlas v1, Victoria v1 and Odin v2 are now `approved` in the shared registry and selected/preloaded in career and Arena. `fixedInstruments:true` records the approved common rectangles; glass underlap and content insets still fit their painted lips without altering the original images. Shared hand/base/control geometry is unchanged. New target screens opt into physical-monitor container sizing for compact cargo text. Previous review-pending notes are historical. The UI and service-worker release identifiers both advance for returning players.

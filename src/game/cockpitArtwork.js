@@ -115,7 +115,14 @@ export class PaintedCockpit {
         const {monitors,hyper,stickSize,stickTranslate,bleed}=cockpitLayout(this.definition,W,H,{jumpHeight:rect('#hyperdrive-card').height,baseline,throttle,corners});
         for(const [id,q]of Object.entries(monitors)){
             const inset=this.definition.screenInsets?.[id],px=(inset?.x??0)/this.definition.width*W,py=(inset?.y??0)/this.definition.height*H;
-            this.style(this.root.querySelector(SCREENS[id]),{left:`${q.x-bleed}px`,top:`${q.y-bleed}px`,width:`${q.width+bleed*2}px`,height:`${q.height+bleed*2}px`,padding:`${bleed+py}px ${bleed+px}px`,'min-height':'0','min-width':'0'});
+            const bottom=(inset?.bottom??inset?.y??0)/this.definition.height*H;
+            // Compact content can opt into its physical monitor's query units,
+            // rather than inheriting viewport-sized cargo text on phones.
+            if(inset?.container){
+                this.style(this.root.querySelector(SCREENS[id]),{'container-type':'size'});
+                if(id==='target')this.style(this.root.querySelector('#screen-target-readout'),{'font-size':'clamp(9px, 7cqw, 14px)'});
+            }
+            this.style(this.root.querySelector(SCREENS[id]),{left:`${q.x-bleed}px`,top:`${q.y-bleed}px`,width:`${q.width+bleed*2}px`,height:`${q.height+bleed*2}px`,padding:`${bleed+py}px ${bleed+px}px ${bleed+bottom}px`,'min-height':'0','min-width':'0'});
         }
         this.style(this.root.querySelector('#hyperdrive-card'),{left:`${hyper.x}px`,top:`${hyper.y}px`,bottom:'auto',width:`${hyper.width}px`,transform:'none',translate:'none'});
         this.style(stick,{width:`${stickSize}px`,height:`${stickSize}px`,translate:`${stickTranslate}px 0`});

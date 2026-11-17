@@ -1,3 +1,8 @@
+import {createVanguardCockpit} from './cockpits/vanguard.js';
+import {createLancerCockpit} from './cockpits/lancer.js';
+import {createAtlasCockpit} from './cockpits/atlas.js';
+import {createBladeCockpit} from './cockpits/blade.js';
+import {createAstraCockpit} from './cockpits/astra.js';
 import {createDemonCockpit} from './cockpits/demon.js';
 import {createMuleCockpit} from './cockpits/mule.js';
 import {createProspectorCockpit} from './cockpits/prospector.js';
@@ -19,6 +24,12 @@ export const APPROVED_COCKPIT_LAYOUT=deepFreeze({
 });
 
 export const COCKPITS=deepFreeze({
+    vanguard:createVanguardCockpit(APPROVED_COCKPIT_LAYOUT),
+    lancer:createLancerCockpit(APPROVED_COCKPIT_LAYOUT),
+    atlas:createAtlasCockpit(APPROVED_COCKPIT_LAYOUT),
+    blade:createBladeCockpit(APPROVED_COCKPIT_LAYOUT),
+    astra:createAstraCockpit(APPROVED_COCKPIT_LAYOUT),
+
     scrapper:createScrapperCockpit(APPROVED_COCKPIT_LAYOUT),
     speedster:createSpeedsterCockpit(APPROVED_COCKPIT_LAYOUT),
     wayfarer:{...APPROVED_COCKPIT_LAYOUT,id:'wayfarer',name:'Hestia / Wanderer',status:'approved',shell:asset('wayfarer-paint-atlas-v2.png')},
@@ -51,7 +62,7 @@ export const paintedCockpitAssets=id=>{
 export const cockpitManifest=id=>{
     const c=getCockpitDefinition(id,{review:true});if(!c)throw new Error(`Unknown cockpit: ${id}`);
     const path=url=>'/assets/'+new URL(url).pathname.split('/assets/').at(-1);
-    return {version:4,width:c.width,height:c.height,shell:c.shell?path(c.shell):null,...(c.forwardHull?{forwardHull:{path:path(c.forwardHull),...c.forwardHullPlacement}}:{}),monitors:c.monitors,housingTop:c.housingTop,...(c.housingTops?{housingTops:c.housingTops,hyperdriveBottom:c.hyperdriveBottom}:{}),
+    return {version:4,width:c.width,height:c.height,shell:c.shell?path(c.shell):null,...(c.structure?{structure:c.structure}:{}),...(c.forwardHull?{forwardHull:{path:path(c.forwardHull),...c.forwardHullPlacement}}:{}),monitors:c.monitors,housingTop:c.housingTop,...(c.housingTops?{housingTops:c.housingTops,hyperdriveBottom:c.hyperdriveBottom}:{}),
         handStrip:{path:path(c.hand),...c.strip},stickBase:{...c.stickBase,path:path(c.stickBase.path)}};
 };
 // Geometry shared by live flight and the authoring view. Measurements are the

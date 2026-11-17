@@ -13,13 +13,13 @@ const base=process.env.VR_BASE_URL??'http://127.0.0.1:4212',out=`output/cockpit-
 const chrome='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const profiles=[['desktop',chromium,{viewport:{width:1440,height:900}}],['android',chromium,devices['Pixel 7 landscape']],['iphone',webkit,devices['iPhone 13 landscape']],['small',chromium,{viewport:{width:667,height:375},deviceScaleFactor:2,isMobile:true,hasTouch:true}]];
 for(const [name,engine,device]of profiles){
- if(!process.env.VR_PROFILES.split(',').includes(name))continue;
+ if(!(process.env.VR_PROFILES??'desktop,android,iphone,small').split(',').includes(name))continue;
  const browser=await engine.launch({headless:true,...(engine===chromium?{...(existsSync(chrome)?{executablePath:chrome}:{}),args:['--no-sandbox','--disable-gpu-sandbox','--mute-audio','--use-gl=angle','--use-angle=swiftshader']}:{})});let page;
  const errors=[],legacy=[],pending=new Set(),networkFailures=[];
  try{
   page=await browser.newPage({...device,serviceWorkers:'block'});page.setDefaultTimeout(120000);
   page.on('request',r=>pending.add(r.url()));page.on('requestfinished',r=>pending.delete(r.url()));page.on('requestfailed',r=>{pending.delete(r.url());networkFailures.push({url:r.url(),error:r.failure()?.errorText});});page.on('response',r=>{if(r.status()>=400)networkFailures.push({url:r.url(),status:r.status()});});
-  page.on('pageerror',e=>{errors.push(e.message);console.error(e.stack);});page.on('console',m=>{if(m.type()==='error')console.error('Browser console:',m.text());});page.on('request',r=>{if(/cockpit-(wayfarer|talon|speedster|scrapper|prospector|demon|mule|legionary|andromeda|torsas)-sprite/.test(r.url()))legacy.push(r.url());});
+  page.on('pageerror',e=>{errors.push(e.message);console.error(e.stack);});page.on('console',m=>{if(m.type()==='error')console.error('Browser console:',m.text());});page.on('request',r=>{if(/cockpit-(wayfarer|talon|speedster|scrapper|prospector|demon|mule|legionary|andromeda|torsas|vanguard|lancer|atlas|astra)-sprite/.test(r.url()))legacy.push(r.url());});
   await page.addInitScript(()=>{
    localStorage.setItem('void-privateer-settings-v1',JSON.stringify({music:0,effects:0,vibration:false}));
    const A=window.AudioContext??window.webkitAudioContext;if(A)A.prototype.resume=async function(){await this.suspend();};
@@ -63,7 +63,10 @@ for(const [name,engine,device]of profiles){
   for(const c of bitmapFit)assert.ok(Math.abs(c.width-c.cssWidth)<=1&&Math.abs(c.height-c.cssHeight)<=1,'canvas pixels match actual display dimensions, including small screens');
   const layers=await page.evaluate(()=>({frame:Number(getComputedStyle(document.querySelector('.painted-cockpit-frame')).zIndex),screen:Number(getComputedStyle(document.querySelector('.cockpit-screen-own')).zIndex),handArea:document.querySelector('.painted-hand-layer').clientWidth*document.querySelector('.painted-hand-layer').clientHeight,fullArea:innerWidth*innerHeight}));
   assert.ok(layers.frame>layers.screen,'the whole frame masks live glass edges');assert.ok(layers.handArea<layers.fullArea*.15,'hand repaints are confined to a small region');
-  assert.ok(geometry.hand.right<geometry.screens.own.x);assert.ok(geometry.screens.radar.y>=geometry.jump.bottom);
+  assert.ok(geometry.hand.right<geometry.screens.own.x);
+  // The backing deliberately bleeds underneath the painted rim. Check the
+  // visible aperture against the button, not that hidden backing rectangle.
+  assert.ok(geometry.layout.monitors.radar.y>=geometry.jump.bottom);
   assert.equal(await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime(),h=r.ui.cockpitArtwork.layout.hand;return r.ui.cockpitPointVisible(h.x+h.width*175/320,h.y+h.height*130/240);}),false,'hand hides HUD target using its cached pose alpha');
   await page.screenshot({path:`${out}/${name}-flight.png`});
   const stick=await page.locator('[data-touch-stick]').boundingBox(),sx=stick.x+stick.width*.7,sy=stick.y+stick.height*.4;
@@ -89,9 +92,12 @@ for(const [name,engine,device]of profiles){
   await page.locator('.cockpit-screen-own').click();await page.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime().ui.isModalOpen);
   assert.ok(await page.locator('[data-ui-command="close-ship"]').isVisible(),'own monitor opens the live ship panel');await page.locator('[data-ui-command="close-ship"]').click();
   await page.waitForFunction(()=>!__VOID_PRIVATEER__.getRuntime().ui.isModalOpen);
-  // Switching hulls must remove all custom state and inline geometry.
-  const switched=await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();r.save.player.shipId='vanguard';r.ui.setCockpitShip('vanguard');return {paint:r.ui.root.dataset.cockpitPaint??null,left:r.ui.el('.cockpit-screen-own').style.left,frame:getComputedStyle(r.ui.cockpitArtwork.frame).display,art:r.ui.el('.cockpit-art').style.backgroundImage};});
-  assert.equal(await page.locator('.painted-cockpit-forward-hull').isVisible(),false,'exterior overlay hides on legacy hulls');assert.equal(switched.paint,null);assert.equal(switched.left,'');assert.equal(switched.frame,'none');assert.ok(switched.art.includes('vanguard'));
+  // Every player hull is painted now. Switching to a different approved hull
+  // must replace the frame and remove the previous hull's optional fitting.
+  const alternate=hull==='wayfarer'?'talon':'wayfarer';
+  const switched=await page.evaluate(next=>{const r=__VOID_PRIVATEER__.getRuntime();r.save.player.shipId=next;r.ui.setCockpitShip(next);return {paint:r.ui.root.dataset.cockpitPaint,container:r.ui.el('.cockpit-screen-target').style.containerType,art:r.ui.el('.cockpit-art').style.backgroundImage};},alternate);
+  await page.evaluate(async()=>{const c=__VOID_PRIVATEER__.getRuntime().ui.cockpitArtwork;await c.ready;});
+  assert.equal(await page.locator('.painted-cockpit-forward-hull').isVisible(),false,'optional exterior overlay hides when switching to another hull');assert.equal(switched.paint,alternate);assert.equal(switched.container,'','previous monitor query sizing is restored');assert.equal(switched.art,'none');
   await page.evaluate(hull=>{const r=__VOID_PRIVATEER__.getRuntime();r.save.player.shipId=hull;r.ui.setCockpitShip(hull);},hull);await page.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime().ui.cockpitArtwork.layout);
   await page.evaluate(async()=>{const c=__VOID_PRIVATEER__.getRuntime().ui.cockpitArtwork;await c.ready;});
   assert.equal(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.cockpitArtwork.shipId),hull);

@@ -1,3 +1,10 @@
+## 0.8.2ow — All tier-III cockpits in live flight
+
+- Activate the approved Bellona, Artemis, Atlas Hauler, Victoria and Odin cockpit frames in career and Arena. Keep their distinct model-informed structures, exact monitor/control positions, navy/white pilot hand and fixed joystick-base sprite.
+- Use Bellona’s corrected charcoal molded impact padding and Odin’s corrected screen apertures; preserve the original full-frame PNGs.
+- Fit readouts inside the painted lips with per-monitor padding and monitor-relative cargo/status typography, including compact phones. Keep image decoding and alpha construction out of the flight loop.
+- Warm the selected approved cockpit assets and invalidate the service-worker cache for returning players. Include the five-hull authoring review, source guides and exact generation prompts.
+
 ## 0.8.2ov — All tier-II cockpits in flight, integrated sound overhaul
 
 - Activate the approved Gaia, Morrigan, Argo, Tyr, Thor and Freya cockpit frames alongside Mercury. Preserve their exact reviewed display fitting, original PNGs, control layout, navy/white hand and fixed joystick base.

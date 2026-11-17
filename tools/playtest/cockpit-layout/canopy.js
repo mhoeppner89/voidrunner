@@ -29,7 +29,7 @@ function projected(point,camera){
 }
 
 export async function createCanopy(shipId='wayfarer'){
-    const spec=views[shipId]??(['scrapper','speedster','demon','mule','prospector','legionary','andromeda','torsas'].includes(shipId)?(await import(`./hulls/${shipId}.js`)).default:undefined);
+    const spec=views[shipId]??(['scrapper','speedster','demon','mule','prospector','legionary','andromeda','torsas','vanguard','lancer','atlas','blade','astra'].includes(shipId)?(await import(`./hulls/${shipId}.js`)).default:undefined);
     if(!spec)throw new Error(`No canopy survey for ${shipId}`);
     const {eye:PILOT_EYE,look:PILOT_LOOK,fov:PILOT_FOV}=spec;
     const model=await loadGlb(`/assets/models/ships/${shipId}.glb`);

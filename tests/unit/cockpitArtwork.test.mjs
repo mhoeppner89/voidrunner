@@ -104,3 +104,15 @@ test('Morrigan warms its approved exterior overlay without changing the original
  assert.equal(cockpitManifest('demon').forwardHull.path,'/assets/cockpits/demon-forward-hull-v1.png');
  for(const id of ['talon','legionary','wayfarer'])assert.equal(getCockpitDefinition(id).forwardHull,undefined);
 });
+
+
+test('all tier-III paintings activate and warm the approved instruments and pilot rig',async()=>{
+ const {COCKPITS,getCockpitDefinition,APPROVED_COCKPIT_LAYOUT}=await import('../../src/game/cockpitDefinitions.js');
+ const {SHIPS}=await import('../../src/game/data.js');
+ const hulls=Object.values(SHIPS).filter(s=>s.tier===3);
+ assert.deepEqual(hulls.map(s=>s.id).sort(),['astra','atlas','blade','lancer','vanguard']);
+ for(const {id}of hulls){const c=COCKPITS[id];assert.equal(c.status,'approved');assert.equal(c.fixedInstruments,true);assert.match(c.shell,/paint-v[12]\.png$/);const png=await readFile(new URL(c.shell));assert.deepEqual([png.readUInt32BE(16),png.readUInt32BE(20)],c.artworkSize);assert.equal(png[25],6);assert.ok(!c.apertureClip);assert.equal(getCockpitDefinition(id),c);assert.equal(getCockpitDefinition(id,{review:true}),c);assert.deepEqual(paintedCockpitAssets(id),[c.shell,c.hand,c.stickBase.path]);
+  assert.equal(c.hand,APPROVED_COCKPIT_LAYOUT.hand);assert.equal(c.stickBase,APPROVED_COCKPIT_LAYOUT.stickBase);assert.equal(c.strip,APPROVED_COCKPIT_LAYOUT.strip);
+  assert.deepEqual(c.monitors.own,APPROVED_COCKPIT_LAYOUT.monitors.own);assert.deepEqual(c.monitors.target,APPROVED_COCKPIT_LAYOUT.monitors.target);assert.deepEqual(c.monitors.radar,{...APPROVED_COCKPIT_LAYOUT.monitors.radar,y:647});
+ }
+});

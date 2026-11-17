@@ -36,3 +36,7 @@ All seven tier-II compositions are approved and active in 0.8.2ov. Mercury keeps
 
 
 Morrigan’s separate `demon-forward-hull-v1.png` is approved for flight at 13% forward / 18% outward. Its full transparent canvas stays registered with the intact `demon-paint-v1.png` frame. The geometry input and exact generation prompt are preserved as `demon-forward-hull-guide-v1.png` and `DEMON-FORWARD-HULL-PROMPT.md`. Do not regenerate the frame to adjust this optional exterior layer.
+
+## Tier-III flight integration — 0.8.2ow
+
+All five tier-III frames are approved and active: Bellona (`vanguard-paint-v2.png`), Artemis (`lancer-paint-v1.png`), Atlas Hauler (`atlas-paint-v1.png`), Victoria (`blade-paint-v1.png`) and Odin (`astra-paint-v2.png`). The exact approved monitor/control layout and shared hand/base remain fixed. Bellona uses charcoal molded impact padding; Odin uses the corrected transparent apertures. See [artwork, guides and exact prompts](TIER-3-ARTWORK.md). Review `/output/cockpit-layout/tier-3.html` uses the same production definitions and renderer as career and Arena.

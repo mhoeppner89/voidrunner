@@ -10,7 +10,6 @@ const THREE = await import('three');
 const { buildGlbScene } = await import('../../src/game/glbLoader.js');
 const { GLB_SHIP_CONFIG, SpaceRenderer } = await import('../../src/game/render.js');
 const { GameUI } = await import('../../src/game/ui.js');
-const { CANOPY_APERTURES } = await import('../../src/game/cockpitDamage.js');
 
 function cockpitNodeMocks() {
     const bezels = new Map();
@@ -183,9 +182,8 @@ test('cockpit images are preloaded on ship changes, not every HUD update', t => 
     ui.root = { dataset: {} }; ui.el = (selector) => nodes[selector];
     let preloads = 0; ui.preloadImageSet = () => { preloads++; };
     ui.setCockpitShip('vanguard');
-    assert.ok(instruments.querySelector('.cockpit-bezel-own'));
-    assert.ok(instruments.querySelector('.cockpit-bezel-radar'));
-    assert.ok(instruments.querySelector('.cockpit-bezel-target'));
+    assert.equal(nodes['.cockpit-art'].style.backgroundImage,'none');
+    assert.equal(instruments.querySelector('.cockpit-bezel-own'),undefined,'approved full frames do not rebuild separate bezels');
     for (let i = 0; i < 60; i++) ui.setCockpitShip('vanguard');
     assert.equal(preloads, 1);
     delete ui.root.dataset.cockpitShip;
@@ -193,77 +191,28 @@ test('cockpit images are preloaded on ship changes, not every HUD update', t => 
     flushFrames();
 });
 
-test('sprite hulls use hull-matched transparent cockpit sprites and distinct monitor layouts', async t => {
-    const { readFile } = await import('node:fs/promises');
-    // Unconverted hulls retain their plates; approved frames use the shared kit.
-    const shipIds = ['vanguard', 'lancer', 'atlas', 'astra'];
-    const artByShip = {
-        vanguard:'cockpit-vanguard-sprite-v7.png', talon:'cockpit-talon-sprite-v6.png',
-        prospector:'cockpit-prospector-sprite-v3.png', lancer:'cockpit-lancer-sprite-v2.png',
-        atlas:'cockpit-atlas-sprite-v4.png',
-        legionary:'cockpit-legionary-sprite-v3.png', andromeda:'cockpit-andromeda-sprite-v2.png',
-        torsas:'cockpit-torsas-sprite-v4.png', astra:'cockpit-astra-sprite-v2.png',
-    };
-    const { nodes, instruments } = cockpitNodeMocks();
-    const ui = Object.create(GameUI.prototype);
-    ui.root = { dataset: {} }; ui.el = (selector) => nodes[selector]; ui.preloadImageSet = () => {};
-    const layouts = new Set(), artUrls = new Set();
-    const flushFrames = mockCockpitBrowser(t);
-    for (const shipId of shipIds) {
-        const artPath = artByShip[shipId] ?? 'cockpit-' + shipId + '-sprite.png';
-        ui.setCockpitShip(shipId);
-        assert.equal(ui.root.dataset.cockpitShip, shipId);
-        assert.equal(nodes['.canopy-aperture'].points, CANOPY_APERTURES[shipId]);
-        assert.equal(nodes['.canopy-art-mask'].href, './assets/remaster/' + artPath);
-        assert.ok(nodes['.cockpit-art'].style.backgroundImage.includes(artPath));
-        assert.ok(instruments.style.values['--cockpit-own-left']);
-        assert.ok(instruments.style.values['--cockpit-radar-left']);
-        assert.ok(instruments.style.values['--cockpit-target-left']);
-        assert.equal(['own', 'radar', 'target'].filter(panel => instruments.querySelector('.cockpit-bezel-' + panel)).length, 3);
-        for (const panel of ['own', 'radar', 'target']) {
-            const rect = ['left', 'top', 'width', 'height'].map(property =>
-                Number.parseFloat(instruments.style.values[`--cockpit-${panel}-${property}`]));
-            assert.ok(rect.every(Number.isFinite), `${shipId}: ${panel} has a complete aperture`);
-            const [left, top, width, height] = rect;
-            assert.ok(left >= 0 && top >= 0 && width >= 8 && height >= 15
-                && left + width <= 100 && top + height <= 100, `${shipId}: ${panel} aperture stays readable and inside the canopy`);
-        }
-        layouts.add(Object.values(instruments.style.values).join('|'));
-        artUrls.add(nodes['.canopy-art-mask'].href);
-        const png = await readFile(new URL('../../assets/remaster/' + artPath, import.meta.url));
-        assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10], shipId + ': valid PNG');
-        assert.equal(png.readUInt32BE(16), 1672, shipId + ': authoring width');
-        assert.equal(png.readUInt32BE(20), 941, shipId + ': authoring height');
-        assert.equal(png[25], 6, shipId + ': RGBA alpha preserves the transparent canopy');
+test('every player hull selects and warms its own approved full frame and shared pilot assets', async t => {
+    const {readFile}=await import('node:fs/promises');
+    const {SHIPS}=await import('../../src/game/data.js');
+    const {getCockpitDefinition,paintedCockpitAssets}=await import('../../src/game/cockpitDefinitions.js');
+    const {nodes,instruments}=cockpitNodeMocks(),ui=Object.create(GameUI.prototype);
+    ui.root={dataset:{}};ui.el=selector=>nodes[selector];
+    const kitCalls=[],preloaded=[];ui.cockpitArtwork={activate:id=>kitCalls.push(id),deactivate:()=>{throw Error('Player hull unexpectedly left the approved cockpit renderer');}};
+    ui.preloadImageSet=(_set,urls)=>preloaded.push(...urls);
+    const flushFrames=mockCockpitBrowser(t),frames=new Set();
+    for(const id of Object.keys(SHIPS)){
+        const definition=getCockpitDefinition(id);assert.ok(definition,`${id} has an approved cockpit`);
+        preloaded.length=0;ui.setCockpitShip(id);
+        assert.equal(ui.root.dataset.cockpitShip,id);assert.equal(kitCalls.at(-1),id);
+        assert.equal(nodes['.cockpit-art'].style.backgroundImage,'none');
+        assert.equal(instruments.querySelector('.cockpit-bezel-own'),undefined,'full painted rims are never reconstructed');
+        for(const asset of paintedCockpitAssets(id))assert.ok(preloaded.includes(asset),`${id} warms ${asset}`);
+        assert.ok(!preloaded.some(url=>url.includes(`cockpit-${id}-sprite`)),`${id} does not warm a legacy plate`);
+        const png=await readFile(new URL(definition.shell));assert.equal(png[25],6,`${id} retains transparent glass`);
+        frames.add(definition.shell);
+        const count=kitCalls.length;for(let n=0;n<60;n++)ui.setCockpitShip(id);assert.equal(kitCalls.length,count,'steady HUD updates never reactivate the cockpit');
     }
-    ui.setCockpitShip('vanguard');
-    assert.ok(instruments.style.values['--cockpit-radar-width'], 'Vanguard radar has a fitted monitor aperture');
-    const kitCalls = [];
-    ui.cockpitArtwork = { activate: (id) => kitCalls.push(['activate', id]), deactivate: () => kitCalls.push(['deactivate']) };
-    const preloaded = [];
-    ui.preloadImageSet = (_set, urls) => preloaded.push(...urls);
-    ui.setCockpitShip('wayfarer');
-    assert.deepEqual(kitCalls.at(-1), ['activate', 'wayfarer'], 'Wayfarer uses the approved frame and hand');
-    assert.equal(nodes['.cockpit-art'].style.backgroundImage, 'none');
-    assert.ok(!preloaded.some((url) => /cockpit-wayfarer-sprite/.test(url)), 'no legacy starter cockpit sprite download');
-    assert.ok(preloaded.some(url=>url.includes('wayfarer-paint-atlas-v2.png')));
-    assert.ok(preloaded.some(url=>url.includes('wayfarer-hand-pitch-v4.png')));
-    ui.setCockpitShip('talon');
-    assert.deepEqual(kitCalls.at(-1), ['activate', 'talon'], 'Mercury uses the shared cockpit renderer');
-    assert.ok(preloaded.some(url=>url.includes('talon-paint-v4.png')));
-    assert.ok(!preloaded.some(url=>/cockpit-talon-sprite/.test(url)));
-    for(const [id,frame]of [['speedster','speedster-paint-v2.png'],['scrapper','scrapper-paint-v2.png'],['prospector','prospector-paint-v2.png'],['demon','demon-paint-v1.png'],['mule','mule-paint-v1.png'],['legionary','legionary-paint-v2.png'],['andromeda','andromeda-paint-v1.png'],['torsas','torsas-paint-v2.png']]){
-        ui.setCockpitShip(id);
-        assert.deepEqual(kitCalls.at(-1),['activate',id],`${id} uses the shared cockpit renderer`);
-        assert.ok(preloaded.some(url=>url.includes(frame)),`${id} warms the approved frame`);
-        assert.ok(!preloaded.some(url=>url.includes(`cockpit-${id}-sprite`)),`${id} never warms the legacy plate`);
-    }
-    assert.ok(preloaded.some(url=>url.includes('wayfarer-stick-base-v1.png')),'approved hulls warm the separate fixed base');
-    ui.setCockpitShip('vanguard');
-    assert.deepEqual(kitCalls.at(-1), ['deactivate'], 'sprite hulls leave the kit');
-    assert.equal(layouts.size, shipIds.length, 'every hull has its own monitor layout');
-    assert.equal(artUrls.size, shipIds.length, 'every hull has its own cockpit sprite');
-    flushFrames();
+    assert.equal(frames.size,Object.keys(SHIPS).length,'every hull has a distinct full frame');flushFrames();
 });
 
 test('flight log groups identical consecutive notices without merging different rewards', () => {
