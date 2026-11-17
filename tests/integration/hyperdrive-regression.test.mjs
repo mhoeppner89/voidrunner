@@ -8,6 +8,7 @@ const {createNewSave}=await import('../../src/game/save.js');
 const {getEffectiveShipStats}=await import('../../src/game/shipStats.js');
 const {LOCATIONS,hyperdriveArrivalRadius}=await import('../../src/game/data.js');
 import {flight} from '../helpers/hyperdrive-flight.mjs';
+import {t} from '../../src/game/i18n.js';
 const axes={pitch:0,yaw:0,roll:0,throttleDelta:0};
 test('changing navigation immediately drops cruise speed and restores throttle',()=>{
  const s=flight();s.autopilot=true;s.hyperdriveFx='active';s.save.player.velocity=[0,0,-50000];s.save.player.throttle=1;s.hyperdriveEncounterAt=20;
@@ -67,3 +68,30 @@ test('guided docking cannot engage hyperdrive or overwrite a safe checkpoint',()
 test('nearby hostiles no longer block or cancel a local jump',()=>{const s=flight();s.hostilesVisibleNear=()=>true;assert.equal(s.hyperdriveBlockReason(),null);s.toggleHyperdrive();assert.equal(s.autopilot,true);for(let i=0;i<90;i++){s.save.world.time+=1/60;s.updatePlayer(1/60,axes);}assert.equal(s.autopilot,true);});
 
 test('Rook to Helix remains one direct leg even though it passes near the Crown',()=>{const s=flight(),p=s.save.player;p.position=[...LOCATIONS.rook.position];p.navTargetId=p.currentTargetId='helix';p.rotation=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),new THREE.Vector3(...LOCATIONS.helix.position).sub(new THREE.Vector3(...p.position)).normalize()).toArray();s.toggleHyperdrive();assert.equal(s.hyperdriveDestination().id,'helix');for(let i=0;i<1800&&s.autopilot;i++){s.save.world.time+=1/60;s.updatePlayer(1/60,axes);}assert.equal(s.autopilot,false);assert.equal(p.navTargetId,'helix');assert.ok(Math.abs(new THREE.Vector3(...p.position).distanceTo(new THREE.Vector3(...LOCATIONS.helix.position))-hyperdriveArrivalRadius(LOCATIONS.helix))<20);assert.match(s.hyperdriveStatus,/Helix/);});
+
+test('engaging hyperdrive owns the steering gesture already held while aligning',()=>{
+ const s=flight(200000),held={...axes,yaw:.8};s.toggleHyperdrive(held);
+ for(let i=0;i<150;i++){s.save.world.time+=1/60;s.updatePlayer(1/60,held);assert.equal(s.autopilot,true,'the pre-existing steering gesture must not cancel warm-up');}
+ assert.equal(s.hyperdriveFx,'active');
+ // Easing the same stick/key back to neutral is release, not a new turn.
+ for(const yaw of [.6,.3,0]){s.save.world.time+=1/60;s.updatePlayer(1/60,{...axes,yaw});assert.equal(s.autopilot,true);}
+ s.save.world.time+=1/60;s.updatePlayer(1/60,{...axes,pitch:.6});
+ assert.equal(s.autopilot,false,'a fresh steering gesture still cancels the drive');assert.equal(s.hyperdriveStatus,t('DISENGAGED · MANUAL INPUT'));
+ assert.ok(Math.hypot(...s.save.player.velocity)<s.playerStats().maxSpeed*1.06);assert.equal(s.save.player.throttle,.37);
+});
+
+test('a deliberate reversal or new axis can interrupt warm-up before returning to neutral',()=>{
+ for(const turn of [{yaw:-.6},{pitch:.7},{roll:.7}]){
+  const s=flight();s.toggleHyperdrive({...axes,yaw:.8});s.save.world.time+=1/60;s.updatePlayer(1/60,{...axes,yaw:.8});assert.equal(s.autopilot,true);
+  s.save.world.time+=1/60;s.updatePlayer(1/60,{...axes,yaw:.8,...turn});assert.equal(s.autopilot,false);assert.equal(s.hyperdriveFx,'drop');
+ }
+});
+
+
+test('renewing steering after easing off and explicitly toggling out do not keep an old engagement gesture',()=>{
+ const s=flight();s.toggleHyperdrive({...axes,yaw:1});
+ s.save.world.time+=1/60;s.updatePlayer(1/60,{...axes,yaw:.4});assert.equal(s.autopilot,true);
+ s.save.world.time+=1/60;s.updatePlayer(1/60,{...axes,yaw:1});assert.equal(s.autopilot,false,'a renewed push interrupts');
+ s.toggleHyperdrive({...axes,yaw:.8});assert.equal(s.autopilot,true);s.toggleHyperdrive();assert.equal(s.autopilot,false);assert.equal(s.hyperdriveEntrySteering,undefined);
+ s.toggleHyperdrive();assert.equal(s.autopilot,true);s.save.world.time+=1/60;s.updatePlayer(1/60,{...axes,yaw:.6});assert.equal(s.autopilot,false,'a new neutral engagement has no stale tolerance');
+});

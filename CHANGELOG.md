@@ -1,3 +1,11 @@
+## 0.8.2ov — All tier-II cockpits in flight, integrated sound overhaul
+
+- Activate the approved Gaia, Morrigan, Argo, Tyr, Thor and Freya cockpit frames alongside Mercury. Preserve their exact reviewed display fitting, original PNGs, control layout, navy/white hand and fixed joystick base.
+- Add Morrigan’s approved exterior armor overlay at 13% forward / 18% outward. Keep the original cockpit PNG intact, warm the separate sprite before flight and cache its alpha for HUD and canopy-damage masking.
+- Warm each active hull’s approved cockpit assets, including the Morrigan and Argo startup paths, instead of downloading legacy plates. Keep unconverted tier-III cockpits intact.
+- Integrate the layered sound system from `sound-design-overhaul`, including its generated sound bank, mixer, engine, ambience, score and live/offline audio checks.
+- Include the approved Balor/Loki frames, the hyperdrive alignment-input fix and the consolidated tier-II review.
+
 ## 0.8.2ou — Sound design overhaul
 
 - Replace the flat one-sample-per-effect playback with layered sound events: recorded bodies plus designed recoil, transient, tail and debris layers, with fresh variants and pitch on every trigger.
@@ -9,6 +17,22 @@
 - Replace the oscillator score with a generated arrangement on the audio clock: seven contexts with their own tempo, harmony and instruments; three combat tiers; opening, resolving, threat, kill and ship-lost accents.
 - Give menus one interface voice in the score's key: press, hover, tab, open, close, confirm, refuse, purchase, equip and reward are distinct, and every menu control responds.
 - Add the sound forge (`npm run audio:forge`), offline mix renders (`npm run audio:mix`), a sound review stand (`/tools/playtest/sound-review/`) and a live browser check (`npm run test:browser:sound`). Retire four superseded interface samples and the unused procedural Foley module.
+
+## 0.8.2ot — Approved Balor cockpit in live flight
+
+- Activate Balor's approved charcoal/red raider frame with its reviewed monitor geometry, separate navy/white hand, fixed joystick base and existing controls.
+- Warm Balor's model at startup and select cockpit assets through the approved registry. Retain cached alpha and hull switching, and invalidate the service-worker cache for returning players.
+- Start the purchased hull's flight-model warm-up while docked, including Balor's baked livery dependencies, so a later offline resume has those assets available.
+
+## 0.8.2os — Approved Loki cockpit in live flight
+
+- Activate Loki’s approved angular interceptor frame with glass fitted to its original transparent openings. Keep the shared hand, fixed joystick base, instruments and mobile controls separate.
+- Warm the selected frame through the approved cockpit registry, preserve steering and hull-switching behavior, and invalidate the service-worker cache for returning players.
+
+## 0.8.2or — Hyperdrive engagement after steering
+
+- Let the explicit engage command supersede the steering gesture still held while lining up a jump. Holding or releasing that same input no longer cancels warm-up immediately.
+- A fresh turn, reversal, renewed push after easing off, or another hyperdrive press still disengages normally. Collision and navigation checks are unchanged.
 
 ## 0.8.2oq — Fit Mercury displays to the approved painting
 

@@ -5,6 +5,7 @@
 - Automated tests live in `tests/unit`, `tests/integration`, and `tests/performance`; run `npm test` or the named group scripts. Shared constructors live in `tests/helpers` and must never import a test suite.
 - Browser gameplay checks live in `tests/browser`; run `npm run test:browser` against a served runtime. They cover desktop Chrome, Android/Chrome and iPhone/WebKit and always mute sound. Set `VR_BASE_URL` to select the server. Install pinned dev dependencies with `npm ci`, and browser engines with `npx playwright install chromium webkit`.
 - `offline-startup.mjs` must keep service workers enabled and use the normal entry URL. It checks decoded opening-screen images, offline resume, report navigation and reconnecting; isolated `startup-probe` tests do not cover these paths. HTTP success alone does not prove an image decoded.
+- On macOS, batch cockpit/offline checks isolate both browser profiles and hulls through `tests/helpers/browser-profiles.mjs`. Repeated cold browser launch/teardown cycles in one Node process can stall between cases with no browser running; use `isolateBrowserHulls` for `VR_COCKPIT_HULLS` batches.
 - Screenshot capture/comparison and the supplemental frame-time probe live in `tools/playtest/probes`. They are optional diagnostics; the grouped test suites cover the former standalone regression probes. Output must go under ignored `output/`.
 - **Clear the Chrome probe profiles before running probes** (`rm -rf /tmp/vr-*-profile`): the deploy update flow reloads the page when a new service worker takes control, which can land mid-poll and reset the session (probes then read a docked, projectile-free world). Fresh profiles also prevent stale cached builds from being tested.
 - `__VOID_PRIVATEER__.getRuntime()` returns the **live session object** (added so probes can drive `frame()`/`updateSimulation()` deterministically). Never serialize it wholesale with CDP `returnByValue` ("Object reference chain is too long" — renderer object graphs are circular); read scoped values (e.g. `rt.ships.map(s => s.position)`).
@@ -35,7 +36,7 @@
 
 ## Approved starter cockpit (cockpitArtwork.js)
 
-- The user approved the complete frame and navy/white hand from cockpit review 04 and requested live integration. The starter `wayfarer` and Mercury `talon` now use `PaintedCockpit` in `cockpitArtwork.js`; other hulls retain their existing plates. This supersedes the earlier code-drawn-only direction for the starter hull.
+- The user approved the complete frame and navy/white hand from cockpit review 04 and requested live integration. All tier-I and tier-II hulls now use `PaintedCockpit` in `cockpitArtwork.js`; tier-III hulls retain their existing plates. This supersedes the earlier code-drawn-only direction for the starter hull.
 - Render the complete approved frame as one image. Live monitor rectangles follow the actual transparent apertures. Never cut its beams/bezels into independently rebuilt parts or restore the flat filler panels.
 - The hand uses three pitch views, one common scale and source shaft anchors aligned to a fixed pivot. Yaw rotates around that pivot. Never translate the base or crop the extended sleeve into view. Three images (frame, hand, fixed base) are decoded; the frame is static and flight updates only change a quantised hand transform/pose. Keep layout reads and alpha-map construction out of the frame loop.
 - The joystick base is a separate transparent sprite behind the hand; its source socket anchor must match the fixed shaft pivot. Never rotate or translate the base with steering.
@@ -84,7 +85,7 @@
 - No floating HUD cards over the 3D view: all telemetry (SPD/THR/FUEL/MSL/HOLD/LOAD/HND/CR, shields/armor/hull) lives on the cockpit monitors. The bottom-left/right cards were scrapped for good.
 - Touch pads are contextual: asteroid → yellow MINE + SCAN, wreck → teal SALVAGE + SCAN, else FIRE/MISSILE; the second pad runs a scan on deposits.
 - The flight stick is always present on every device (Wing Commander 2 style: the pilot's gloved left hand on the stick, bottom-left, moving with every input source). Tilt may return later only as an option. Hyperdrive engages by tapping the target monitor when a location is locked (hint reads "ACTIVATE HYPERDRIVE"), pause/fullscreen buttons top-left, thrust is a drag lever.
-- The starter and Mercury cockpits use approved full frames and the shared anchored hand strip; other hulls keep their current art. Preserve the approved control layout and generous invisible touch areas.
+- All tier-I and tier-II cockpits use approved full frames and the shared anchored hand strip; tier-III hulls keep their current art. Preserve the approved control layout and generous invisible touch areas.
 - Docking/landing is automatic when slow and close (no button); AI fights WW2-style with strafing runs, and encounters never stack on an active one.
 
 ## Shared cockpit authoring
@@ -92,3 +93,8 @@
 - `src/game/cockpitDefinitions.js` is the geometry/approval authority. The live game and isolated review both use `PaintedCockpit`; do not add a separate review layout or hand renderer. `assets/cockpits/wayfarer-v4.json` is a generated export.
 - Mercury (`talon`) is approved for flight. It reuses the starter instruments/controls, with live glass fitted in code to the actual openings of the original v4 painting. Do not regenerate the painting to chase minor display alignment errors. Its hand/base rig shifts 60 source pixels left onto the console top, keeping its touch area unchanged. The current artwork review and model-informed geometry are in `tools/playtest/cockpit-layout`; see its README for the pipeline.
 - Review phone/desktop presets run in real inner viewports. Keep those media-query sizes and production CSS; do not simulate phone layout by resizing only a div.
+
+- For remaining cockpits, follow the revised starter/Mercury pipeline in `tools/playtest/cockpit-layout/README.md`. Tier-1 hulls are Hestia (approved), Balor and Loki. Every new hull needs its own model-informed, unpainted layout approval before imagegen, and composition approval before live activation.
+- Once cockpit composition is approved, fit monitor rectangles/content insets to its actual alpha openings in code. Preserve the original detailed PNG; do not repeatedly regenerate bezels or cut their rims with an aperture stencil for minor alignment. Keep the approved hand/base assets and adjust their common fixed socket placement in code.
+
+- Morrigan (`demon`) includes the approved separate exterior armor layer `demon-forward-hull-v1.png`, at 13% forward / 18% outward. Keep its full transparent canvas registered to the original frame. Its optional asset/placement belong to the cockpit definition, are warmed with that hull, and join the cached HUD alpha plus canopy-damage mask. Do not add per-frame readbacks or model rendering for this static layer. Mercury/Tyr retain their original views without added noses.

@@ -20,7 +20,10 @@ export class PaintedCockpit {
         if(this.frame?.isConnected)return;
         const instruments=this.root.querySelector('.cockpit-instruments');
         this.frame=new Image();this.frame.className='painted-cockpit-frame';this.frame.alt='';this.frame.setAttribute('aria-hidden','true');
-        instruments.prepend(this.frame);
+        this.forwardHull=new Image();this.forwardHull.className='painted-cockpit-forward-hull';this.forwardHull.alt='';this.forwardHull.setAttribute('aria-hidden','true');this.forwardHull.hidden=true;
+        instruments.prepend(this.forwardHull,this.frame);
+        this.damageHullMask=svg('image',{class:'canopy-hull-mask',width:1000,height:1000,preserveAspectRatio:'none',filter:'url(#canopy-opaque)'});
+        this.root.querySelector('#canopy-damage-mask')?.append(this.damageHullMask);
         this.clipId=`painted-apertures-${++clipSequence}`;
         const definitions=svg('svg',{'aria-hidden':'true',width:0,height:0});
         definitions.style.position='absolute';definitions.style.pointerEvents='none';
@@ -40,6 +43,9 @@ export class PaintedCockpit {
     }
     loadAssets(shell){
         this.frame.src=shell;
+        const hull=this.definition.forwardHull;this.forwardHull.hidden=!hull;
+        if(hull){this.forwardHull.src=hull;this.damageHullMask.setAttribute('href',hull);this.damageHullMask.style.display='';}
+        else{this.forwardHull.removeAttribute('src');this.damageHullMask.removeAttribute('href');this.damageHullMask.style.display='none';}
         this.mountImage.setAttribute('href',this.definition.stickBase.path);
         for(const [key,value]of Object.entries({href:this.definition.hand,width:this.definition.strip.width,height:this.definition.strip.height}))this.handImage.setAttribute(key,value);
         const generation=++this.assetGeneration;
@@ -48,9 +54,14 @@ export class PaintedCockpit {
             this.frame.decode(),this.alphaResource(shell,371,170),
             this.alphaResource(definition.hand,543,181),
             this.alphaResource(definition.stickBase.path,543,181),
-        ]).then(([,frameAlpha,handAlpha,baseAlpha])=>{
+            ...(hull?[this.forwardHull.decode(),this.alphaResource(hull,371,170)]:[]),
+        ]).then(([,frameAlpha,handAlpha,baseAlpha,,hullAlpha])=>{
             if(generation!==this.assetGeneration)return;
-            this.alpha=frameAlpha;this.handAlpha=handAlpha;this.baseAlpha=baseAlpha;this.dirty=true;
+            // Merge once on load. HUD hit tests use the cached union, never a
+            // canvas readback or image decode in the flight loop.
+            this.hullAlpha=hullAlpha;this.alpha=frameAlpha;
+            if(hullAlpha){this.alpha=new Uint8Array(frameAlpha.length);for(let i=0;i<this.alpha.length;i++)this.alpha[i]=Math.max(frameAlpha[i],hullAlpha[i]);}
+            this.handAlpha=handAlpha;this.baseAlpha=baseAlpha;this.dirty=true;
         }).catch(error=>{if(generation!==this.assetGeneration)return;this.loadError=String(error);console.error('Cockpit artwork could not load',error);});
     }
     alphaResource(path,width,height){
@@ -73,7 +84,7 @@ export class PaintedCockpit {
         if(!definition||!(shell??definition.shell))throw new Error(`Cockpit is not approved for flight: ${shipId}`);
         if(this.active)this.deactivate();
         this.definition=definition;this.shipId=shipId;this.active=true;this.root.dataset.cockpitPaint=shipId;
-        this.ensureDom();this.assetGeneration??=0;this.loadError=undefined;this.alpha=this.handAlpha=this.baseAlpha=undefined;
+        this.ensureDom();this.assetGeneration??=0;this.loadError=undefined;this.alpha=this.handAlpha=this.baseAlpha=this.hullAlpha=undefined;
         this.aperturePath.setAttribute('d',cockpitApertureClip(definition));
         this.frame.style.clipPath=definition.apertureClip?`url(#${this.clipId})`:'none';
         this.loadAssets(shell??definition.shell);
@@ -89,6 +100,7 @@ export class PaintedCockpit {
         const stick=this.root.querySelector('[data-touch-stick]');if(this.oldOrigin===undefined)delete stick.dataset.origin;else stick.dataset.origin=this.oldOrigin;
         for(const el of this.root.querySelectorAll('.touch-right,[data-touch-throttle]'))el.inert=false;
         for(const key of Object.keys(this.engaged))this.root.querySelector(key)?.classList.remove('is-engaged');this.engaged={};
+        this.forwardHull.hidden=true;this.damageHullMask.style.display='none';
         this.layout=undefined;this.dirty=true;
     }
     invalidate(){this.dirty=true;}

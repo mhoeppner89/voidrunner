@@ -4,7 +4,7 @@ const $=s=>document.querySelector(s),params=new URLSearchParams(location.search)
 const host=$('#viewport-host');host.replaceChildren();
 const frame=document.createElement('iframe');frame.id='review-frame';frame.title='Interactive cockpit layout';host.append(frame);
 if(['navigation','combat','salvage'].includes(params.get('scene')))$('#scene').value=params.get('scene');
-$('#hull').value=params.get('hull')==='wayfarer'?'wayfarer':'talon';
+$('#hull').value=[...$('#hull').options].some(o=>o.value===params.get('hull'))?params.get('hull'):'scrapper';
 $('#review-viewport').value=['desktop','phone'].includes(params.get('viewport'))?params.get('viewport'):'fit';
 const child=()=>frame.contentWindow;
 function resize(){

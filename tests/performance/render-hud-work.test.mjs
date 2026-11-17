@@ -195,13 +195,12 @@ test('cockpit images are preloaded on ship changes, not every HUD update', t => 
 
 test('sprite hulls use hull-matched transparent cockpit sprites and distinct monitor layouts', async t => {
     const { readFile } = await import('node:fs/promises');
-    // The starter has its approved frame/hand; other hulls keep their matched plates.
-    const shipIds = ['vanguard', 'prospector', 'lancer', 'atlas',
-        'speedster', 'legionary', 'andromeda', 'torsas', 'astra'];
+    // Unconverted hulls retain their plates; approved frames use the shared kit.
+    const shipIds = ['vanguard', 'lancer', 'atlas', 'astra'];
     const artByShip = {
         vanguard:'cockpit-vanguard-sprite-v7.png', talon:'cockpit-talon-sprite-v6.png',
         prospector:'cockpit-prospector-sprite-v3.png', lancer:'cockpit-lancer-sprite-v2.png',
-        atlas:'cockpit-atlas-sprite-v4.png', speedster:'cockpit-speedster-sprite-v4.png',
+        atlas:'cockpit-atlas-sprite-v4.png',
         legionary:'cockpit-legionary-sprite-v3.png', andromeda:'cockpit-andromeda-sprite-v2.png',
         torsas:'cockpit-torsas-sprite-v4.png', astra:'cockpit-astra-sprite-v2.png',
     };
@@ -253,7 +252,14 @@ test('sprite hulls use hull-matched transparent cockpit sprites and distinct mon
     assert.deepEqual(kitCalls.at(-1), ['activate', 'talon'], 'Mercury uses the shared cockpit renderer');
     assert.ok(preloaded.some(url=>url.includes('talon-paint-v4.png')));
     assert.ok(!preloaded.some(url=>/cockpit-talon-sprite/.test(url)));
-    ui.setCockpitShip('prospector');
+    for(const [id,frame]of [['speedster','speedster-paint-v2.png'],['scrapper','scrapper-paint-v2.png'],['prospector','prospector-paint-v2.png'],['demon','demon-paint-v1.png'],['mule','mule-paint-v1.png'],['legionary','legionary-paint-v2.png'],['andromeda','andromeda-paint-v1.png'],['torsas','torsas-paint-v2.png']]){
+        ui.setCockpitShip(id);
+        assert.deepEqual(kitCalls.at(-1),['activate',id],`${id} uses the shared cockpit renderer`);
+        assert.ok(preloaded.some(url=>url.includes(frame)),`${id} warms the approved frame`);
+        assert.ok(!preloaded.some(url=>url.includes(`cockpit-${id}-sprite`)),`${id} never warms the legacy plate`);
+    }
+    assert.ok(preloaded.some(url=>url.includes('wayfarer-stick-base-v1.png')),'approved hulls warm the separate fixed base');
+    ui.setCockpitShip('vanguard');
     assert.deepEqual(kitCalls.at(-1), ['deactivate'], 'sprite hulls leave the kit');
     assert.equal(layouts.size, shipIds.length, 'every hull has its own monitor layout');
     assert.equal(artUrls.size, shipIds.length, 'every hull has its own cockpit sprite');

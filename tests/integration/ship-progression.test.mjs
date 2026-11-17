@@ -3,6 +3,7 @@ import {SHIPS} from '../../src/game/data.js';
 import {createNewSave,hydrateSave} from '../../src/game/save.js';
 import {createOutfittingState,HULL_HARDPOINTS} from '../../src/game/outfitting.js';
 import {quoteShipTrade,commitShipTrade} from '../../src/game/shipTrade.js';
+import {fixture} from '../helpers/session.mjs';
 import {canMineWithHull,droneBayLayoutFor} from '../../src/game/droneData.js';
 import {DRONE_PORTS} from '../../src/game/droneFlight.js';
 import {createEnemyLoadout} from '../../src/game/enemyLoadouts.js';
@@ -29,4 +30,13 @@ test('switching is local, cargo-safe, and stale quotes do not mutate resources',
 });
 test('trading active hull leaves another stored hull and its equipment intact',()=>{
  const p=career().player;commitShipTrade(p,quoteShipTrade(p,'talon',{keepCurrent:true}));const saved=structuredClone(p.outfitting.loadouts.wayfarer);assert.ok(commitShipTrade(p,quoteShipTrade(p,'atlas')).ok);assert.deepEqual(p.ownedShips,['wayfarer','atlas']);assert.deepEqual(p.outfitting.loadouts.wayfarer,saved);assert.ok(p.storedShips.wayfarer);assert.equal(p.outfitting.loadouts.talon,undefined);
+});
+
+test('buying Balor warms its flight model before an offline career resume',()=>{
+ const r=fixture(),warmed=[];r.save.player.dockedAt='blackglass';r.save.player.systemId='redwake';r.save.player.credits=500000;
+ r.ui={setCockpitShip(){},refreshDock(){}};r.audio={play(){}};
+ r.renderer={clearDrones(){},preloadGlbShips(variants){warmed.push(...variants);}};
+ r.abandonMiningDrones=r.recallPdcDrones=r.initializeCommissionedShipState=r.syncWeaponProjection=r.persistSave=()=>{};
+ const result=r.buyShip('scrapper');assert.ok(result.ok,result.code);assert.equal(r.save.player.shipId,'scrapper');
+ assert.deepEqual(warmed,['scrapper'],'a purchase warms all renderer model dependencies, including baked liveries, while online');
 });

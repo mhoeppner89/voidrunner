@@ -22,7 +22,7 @@ export function cockpitStructure(definition,canopy){
     const bow=[beams[0][0],...beams.map(line=>line[1])];
     const surfaces=consoleSurfaces(definition);
     const panels=surfaces.filter(s=>s.kind==='deck-top').map(s=>s.points);
-    const continuous=definition.id==='talon';
+    const continuous=definition.continuousBow??(definition.id==='talon');
     return {width:W,height:H,beams:[...beams,...rails],bowPath:continuous?curvedBow(bow):null,rails:continuous?rails:[...beams,...rails],panels,surfaces,monitors};
 }
 // Raised radar cowl blends into the neighboring console with swept shoulders,

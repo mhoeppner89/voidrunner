@@ -1,38 +1,61 @@
-// Approved starter cockpit in the real game. Silent desktop, Android, WebKit
+// Approved cockpit in the real game. Silent desktop, Android, WebKit
 // and small-phone checks.
 import {existsSync} from 'node:fs';
 import {chromium,webkit,devices} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
-import {isolateBrowserProfiles} from '../helpers/browser-profiles.mjs';
+import {isolateBrowserProfiles,isolateBrowserHulls} from '../helpers/browser-profiles.mjs';
 await isolateBrowserProfiles(import.meta.url,['desktop','android','iphone','small']);
-const hull=process.env.VR_COCKPIT_HULL??'wayfarer';
+await isolateBrowserHulls(import.meta.url);
+const hulls=(process.env.VR_COCKPIT_HULLS??process.env.VR_COCKPIT_HULL??'wayfarer').split(',');
+for(const hull of hulls){
 const base=process.env.VR_BASE_URL??'http://127.0.0.1:4212',out=`output/cockpit-artwork/${hull}/checks`;await mkdir(out,{recursive:true});
 const chrome='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const profiles=[['desktop',chromium,{viewport:{width:1440,height:900}}],['android',chromium,devices['Pixel 7 landscape']],['iphone',webkit,devices['iPhone 13 landscape']],['small',chromium,{viewport:{width:667,height:375},deviceScaleFactor:2,isMobile:true,hasTouch:true}]];
 for(const [name,engine,device]of profiles){
  if(!process.env.VR_PROFILES.split(',').includes(name))continue;
  const browser=await engine.launch({headless:true,...(engine===chromium?{...(existsSync(chrome)?{executablePath:chrome}:{}),args:['--no-sandbox','--disable-gpu-sandbox','--mute-audio','--use-gl=angle','--use-angle=swiftshader']}:{})});let page;
+ const errors=[],legacy=[],pending=new Set(),networkFailures=[];
  try{
-  page=await browser.newPage({...device,serviceWorkers:'block'});page.setDefaultTimeout(120000);const errors=[],legacy=[];
-  page.on('pageerror',e=>{errors.push(e.message);console.error(e.stack);});page.on('request',r=>{if(/cockpit-(wayfarer|talon)-sprite/.test(r.url()))legacy.push(r.url());});
+  page=await browser.newPage({...device,serviceWorkers:'block'});page.setDefaultTimeout(120000);
+  page.on('request',r=>pending.add(r.url()));page.on('requestfinished',r=>pending.delete(r.url()));page.on('requestfailed',r=>{pending.delete(r.url());networkFailures.push({url:r.url(),error:r.failure()?.errorText});});page.on('response',r=>{if(r.status()>=400)networkFailures.push({url:r.url(),status:r.status()});});
+  page.on('pageerror',e=>{errors.push(e.message);console.error(e.stack);});page.on('console',m=>{if(m.type()==='error')console.error('Browser console:',m.text());});page.on('request',r=>{if(/cockpit-(wayfarer|talon|speedster|scrapper|prospector|demon|mule|legionary|andromeda|torsas)-sprite/.test(r.url()))legacy.push(r.url());});
   await page.addInitScript(()=>{
    localStorage.setItem('void-privateer-settings-v1',JSON.stringify({music:0,effects:0,vibration:false}));
    const A=window.AudioContext??window.webkitAudioContext;if(A)A.prototype.resume=async function(){await this.suspend();};
    window.testPad={index:0,id:'Cockpit test controller',mapping:'standard',connected:true,axes:[0,0,0,0],buttons:Array.from({length:17},()=>({pressed:false,value:0}))};Object.defineProperty(navigator,'getGamepads',{value:()=>[testPad]});
   });
-  await page.goto(`${base}/game.html?revision=0.8.2oq&startup-probe=1`);await page.waitForFunction(()=>window.__VOID_PRIVATEER__?.newGame);
+  await page.goto(`${base}/game.html?startup-probe=1`);await page.waitForFunction(()=>window.__VOID_PRIVATEER__?.newGame);
   await page.evaluate(()=>__VOID_PRIVATEER__.newGame());
-  await page.evaluate(async hull=>{const r=__VOID_PRIVATEER__.getRuntime();r.audio.setVolumes(0,0);r.skipTutorial();if(hull!=='wayfarer'){r.save.player.credits=10000000;const result=r.buyShip(hull);if(!result.ok)throw Error(JSON.stringify(result));}await r.launch();},hull);
+  await page.evaluate(async hull=>{const r=__VOID_PRIVATEER__.getRuntime();r.audio.setVolumes(0,0);r.skipTutorial();if(hull!=='wayfarer'){
+   r.save.player.credits=10000000;const {LOCATIONS}=await import('/src/game/data.js'),home=r.save.player.dockedAt;
+   const yard=Object.values(LOCATIONS).find(l=>l.id===home&&l.shipsForSale?.includes(hull))??Object.values(LOCATIONS).find(l=>l.services?.shipyard&&l.shipsForSale?.includes(hull));
+   if(!yard)throw Error(`No shipyard stocks ${hull}`);if(yard.id!==home)r.dockAt(yard.id,true);
+   const result=r.buyShip(hull);if(!result.ok)throw Error(JSON.stringify(result));if(yard.id!==home)r.dockAt(home,true);
+  }await r.launch();},hull);
   await page.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime()?.ui.cockpitArtwork?.layout);
   await page.evaluate(async()=>{const r=__VOID_PRIVATEER__.getRuntime();await r.ui.cockpitArtwork.ready;r.ui.cockpitArtwork.invalidate();});
   await page.waitForTimeout(150);
   const geometry=await page.evaluate(()=>{
    const r=__VOID_PRIVATEER__.getRuntime(),c=r.ui.cockpitArtwork,box=s=>{const e=document.querySelector(s),b=e.getBoundingClientRect();return {x:b.x,y:b.y,w:b.width,h:b.height,right:b.right,bottom:b.bottom};};
-   return {hull:r.save.player.shipId,underlap:c.definition.glassUnderlap??3,source:c.definition.shell,layout:structuredClone(c.layout),frame:box('.painted-cockpit-frame'),screens:Object.fromEntries(['own','radar','target'].map(k=>[k,box('.cockpit-screen-'+k)])),hand:box('.painted-pilot-hand'),jump:box('#hyperdrive-card'),rail:box('.painted-throttle-rail'),throttle:box('[data-touch-throttle]'),stick:box('[data-touch-stick]'),base:box('.painted-stick-mount image'),baseSource:document.querySelector('.painted-stick-mount image').getAttribute('href'),baseShapes:document.querySelectorAll('.painted-stick-mount path,.painted-stick-mount ellipse').length,mask:document.querySelector('.canopy-art-mask').getAttribute('href'),touch:document.querySelector('#game-shell').dataset.cockpitTouch,damage:r.ui.cockpitPointVisible(innerWidth*.5,innerHeight*(c.shipId==='talon'?600:174)/850),glass:r.ui.cockpitPointVisible(innerWidth*.5,innerHeight*.38),monitor:r.ui.cockpitPointVisible(innerWidth*.5,innerHeight*.85),loadError:c.loadError};
+   return {hull:r.save.player.shipId,underlap:c.definition.glassUnderlap??3,source:c.definition.shell,layout:structuredClone(c.layout),frame:box('.painted-cockpit-frame'),screens:Object.fromEntries(['own','radar','target'].map(k=>[k,box('.cockpit-screen-'+k)])),hand:box('.painted-pilot-hand'),jump:box('#hyperdrive-card'),rail:box('.painted-throttle-rail'),throttle:box('[data-touch-throttle]'),stick:box('[data-touch-stick]'),base:box('.painted-stick-mount image'),baseSource:document.querySelector('.painted-stick-mount image').getAttribute('href'),baseShapes:document.querySelectorAll('.painted-stick-mount path,.painted-stick-mount ellipse').length,mask:document.querySelector('.canopy-art-mask').getAttribute('href'),touch:document.querySelector('#game-shell').dataset.cockpitTouch,damage:(()=>{for(let y=2;y<110;y++)for(let x=70;x<300;x++)if(c.alpha[y*371+x]>240)return r.ui.cockpitPointVisible(c.layout.left+(x+.5)/371*c.layout.width,c.layout.top+(y+.5)/170*c.layout.height);throw Error('No opaque canopy sample');})(),glass:r.ui.cockpitPointVisible(innerWidth*.5,innerHeight*.38),monitor:r.ui.cockpitPointVisible(innerWidth*.5,innerHeight*.85),loadError:c.loadError};
   });
+  const hullLayer=await page.evaluate(()=>{
+   const r=__VOID_PRIVATEER__.getRuntime(),c=r.ui.cockpitArtwork,l=c.layout;
+   const element=c.forwardHull,rect=element.getBoundingClientRect(),frame=c.frame.getBoundingClientRect();
+   let sample=null;
+   if(c.definition.forwardHull){
+    for(let y=1;y<120&&!sample;y++)for(let x=1;x<370;x++){
+     const i=y*371+x;if(c.hullAlpha[i]>240){const px=l.left+(x+.5)/371*l.width,py=l.top+(y+.5)/170*l.height;
+      if(!l.blockers.some(b=>px-l.left>=b.x&&px-l.left<=b.x+b.width&&py-l.top>=b.y&&py-l.top<=b.y+b.height)){sample={visible:r.ui.cockpitPointVisible(px,py),alpha:c.alpha[i]};break;}}
+    }
+   }
+   return {expected:Boolean(c.definition.forwardHull),visible:getComputedStyle(element).display!=='none',decoded:element.complete&&element.naturalWidth>0,source:element.getAttribute('src'),sample,rect:rect.toJSON(),frame:frame.toJSON(),mask:c.damageHullMask.getAttribute('href'),placement:c.definition.forwardHullPlacement};
+  });
+  assert.equal(hullLayer.visible,hullLayer.expected);
+  if(hullLayer.expected){assert.equal(hullLayer.decoded,true);assert.ok(hullLayer.source.endsWith('demon-forward-hull-v1.png'));assert.equal(hullLayer.mask,hullLayer.source);assert.equal(hullLayer.sample?.visible,false,'exterior armor hides HUD markers using cached alpha');assert.ok(hullLayer.sample.alpha>240,'cached union retains the sampled armor opacity');assert.deepEqual(hullLayer.rect,hullLayer.frame);assert.equal(hullLayer.placement.forward,13);assert.equal(hullLayer.placement.outward,18);}
   assert.equal(geometry.loadError,undefined);assert.equal(geometry.touch,String(name!=='desktop'));assert.equal(await page.locator('.touch-right').isVisible(),name!=='desktop');
-  assert.ok(await page.locator('.painted-pilot-hand').isVisible());assert.equal(legacy.length,0,'no legacy starter plate is loaded');
+  assert.ok(await page.locator('.painted-pilot-hand').isVisible());assert.equal(legacy.length,0,'no legacy approved-hull plate is loaded');
   assert.ok(geometry.baseSource.includes('wayfarer-stick-base-v1.png'));assert.equal(geometry.baseShapes,0,'fixed base uses its sprite, not drawn placeholder shapes');
   assert.equal(geometry.hull,hull);assert.equal(geometry.mask,geometry.source);assert.equal(geometry.damage,false,'beam hides HUD target');assert.equal(geometry.glass,true,'open glass allows HUD target');assert.equal(geometry.monitor,false,'monitor hides HUD target');
   for(const [id,b]of Object.entries(geometry.screens)){const q=geometry.layout.monitors[id];assert.ok(b.x<=q.x&&b.y<=q.y&&b.right>=q.x+q.width&&b.bottom>=q.y+q.height,`${id} glass underlaps the exact sprite opening`);const bleed=Math.max(1.5,geometry.underlap*Math.max(geometry.layout.width/1851,geometry.layout.height/850));assert.ok(q.x-b.x<=bleed+.05&&q.y-b.y<=bleed+.05);}
@@ -67,12 +90,16 @@ for(const [name,engine,device]of profiles){
   assert.ok(await page.locator('[data-ui-command="close-ship"]').isVisible(),'own monitor opens the live ship panel');await page.locator('[data-ui-command="close-ship"]').click();
   await page.waitForFunction(()=>!__VOID_PRIVATEER__.getRuntime().ui.isModalOpen);
   // Switching hulls must remove all custom state and inline geometry.
-  const switched=await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();r.save.player.shipId='prospector';r.ui.setCockpitShip('prospector');return {paint:r.ui.root.dataset.cockpitPaint??null,left:r.ui.el('.cockpit-screen-own').style.left,frame:getComputedStyle(r.ui.cockpitArtwork.frame).display,art:r.ui.el('.cockpit-art').style.backgroundImage};});
-  assert.equal(switched.paint,null);assert.equal(switched.left,'');assert.equal(switched.frame,'none');assert.ok(switched.art.includes('prospector'));
-  await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();r.save.player.shipId='wayfarer';r.ui.setCockpitShip('wayfarer');});await page.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime().ui.cockpitArtwork.layout);
+  const switched=await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();r.save.player.shipId='vanguard';r.ui.setCockpitShip('vanguard');return {paint:r.ui.root.dataset.cockpitPaint??null,left:r.ui.el('.cockpit-screen-own').style.left,frame:getComputedStyle(r.ui.cockpitArtwork.frame).display,art:r.ui.el('.cockpit-art').style.backgroundImage};});
+  assert.equal(await page.locator('.painted-cockpit-forward-hull').isVisible(),false,'exterior overlay hides on legacy hulls');assert.equal(switched.paint,null);assert.equal(switched.left,'');assert.equal(switched.frame,'none');assert.ok(switched.art.includes('vanguard'));
+  await page.evaluate(hull=>{const r=__VOID_PRIVATEER__.getRuntime();r.save.player.shipId=hull;r.ui.setCockpitShip(hull);},hull);await page.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime().ui.cockpitArtwork.layout);
+  await page.evaluate(async()=>{const c=__VOID_PRIVATEER__.getRuntime().ui.cockpitArtwork;await c.ready;});
+  assert.equal(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.cockpitArtwork.shipId),hull);
   assert.deepEqual(errors,[]);
   const cost=await page.evaluate(()=>{const c=__VOID_PRIVATEER__.getRuntime().ui.cockpitArtwork,t=performance.now();for(let i=0;i<300;i++)c.update(1/60,{yaw:Math.sin(i),pitch:Math.cos(i)});return (performance.now()-t)/300;});
-  await writeFile(`${out}/${name}.json`,JSON.stringify({geometry,steer,updateMs:cost,errors},null,2));console.log(name,'approved cockpit passed, update ms',cost.toFixed(3));
- }catch(error){await page?.screenshot({path:`${out}/${name}-failure.png`}).catch(()=>{});throw error;}
+  await writeFile(`${out}/${name}.json`,JSON.stringify({geometry,hullLayer,steer,updateMs:cost,errors},null,2));console.log(name,hull,'approved cockpit passed, update ms',cost.toFixed(3));
+ }catch(error){console.error('Cockpit failure diagnostics',JSON.stringify({hull,name,errors,pending:[...pending],networkFailures}));await page?.screenshot({path:`${out}/${name}-failure.png`}).catch(()=>{});throw error;}
  finally{await browser.close();}
+}
+
 }

@@ -94,16 +94,19 @@ const facingNegativeZ = (x, y, z) => {
     return [qx, qy, qz, qw];
 };
 const SHIP_WARM_ASSETS = Object.freeze({
-    speedster: ['./assets/models/ships/speedster.glb', './assets/remaster/cockpit-speedster-sprite-v4.png'],
-    legionary: ['./assets/models/ships/legionary.glb', './assets/remaster/cockpit-legionary-sprite-v3.png'],
-    andromeda: ['./assets/models/ships/andromeda.glb', './assets/remaster/cockpit-andromeda-sprite-v2.png'],
-    torsas: ['./assets/models/ships/torsas.glb', './assets/remaster/cockpit-torsas-sprite-v4.png'],
+    mule: ['./assets/models/ships/mule.glb', ...paintedCockpitAssets('mule')],
+    demon: ['./assets/models/ships/demon.glb', ...paintedCockpitAssets('demon')],
+    scrapper: ['./assets/models/ships/scrapper.glb', ...paintedCockpitAssets('scrapper')],
+    speedster: ['./assets/models/ships/speedster.glb', ...paintedCockpitAssets('speedster')],
+    legionary: ['./assets/models/ships/legionary.glb', ...paintedCockpitAssets('legionary')],
+    andromeda: ['./assets/models/ships/andromeda.glb', ...paintedCockpitAssets('andromeda')],
+    torsas: ['./assets/models/ships/torsas.glb', ...paintedCockpitAssets('torsas')],
     astra: ['./assets/models/ships/astra.glb', './assets/remaster/cockpit-astra-sprite-v2.png'],
     // Warm the approved starter frame and its anchored hand strip before flight.
     wayfarer: ['./assets/models/ships/wayfarer.glb', ...paintedCockpitAssets('wayfarer')],
     vanguard: ['./assets/models/ships/vanguard.glb', './assets/remaster/cockpit-vanguard-sprite-v7.png'],
     talon: ['./assets/models/ships/talon.glb', ...paintedCockpitAssets('talon')],
-    prospector: ['./assets/models/ships/prospector.glb', './assets/remaster/cockpit-prospector-sprite-v3.png'],
+    prospector: ['./assets/models/ships/prospector.glb', ...paintedCockpitAssets('prospector')],
     lancer: ['./assets/models/ships/lancer.glb', './assets/remaster/cockpit-lancer-sprite-v2.png'],
     atlas: ['./assets/models/ships/atlas.glb', './assets/remaster/cockpit-atlas-sprite-v4.png'],
 });

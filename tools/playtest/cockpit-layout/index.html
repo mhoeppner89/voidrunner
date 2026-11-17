@@ -18,7 +18,7 @@
   <aside id="review-options" hidden>
     <h1>Starter cockpit / structure first</h1>
     <p>Mercury artwork on the approved monitor and control layout. The existing hand and joystick base remain separate overlays. Readouts and flight are simulated; your career is untouched. Sound is off.</p>
-    <label>Hull <select id="hull"><option value="talon">Mercury · artwork</option><option value="wayfarer">Hestia / Wanderer · approved</option></select></label>
+    <label>Hull <select id="hull"><option value="prospector">Gaia · unpainted layout</option><option value="talon">Mercury · artwork</option><option value="wayfarer">Hestia / Wanderer · approved</option></select></label>
     <label>Viewport <select id="review-viewport"><option value="fit">This screen</option><option value="desktop">Desktop · 16:10</option><option value="phone">Phone · landscape</option></select></label>
     <label>Situation <select id="scene"><option value="navigation">Navigation</option><option value="combat">Combat</option><option value="salvage">Salvage</option></select></label>
     <label><input id="guides" type="checkbox"> Show touch areas and layout measurements</label>
@@ -49,7 +49,7 @@
   <dialog id="model-dialog">
     <header><b>Actual starter hull / canopy</b><button id="model-close">Close</button></header>
     <div id="model-stage"></div>
-    <footer><p>Cyan: original glazing. Gold: proposed pilot eye and forward direction. Drag to orbit; scroll to zoom.</p><p>The proposed eye is inside the glazing. The thin interior bow follows the exterior pane ring, widened for visibility; console connections are proposed. This exterior model has no authored seat or complete interior.</p><button id="model-front">Canopy close-up</button><button id="model-whole">Whole ship</button></footer>
+    <footer><p>Cyan: original glazing. Gold: proposed pilot eye and forward direction. Drag to orbit; scroll to zoom.</p><p>The eye marker is a proposed seat position. The thin interior frame follows the exterior glazing shape, adapted for visibility; console connections are proposed. This exterior model has no authored seat or complete interior.</p><button id="model-front">Canopy close-up</button><button id="model-whole">Whole ship</button></footer>
   </dialog>
   <script type="module" src="./review.js"></script>
 </body>

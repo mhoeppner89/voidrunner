@@ -1,3 +1,11 @@
+import {createDemonCockpit} from './cockpits/demon.js';
+import {createMuleCockpit} from './cockpits/mule.js';
+import {createProspectorCockpit} from './cockpits/prospector.js';
+import {createLegionaryCockpit} from './cockpits/legionary.js';
+import {createAndromedaCockpit} from './cockpits/andromeda.js';
+import {createTorsasCockpit} from './cockpits/torsas.js';
+import {createScrapperCockpit} from './cockpits/scrapper.js';
+import {createSpeedsterCockpit} from './cockpits/speedster.js';
 // Single source for the approved glass apertures, shared pilot rig and hull approval state.
 const deepFreeze=value=>{for(const item of Object.values(value))if(item&&typeof item==='object')deepFreeze(item);return Object.freeze(value);};
 const asset=name=>new URL(`../../assets/cockpits/${name}`,import.meta.url).href;
@@ -11,6 +19,8 @@ export const APPROVED_COCKPIT_LAYOUT=deepFreeze({
 });
 
 export const COCKPITS=deepFreeze({
+    scrapper:createScrapperCockpit(APPROVED_COCKPIT_LAYOUT),
+    speedster:createSpeedsterCockpit(APPROVED_COCKPIT_LAYOUT),
     wayfarer:{...APPROVED_COCKPIT_LAYOUT,id:'wayfarer',name:'Hestia / Wanderer',status:'approved',shell:asset('wayfarer-paint-atlas-v2.png')},
     // Fit live glass to the approved v4 painting. Never repaint it to chase a
     // subpixel DOM alignment error. Insets keep readouts clear of bevel corners.
@@ -20,6 +30,12 @@ export const COCKPITS=deepFreeze({
         housingTops:{radar:560},hyperdriveBottom:633,stickClearanceX:416,
         id:'talon',name:'Mercury',status:'approved',shell:asset('talon-paint-v4.png'),
         artworkSize:[1850,850],glassUnderlap:3,handOffsetX:-60},
+    demon:createDemonCockpit(APPROVED_COCKPIT_LAYOUT),
+    mule:createMuleCockpit(APPROVED_COCKPIT_LAYOUT),
+    prospector:createProspectorCockpit(APPROVED_COCKPIT_LAYOUT),
+    legionary:createLegionaryCockpit(APPROVED_COCKPIT_LAYOUT),
+    andromeda:createAndromedaCockpit(APPROVED_COCKPIT_LAYOUT),
+    torsas:createTorsasCockpit(APPROVED_COCKPIT_LAYOUT),
 });
 export const STARTER_COCKPIT=COCKPITS.wayfarer;
 export const getCockpitDefinition=(id,{review=false}={})=>{
@@ -29,13 +45,13 @@ export const getCockpitDefinition=(id,{review=false}={})=>{
 export const hasPaintedCockpit=id=>Boolean(getCockpitDefinition(id));
 export const paintedCockpitAssets=id=>{
     const c=getCockpitDefinition(id);
-    return c?[c.shell,c.hand,c.stickBase.path]:[];
+    return c?[c.shell,c.hand,c.stickBase.path,...(c.forwardHull?[c.forwardHull]:[])]:[];
 };
 // Export metadata for external art tools; the JSON is generated, not another layout authority.
 export const cockpitManifest=id=>{
     const c=getCockpitDefinition(id,{review:true});if(!c)throw new Error(`Unknown cockpit: ${id}`);
     const path=url=>'/assets/'+new URL(url).pathname.split('/assets/').at(-1);
-    return {version:4,width:c.width,height:c.height,shell:c.shell?path(c.shell):null,monitors:c.monitors,housingTop:c.housingTop,...(c.housingTops?{housingTops:c.housingTops,hyperdriveBottom:c.hyperdriveBottom}:{}),
+    return {version:4,width:c.width,height:c.height,shell:c.shell?path(c.shell):null,...(c.forwardHull?{forwardHull:{path:path(c.forwardHull),...c.forwardHullPlacement}}:{}),monitors:c.monitors,housingTop:c.housingTop,...(c.housingTops?{housingTops:c.housingTops,hyperdriveBottom:c.hyperdriveBottom}:{}),
         handStrip:{path:path(c.hand),...c.strip},stickBase:{...c.stickBase,path:path(c.stickBase.path)}};
 };
 // Geometry shared by live flight and the authoring view. Measurements are the
@@ -48,7 +64,7 @@ export function cockpitLayout(c,W,H,{jumpHeight,baseline,throttle,corners}){
     return {monitors,hyper,stickSize,stickTranslate:(edge-stickSize)/2-baseline.x,bleed:Math.max(1.5,(c.glassUnderlap??3)*Math.max(W/c.width,H/c.height))};
 }
 
-// A single intact image is clipped only at the locked live glass openings.
-// Never resize/move a monitor to accommodate small generative edge errors.
+// Optional stencil for code-only layout guides. Approved painted frames keep
+// their original pixels; fit each live monitor to its measured opening instead.
 export const cockpitApertureClip=c=>'M0,0 H1 V1 H0 Z '+Object.values(c.monitors).map(r=>
     `M${r.x/c.width},${r.y/c.height} h${r.width/c.width} v${r.height/c.height} h${-r.width/c.width} Z`).join(' ');

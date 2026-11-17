@@ -4,6 +4,7 @@ import {createCanopy} from './canopy.js';
 import {mountInstruments} from './instruments.js';
 import {greyboxFrame} from './artwork.js';
 import {COCKPITS,getCockpitDefinition,cockpitManifest} from '/src/game/cockpitDefinitions.js';
+import {drawForwardHull,drawPaintedForwardHull,MORRIGAN_FORWARD_PLACEMENT} from './hull-blockout.js';
 
 const $=selector=>document.querySelector(selector),cockpit=$('#cockpit'),canvas=$('#space'),ctx=canvas.getContext('2d',{alpha:false});
 const params=new URLSearchParams(location.search);
@@ -14,6 +15,8 @@ const initialCanopy=canopy.project(definition.width/definition.height);
 const mockup=params.get('mockup')==='1';
 const shell=mockup?greyboxFrame(definition,initialCanopy):definition.shell??greyboxFrame(definition,initialCanopy);
 const instruments=mountInstruments(cockpit,definition,shell),artwork=instruments.artwork;
+const forwardHull=params.get('hull-view')==='1'?(params.get('hull-art')==='1'?drawPaintedForwardHull(definition.id):drawForwardHull(definition.id,params.get('view-forward')??MORRIGAN_FORWARD_PLACEMENT.forward,params.get('hull-outward')??MORRIGAN_FORWARD_PLACEMENT.outward)):undefined;
+if(forwardHull){artwork.forwardHull.hidden=true;cockpit.append(forwardHull.image);}
 const frame=cockpitManifest(definition.id);
 $('#hull').value=definition.id;
 $('.review-title').innerHTML=`${definition.name} <small>${definition.status==='approved'?'APPROVED REFERENCE':definition.shell?'ARTWORK · AWAITING APPROVAL':'UNPAINTED LAYOUT · AWAITING APPROVAL'}</small>`;
@@ -149,10 +152,15 @@ function tick(now){
     frameId=requestAnimationFrame(tick);
 }
 window.addEventListener('pagehide',()=>{cancelAnimationFrame(frameId);input.dispose();},{once:true});
-window.render_game_to_text=()=>JSON.stringify({mode:'cockpit-layout-review',hull:definition.id,approval:definition.status,artworkGenerated:Boolean(definition.shell),coordinates:'screen origin top-left; yaw right / pitch down',scene:state.scene,hand:[state.handX,state.handY],throttle:state.throttle,speed:state.speed,ownPage:state.ownPage,missiles:state.missiles,shotsFired:state.shotsFired,paused:state.paused,input:state.lastInput,canopy:apertureInfo,careerModified:false});
+window.render_game_to_text=()=>JSON.stringify({mode:'cockpit-layout-review',hull:definition.id,approval:definition.status,artworkGenerated:Boolean(definition.shell),coordinates:'screen origin top-left; yaw right / pitch down',scene:state.scene,hand:[state.handX,state.handY],throttle:state.throttle,speed:state.speed,ownPage:state.ownPage,missiles:state.missiles,shotsFired:state.shotsFired,paused:state.paused,input:state.lastInput,canopy:apertureInfo,careerModified:false,viewpointForward:forwardHull?.viewpointForward,structuresOutward:forwardHull?.structuresOutward,hullFinish:forwardHull?.kind});
 window.advanceTime=ms=>{for(let n=0;n<Math.ceil(ms/(1000/60));n++)sampleAndAdvance(1/60);drawSpace();updateHud();};
-window.cockpitReview={mockup,state,input,instruments,definition,manifest:frame,resize,setScene,get canopy(){return canopy;},get artwork(){return artwork;}};
+window.addEventListener('message',event=>{
+    if(event.origin!==location.origin||event.source!==parent||event.data?.type!=='cockpit-forward-view'||!forwardHull||forwardHull.kind==='painted-hull-review')return;
+    const next=drawForwardHull(definition.id,event.data.value,event.data.outward);
+    forwardHull.image.replaceWith(next.image);Object.assign(forwardHull,next);
+});
+window.cockpitReview={mockup,state,input,instruments,definition,manifest:frame,forwardHull,resize,setScene,get canopy(){return canopy;},get artwork(){return artwork;}};
 setScene(params.get('scene')??'navigation');if(['desktop','phone'].includes(params.get('viewport')))$('#review-viewport').value=params.get('viewport');
 resize();
-try{await artwork.ready;if(artwork.loadError)throw new Error(artwork.loadError);resize();window.ready=true;parent.postMessage({type:'cockpit-ready'},location.origin);}catch(error){message(`Cockpit could not load: ${error.message}`);window.reviewError=error.message;parent.postMessage({type:'cockpit-error',message:error.message},location.origin);}
+try{await artwork.ready;if(forwardHull)await forwardHull.image.decode();if(artwork.loadError)throw new Error(artwork.loadError);resize();window.ready=true;parent.postMessage({type:'cockpit-ready'},location.origin);}catch(error){message(`Cockpit could not load: ${error.message}`);window.reviewError=error.message;parent.postMessage({type:'cockpit-error',message:error.message},location.origin);}
 frameId=requestAnimationFrame(tick);

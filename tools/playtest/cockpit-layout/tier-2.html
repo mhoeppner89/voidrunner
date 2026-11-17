@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Tier II · Cockpit review</title>
+  <link rel="icon" href="/favicon.svg">
+  <link rel="stylesheet" href="./tier-2.css">
+</head>
+<body>
+  <header>
+    <div><h1>Tier II cockpits</h1><p>Seven approved cockpits · integrated in live flight</p></div>
+    <a id="individual" href="./index.html?hull=prospector" target="_blank" rel="noopener">Detailed review ↗</a>
+  </header>
+  <nav id="ships" aria-label="Tier II ships"></nav>
+  <section id="toolbar" aria-label="Preview controls">
+    <button id="previous" aria-label="Previous ship">←</button>
+    <button id="next" aria-label="Next ship">→</button>
+    <label>View <select id="profile"><option value="desktop">Desktop</option><option value="phone">Phone</option><option value="fit">This screen</option></select></label>
+    <label>Scene <select id="scene"><option value="navigation">Navigation</option><option value="combat">Combat</option><option value="salvage">Salvage</option></select></label>
+    <label class="guides"><input id="guides" type="checkbox"> Fit guides</label>
+    <label id="forward-label"><input id="forward-hull" type="checkbox"> Manual hull blockout</label>
+    <label id="forward-view-label" title="Move the pilot eye forward by this percentage of ship length; 0% restores the previous view." hidden>View forward <input id="forward-view" type="range" min="0" max="30" step="1" value="13" aria-describedby="forward-value"><output id="forward-value" for="forward-view">13%</output></label>
+    <button id="forward-reset" hidden>Reset forward</button>
+    <label id="outward-view-label" title="Move each structure outward horizontally by this percentage of screen width, keeping its shape and viewpoint fixed." hidden>Structures outward <input id="outward-view" type="range" min="0" max="35" step="0.5" value="18" aria-describedby="outward-value"><output id="outward-value" for="outward-view">18%</output></label>
+    <label id="painted-hull-label" hidden><input id="painted-hull" type="checkbox"> Painted hull</label>
+    <button id="model">Actual canopy</button>
+    <button id="reset">Reset</button>
+    <button id="focus">Focus cockpit</button>
+    <span id="status" role="status" aria-live="polite">Loading cockpit…</span>
+  </section>
+  <main id="stage" aria-label="Interactive cockpit preview"></main>
+  <button id="unfocus" hidden>← Review controls</button>
+  <div id="error" role="alert" hidden></div>
+  <footer>Drag the grip or use keyboard/controller. Tap the monitors to inspect their pages. Sound is off; career saves are untouched.</footer>
+  <script type="module" src="./tier-2.js"></script>
+</body>
+</html>

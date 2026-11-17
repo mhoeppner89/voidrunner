@@ -17760,13 +17760,14 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 
 /* Approved shared cockpit artwork. Scope every override to active painted hulls so
    switching ships restores the existing cockpit and control layouts. */
-.painted-cockpit-frame,.painted-pilot-hand,.painted-stick-mount,.painted-hand-layer{display:none}
+.painted-cockpit-frame,.painted-cockpit-forward-hull,.painted-pilot-hand,.painted-stick-mount,.painted-hand-layer{display:none}
 .painted-throttle-rail{display:contents}
 #game-shell[data-cockpit-paint] .cockpit-art,
 #game-shell[data-cockpit-paint] .cockpit-bezel,
 #game-shell[data-cockpit-paint] .cockpit-glass{display:none}
 #game-shell[data-cockpit-paint] .cockpit-instruments{inset:0;transform:none}
 #game-shell[data-cockpit-paint] :is(.painted-cockpit-frame,.painted-stick-mount){display:block;position:absolute;inset:0;width:100%;height:100%;pointer-events:none;image-rendering:pixelated}
+#game-shell[data-cockpit-paint] .painted-cockpit-forward-hull:not([hidden]){display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:fill;z-index:1;pointer-events:none;image-rendering:pixelated}
 #game-shell[data-cockpit-paint] .painted-cockpit-frame{z-index:3;transform:translateZ(0)}
 #game-shell[data-cockpit-paint] .cockpit-vignette{transform:none}
 #game-shell[data-cockpit-paint] .painted-hand-layer{display:block;position:absolute;z-index:4;pointer-events:none;overflow:hidden;contain:strict;isolation:isolate;transform:translateZ(0)}

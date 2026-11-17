@@ -3171,7 +3171,7 @@ export class GameSession {
         if (actions.jettison)
             this.jettisonCargo(this.activeMugCargoCommodity() ?? 'gold');
         if (actions.autopilot)
-            this.toggleHyperdrive();
+            this.toggleHyperdrive(actions);
         if (actions.weaponSelect)
             this.switchWeapon(actions.weaponSelect);
         if (actions.weaponCycle)
@@ -4090,8 +4090,23 @@ export class GameSession {
         if (actions.throttleSet !== undefined)
             this.save.player.throttle = actions.throttleSet;
         this.save.player.throttle = clamp(this.save.player.throttle + actions.throttleDelta * dt, 0, 1);
-        const manualAuthority = Math.max(Math.abs(actions.pitch), Math.abs(actions.yaw), Math.abs(actions.roll));
+        let manualAuthority = Math.max(Math.abs(actions.pitch), Math.abs(actions.yaw), Math.abs(actions.roll));
+        const entrySteering = this.hyperdriveEntrySteering;
+        if (this.autopilot && entrySteering) {
+            // Engagement supersedes a steering gesture already used to align.
+            // Let that gesture ease back to neutral; a fresh axis, reversal or
+            // renewed push still interrupts immediately, including during charge.
+            if (manualAuthority <= 0.15) this.hyperdriveEntrySteering = undefined;
+            else {
+                const pitch = clamp(actions.pitch, Math.min(0,entrySteering.pitch), Math.max(0,entrySteering.pitch));
+                const yaw = clamp(actions.yaw, Math.min(0,entrySteering.yaw), Math.max(0,entrySteering.yaw));
+                const roll = clamp(actions.roll, Math.min(0,entrySteering.roll), Math.max(0,entrySteering.roll));
+                manualAuthority = Math.max(Math.abs(actions.pitch-pitch), Math.abs(actions.yaw-yaw), Math.abs(actions.roll-roll));
+                entrySteering.pitch=pitch;entrySteering.yaw=yaw;entrySteering.roll=roll;
+            }
+        }
         if (this.autopilot && manualAuthority > 0.35) {
+            this.hyperdriveEntrySteering=undefined;
             this.hyperdriveWaypoint=undefined;this.tutorialSurveyTrack=undefined;
             this.autopilot = false;
             this.hyperdriveEncounterAt = null;
@@ -7112,6 +7127,7 @@ export class GameSession {
         this.save.player.navTargetId = locationId;
     }
     disengageHyperdrive() {
+        this.hyperdriveEntrySteering=undefined;
         this.hyperdriveWaypoint=undefined;this.tutorialSurveyTrack=undefined;
         // Any reason to leave the leg also cancels a call that was still due
         // on it; the pickup itself calls this, then keeps its own record.
@@ -7137,7 +7153,7 @@ export class GameSession {
         if(this.autopilot)return this.hyperdriveWaypoint??LOCATIONS[this.save.player.navTargetId];
         return this.distressWaypoint()??this.explorationWaypoint()??this.tutorialLocalWaypoint()??LOCATIONS[this.save.player.navTargetId];
     }
-    toggleHyperdrive() {
+    toggleHyperdrive(actions = {}) {
         if(this.save.player.raceReturn)return;
         if(this.arena?.run || this.playerDocking)return;
         if (this.pendingDroneDeparture) { this.cancelDroneDeparture(); return; }
@@ -7174,6 +7190,8 @@ export class GameSession {
         const nav = this.hyperdriveDestination();
         if (!this.requestDroneDeparture('hyperdrive')) return;
         this.hyperdriveReturnThrottle = this.save.player.throttle;
+        const pitch=actions.pitch??0,yaw=actions.yaw??0,roll=actions.roll??0;
+        this.hyperdriveEntrySteering=Math.max(Math.abs(pitch),Math.abs(yaw),Math.abs(roll))>0.35?{pitch,yaw,roll}:undefined;
         this.hyperdriveWaypoint=nav.kind==='waypoint'?nav:undefined;
         this.recallMiningDrones('hyperdrive');
         this.autopilot = true;
@@ -14063,6 +14081,9 @@ export class GameSession {
             this.save.player.outfitting.loadouts, { activeShipId: this.save.player.shipId });
         this._statsDirty = true;
         this.ui.setCockpitShip(shipId);
+        // The next session preloads the active hull, including baked liveries.
+        // Start those same dependencies now so a bought ship can resume offline.
+        this.renderer?.preloadGlbShips?.([playerShipVariant(shipId)]);
         if (!quote.switching) this.initializeCommissionedShipState(this.playerStats());
         else normalizeLauncherMagazines(this.save.player);
         this.syncWeaponProjection();

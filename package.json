@@ -35,6 +35,7 @@
     "test:browser:locations": "node tests/browser/location-buttons.mjs",
     "test:browser:planets": "node tests/browser/planet-transitions.mjs",
     "test:browser:interface-naming": "node tests/browser/interface-naming.mjs",
+    "test:browser:tutorial-return-hyperdrive": "node tests/browser/tutorial-return-hyperdrive.mjs",
     "test:browser:hyperdrive-direct": "node tests/browser/hyperdrive-direct.mjs",
     "test:browser:story-investment": "node tests/browser/story-investment.mjs",
     "test:browser:transit-lighting": "node tools/playtest/planet-transitions.mjs && node tests/browser/transit-lighting.mjs",
