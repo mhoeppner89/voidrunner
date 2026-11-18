@@ -45,6 +45,17 @@
 - Runtime CSS is scoped to `#game-shell[data-cockpit-paint]`. Deactivation restores inline geometry, touch origin and inert state for other hulls. Canopy cracks use the frame's inverse alpha mask, and HUD-marker visibility samples cached alpha plus monitor/control bounds.
 - `npm run test:browser:cockpit` now verifies the approved art in live career flight on desktop, Android, iPhone and a small phone. `tests/browser/cockpit-layout.mjs` covers the isolated review. The rejected procedural cockpit experiment and its tests have been removed; keep the current artwork checks. The live `GameUI.updateCockpitKit` hook retains its historical name and still drives `PaintedCockpit`.
 
+## Station & ship menus (station-ui.css)
+
+- `src/station-ui.css` (loaded after `style.css`) owns the docked menus, scene-hotspot skin, conversations, story/dock overlays, ship sheet, map and options. Tokens (`--sx-*`, `--ui-text-font`) live in the single `:root` block of `style.css`. The approved style frames are in `tools/playtest/menu-review/`.
+- Type rule: the pixel face is opt-in for place names, titles, prices, badges and hero numbers (`.sx-price`, `.sx-big`, `h2`/hero `h3`); everything else in menus reads in Barlow Semi Condensed. Cockpit/HUD keep their lettering. `tests/browser/interface-font-sort.mjs` encodes this split.
+- Console look (0.8.2pd): panels are bezelled screens (`::before` = corner screws; scanlines live in the background layer, never as an overlay above text — the user found overlays hard to read). Metal is navy steel via the `--sx-metal-*`/`--sx-key-*` tokens, not grey; keys use the light-top-left/dark-bottom-right bevel and invert when pressed. Phones use a 3px bezel without screws.
+- Item art is generated: edit `tools/icons/itemGlyphs.mjs`, run `npm run icons:pixelize`, never hand-edit `src/game/itemSprites.js`. Show sprites at multiples of 32px.
+- The header station directory uses `data-dock-jump` so it never collides with scene-hotspot attributes (`data-dock-hotspot`, `data-market-point`, `data-bar-panel`) that tests and players click on the scenes; inside a market point or bar board the keys also carry the legacy attribute.
+- Shared components: `.sx-panel` (bezelled screen), `.sx-panel-head`, `.sx-btn` (`-primary`/`-secondary`/`-ghost`/`-danger`), `.sx-seg`, `.sx-filter`, `.sx-row`, `.sx-chip`, `.sx-stats`, `.sx-hint`. Icons come from `src/game/uiIcons.js`. Reuse them; don't add per-screen button skins.
+- Landscape phones (`max-height: 520px`) get a 48px header, two panes side by side and pinned action bars; never stack what can sit side by side. Desktop header stays 67px — concourse ship/hotspot placement is measured relative to the scene box below it.
+- Rebuilt menus keep their old class names and data attributes (tests and controller rely on them) but their old `style.css` rules were removed. When reworking a menu, delete its old rules instead of overriding them; check selector-level pruning with a same-session stylesheet A/B screenshot (fonts must resolve from `src/`).
+
 ## Theme / CSS rules
 
 - style.css has a SINGLE `:root` palette block at the top (base + `--void-*` + `--retro-*` tokens, effective values only). Never add a second `:root` block mid-file — the old "VOIDRUNNER STYLE LOCK" block silently shadowed the top tokens with its navy values; the effective palette IS the navy one (`--void-navy` bg, `--void-gold` accents). New colors go into that one block as tokens; dead tokens get deleted, not kept.

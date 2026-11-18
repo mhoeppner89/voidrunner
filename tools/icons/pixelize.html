@@ -1,0 +1,61 @@
+<!doctype html><meta charset="utf-8"><title>Item sprite pixelizer</title>
+<script type="module">
+// Rasterises the vector glyphs into 32×32 pixel sprites: hard-edged layers,
+// a top-left light, a dark rim, dithered lower hull and a 1px ink outline.
+import {SYMBOLS,COMMODITY_SYMBOLS,SIGNALS,ACCENTS,CARGO_PAINT,FALLBACK} from './itemGlyphs.mjs';
+const N=32, INK=[5,8,15], WHITE=[255,255,255];
+// Pixel steel is lighter than the old vector paint: small sprites need value contrast.
+const STEEL={body:'#2f4f68',face:'#5e86a3',edge:'#c6deec',line:'#8fb1c7'};
+const hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+const mix=(a,b,t)=>a.map((v,i)=>Math.round(v+(b[i]-v)*t));
+const sat=(c,k)=>{const m=(c[0]+c[1]+c[2])/3;return c.map(x=>Math.max(0,Math.min(255,Math.round(m+(x-m)*k))));};
+const toHex=c=>'#'+c.map(v=>v.toString(16).padStart(2,'0')).join('');
+function mask(d,mode,width){
+  const c=new OffscreenCanvas(N,N),x=c.getContext('2d');
+  x.setTransform(N/64,0,0,N/64,0,0);x.translate(3,3);x.scale(.9,.9);x.lineJoin='round';x.lineCap='round';
+  const p=new Path2D(d);if(mode==='fill'){x.fillStyle='#fff';x.fill(p);}else{x.strokeStyle='#fff';x.lineWidth=width;x.stroke(p);}
+  const a=x.getImageData(0,0,N,N).data,m=new Float32Array(N*N);for(let i=0;i<N*N;i++)m[i]=a[i*4+3]/255;return m;
+}
+function sprite(shape,paint,signal){
+  const pal={body:sat(hex(paint.body),1.25),face:sat(hex(paint.face),1.3),edge:hex(paint.edge),line:hex(paint.line),accent:sat(hex(paint.accent),1.15)};
+  const k=64/N/0.9;
+  const L={body:mask(shape.body,'fill'),facet:mask(shape.facet,'fill'),eng:mask(shape.detail,'stroke',k*1.05),
+    core:shape.core?mask(shape.core,'fill'):null,coreS:shape.core?mask(shape.core,'stroke',k*1.1):null,sig:signal?mask(signal,'stroke',k*1.1):null};
+  const lab=new Uint8Array(N*N); // 1 body 2 facet 3 engraving-in 4 core 5 signal 6 engraving-out
+  for(let i=0;i<N*N;i++){
+    const inside=L.body[i]>.5||L.facet[i]>.5;
+    if(L.core&&(L.core[i]>.4||L.coreS[i]>.45))lab[i]=4;
+    else if(L.sig&&L.sig[i]>.38)lab[i]=5;
+    else if(L.eng[i]>.33)lab[i]=inside?3:6;
+    else if(L.facet[i]>.5)lab[i]=2;
+    else if(L.body[i]>.5)lab[i]=1;
+  }
+  const at=(x,y)=>x<0||y<0||x>=N||y>=N?0:lab[y*N+x], solid=l=>l&&l!==5&&l!==6;
+  const dark=mix(pal.body,[4,6,14],.5), px=new Array(N*N).fill(null);
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+    const i=y*N+x,l=lab[i];
+    if(!l){if(at(x+1,y)||at(x-1,y)||at(x,y+1)||at(x,y-1))px[i]=INK;continue;}
+    const lit=!solid(at(x,y-1))||!solid(at(x-1,y)), shade=!solid(at(x,y+1))||!solid(at(x+1,y));
+    px[i]=l===4?(at(x,y-1)===4&&at(x-1,y)===4?pal.accent:mix(pal.accent,WHITE,.55))
+      :l===5?mix(pal.accent,WHITE,.15)
+      :l===6?pal.edge
+      :l===3?mix(pal.line,dark,.6)
+      :l===2?(lit?mix(pal.face,WHITE,.4):shade?mix(pal.face,dark,.3):pal.face)
+      :lit?mix(pal.edge,pal.body,.25):shade?dark:((x+y)%2&&y>N*.62?mix(pal.body,dark,.45):pal.body);
+  }
+  // Palette + run-length grid: each run is a palette char (0 = clear,
+  // 1-9a-z colours) followed by its length in base 36 (1-z).
+  const palette=[],index=new Map();let rle='',prev=-1,len=0;
+  const flush=()=>{if(len)rle+=prev.toString(36)+len.toString(36);};
+  for(let i=0;i<N*N;i++){let v=0;if(px[i]){const key=toHex(px[i]);if(!index.has(key)){palette.push(key);index.set(key,palette.length);}v=index.get(key);}
+    if(v===prev&&len<35)len++;else{flush();prev=v;len=1;}}
+  flush();
+  return [palette.map(c=>c.slice(1)).join(''),rle];
+}
+const out={equipment:{},commodity:{}};
+for(const [id,shape] of Object.entries(SYMBOLS))out.equipment[id]=sprite(shape,{...STEEL,accent:ACCENTS[id]??'#9ed5e8'},SIGNALS[id]);
+out.equipment.fallback=sprite(FALLBACK,{...STEEL,accent:'#9ed5e8'});
+for(const [id,shape] of Object.entries(COMMODITY_SYMBOLS))out.commodity[id]=sprite(shape,CARGO_PAINT[id]);
+out.commodity.fallback=sprite(FALLBACK,{...STEEL,accent:'#9ed5e8'});
+window.sprites=out;
+</script>

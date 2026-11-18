@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Station Menu Review</title>
+<link rel="stylesheet" href="station-ui.css">
+<style>
+  :root { --bg: #040b1f; --panel: #0a1838; --line: rgba(132, 176, 255, 0.2); --text: #eef3ff; --muted: #9aa9cb; --gold: #ffd05c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 500 16px/1.5 "Barlow Semi Condensed", system-ui, sans-serif; }
+  header.page { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 14px 24px; background: rgba(4, 11, 31, 0.94); border-bottom: 1px solid var(--line); backdrop-filter: blur(8px); }
+  header.page h1 { margin: 0; font: 400 24px/1 "Void VGA Text", monospace; }
+  header.page p { margin: 0; color: var(--muted); flex: 1 1 360px; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; }
+  .controls button, .verdict button, .controls select { min-height: 40px; padding: 0 14px; font: 600 14px/1 inherit; font-family: inherit; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text); background: var(--panel); border: 1px solid var(--line); cursor: pointer; }
+  .controls button:hover, .verdict button:hover { border-color: var(--gold); }
+  main { padding: 24px; display: grid; gap: 40px; }
+  section.screen { display: grid; gap: 16px; }
+  section.screen > h2 { margin: 0; display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; font: 400 24px/1 "Void VGA Text", monospace; }
+  section.screen > h2 small { font: 500 15px/1.4 "Barlow Semi Condensed", sans-serif; color: var(--muted); }
+  .views { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+  figure { margin: 0; display: grid; gap: 8px; }
+  figcaption { display: flex; justify-content: space-between; gap: 12px; font: 600 13px/1 inherit; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  figcaption a { color: var(--gold); text-decoration: none; letter-spacing: 0.06em; }
+  .device { position: relative; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45); background: #000; }
+  .device.phone { border: 6px solid #10182c; border-radius: 18px; }
+  .device iframe { position: absolute; top: 0; left: 0; border: 0; transform-origin: 0 0; }
+  .phones { display: grid; gap: 20px; }
+  .review { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; max-width: 1100px; }
+  .verdict { display: flex; gap: 6px; }
+  .verdict button[aria-pressed="true"] { color: #241500; background: var(--gold); border-color: var(--gold); }
+  .verdict button[data-verdict="changes"][aria-pressed="true"] { background: #ff9a6b; border-color: #ff9a6b; }
+  textarea { width: 100%; min-height: 44px; padding: 10px 12px; font: 500 15px/1.4 inherit; font-family: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); resize: vertical; }
+  .notes { max-width: 1100px; color: var(--muted); }
+  .notes b { color: var(--text); }
+  @media (max-width: 760px) { .review { grid-template-columns: 1fr; } main, header.page { padding-inline: 12px; } }
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>Station Menu Review</h1>
+  <p>Style frames for the menu overhaul, with real game data from a new career at Helix Freeport. Each view runs in its real viewport size. Click rows, filters and quantities to try them; nothing is saved to the game.</p>
+  <div class="controls">
+    <select id="lang" aria-label="Language"><option value="de">Deutsch</option><option value="en">English</option></select>
+    <button id="reload">Reload frames</button>
+    <button id="export">Export verdicts</button>
+  </div>
+</header>
+<main id="screens"></main>
+<script type="module">
+const SCREENS = [
+  ['trade', 'Handel', 'Commodity list, the selected good with market data and route intel, and a trade ticket with quantity, cargo preview and Buy/Sell.'],
+  ['equipment', 'Ausrüstung', 'Your ship\'s loadout, the shop catalog with category filters and fit hints, and the item detail with stat comparison against the mount it would fill.'],
+  ['missions', 'Aufträge', 'Contract list with type, risk and reward, and a dossier with the route, terms, bonus and briefing.'],
+];
+const VIEWS = [
+  ['Desktop', 1440, 900, 0.62, false],
+  ['Pixel 7', 863, 360, 0.72, true],
+  ['iPhone 13', 750, 342, 0.72, true],
+  ['iPhone SE', 568, 320, 0.72, true],
+];
+const KEY = 'voidrunner-menu-review-v1';
+const read = () => { try { return JSON.parse(localStorage.getItem(KEY)) ?? {}; } catch { return {}; } };
+const write = (data) => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch {} };
+const lang = document.getElementById('lang');
+lang.value = new URLSearchParams(location.search).get('lang') ?? 'de';
+function frame(screen, [name, w, h, scale, phone]) {
+  const src = `frame.html?screen=${screen}&lang=${lang.value}`;
+  return `<figure><figcaption><span>${name} · ${w}×${h}</span><a href="${src}" target="_blank" rel="noopener">Open ↗</a></figcaption>
+    <div class="device ${phone ? 'phone' : ''}" style="width:${Math.round(w * scale)}px;height:${Math.round(h * scale)}px">
+      <iframe src="${src}" title="${screen} ${name}" width="${w}" height="${h}" style="transform:scale(${scale})" loading="lazy"></iframe></div></figure>`;
+}
+function render() {
+  const data = read();
+  document.getElementById('screens').innerHTML = SCREENS.map(([id, title, note]) => `
+    <section class="screen" data-screen="${id}">
+      <h2>${title}<small>${note}</small></h2>
+      <div class="views">${frame(id, VIEWS[0])}<div class="phones">${VIEWS.slice(1).map((v) => frame(id, v)).join('')}</div></div>
+      <div class="review">
+        <div class="verdict">${[['approve', 'Approve'], ['changes', 'Needs changes']].map(([v, l]) => `<button data-verdict="${v}" aria-pressed="${data[id]?.verdict === v}">${l}</button>`).join('')}</div>
+        <textarea placeholder="Notes for ${title}…" data-notes="${id}">${data[id]?.notes ?? ''}</textarea>
+      </div>
+    </section>`).join('') + `
+    <section class="screen"><h2>Overall<small>The direction as a whole: type, colour, density, motion.</small></h2>
+      <div class="review"><div class="verdict">${[['approve', 'Approve'], ['changes', 'Needs changes']].map(([v, l]) => `<button data-verdict="${v}" data-overall aria-pressed="${data.overall?.verdict === v}">${l}</button>`).join('')}</div>
+      <textarea placeholder="Overall notes…" data-notes="overall">${data.overall?.notes ?? ''}</textarea></div>
+      <p class="notes"><b>Rollout after approval:</b> the same design system carries over to the shipyard, guilds, services and paint workshop, the dock header and scene hotspots, conversations and story cards, the ship sheet and the in-flight menus (map, pause and options). Each one keeps its controller navigation and touch targets.</p>
+    </section>`;
+}
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-verdict]');
+  if (!button) return;
+  const id = button.hasAttribute('data-overall') ? 'overall' : button.closest('[data-screen]').dataset.screen;
+  const data = read(); data[id] = {...data[id], verdict: button.dataset.verdict}; write(data);
+  button.parentElement.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+});
+document.addEventListener('input', (event) => {
+  const id = event.target.dataset.notes;
+  if (!id) return;
+  const data = read(); data[id] = {...data[id], notes: event.target.value}; write(data);
+});
+document.getElementById('reload').onclick = render;
+lang.onchange = render;
+document.getElementById('export').onclick = () => {
+  const blob = new Blob([JSON.stringify({exported: new Date().toISOString(), verdicts: read()}, null, 2)], {type: 'application/json'});
+  const a = Object.assign(document.createElement('a'), {href: URL.createObjectURL(blob), download: 'voidrunner-menu-review.json'});
+  a.click(); URL.revokeObjectURL(a.href);
+};
+render();
+window.menuReview = {ready: true};
+</script>
+</body>
+</html>

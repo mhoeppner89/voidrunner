@@ -1,3 +1,18 @@
+## 0.8.2pd — Console menus, station directory and fewer clicks
+
+- Restyle the menus as consoles in the spirit of early-90s space sims: every panel is a screen in a brushed navy-steel bezel with corner screws, a dark navy face with faint scanlines kept under the text, phosphor labels and readouts, and a short power-on when a screen opens. Buttons and tabs are raised hardware keys that press in; lit tabs show a green LED. The dock header is a riveted navy console strip with the place name on an amber display and LCD readouts for cargo and credits. The ship sheet, map, options, conversations, story cards and scene hotspots use the same parts.
+- Replace the vector cargo and equipment glyphs with 32×32 pixel-art sprites (ink outline, top-left light, dithered lower hull), shown at whole multiples (32/64/96/128 px). `npm run icons:pixelize` regenerates `src/game/itemSprites.js` from the vector source in `tools/icons/itemGlyphs.mjs`. Menu line icons draw with crisp square edges; Equipment and Services no longer share a wrench icon.
+- The dock header is now a station directory: trade, equipment, shipyard, the den, services, the bar, contracts and guilds are one tap (or LB/RB) away from any screen, without walking back through the concourse. Services shows a "!" when the ship needs repair or fuel; contracts show the number of postings. A Launch key in the header departs from any screen.
+- Fewer clicks: Buy & install (or Buy & replace) fits a shop item into a free or chosen mount in one step, with the stat comparison against that mount; Repair & refill settles both service desks at once; Sell cargo sells everything this counter buys (legal goods at the market, restricted goods in the den) with one summary.
+
+## 0.8.2pc — Station and ship menu overhaul
+
+- Rebuild every station menu on one design system approved from style frames (`tools/playtest/menu-review/`): bevelled navy panels with gold corner brackets, the pixel face for place names, titles, prices and hero numbers, and Barlow Semi Condensed (bundled, offline) for text and labels.
+- Desktop layouts use the width: Trade shows the goods list, the selected cargo with supply/demand, remembered prices from other ports and a trade ticket with quantity slider, cargo preview and Buy/Sell; Equipment shows the loadout, a catalog with category filters and free-mount/replace hints, and a stat comparison with bars against the mount it would fill; Contracts get type filters, risk pips, a route diagram and a pinned Accept; the Shipyard adds hull outlines, a large 3D stage and spec bars against the best hull on sale.
+- Landscape phones get a 48px header, two panes side by side and action bars that never scroll away; all ten goods fit without scrolling, and Equipment keeps the loadout as an icon rail.
+- Restyle the dock header (icon tabs, cargo and credit chips), scene hotspots, Guilds, Services, the paint workshop, conversations, story cards, dock notices, the ship sheet, map and options in the same language. Header and ship-sheet tabs are real tabs, so LB/RB cycle them.
+- Remove about 7,900 lines of unused or superseded CSS from style.css (selectors for classes no source uses, then each rebuilt menu's old override layers).
+
 ## 0.8.2pb — More music: rotation, system signatures and docked themes
 
 - Restructure the adaptive score into a catalogue of pieces with a director that plays them: rotating contexts (open space, planets, belts, graveyard) close each piece with a cadence after a few minutes and rest in silence (30–90 s in open space) before choosing another, never the same twice running.

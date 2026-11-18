@@ -13378,7 +13378,8 @@ export class GameSession {
         this.audio.play('uiTab');
         return true;
     }
-    trade(kind, commodityId, quantity) {
+    // quiet: part of a batch (sellAllCargo) — no event, sound, redraw or save.
+    trade(kind, commodityId, quantity, { quiet = false } = {}) {
         const dock = this.save.player.dockedAt;
         if (!dock)
             return;
@@ -13391,8 +13392,10 @@ export class GameSession {
             && (kind === 'sell' || kind === 'den-sell') && commodityId === 'food'
             && (this.save.player.cargo.food ?? 0) - quantity < (getTutorialQuest(this.save)?.flags.deliveryRequired??TUTORIAL_REQUIRED_SUPPLIES)) {
             const message = t('Keep the delivery cargo aboard until you sell it at Vesper.');
-            this.ui.showToast(message, 'warning', 4200);
-            this.audio.play('deny', 0.8);
+            if (!quiet) {
+                this.ui.showToast(message, 'warning', 4200);
+                this.audio.play('deny', 0.8);
+            }
             return { ok: false, message };
         }
         const den = kind === 'den-buy' || kind === 'den-sell';
@@ -13422,6 +13425,8 @@ export class GameSession {
             });
             this.ensureTutorialDelivery();
         }
+        if (quiet)
+            return result;
         const goldHeatNote = result.ok && commodityId === 'gold' ? t(' The board marks the sale — expect company on the Shattered Crown lanes.') : '';
         const denNote = result.ok && den ? t(' The den pays untraceable — no manifest entry.') : '';
         const holdNote = result.ok ? t(' Hold: {used}/{capacity} mass.', { used: result.postCargoMass.toFixed(1), capacity: cargoCapacity(this.save.player) }) : '';
@@ -13434,6 +13439,40 @@ export class GameSession {
         this.showTutorialDockBriefing();
         this.persistSave();
         return result;
+    }
+    // One click empties the hold at this counter: legal goods on the
+    // market, restricted goods in the den. Mission cargo is sealed and never
+    // listed here; the tutorial's delivery supplies stay aboard.
+    sellAllCargo(den = false) {
+        const dock = this.save.player.dockedAt;
+        if (!dock || !this.dockHasService('market'))
+            return { ok: false };
+        const kind = den ? 'den-sell' : 'sell';
+        const sold = [];
+        let total = 0, gold = false;
+        for (const [commodityId, held] of Object.entries(this.save.player.cargo ?? {})) {
+            if (!(held > 0) || !COMMODITIES[commodityId] || COMMODITIES[commodityId].legal === den)
+                continue;
+            const result = this.trade(kind, commodityId, held, { quiet: true });
+            if (!result?.ok)
+                continue;
+            sold.push(`${result.quantity}× ${t(COMMODITIES[commodityId].name)}`);
+            total += result.total;
+            gold ||= commodityId === 'gold';
+        }
+        if (!sold.length) {
+            this.ui.showToast(t('Nothing in the hold sells here.'), 'warning');
+            this.audio.play('deny', 0.8);
+            return { ok: false };
+        }
+        this.ui.pushEvent(t('Sold {goods} for {credits}.', { goods: sold.join(', '), credits: formatCredits(total) }), 'success');
+        if (gold)
+            this.ui.showToast(t(' The board marks the sale — expect company on the Shattered Crown lanes.').trim(), 'warning');
+        this.audio.play('purchase', 0.8);
+        this.ui.refreshDock(this.save);
+        this.showTutorialDockBriefing();
+        this.persistSave();
+        return { ok: true, total };
     }
     acceptMission(missionId) {
         if (!tutorialContentUnlocked(this.save) && !(missionId === TUTORIAL_MINING_CONTRACT_ID && getTutorialQuest(this.save)?.stepId === 'mining-contract' && getTutorialQuest(this.save)?.flags.miningExplained)) {

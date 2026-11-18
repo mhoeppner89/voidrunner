@@ -453,6 +453,7 @@ const actions = {
     patrolReply: () => session?.patrolReply(),
     paySyndicateBerth: () => session?.paySyndicateBerth(),
     chooseRaceHull:id=>session?.chooseRaceHull(id),
+    sellAllCargo: (den) => session?.sellAllCargo(den),
     acceptMission: (missionId) => session?.acceptMission(missionId),
     discardMission: (missionId) => session?.discardMission(missionId),
     chooseExploration: choice=>session?.chooseExploration(choice),

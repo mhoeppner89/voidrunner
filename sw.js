@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v681-0-8-2pb-music-variety';
+const CACHE = 'voidrunner-v683-0-8-2pd-console-menus';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -18,6 +18,7 @@ const CORE_ASSETS = [
   './favicon.svg',
   './manifest.webmanifest',
   './src/style.css',
+  './src/station-ui.css',
   './src/main.js',
   './src/game/gamepad.js',
   './src/game/controllerBindings.js',
@@ -42,6 +43,10 @@ const CORE_ASSETS = [
   './src/game/transitAudio.js',
   './assets/fonts/void-vga.ttf',
   './assets/fonts/void-vga-text.ttf',
+  './assets/fonts/barlow-semi-condensed-400.woff2',
+  './assets/fonts/barlow-semi-condensed-500.woff2',
+  './assets/fonts/barlow-semi-condensed-600.woff2',
+  './assets/fonts/barlow-semi-condensed-700.woff2',
   './vendor/three.module.min.js',
   './vendor/three.core.min.js',
   './src/game/adventureDialogues.js',
@@ -179,6 +184,7 @@ const CORE_ASSETS = [
   './src/game/equipmentInventory.js',
   './src/game/equipmentUi.js',
   './src/game/itemIcons.js',
+  './src/game/itemSprites.js',
   './src/game/equipmentStatPresentation.js',
   './src/game/careerLoot.js',
   './src/game/explorationData.js',
@@ -204,6 +210,7 @@ const CORE_ASSETS = [
   './src/game/tutorialText.js',
   './src/game/tutorialRuntime.js',
   './src/game/ui.js',
+  './src/game/uiIcons.js',
   './src/game/canvasSizeCache.js',
   './src/game/weapons.js',
   './art/title-cockpit.webp',

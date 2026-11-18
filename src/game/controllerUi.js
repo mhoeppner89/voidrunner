@@ -156,8 +156,10 @@ export class ControllerUI {
             }
             node = node.parentElement;
         }
-        for (const node of scope.querySelectorAll('.modal-card, .settings-content, .ship-body, .dock-terminal, .adventure-body')) {
-            if (node.scrollHeight > node.clientHeight + 4) { node.scrollTop += amount; return; }
+        // Fallback when focus sits outside any scroller: the menus' scrolling
+        // panes, detail panes first so the stick reads what was selected.
+        for (const node of scope.querySelectorAll('.inventory-detail-scroll, .mission-dossier-scroll, .trade-overview, .ship-sheet-scroll, .paint-controls, .sx-scroll, .guild-board, .ship-console-body, .adventure-dialogue, .modal-card, .settings-content')) {
+            if (visible(node) && node.scrollHeight > node.clientHeight + 4) { node.scrollTop += amount; return; }
         }
     }
     tick(now) {

@@ -25,6 +25,7 @@ import { equipmentUnlocked, getEffectiveShipStats, dockServiceQuote, repaintCost
 import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS, TRACKING_LASER, LAUNCHERS, weaponForOutfit, launcherForOutfit, weaponRange, weaponShotDamage, weaponIdForOutfit, launcherMagazineEntries, weaponOwned } from './weapons.js';
 import { TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
 import {equipmentIcon, commodityIcon} from './itemIcons.js';
+import {uiIcon} from './uiIcons.js';
 import {equipmentStatChanges} from './equipmentStatPresentation.js';
 import { shipTopDownProfile, shipProfilePath } from './shipTopDownProfile.js';
 import { defaultSettings, saveGame } from './save.js';
@@ -476,7 +477,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2pb';
+const GAME_VERSION = '0.8.2pd';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -1374,7 +1375,7 @@ export class GameUI {
     `;
     }
     bindStaticEvents() {
-        const delegatedActionSelector = '[data-ui-command], [data-tutorial-action], [data-map-view], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-market-point], [data-commodity-id], [data-market-qty], [data-bar-panel], [data-dialogue-topic], [data-dialogue-action], [data-mission-board-tab], [data-mission-select], [data-mission-course], [data-mission-discard], [data-mission-discard-confirm], [data-nav-id], [data-trade], [data-jettison], [data-mission-id], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action], [data-equipment-id], [data-ship-id], [data-ship-detail], [data-ship-detail-back], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty], [data-arena-fit], [data-observer-scenario], [data-observer-difficulty], [data-observer-blue-fit], [data-observer-red-fit], [data-pay-mug]';
+        const delegatedActionSelector = '[data-ui-command], [data-tutorial-action], [data-map-view], [data-dock-tab], [data-dock-terminal], [data-dock-hotspot], [data-dock-jump], [data-market-point], [data-commodity-id], [data-market-qty], [data-bar-panel], [data-dialogue-topic], [data-dialogue-action], [data-mission-board-tab], [data-mission-kind], [data-mission-select], [data-mission-course], [data-mission-discard], [data-mission-discard-confirm], [data-nav-id], [data-trade], [data-jettison], [data-mission-id], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action], [data-equipment-id], [data-ship-id], [data-ship-detail], [data-ship-detail-back], [data-guild-id], [data-person-id], [data-map-target-kind], [data-arena-env], [data-arena-scenario], [data-arena-difficulty], [data-arena-fit], [data-observer-scenario], [data-observer-difficulty], [data-observer-blue-fit], [data-observer-red-fit], [data-pay-mug]';
         const directPointerElement = (event) => {
             const correctedSceneControl = event.pointerType !== 'mouse' && event.target instanceof Element
                 ? event.target.closest('.scene-pointer')
@@ -1496,6 +1497,20 @@ export class GameUI {
                 if (!duplicatePointerClick)
                     selectMapTarget(target);
             }
+            else if (target.dataset.dockJump) {
+                const [kind, value] = target.dataset.dockJump.split(':');
+                if (kind === 'market')
+                    this.openMarketPoint(value);
+                else if (kind === 'bar' && ['people', 'missions', 'guilds'].includes(value))
+                    this.switchToTerminal('bar', value);
+                else if (kind === 'services') {
+                    this.paintEditorOpen = false;
+                    this.paintDraft = undefined;
+                    this.dockTab = 'concourse';
+                    this.dockTerminal = 'services';
+                    this.renderDock();
+                }
+            }
             else if (target.dataset.barPanel) {
                 const panel = target.dataset.barPanel;
                 if (panel === 'people' || panel === 'missions' || panel === 'guilds')
@@ -1507,6 +1522,12 @@ export class GameUI {
                 this.handleDialogueAction(target.dataset.dialogueAction, target.dataset.destinationId);
             else if (target.dataset.missionBoardTab)
                 this.setMissionBoardTab(target.dataset.missionBoardTab);
+            else if (target.dataset.missionKind) {
+                this.missionKindFilter = target.dataset.missionKind;
+                this.missionSelectedId = undefined;
+                this.missionDiscardId = undefined;
+                this.renderDock();
+            }
             else if (target.dataset.missionSelect)
                 this.selectMission(target.dataset.missionSelect);
             else if (target.dataset.missionDiscardConfirm) {
@@ -1691,8 +1712,17 @@ export class GameUI {
             event.preventDefault();
             this.actions?.openShipMenu();
         });
+        this.root.addEventListener('change', (event) => {
+            if (event.target.matches?.('[data-market-qty-range]'))
+                this.setMarketQuantity(`set:${event.target.value}`);
+        });
         this.root.addEventListener('input', (event) => {
             const element = event.target;
+            if (element.matches?.('[data-market-qty-range]')) {
+                const output = element.closest('.trade-ticket')?.querySelector('.trade-quantity output');
+                if (output) output.textContent = element.value;
+                return;
+            }
             if(element.matches?.('[data-paint-color]')){
                 const draft=editablePaint(this.paintDraft,this.save.player.shipId);draft.colors[Number(element.dataset.paintColor)]=element.value;
                 this.updatePaintDraft(draft);return;
@@ -1716,7 +1746,7 @@ export class GameUI {
         this.root.addEventListener('keydown', (event) => {
             if (event.key !== 'Enter' && event.key !== ' ')
                 return;
-            const target = event.target.closest('[data-ui-command], [data-tutorial-action], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-dialogue-topic], [data-dialogue-action], [data-mission-board-tab], [data-mission-select], [data-mission-course], [data-mission-discard], [data-mission-discard-confirm], [data-mission-id], [data-guild-id], [data-person-id], [data-ship-detail], [data-ship-detail-back], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action]');
+            const target = event.target.closest('[data-ui-command], [data-tutorial-action], [data-dock-hotspot], [data-market-point], [data-bar-panel], [data-dialogue-topic], [data-dialogue-action], [data-mission-board-tab], [data-mission-kind], [data-mission-select], [data-mission-course], [data-mission-discard], [data-mission-discard-confirm], [data-mission-id], [data-guild-id], [data-person-id], [data-ship-detail], [data-ship-detail-back], [data-outfit-slot], [data-outfit-item], [data-outfit-view], [data-outfit-group], [data-outfit-action]');
             if (!target)
                 return;
             event.preventDefault();
@@ -1840,8 +1870,9 @@ export class GameUI {
             case 'observer-exit':
                 this.actions?.quitToTitle();
                 break;
+            case 'launch-dock':
             case 'launch':
-                if (DOCK_LOCATION_IDS.includes(this.dockLocation) && this.dockTerminal === 'concourse' && element?.classList.contains('concourse-hover-ship'))
+                if (DOCK_LOCATION_IDS.includes(this.dockLocation) && this.dockTerminal === 'concourse' && (command === 'launch-dock' || element?.classList.contains('concourse-hover-ship')))
                     this.startVesperLaunchTransition();
                 else if (this.canLaunchFromDock())
                     void this.launchFromDock();
@@ -1971,6 +2002,14 @@ export class GameUI {
             case 'paint-reset':this.updatePaintDraft(JSON.parse(JSON.stringify(this.save.player.shipPaints?.[this.save.player.shipId]??'original')));break;
             case 'repair':
                 this.actions?.repair();
+                break;
+            case 'service-all':
+                // Repair first: a short purse goes to the hull before the tanks.
+                if (dockServiceQuote(this.save.player, 'repair').total > 0) this.actions?.repair();
+                if (dockServiceQuote(this.save.player, 'refill').total > 0) this.actions?.refuel();
+                break;
+            case 'sell-cargo':
+                this.actions?.sellAllCargo?.(element?.dataset.den === 'true');
                 break;
             case 'refuel':
                 this.actions?.refuel();
@@ -2319,24 +2358,33 @@ export class GameUI {
     // and switches inside it, and nothing repeats the name underneath. Returns
     // '' when the screen has nothing to switch between, which leaves the plain
     // label in place.
+    // Station directory: every venue of this dock is one tap away from any
+    // screen (Privateer-style hotspot walks stay in the scenes, but nobody has
+    // to walk back through the concourse to get from trade to the bar).
+    // Tabs carry role="tab" so the controller's LB/RB cycles them; the icon
+    // and label stay together, labels fold away where the bar gets narrow.
     dockScreenTabs() {
-        if (this.dockTerminal === 'market' && this.marketPoint) {
-            const tab = (point, label) => `<button type="button" class="${this.marketPoint === point ? 'is-active' : ''}" data-market-point="${point}" aria-pressed="${this.marketPoint === point}">${t(label)}</button>`;
-            const tabs = [
-                hasLocationService(this.dockLocation, 'market') ? tab('commodities', UI_TERMS.trade) : '',
-                hasLocationService(this.dockLocation, 'outfitting') ? tab('equipment', UI_TERMS.equipment) : '',
-                hasLocationService(this.dockLocation, 'shipyard') ? tab('shipyard', UI_TERMS.shipyard) : '',
-                this.denUnlockedAt(this.dockLocation) ? tab('den', "SMUGGLER'S DEN") : '',
-            ].filter(Boolean);
-            // A lone tab would just repeat the label beside it.
-            return tabs.length > 1 ? `<nav class="dock-screen-tabs" aria-label="${t('Market points')}">${tabs.join('')}</nav>` : '';
-        }
-        if (this.dockTerminal === 'bar' && this.barPanel === 'missions') {
-            const { offers, active } = this.missionBoardCounts();
-            const tab = (id, label, count) => `<button type="button" class="${this.missionBoardTab === id ? 'is-active' : ''}" data-mission-board-tab="${id}" aria-pressed="${this.missionBoardTab === id}">${t(label)} <b>${count}</b></button>`;
-            return `<nav class="dock-screen-tabs" aria-label="${t('Mission board sections')}">${tab('available', 'AVAILABLE', offers.length)}${tab('active', 'ACTIVE', active.length)}</nav>`;
-        }
-        return '';
+        const loc = this.dockLocation, venue = LOCATIONS[loc];
+        // Inside a market point or a bar board no scene hotspots are on screen, so
+        // the keys there also keep the venue's own attribute (as the old tabs did).
+        const legacy = (jump) => { const [kind, value] = jump.split(':'); return kind === 'market' && this.dockTerminal === 'market' && this.marketPoint ? ` data-market-point="${value}"` : kind === 'bar' && value !== 'people' && this.dockTerminal === 'bar' && ['missions', 'guilds'].includes(this.barPanel) ? ` data-bar-panel="${value}"` : ''; };
+        const tab = (jump, active, label, icon, badge) => `<button type="button" role="tab" class="sx-tab ${active ? 'is-active' : ''}" data-dock-jump="${jump}"${legacy(jump)} aria-selected="${active}" aria-pressed="${active}" title="${escapeHtml(t(label))}">${uiIcon(icon)}<span>${t(label)}</span>${badge === undefined ? '' : `<b class="sx-badge ${badge === '!' ? 'is-alert' : ''}">${badge}</b>`}</button>`;
+        const market = this.dockTerminal === 'market' ? this.marketPoint : '', bar = this.dockTerminal === 'bar' ? this.barPanel : '';
+        const { offers } = this.missionBoardCounts();
+        const player = this.save.player;
+        const needsService = (hasLocationService(loc, 'repair') && dockServiceQuote(player, 'repair').total > 0)
+            || (hasLocationService(loc, 'fuel') && dockServiceQuote(player, 'refill').total > 0);
+        const tabs = [
+            hasLocationService(loc, 'market') ? tab('market:commodities', market === 'commodities', UI_TERMS.trade, 'trade') : '',
+            hasLocationService(loc, 'outfitting') ? tab('market:equipment', market === 'equipment', UI_TERMS.equipment, 'equipment') : '',
+            hasLocationService(loc, 'shipyard') ? tab('market:shipyard', market === 'shipyard', UI_TERMS.shipyard, 'shipyard') : '',
+            this.denUnlockedAt(loc) ? tab('market:den', market === 'den', "SMUGGLER'S DEN", 'den') : '',
+            hasAnyLocationService(loc, ['repair', 'fuel']) ? tab('services', this.dockTerminal === 'services', 'SERVICES', 'repair', needsService ? '!' : undefined) : '',
+            hasLocationService(loc, 'bar') ? tab('bar:people', bar === 'people', socialVenueKey(venue), 'bar') : '',
+            hasAnyLocationService(loc, ['missions', 'race']) ? tab('bar:missions', bar === 'missions', missionBoardKey(venue), 'contracts', offers.length || undefined) : '',
+            this.localGuildIds().length ? tab('bar:guilds', bar === 'guilds', 'GUILDS', 'guilds') : '',
+        ].filter(Boolean);
+        return tabs.length ? `<nav class="dock-screen-tabs sx-tabs" role="tablist" aria-label="${t('Station directory')}">${tabs.join('')}</nav>` : '';
     }
     // The screen name shown in the dock header. Content panels no longer
     // repeat it as their own title band, so this is the single "where am I".
@@ -2356,6 +2404,12 @@ export class GameUI {
             equipment: t(UI_TERMS.equipment),
             shipyard: t(UI_TERMS.shipyard),
         }[this.dockTerminal] ?? t('CONCOURSE');
+    }
+    markEntering(element) {
+        if (!element) return;
+        element.classList.add('is-entering');
+        clearTimeout(element.enteringTimer);
+        element.enteringTimer = setTimeout(() => element.classList.remove('is-entering'), 450);
     }
     renderDock() {
         if (!this.save || !this.dockLocation)
@@ -2403,12 +2457,17 @@ export class GameUI {
                 : t('Return to the concourse');
         dock.innerHTML = `
       <div class="dock-backdrop">${this.locationIllustration(this.dockLocation, illustrationScreen)}</div>
-      <header class="dock-header">
-        ${backCommand ? `<button type="button" class="dock-back-button dock-pointer" data-ui-command="${backCommand}" aria-label="${escapeHtml(backLabel)}">◀</button>` : ''}
-        <div class="dock-heading"><span>${t(location.kind.toUpperCase())} · ${t(FACTION_NAMES[location.faction])}</span><h2>${escapeHtml(location.name)}</h2></div>
-        ${this.dockScreenTabs() || `<span class="dock-screen-label">${escapeHtml(this.dockScreenLabel())}</span>`}
-        ${story && !story.skipped ? `<button type="button" class="dock-story-button" data-ui-command="story" aria-haspopup="dialog">${t('Story')}</button>` : ''}
-        <div class="dock-wallet-unit"><div class="dock-wallet"><span>${t('CREDIT')}</span><strong>${formatCredits(this.save.player.credits)}</strong></div><button class="dock-options-button dock-pointer" data-ui-command="options" role="button" tabindex="0" aria-label="${t('Options')}">⚙</button></div>
+      <header class="dock-header sx-header">
+        ${backCommand ? `<button type="button" class="dock-back-button sx-back dock-pointer" data-ui-command="${backCommand}" aria-label="${escapeHtml(backLabel)}">${uiIcon('back', 22)}</button>` : ''}
+        <div class="dock-heading sx-place"><span>${t(location.kind.toUpperCase())} · <b>${t(FACTION_NAMES[location.faction])}</b></span><h2>${escapeHtml(location.name)}</h2></div>
+        ${this.dockScreenTabs() || `<span class="dock-screen-label sx-screen-label">${escapeHtml(this.dockScreenLabel())}</span>`}
+        <div class="dock-wallet-unit sx-status">
+          ${story && !story.skipped ? `<button type="button" class="dock-story-button sx-icon-button" data-ui-command="story" aria-haspopup="dialog" aria-label="${t('Story')}">${uiIcon('story')}<span>${t('Story')}</span></button>` : ''}
+          <div class="dock-cargo sx-chip" role="img" aria-label="${t('Cargo')} ${cargoMass(this.save.player).toFixed(1)} / ${cargoCapacity(this.save.player)}">${uiIcon('cargo', 18)}<span><small>${t('Cargo')}</small><b>${Number(cargoMass(this.save.player).toFixed(1))}/${formatNumber(cargoCapacity(this.save.player))}</b></span><i class="sx-meter"><i style="width:${Math.min(100, cargoMass(this.save.player) / Math.max(1, cargoCapacity(this.save.player)) * 100).toFixed(1)}%"></i></i></div>
+          <div class="dock-wallet sx-chip">${uiIcon('credits', 18)}<span><span>${t('CREDIT')}</span><strong>${formatCredits(this.save.player.credits)}</strong></span></div>
+          <button type="button" class="dock-launch-button sx-launch dock-pointer" data-ui-command="launch-dock" aria-label="${escapeHtml(t('Launch the docked {ship}', { ship: SHIPS[this.save.player.shipId]?.name ?? '' }))}">${uiIcon('flight', 18)}<span>${t('Launch')}</span></button>
+          <button class="dock-options-button sx-icon-button dock-pointer" data-ui-command="options" aria-label="${t('Options')}">${uiIcon('gear')}</button>
+        </div>
       </header>
       ${notices ? `<div class="dock-notice-stack">${notices}</div>` : ''}
       <div class="dock-content">${terminal}</div>
@@ -2427,6 +2486,8 @@ export class GameUI {
             && prevBarPerson === (this.barPersonId ?? '');
         if (content)
             content.scrollTop = preserveScroll ? prevScroll : 0;
+        if (!preserveScroll)
+            this.markEntering(dock);
         const illustration = dock.querySelector('.dock-backdrop img');
         illustration?.addEventListener('load', () => this.syncConcourseOverlay(), { once: true });
         this.syncConcourseOverlay();
@@ -3190,7 +3251,6 @@ export class GameUI {
         }
         return `
       <div class="market-screen market-menu-screen">
-        <div class="scene-pointer scene-return-pointer" data-ui-command="market-overview" role="button" tabindex="0" aria-label="${t('Return to the market floor')}"><i>◀</i><b>${t('MARKET FLOOR')}</b><small>${t('Back to the scene')}</small></div>
         <div id="market-point-content"></div>
       </div>
     `;
@@ -3255,6 +3315,10 @@ export class GameUI {
             this.marketQuantity = 1;
         else if (command === 'five')
             this.marketQuantity = 5;
+        else if (command === 'ten')
+            this.marketQuantity = 10;
+        else if (String(command).startsWith('set:'))
+            this.marketQuantity = Math.max(1, Math.min(999, Math.floor(Number(String(command).slice(4)) || 1)));
         this.renderMarketPoint(this.marketPoint || 'commodities');
     }
     commodityArt(commodity, size = 'thumb') {
@@ -3312,9 +3376,12 @@ export class GameUI {
         const commodityId = this.marketCommodityId;
         const commodity = COMMODITIES[commodityId];
         const item = market[commodityId];
-        const owned = this.save.player.cargo[commodityId] ?? 0;
-        const price = den ? denPrice(this.dockLocation, commodityId, item, this.save.world.seed, this.save.world.economyClock) ?? 0 : tutorialTradePrice(this.save,this.dockLocation,commodityId) ?? item.lastPrice;
+        const player = this.save.player;
+        const owned = player.cargo[commodityId] ?? 0;
+        const marketPriceFor = (id) => den ? denPrice(this.dockLocation, id, market[id], this.save.world.seed, this.save.world.economyClock) ?? 0 : tutorialTradePrice(this.save,this.dockLocation,id) ?? market[id].lastPrice;
+        const price = marketPriceFor(commodityId);
         const quantity = Math.max(1, Math.min(999, Math.floor(this.marketQuantity || 1)));
+        const buyKind = den ? 'den-buy' : 'buy', sellKind = den ? 'den-sell' : 'sell';
         const buyQuote = quoteCommodityTrade(this.save, this.dockLocation, commodityId, 'buy', quantity, price);
         const sellQuote = quoteCommodityTrade(this.save, this.dockLocation, commodityId, 'sell', quantity, price);
         const maxBuy = quoteCommodityTrade(this.save, this.dockLocation, commodityId, 'buy', 999, price);
@@ -3325,48 +3392,68 @@ export class GameUI {
         const trend = this.marketTrend(price, intel);
         const remoteQuotes = den ? [] : knownMarketQuotes(this.save.world, commodityId, this.dockLocation);
         const bestRoute = den ? undefined : bestKnownTradeRoute(this.save.world, this.dockLocation, commodityId);
-        const quoteLine = (quote) => quote.quantity > 0
-            ? t('{total} · {mass} mass', { total: formatCredits(quote.total), mass: Math.abs(quote.massDelta ?? commodity.mass * quote.quantity).toFixed(1) })
-            : this.tradeFailureLabel(quote.reason);
-        const marketPriceFor = (id) => den ? denPrice(this.dockLocation, id, market[id], this.save.world.seed, this.save.world.economyClock) ?? 0 : tutorialTradePrice(this.save,this.dockLocation,id) ?? market[id].lastPrice;
-        const catalogIds = [...ids].sort((a,b)=>Number((this.save.player.cargo[b]??0)>0)-Number((this.save.player.cargo[a]??0)>0));
+        const bandTag = (entry, value) => value < entry.basePrice * 0.9 ? `<em class="sx-tag is-down">▼ ${t('LOW')}</em>` : value > entry.basePrice * 1.15 ? `<em class="sx-tag is-up">▲ ${t('HIGH')}</em>` : '';
+        // Cargo first, then the market's order: what you can sell sits on top.
+        const catalogIds = [...ids].sort((a,b)=>Number((player.cargo[b]??0)>0)-Number((player.cargo[a]??0)>0));
         const catalog = catalogIds.map((id) => {
-            const entry = COMMODITIES[id];
-            const entryPrice = marketPriceFor(id);
-            const entryOwned = this.save.player.cargo[id] ?? 0;
-            return `<button type="button" class="commodity-card ${id === commodityId ? 'selected' : ''} ${entryOwned > 0 ? 'has-cargo' : ''} ${entry.legal ? '' : 'restricted'}" data-commodity-id="${id}" role="option" aria-selected="${id === commodityId}" style="--commodity-accent:${entry.accent}">
-              ${this.commodityArt(entry)}
-              <span class="commodity-card-copy"><b>${escapeHtml(t(entry.name))}</b></span>
-              <span class="commodity-card-price"><b>${formatCredits(entryPrice)}</b>${entryOwned > 0 ? `<em class="commodity-hold-badge">${t('HOLD')} ${entryOwned}</em>` : ''}</span>
+            const entry = COMMODITIES[id], entryPrice = marketPriceFor(id), entryOwned = player.cargo[id] ?? 0;
+            return `<button type="button" class="commodity-card sx-row ${id === commodityId ? 'selected' : ''} ${entryOwned > 0 ? 'has-cargo' : ''} ${entry.legal ? '' : 'restricted'}" data-commodity-id="${id}" role="option" aria-selected="${id === commodityId}" style="--accent:${entry.accent}">
+              <span class="commodity-art sx-row-icon" aria-hidden="true">${commodityIcon(entry)}${entryOwned > 0 ? `<em class="commodity-hold-badge" title="${t('HOLD')} ${entryOwned}">${entryOwned}</em>` : ''}</span>
+              <span class="commodity-card-copy sx-row-main"><b>${escapeHtml(t(entry.name))}</b><small>${escapeHtml(t(entry.category))}</small></span>
+              <span class="commodity-card-price sx-row-side"><b class="sx-price">${formatCredits(entryPrice)}</b>${den ? '' : bandTag(entry, entryPrice)}</span>
             </button>`;
         }).join('');
         const quoteRows = remoteQuotes.length ? remoteQuotes.slice(0, 4).map((quote) => {
             const margin = quote.price - price;
-            return `<li class="${margin > 0 ? 'profitable' : margin < 0 ? 'loss' : ''}"><span><b>${escapeHtml(LOCATIONS[quote.locationId]?.shortName ?? quote.locationId)}</b><small>${this.marketAge(quote.seenAt)}</small></span><strong>${formatCredits(quote.price)}</strong><em>${margin > 0 ? '+' : margin < 0 ? '−' : ''}${formatCredits(Math.abs(margin))}/${t('UNIT')}</em></li>`;
+            const best = bestRoute?.destinationId === quote.locationId && margin > 0;
+            return `<li class="${margin > 0 ? 'profitable' : margin < 0 ? 'loss' : ''} ${best ? 'is-best' : ''}"><span><b>${escapeHtml(LOCATIONS[quote.locationId]?.name ?? quote.locationId)}</b><small>${this.marketAge(quote.seenAt)}</small></span><strong class="sx-price">${formatCredits(quote.price)}</strong><em>${margin > 0 ? '+' : margin < 0 ? '−' : ''}${formatCredits(Math.abs(margin))}/${t('UNIT')}</em></li>`;
         }).join('') : `<li class="market-intel-empty">${t('Visit another port to record a comparison price.')}</li>`;
-        const routeCallout = bestRoute?.profitPerUnit > 0
-            ? `<div class="best-known-route"><span>${t('BEST KNOWN ROUTE')}</span><b>${escapeHtml(LOCATIONS[bestRoute.destinationId]?.shortName ?? bestRoute.destinationId)} · +${formatCredits(bestRoute.profitPerUnit)}/${t('UNIT')}</b><small>${t('Estimate from your last observed destination price.')}</small></div>`
-            : `<div class="best-known-route muted"><span>${t('BEST KNOWN ROUTE')}</span><b>${t('NO PROFITABLE QUOTE RECORDED')}</b><small>${t('Visit ports or ask around at the bar.')}</small></div>`;
+        const mass = cargoMass(player), capacity = cargoCapacity(player), adding = commodity.mass * quantity;
+        const pct = (value) => Math.max(0, Math.min(100, value / Math.max(1, capacity) * 100)).toFixed(1);
+        const sliderMax = Math.max(1, maxBuy.quantity, owned, quantity);
+        // What "Sell cargo" would pay right now for everything this counter buys.
+        const cargoValue = ids.filter((id) => (player.cargo[id] ?? 0) > 0 && COMMODITIES[id].legal !== den)
+            .reduce((sum, id) => sum + (quoteCommodityTrade(this.save, this.dockLocation, id, 'sell', player.cargo[id], marketPriceFor(id)).total || 0), 0);
         return `
-        <div class="market-layout commodity-exchange ${den ? 'is-den' : ''} ${this.marketMobileDetail ? 'is-detail-open' : ''}">
-          <div class="commodity-market-shell">
-            <div class="commodity-catalog" role="listbox" aria-label="${t('Commodities')}">${catalog}</div>
-            <section class="trade-ticket ${commodity.legal ? '' : 'restricted'}" style="--commodity-accent:${commodity.accent}">
-              <div class="trade-ticket-hero"><button type="button" class="commodity-list-back" data-ui-command="commodity-list">${t('◀ ALL COMMODITIES')}</button>${this.commodityArt(commodity, 'hero')}<div><span class="eyebrow">${escapeHtml(t(commodity.category))} · ${escapeHtml(t(commodity.packaging))}</span><h3>${escapeHtml(t(commodity.name))}</h3><details class="ui-details"><summary>${t('Details')}</summary><p>${escapeHtml(t(commodity.description))}</p><blockquote>${escapeHtml(t(commodity.flavor))}</blockquote></details></div></div>
-              <div class="trade-market-readout">
-                <div><span>${t('PRICE')}</span><b>${formatCredits(price)}</b><small class="price-${band.className}">${band.label}</small></div>
-                <div><span>${t('MARKET')}</span><b>${condition.label}</b><small>${item.supply} ${t('SUPPLY')} / ${item.demand} ${t('DEMAND')}</small></div>
-                <div><span>${t('DIRECTION')}</span><b class="price-${trend.className}">${trend.symbol} ${trend.label}</b></div>
-                <div><span>${t('YOUR HOLD')}</span><b>${owned} ${t('UNITS')}</b><small>${(owned * commodity.mass).toFixed(1)} ${t('MASS')}</small></div>
+        <div class="market-layout commodity-exchange sx-trade ${den ? 'is-den' : ''}">
+          <section class="sx-panel commodity-panel">
+            <header class="sx-panel-head"><h3>${den ? t("SMUGGLER'S DEN") : t('Commodities')}</h3><span class="sx-spacer"></span>${cargoValue > 0 ? `<button type="button" class="trade-sell-cargo sx-btn sx-btn-secondary" data-ui-command="sell-cargo" data-den="${den}" aria-label="${escapeHtml(t('Sell all cargo for {credits}', { credits: formatCredits(cargoValue) }))}"><span>${t('Sell cargo')}</span><small>${formatCredits(cargoValue)}</small></button>` : `<span class="sx-count">${ids.length}</span>`}</header>
+            <div class="sx-scroll"><div class="commodity-catalog sx-list" role="listbox" aria-label="${t('Commodities')}">${catalog}</div></div>
+          </section>
+          <div class="sx-detail trade-detail">
+            <section class="sx-panel trade-overview ${commodity.legal ? '' : 'restricted'}" style="--accent:${commodity.accent}">
+              <div class="trade-ticket-hero">
+                <figure class="sx-art trade-hero-art" aria-hidden="true">${commodityIcon(commodity)}</figure>
+                <div class="trade-hero-copy"><span class="sx-label">${escapeHtml(t(commodity.category))} · ${escapeHtml(t(commodity.packaging))}</span><h3 class="${commodity.legal ? '' : 'is-illegal'}">${escapeHtml(t(commodity.name))}</h3><p class="sx-copy">${escapeHtml(t(commodity.description))}</p><blockquote>${escapeHtml(t(commodity.flavor))}</blockquote></div>
               </div>
-              <div class="trade-controls"><div class="trade-capacity">${t('Cargo')} <b>${cargoMass(this.save.player).toFixed(1)}/${cargoCapacity(this.save.player)}</b></div><div class="trade-quantity"><span>${t('QUANTITY')}</span><div><button type="button" data-market-qty="minus" aria-label="${t('Decrease quantity')}">−</button><output>${quantity}</output><button type="button" data-market-qty="plus" aria-label="${t('Increase quantity')}">+</button><button type="button" data-market-qty="one">1</button><button type="button" data-market-qty="five">5</button></div></div>
-              <div class="trade-actions-ticket">
-                <button type="button" class="trade-buy" data-trade="${den ? 'den-buy' : 'buy'}:${commodityId}:${quantity}" ${buyQuote.quantity > 0 ? '' : 'disabled'}><span>${t('BUY')} ${buyQuote.quantity || quantity}</span><small>${escapeHtml(quoteLine(buyQuote))}</small></button>
-                <button type="button" class="trade-sell" data-trade="${den ? 'den-sell' : 'sell'}:${commodityId}:${quantity}" ${sellQuote.quantity > 0 ? '' : 'disabled'}><span>${t('SELL')} ${sellQuote.quantity || quantity}</span><small>${escapeHtml(quoteLine(sellQuote))}</small></button>
-                <button type="button" data-trade="${den ? 'den-buy' : 'buy'}:${commodityId}:999" ${maxBuy.quantity > 0 ? '' : 'disabled'}><span>${t('BUY MAX')} · ${maxBuy.quantity}</span>${maxBuy.quantity>0?`<small>${formatCredits(maxBuy.total)}</small>`:''}</button>
-                <button type="button" data-trade="${den ? 'den-sell' : 'sell'}:${commodityId}:999" ${sellAll.quantity > 0 ? '' : 'disabled'}><span>${t('SELL ALL')} · ${sellAll.quantity}</span>${sellAll.quantity>0?`<small>${formatCredits(sellAll.total)}</small>`:''}</button>
+              <dl class="trade-market-readout sx-stats">
+                <div><dt>${t('PRICE')}</dt><dd class="sx-big">${formatCredits(price)}</dd><small class="sx-tag price-${band.className} ${band.className === 'low' ? 'is-down' : band.className === 'high' ? 'is-up' : 'is-flat'}">${band.className === 'low' ? '▼' : band.className === 'high' ? '▲' : '■'} ${band.label}</small></div>
+                <div><dt>${t('MARKET')}</dt><dd>${condition.label}</dd><i class="sx-dual" aria-hidden="true"><i style="--v:${Math.min(100, item.supply)}%"></i><i style="--v:${Math.min(100, item.demand)}%"></i></i><small>${item.supply} ${t('SUPPLY')} · ${item.demand} ${t('DEMAND')}</small></div>
+                <div><dt>${t('DIRECTION')}</dt><dd class="price-${trend.className}">${trend.symbol} ${trend.label}</dd><small>${intel?.previousPrice ? t('SINCE LAST VISIT') : t('FIRST RECORDED QUOTE')}</small></div>
+                <div><dt>${t('YOUR HOLD')}</dt><dd>${owned} ${t('UNITS')}</dd><small>${(owned * commodity.mass).toFixed(1)} ${t('MASS')}</small></div>
+              </dl>
+              ${den ? `<p class="den-footnote sx-hint is-warn">${uiIcon('info', 16)}<span>${t('Untraceable cargo. The den pays off-manifest and never writes the transaction to a licensed manifest.')}</span></p>` : `<div class="route-intelligence"><span class="sx-label">${t('Market intel')}</span>${bestRoute?.profitPerUnit > 0 ? `<div class="best-known-route"><span>${t('BEST KNOWN ROUTE')}</span><b>${escapeHtml(LOCATIONS[bestRoute.destinationId]?.name ?? bestRoute.destinationId)} · +${formatCredits(bestRoute.profitPerUnit)}/${t('UNIT')}</b><small>${t('Estimate from your last observed destination price.')}</small></div>` : ''}<ol>${quoteRows}</ol></div>`}
+            </section>
+            <section class="sx-panel trade-ticket ${commodity.legal ? '' : 'restricted'}">
+              <header class="sx-panel-head"><h3>${t('Trade')}</h3></header>
+              <div class="trade-ticket-body">
+                <span class="sx-label trade-quantity-label">${t('QUANTITY')}</span>
+                <div class="trade-quantity"><button type="button" data-market-qty="minus" aria-label="${t('Decrease quantity')}">−</button><output aria-live="polite">${quantity}</output><button type="button" data-market-qty="plus" aria-label="${t('Increase quantity')}">+</button></div>
+                <input class="trade-range" type="range" min="1" max="${sliderMax}" value="${Math.min(quantity, sliderMax)}" data-market-qty-range aria-label="${t('QUANTITY')}">
+                <div class="trade-presets"><button type="button" data-market-qty="one" aria-pressed="${quantity === 1}">1</button><button type="button" data-market-qty="five" aria-pressed="${quantity === 5}">5</button><button type="button" data-market-qty="ten" aria-pressed="${quantity === 10}">10</button><button type="button" data-market-qty="set:${Math.max(1, maxBuy.quantity)}" ${maxBuy.quantity > 0 ? '' : 'disabled'}>${t('MAX')}</button></div>
+                <div class="trade-summary">
+                  <div><span>${t('Unit price')}</span><b>${formatCredits(price)}</b></div>
+                  <div class="is-total"><span>${t('Total')}</span><b>${formatCredits(price * quantity)}</b></div>
+                  <div><span>${t('Cargo')}</span><b>${mass.toFixed(1)} → ${(mass + adding).toFixed(1)} / ${capacity}</b></div>
+                  <i class="sx-bar trade-capacity" aria-hidden="true"><i style="width:${pct(mass)}%"></i><i class="${mass + adding > capacity + 1e-6 ? 'is-out' : ''}" style="--from:${pct(mass)}%;width:${Math.min(100 - Number(pct(mass)), Number(pct(adding))).toFixed(1)}%"></i></i>
+                </div>
+                <div class="trade-actions-ticket">
+                  <button type="button" class="trade-buy sx-btn sx-btn-primary" data-trade="${buyKind}:${commodityId}:${quantity}" ${buyQuote.quantity > 0 ? '' : 'disabled'}><span>${t('BUY')} ${buyQuote.quantity || quantity}</span><small>${buyQuote.quantity > 0 ? formatCredits(buyQuote.total) : escapeHtml(this.tradeFailureLabel(buyQuote.reason))}</small></button>
+                  <button type="button" class="trade-sell sx-btn sx-btn-secondary" data-trade="${sellKind}:${commodityId}:${quantity}" ${sellQuote.quantity > 0 ? '' : 'disabled'}><span>${t('SELL')} ${sellQuote.quantity || quantity}</span><small>${sellQuote.quantity > 0 ? formatCredits(sellQuote.total) : escapeHtml(this.tradeFailureLabel(sellQuote.reason))}</small></button>
+                  <button type="button" class="trade-buy-max sx-btn sx-btn-ghost" data-trade="${buyKind}:${commodityId}:999" ${maxBuy.quantity > 0 ? '' : 'disabled'}><span>${t('BUY MAX')} · ${maxBuy.quantity}</span>${maxBuy.quantity > 0 ? `<small>${formatCredits(maxBuy.total)}</small>` : ''}</button>
+                  <button type="button" class="trade-sell-all sx-btn sx-btn-ghost" data-trade="${sellKind}:${commodityId}:999" ${sellAll.quantity > 0 ? '' : 'disabled'}><span>${t('SELL ALL')} · ${sellAll.quantity}</span>${sellAll.quantity > 0 ? `<small>${formatCredits(sellAll.total)}</small>` : ''}</button>
+                </div>
               </div>
-              <details class="trade-notes"><summary>${t('Market intel')}</summary>${den ? `<p class="den-footnote">${t('Untraceable cargo. The den pays off-manifest and never writes the transaction to a licensed manifest.')}</p>` : `<div class="route-intelligence"><p>${intel?.previousPrice ? t('SINCE LAST VISIT') : t('FIRST RECORDED QUOTE')}</p>${routeCallout}<ol>${quoteRows}</ol></div>`}</details></div>
             </section>
           </div>
         </div>`;
@@ -3377,40 +3464,25 @@ export class GameUI {
         if (!content || !marketScreen || !this.save || !this.dockLocation)
             return;
         const changedPoint = this.marketPoint !== point;
-        const prevItemScroll = content.querySelector('.dealer-item-list')?.scrollTop ?? 0;
-        const prevFitScroll = content.querySelector('.dealer-fit-summary')?.scrollTop ?? 0;
-        const prevFitPanelScroll = content.querySelector('.dealer-fit-scroll')?.scrollTop ?? 0;
+        // Redraws of the same point (a selection, a trade, a quantity) keep
+        // every scrolling pane where it was.
+        const scrolls = [...content.querySelectorAll('.sx-scroll, .inventory-detail-scroll, .trade-overview')].map((element) => element.scrollTop);
         this.marketPoint = point;
         if (point !== 'shipyard')
             this.shipDetailId = undefined;
         this.disposeShipPreviews();
-        // A commodity selection refreshes the same exchange panel; keep the
-        // catalog's scroll anchor instead of bouncing back to the top.
-        const prevCatalogScroll = content.querySelector('.commodity-catalog')?.scrollTop ?? 0;
-        if (point === 'equipment') {
+        if (point === 'equipment')
             content.innerHTML = this.renderOutfitting();
-            if (!changedPoint) {
-                const itemList = content.querySelector('.dealer-item-list');
-                const fitSummary = content.querySelector('.dealer-fit-summary');
-                if (itemList)
-                    itemList.scrollTop = prevItemScroll;
-                if (fitSummary)
-                    fitSummary.scrollTop = prevFitScroll;
-                const fitScroll = content.querySelector('.dealer-fit-scroll');
-                if (fitScroll)
-                    fitScroll.scrollTop = prevFitPanelScroll;
-            }
-        }
         else if (point === 'shipyard') {
             content.innerHTML = this.renderShipyard();
             this.mountShipPreviews();
         }
-        else {
+        else
             content.innerHTML = this.renderCommodityExchange(point === 'den');
-            const catalog = content.querySelector('.commodity-catalog');
-            if (catalog && prevCatalogScroll > 0)
-                catalog.scrollTop = prevCatalogScroll;
-        }
+        if (changedPoint)
+            this.markEntering(content);
+        if (!changedPoint)
+            content.querySelectorAll('.sx-scroll, .inventory-detail-scroll, .trade-overview').forEach((element, index) => { if (scrolls[index]) element.scrollTop = scrolls[index]; });
         if (changedPoint) {
             marketScreen.scrollTop = 0;
             content.scrollTop = 0;
@@ -3533,19 +3605,27 @@ export class GameUI {
         this.missionMobileDetail = true;
         this.renderDock();
     }
+    missionLook(mission) {
+        // One colour and glyph per kind of work; story contracts are gold.
+        const kind = mission.authored ? 'story_contract' : mission.kind;
+        const colors = { story_contract: '#ffd05c', race: '#d58cff', delivery: '#69e4f2', transport: '#ffd05c', bounty: '#ff7d60', salvage: '#5ee0c0', mining: '#f2c94c', smuggle: '#f05c43' };
+        const risk = this.missionRisk(mission);
+        const level = { routine: 1, guarded: 2, high: 3, extreme: 4, illegal: 4 }[risk.tone] ?? 1;
+        return { icon: kind, color: colors[kind] ?? '#69e4f2', risk, pips: `<span class="mission-risk" data-level="${level}" aria-hidden="true"><i></i><i></i><i></i><i></i></span>` };
+    }
     renderMissionListRow(mission, selected) {
         const route = this.missionRoute(mission);
-        const risk = this.missionRisk(mission);
+        const look = this.missionLook(mission);
         const active = this.missionBoardTab === 'active' || mission.active;
-        return `<button type="button" class="mission-row ${mission.kind} risk-${risk.tone} ${mission.authored ? 'is-authored' : ''} ${selected ? 'is-selected' : ''} ${mission.locked ? 'is-locked' : ''}" data-mission-select="${mission.id}" aria-pressed="${selected}">
-          <i aria-hidden="true"></i>
-          <span class="mission-row-copy"><small>${this.missionBadge(mission)} · ${risk.label}</small><b>${escapeHtml(missionTitle(mission))}</b><em>${escapeHtml(route.targetName)} · ${route.hops ? this.jumpCountLabel(route.hops) : t('LOCAL')}</em></span>
-          <span class="mission-row-value"><strong>${formatCredits(mission.reward + (mission.complication?.bonus ?? 0))}</strong><small>${active ? this.missionProgress(mission) : this.deadlineLabel(mission)}</small></span>
+        return `<button type="button" class="mission-row sx-row ${mission.kind} risk-${look.risk.tone} ${mission.authored ? 'is-authored' : ''} ${selected ? 'is-selected' : ''} ${mission.locked ? 'is-locked' : ''}" data-mission-select="${mission.id}" aria-pressed="${selected}" style="--accent:${look.color}">
+          <span class="sx-row-icon" aria-hidden="true">${uiIcon(look.icon, 26)}</span>
+          <span class="mission-row-copy sx-row-main"><small class="mission-kind">${this.missionBadge(mission)} · ${look.risk.label}</small><b>${escapeHtml(missionTitle(mission))}</b><em>${escapeHtml(route.targetName)} · ${route.hops ? this.jumpCountLabel(route.hops) : t('LOCAL')}</em></span>
+          <span class="mission-row-value sx-row-side"><strong class="sx-price">${formatCredits(mission.reward + (mission.complication?.bonus ?? 0))}</strong><small>${active ? this.missionProgress(mission) : this.deadlineLabel(mission)}</small>${look.pips}</span>
         </button>`;
     }
     renderMissionDossier(mission) {
         if (!mission)
-            return `<div class="mission-dossier-empty"><b>${t('SELECT A CONTRACT')}</b><p>${t('Choose a posting to inspect its route, risks, and terms.')}</p></div>`;
+            return `<div class="mission-dossier-empty sx-panel"><b>${t('SELECT A CONTRACT')}</b><p>${t('Choose a posting to inspect its route, risks, and terms.')}</p></div>`;
         const route = this.missionRoute(mission);
         const risk = this.missionRisk(mission);
         const eligibility = this.missionEligibility(mission);
@@ -3563,11 +3643,13 @@ export class GameUI {
         const raceBest = Number.isFinite(mission.bestTime ?? mission.record?.bestTime)
             ? `${(mission.bestTime ?? mission.record.bestTime).toFixed(1)}s`
             : '—';
-        return `<article class="mission-dossier ${mission.kind} risk-${risk.tone}">
-          <header class="mission-dossier-header"><button type="button" class="mission-list-back" data-ui-command="mission-list" title="${t('◀ ALL CONTRACTS')}" aria-label="${t('◀ ALL CONTRACTS')}">◀</button><div><span>${this.missionBadge(mission)} · ${risk.label}</span><h3>${escapeHtml(missionTitle(mission))}</h3></div><strong>${formatCredits(mission.reward)}</strong></header><div class="mission-dossier-scroll">
+        const look = this.missionLook(mission);
+        const hops = Math.max(0, route.hops);
+        return `<article class="mission-dossier sx-panel ${mission.kind} risk-${risk.tone}" style="--accent:${look.color}">
+          <header class="mission-dossier-header"><div class="mission-dossier-title"><span class="mission-kind">${this.missionBadge(mission)} · ${risk.label}</span>${look.pips}<h3>${escapeHtml(missionTitle(mission))}</h3><p>${escapeHtml(t(mission.issuer ?? ''))}</p></div><div class="mission-reward"><span class="sx-label">${t('Reward')}</span><strong>${formatCredits(mission.reward)}</strong>${complication && !complicationLost ? `<small>+${formatCredits(complication.bonus)} ${t('bonus')}</small>` : ''}</div></header><div class="mission-dossier-scroll">
           ${mission.authored?`<p class="mission-briefing">${escapeHtml(missionBriefing(mission))}</p>`: ''}
           ${mission.authored ? `<div class="mission-chain-mark"><span>${t('LOCAL STORY')}</span><b>${escapeHtml(t(mission.chainLabel))}</b><small>${escapeHtml(t(mission.stageLabel))}</small></div>` : ''}
-          <div class="mission-route-strip"><span><b>${escapeHtml(LOCATIONS[route.originId]?.shortName ?? this.dockLocation.toUpperCase())}</b></span><i></i><em>${route.hops ? this.jumpCountLabel(route.hops, true) : t('{distance}u LOCAL', { distance: Math.max(1, Math.round(route.distance)) })}</em><i></i><span><b>→ ${escapeHtml(LOCATIONS[route.targetId]?.shortName ?? route.targetName)}</b></span></div>
+          <div class="mission-route-strip"><div class="mission-route-node"><span class="sx-label">${t('From')}</span><b>${escapeHtml(LOCATIONS[route.originId]?.shortName ?? this.dockLocation.toUpperCase())}</b><small>${escapeHtml(SYSTEMS[LOCATIONS[route.originId]?.systemId]?.name ?? '')}</small></div><div class="mission-route-line" aria-hidden="true"><i></i>${Array.from({ length: Math.min(4, hops) }, () => '<i></i>').join('')}<i></i></div><em>${route.hops ? this.jumpCountLabel(route.hops, true) : t('{distance}u LOCAL', { distance: Math.max(1, Math.round(route.distance)) })}</em><div class="mission-route-node is-target"><span class="sx-label">${t('To')}</span><b>${escapeHtml(LOCATIONS[route.targetId]?.shortName ?? route.targetName)}</b><small>${escapeHtml(route.systemName ?? '')}</small></div></div>
           <dl class="mission-terms">
             <div><dt>${t('DEADLINE')}</dt><dd>${this.deadlineLabel(mission)}</dd></div>
             ${mission.deposit>0?`<div><dt>${t('BOND')}</dt><dd>${formatCredits(mission.deposit)}</dd></div>`:''}
@@ -3576,14 +3658,14 @@ export class GameUI {
             ${mission.kind === 'race' ? `<div><dt>${t('TIER')}</dt><dd>${mission.tier ?? 1}</dd></div><div><dt>${t('PERSONAL BEST')}</dt><dd>${raceBest}</dd></div>` : ''}
           </dl>
           ${complication ? `<section class="mission-complication ${complicationLost ? 'is-lost' : ''}"><span>${complication.kind === 'fragile' ? t('FRAGILE LOAD') : t('EARLY DELIVERY BONUS')}</span><b>${complicationLost ? t('BONUS LOST') : `+${formatCredits(complication.bonus)}`}</b><p>${complication.kind === 'fragile' ? t('Keep structural damage at zero after acceptance.') : t('Deliver within {time} to earn the bonus.', { time: complicationTime })}</p></section>` : ''}
-          ${active||mission.authored||!['delivery','transport','smuggle'].includes(mission.kind)?`<section class="mission-objective" aria-label="${active?t('CURRENT OBJECTIVE'):t('CONTRACT SUMMARY')}"><b>${escapeHtml(this.missionProgress(mission))}</b></section>`:''}<details class="ui-details mission-details"><summary>${t('Details')}</summary><p>${escapeHtml(t(mission.issuer))}</p>${mission.authored?'':`<p class="mission-briefing">${escapeHtml(missionBriefing(mission))}</p>`}</details>
-          ${!active&&mission.kind==='race'?`<div class="race-hull-options">${Object.values(RACE_HULLS).map(h=>`<button data-race-hull="${h.id}" aria-pressed="${(this.save.player.raceHullChoice??'talon')===h.id}">${h.name}<small>${h.style}</small></button>`).join('')}</div>`:''}${!active && eligibility.issues.length ? `<ul class="mission-blockers">${eligibility.issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join('')}</ul>` : ''}
+          ${active||mission.authored||!['delivery','transport','smuggle'].includes(mission.kind)?`<section class="mission-objective" aria-label="${active?t('CURRENT OBJECTIVE'):t('CONTRACT SUMMARY')}"><b>${escapeHtml(this.missionProgress(mission))}</b></section>`:''}${mission.authored?'':`<p class="mission-briefing sx-copy">${escapeHtml(missionBriefing(mission))}</p>`}
+          ${!active&&mission.kind==='race'?`<div class="race-hull-options">${Object.values(RACE_HULLS).map(h=>`<button data-race-hull="${h.id}" aria-pressed="${(this.save.player.raceHullChoice??'talon')===h.id}">${h.name}<small>${h.style}</small></button>`).join('')}</div>`:''}${!active && eligibility.issues.length ? `<ul class="mission-blockers">${eligibility.issues.map((issue) => `<li class="sx-hint is-danger">${escapeHtml(issue)}</li>`).join('')}</ul>` : ''}
           </div><footer class="mission-dossier-actions ${discardable ? 'has-discard' : ''}">
-            ${active ? `<button type="button" class="primary" data-mission-course="${route.targetId}" ${route.targetId ? '' : 'disabled'}>${t('SET COURSE')}</button>` : `<button type="button" class="primary" data-mission-id="${mission.id}" ${eligibility.ok && (tutorialContentUnlocked(this.save)||mission.id===TUTORIAL_MINING_CONTRACT_ID&&getTutorialQuest(this.save)?.flags.miningExplained) ? '' : 'disabled'}>${mission.locked ? t('COURSE LOCKED') : t('ACCEPT')}</button>`}
+            ${active ? `<button type="button" class="primary sx-btn sx-btn-primary" data-mission-course="${route.targetId}" ${route.targetId ? '' : 'disabled'}>${t('SET COURSE')}</button>` : `<button type="button" class="primary sx-btn sx-btn-primary" data-mission-id="${mission.id}" ${eligibility.ok && (tutorialContentUnlocked(this.save)||mission.id===TUTORIAL_MINING_CONTRACT_ID&&getTutorialQuest(this.save)?.flags.miningExplained) ? '' : 'disabled'}>${mission.locked ? t('COURSE LOCKED') : t('ACCEPT')}${mission.deposit > 0 && !mission.locked ? `<small>${t('BOND')} ${formatCredits(mission.deposit)}</small>` : ''}</button>`}
             ${mission.id===TUTORIAL_MINING_CONTRACT_ID&&!getTutorialQuest(this.save)?.flags.miningExplained?`<small>${t('Talk to Rin first.')}</small>`:''}
-            ${discardable ? `<button type="button" class="mission-discard-action" data-mission-discard="${mission.id}" aria-expanded="${confirmingDiscard}">${t('DISCARD CONTRACT')}</button>` : ''}
+            ${discardable ? `<button type="button" class="mission-discard-action sx-btn sx-btn-ghost" data-mission-discard="${mission.id}" aria-expanded="${confirmingDiscard}">${t('DISCARD CONTRACT')}</button>` : ''}
             ${!active && !tutorialContentUnlocked(this.save) && mission.id!==TUTORIAL_MINING_CONTRACT_ID?`<small>${t('Finish the family prologue to take on contracts and races.')}</small>`:''}
-            ${confirmingDiscard ? `<div class="mission-discard-confirm" role="alert"><p>${t('Discard this contract? The bond stays lost, reserved mission cargo is removed, and guild and faction standing fall.')}</p><button type="button" data-ui-command="mission-discard-cancel">${t('KEEP CONTRACT')}</button><button type="button" class="mission-discard-final" data-mission-discard-confirm="${mission.id}">${t('CONFIRM DISCARD')}</button></div>` : ''}
+            ${confirmingDiscard ? `<div class="mission-discard-confirm" role="alert"><p>${t('Discard this contract? The bond stays lost, reserved mission cargo is removed, and guild and faction standing fall.')}</p><button type="button" class="sx-btn sx-btn-secondary" data-ui-command="mission-discard-cancel">${t('KEEP CONTRACT')}</button><button type="button" class="mission-discard-final sx-btn sx-btn-danger" data-mission-discard-confirm="${mission.id}">${t('CONFIRM DISCARD')}</button></div>` : ''}
           </footer>
         </article>`;
     }
@@ -3593,21 +3675,27 @@ export class GameUI {
     }
     renderMissions() {
         const { offers, active } = this.missionBoardCounts();
-        const source = this.missionBoardTab === 'active' ? active : offers;
+        const all = this.missionBoardTab === 'active' ? active : offers;
+        const kinds = [...new Set(all.map((mission) => mission.authored ? 'authored' : mission.kind))];
+        const filter = kinds.includes(this.missionKindFilter) ? this.missionKindFilter : 'all';
+        const source = filter === 'all' ? all : all.filter((mission) => (mission.authored ? 'authored' : mission.kind) === filter);
         const selected = source.find((mission) => mission.id === this.missionSelectedId) ?? source[0];
         if (selected)
             this.missionSelectedId = selected.id;
+        const kindLabel = (kind) => kind === 'authored' ? t('STORY CONTRACT') : this.missionBadge({ kind });
+        const tab = (id, label, count) => `<button type="button" data-mission-board-tab="${id}" aria-pressed="${this.missionBoardTab === id}">${t(label)} <b class="sx-badge">${count}</b></button>`;
         return `
-      <div class="mission-terminal ${this.missionMobileDetail ? 'is-detail-open' : ''}">
-        <div class="mission-terminal-body">
-          <aside class="mission-browser" aria-label="${t('Contract list')}">
-            ${source.length ? source.map((mission) => this.renderMissionListRow(mission, mission.id === selected?.id)).join('') : `<div class="mission-list-empty"><b>${this.missionBoardTab === 'active' ? t('NO ACTIVE CONTRACTS') : t('NO FRESH CONTRACTS')}</b><p>${this.missionBoardTab === 'active' ? t('Accepted work and live progress will appear here.') : t(tutorialCampaignSummary(this.save)?.active ? 'Finish the family prologue to take on contracts and races.' : 'Launch, trade, or return after the board cycles.')}</p></div>`}
-          </aside>
-          <section class="mission-dossier-wrap">${this.renderMissionDossier(selected)}</section>
-        </div>
+      <div class="mission-terminal sx-missions">
+        <section class="mission-browser sx-panel" aria-label="${t('Contract list')}">
+          <header class="sx-panel-head"><div class="sx-seg mission-board-tabs">${tab('available', 'AVAILABLE', offers.length)}${tab('active', 'ACTIVE', active.length)}</div></header>
+          ${kinds.length > 1 ? `<div class="sx-chips mission-filters">${[['all', t('All')], ...kinds.map((kind) => [kind, kindLabel(kind)])].map(([kind, label]) => `<button type="button" class="sx-filter" data-mission-kind="${kind}" aria-pressed="${filter === kind}">${escapeHtml(label)}</button>`).join('')}</div>` : ''}
+          <div class="sx-scroll"><div class="sx-list mission-list">${source.length ? source.map((mission) => this.renderMissionListRow(mission, mission.id === selected?.id)).join('') : `<div class="mission-list-empty"><b>${this.missionBoardTab === 'active' ? t('NO ACTIVE CONTRACTS') : t('NO FRESH CONTRACTS')}</b><p>${this.missionBoardTab === 'active' ? t('Accepted work and live progress will appear here.') : t(tutorialCampaignSummary(this.save)?.active ? 'Finish the family prologue to take on contracts and races.' : 'Launch, trade, or return after the board cycles.')}</p></div>`}</div></div>
+        </section>
+        <section class="mission-dossier-wrap">${this.renderMissionDossier(selected)}</section>
       </div>
     `;
     }
+
     missionBoardSource(tab = this.missionBoardTab) {
         const posted = this.save.world.offers[this.dockLocation] ?? [];
         const activeRaces = posted.filter((mission) => mission.kind === 'race'
@@ -3749,11 +3837,15 @@ export class GameUI {
         for (const id of ammoIds) magazines.push([player.ammo?.[id] ?? 0, AMMO_CAPACITY[id] ?? 0]);
         const ammo = magazines.reduce((n, m) => n + m[0], 0), ammoMax = magazines.reduce((n, m) => n + m[1], 0);
         const bar = (label, value, max) => `<label><span>${t(label)}</span><em>${Math.ceil(value)}/${max}</em><i><b style="width:${percent(value,max)}%"></b></i></label>`;
-        const action = (command, label, quote) => `<button type="button" class="primary" data-ui-command="${command}" ${!quote.ok || quote.total <= 0 || quote.total > player.credits ? 'disabled' : ''}>${t(label)} · ${Number.isFinite(quote.total) ? formatCredits(quote.total) : '—'}</button>`;
+        const action = (command, label, quote) => `<button type="button" class="primary sx-btn sx-btn-primary" data-ui-command="${command}" ${!quote.ok || quote.total <= 0 || quote.total > player.credits ? 'disabled' : ''}>${t(label)} · ${Number.isFinite(quote.total) ? formatCredits(quote.total) : '—'}</button>`;
+        // Both desks needed: one key settles the whole bill.
+        const fullService = repairBay && fuelDepot && repairs.ok && refill.ok && repairs.total > 0 && refill.total > 0;
+        const fullTotal = fullService ? repairs.total + refill.total : 0;
         return `<div class="service-grid service-grid-simple">
-          ${repairBay ? `<article class="service-card"><h3>${t('Ship & drone repair')}</h3><div class="service-emblem" aria-hidden="true"><svg viewBox="0 0 100 64"><path d="M50 4 63 31 84 47 64 47 60 59 40 59 36 47 16 47 37 31Z"/><path class="service-emblem-accent" d="M76 8v20M66 18h20"/></svg></div><div class="service-bars">${bar('Hull',player.hull,stats.hull)}${droneMax ? bar('Drones',droneHull,droneMax) : ''}</div>${action('repair','REPAIR',repairs)}</article>` : ''}
-          ${fuelDepot ? `<article class="service-card"><h3>${t('Fuel and ordnance')}</h3><div class="service-emblem" aria-hidden="true"><svg viewBox="0 0 100 64"><path d="M27 13h30v46H27ZM33 5h18v8M57 21h9l9 11v17q0 8-8 8t-8-8V36M65 15l10 12"/><path class="service-emblem-accent" d="m43 24-7 13h10l-7 13"/></svg></div><div class="service-bars">${bar('FUEL',player.fuel,stats.fuel)}${ammoMax ? bar('Ammunition',ammo,ammoMax) : ''}</div>${action('refuel','REFILL',refill)}</article>` : ''}
-          ${repairBay ? `<article class="service-card service-paint-card"><h3>${t('Hull paint')}</h3><div class="ship-silhouette service-paint-preview" data-variant="${escapeHtml(SHIPS[player.shipId].variant)}" data-current-paint role="img" aria-label="${escapeHtml(t('Hull paint'))}"></div><button type="button" class="primary" data-ui-command="paint-open">${t('Customize paint')}</button></article>` : ''}
+          ${fullService ? `<div class="service-quick sx-panel"><span class="service-quick-copy"><b>${t('Full service')}</b><small>${t('Hull, fuel and ordnance in one go')}</small></span><button type="button" class="sx-btn sx-btn-primary" data-ui-command="service-all" ${fullTotal > player.credits ? 'disabled' : ''}><span>${t('Repair & refill')}</span><small>${formatCredits(fullTotal)}</small></button></div>` : ''}
+          ${repairBay ? `<article class="service-card sx-panel"><h3>${uiIcon('repair', 18)}${t('Ship & drone repair')}</h3><div class="service-emblem" aria-hidden="true"><svg viewBox="0 0 100 64"><path d="M50 4 63 31 84 47 64 47 60 59 40 59 36 47 16 47 37 31Z"/><path class="service-emblem-accent" d="M76 8v20M66 18h20"/></svg></div><div class="service-bars">${bar('Hull',player.hull,stats.hull)}${droneMax ? bar('Drones',droneHull,droneMax) : ''}</div>${action('repair','REPAIR',repairs)}</article>` : ''}
+          ${fuelDepot ? `<article class="service-card sx-panel"><h3>${uiIcon('fuel', 18)}${t('Fuel and ordnance')}</h3><div class="service-emblem" aria-hidden="true"><svg viewBox="0 0 100 64"><path d="M27 13h30v46H27ZM33 5h18v8M57 21h9l9 11v17q0 8-8 8t-8-8V36M65 15l10 12"/><path class="service-emblem-accent" d="m43 24-7 13h10l-7 13"/></svg></div><div class="service-bars">${bar('FUEL',player.fuel,stats.fuel)}${ammoMax ? bar('Ammunition',ammo,ammoMax) : ''}</div>${action('refuel','REFILL',refill)}</article>` : ''}
+          ${repairBay ? `<article class="service-card sx-panel service-paint-card"><h3>${uiIcon('paint', 18)}${t('Hull paint')}</h3><div class="ship-silhouette service-paint-preview" data-variant="${escapeHtml(SHIPS[player.shipId].variant)}" data-current-paint role="img" aria-label="${escapeHtml(t('Hull paint'))}"></div><button type="button" class="primary sx-btn sx-btn-secondary" data-ui-command="paint-open">${t('Customize paint')}</button></article>` : ''}
         </div>`;
     }
     renderPaintWorkshop(){
@@ -3764,12 +3856,12 @@ export class GameUI {
         const aspect=SHIP_PAINT_MASKS[player.shipId].aspect;
         const icon=p=>{const clip=`paint-${player.shipId}-${p.id}`;return `<svg viewBox="0 0 40 40" aria-hidden="true"><defs><clipPath id="${clip}"><path d="${path(layout.outline)}Z"/></clipPath></defs><g transform="translate(20 20) scale(${17*Math.min(1,aspect)} ${-17/Math.max(1,aspect)})"><g clip-path="url(#${clip})"><path class="paint-main" d="M-1 -1H1V1H-1Z"/>${p.top.map(s=>`<path class="paint-${s.color===1?'second':'accent'}" d="${path(s.points)}${s.width?'':'Z'}" ${s.width?`style="fill:none;stroke:var(--paint-${s.color});stroke-width:${s.width};stroke-linejoin:round"`:''}/>`).join('')}</g></g></svg>`;};
         return `<section class="paint-workshop" style="${colorStyle}">
-          <div class="paint-stage"><h3>${escapeHtml(SHIPS[player.shipId].name)}</h3><div class="ship-silhouette paint-editor-preview" data-variant="${escapeHtml(SHIPS[player.shipId].variant)}" data-repaint-preview role="img" aria-label="${escapeHtml(t('Paint preview'))}"></div><span class="paint-orbit-hint">${t('Drag to rotate')}</span></div>
-          <div class="paint-controls"><div class="paint-control-heading"><h3><span class="paint-heading-title">${t('Hull paint')}</span><span class="paint-current-pattern"></span></h3><button data-ui-command="paint-factory" aria-pressed="${this.paintDraft==='original'}">${t('Factory finish')}</button></div>
+          <div class="paint-stage sx-panel"><h3>${escapeHtml(SHIPS[player.shipId].name)}</h3><div class="ship-silhouette paint-editor-preview" data-variant="${escapeHtml(SHIPS[player.shipId].variant)}" data-repaint-preview role="img" aria-label="${escapeHtml(t('Paint preview'))}"></div><span class="paint-orbit-hint">${t('Drag to rotate')}</span></div>
+          <div class="paint-controls sx-panel"><div class="paint-control-heading"><h3><span class="paint-heading-title">${t('Hull paint')}</span><span class="paint-current-pattern"></span></h3><button data-ui-command="paint-factory" aria-pressed="${this.paintDraft==='original'}">${t('Factory finish')}</button></div>
           <div class="paint-patterns" aria-label="${t('Pattern')}">${patterns.map(p=>`<button data-ui-command="paint-pattern" data-pattern="${p.id}" aria-label="${t(p.name)}" aria-pressed="${typeof this.paintDraft==='object'&&this.paintDraft.pattern===p.id}">${icon(p)}<span>${t(p.name)}</span></button>`).join('')}</div>
           <div class="paint-colors">${['Main color','Secondary color','Accent color'].map((name,i)=>`<label><span>${t(name)}</span><input type="color" data-paint-color="${i}" value="${design.colors[i]}" aria-label="${t(name)}"></label>`).join('')}</div>
           <div class="paint-palettes" aria-label="${t('Suggested colors')}">${PAINT_PALETTES.map((p,i)=>`<button data-ui-command="paint-palette" data-palette="${i}" aria-label="${t(p.name)}" title="${t(p.name)}">${p.colors.map(c=>`<i style="background:${c}"></i>`).join('')}</button>`).join('')}</div>
-          <div class="paint-commit"><button data-ui-command="paint-reset">${t('Reset')}</button><button class="primary" data-ui-command="repaint">${t('Apply paint')}</button></div></div></section>`;
+          <div class="paint-commit"><button class="sx-btn sx-btn-ghost" data-ui-command="paint-reset">${t('Reset')}</button><button class="primary sx-btn sx-btn-primary" data-ui-command="repaint">${t('Apply paint')}</button></div></div></section>`;
     }
     syncPaintControls(){
         const workshop=this.root.querySelector('.paint-workshop');if(!workshop)return;
@@ -4182,19 +4274,21 @@ export class GameUI {
     renderEquipment() {
         return this.renderOutfitting();
     }
+    shipSilhouette(variant, className = '') {
+        const profile = shipTopDownProfile(variant ?? 'kestrel');
+        return `<svg class="ship-outline ${className}" viewBox="${profile.minX - 1} ${profile.minZ - 1} ${profile.maxX - profile.minX + 2} ${profile.maxZ - profile.minZ + 2}" aria-hidden="true" focusable="false"><path d="${shipProfilePath(profile)}" fill="currentColor" fill-opacity=".12" stroke="currentColor" stroke-width=".5" stroke-linejoin="round"/><path d="${shipProfilePath(profile, true)}" fill="none" stroke="currentColor" stroke-width=".32" opacity=".65" stroke-linejoin="round"/></svg>`;
+    }
     renderShipyard() {
         const stockIds = [...new Set([...(LOCATIONS[this.dockLocation].shipsForSale ?? []), ...Object.keys(this.save.player.storedShips ?? {})])].sort((a,b)=>(SHIPS[a].tier-SHIPS[b].tier)||SHIPS[a].price-SHIPS[b].price);
         if (!stockIds.length)
-            return `<div class="shipyard-grid"><p class="market-empty">${t('No hulls for sale at this port.')}</p></div>`;
+            return `<div class="shipyard-grid"><p class="market-empty sx-hint">${t('No hulls for sale at this port.')}</p></div>`;
         const selectedId = stockIds.includes(this.shipDetailId) ? this.shipDetailId : stockIds[0];
         this.shipDetailId = selectedId;
-        // No broker title band: the header bar names the screen, the stock list
-        // is the screen, and the selected hull's card already carries the
-        // current ship, the trade-in value and the balance.
-        return `<div class="ship-broker" data-selected-ship="${selectedId}">
-          <nav class="ship-stock-list" aria-label="${t('Hulls for sale')}">
-            ${stockIds.map((shipId) => this.renderShipSelector(shipId, selectedId)).join('')}
-          </nav>
+        return `<div class="ship-broker sx-yard" data-selected-ship="${selectedId}">
+          <section class="ship-stock-panel sx-panel">
+            <header class="sx-panel-head"><h3>${t('Hulls for sale')}</h3><span class="sx-spacer"></span><span class="sx-count">${stockIds.length}</span></header>
+            <div class="sx-scroll"><nav class="ship-stock-list sx-list" aria-label="${t('Hulls for sale')}">${stockIds.map((shipId) => this.renderShipSelector(shipId, selectedId)).join('')}</nav></div>
+          </section>
           ${this.renderShipCard(selectedId)}
         </div>`;
     }
@@ -4202,9 +4296,10 @@ export class GameUI {
         const ship = SHIPS[saleId];
         const active = this.save.player.shipId === saleId;
         const selected = selectedId === saleId;
-        return `<button type="button" class="ship-stock-option ${selected ? 'is-selected' : ''} ${active ? 'is-current' : ''}" data-ship-detail="${saleId}" aria-pressed="${selected}">
-          <span><b>${escapeHtml(ship.name)}</b><small>T${ship.tier} · ${escapeHtml(t(shipRoleLabel(ship.role)))}</small></span>
-          <strong>${active ? t('CURRENT SHIP') : this.save.player.storedShips?.[saleId] ? 'STORED' : formatCredits(ship.price)}</strong>
+        return `<button type="button" class="ship-stock-option sx-row ${selected ? 'is-selected' : ''} ${active ? 'is-current' : ''}" data-ship-detail="${saleId}" aria-pressed="${selected}">
+          <span class="ship-stock-art sx-row-icon">${this.shipSilhouette(ship.variant)}</span>
+          <span class="sx-row-main"><b>${escapeHtml(ship.name)}</b><small>T${ship.tier} · ${escapeHtml(t(shipRoleLabel(ship.role)))}</small></span>
+          <span class="sx-row-side"><strong class="sx-price ${active ? 'is-current' : ''}">${active ? t('CURRENT SHIP') : this.save.player.storedShips?.[saleId] ? t('STORED') : formatCredits(ship.price)}</strong></span>
         </button>`;
     }
     renderShipCard(saleId) {
@@ -4219,43 +4314,52 @@ export class GameUI {
         const carriedMass = cargoMass(this.save.player);
         const quote = active ? { ok: false, code: 'already-owned' } : quoteShipTrade(this.save.player, saleId, { cargoMass: carriedMass });
         const capacity = quote.cargoCapacity ?? ship.cargo;
+        // Bars compare against the best hull in the game for each figure.
+        const sold = [...new Set(Object.values(LOCATIONS).flatMap((location) => location.shipsForSale ?? []))].map((id) => SHIPS[id]).filter(Boolean);
+        const best = (pick) => Math.max(...sold.map(pick).filter(Number.isFinite), 1);
         const stats = [
-            ['CRUISE SPEED', displaySpeed(ship.maxSpeed), displaySpeed(ship.maxSpeed) - displaySpeed(current.maxSpeed)],
-            ['AFTERBURNER', displaySpeed(ship.afterburnSpeed), displaySpeed(ship.afterburnSpeed) - displaySpeed(current.afterburnSpeed)],
-            ['ACCELERATION', ship.acceleration, ship.acceleration - current.acceleration],
-            ['TURN RATE', ship.angularAcceleration.toFixed(2), ship.angularAcceleration - current.angularAcceleration, 2],
-            ['SHIELD', ship.shield, ship.shield - current.shield],
-            ['HULL INTEGRITY', ship.hull, ship.hull - current.hull],
-            ['CARGO', capacity, capacity - current.cargo],
-            ['FUEL', ship.fuel, ship.fuel - current.fuel],
+            ['CRUISE SPEED', displaySpeed(ship.maxSpeed), displaySpeed(ship.maxSpeed) - displaySpeed(current.maxSpeed), 0, best((entry) => displaySpeed(entry.maxSpeed))],
+            ['ACCELERATION', ship.acceleration, ship.acceleration - current.acceleration, 0, best((entry) => entry.acceleration)],
+            ['TURN RATE', ship.angularAcceleration.toFixed(2), ship.angularAcceleration - current.angularAcceleration, 2, best((entry) => entry.angularAcceleration)],
+            ['SHIELD', ship.shield, ship.shield - current.shield, 0, best((entry) => entry.shield)],
+            ['HULL INTEGRITY', ship.hull, ship.hull - current.hull, 0, best((entry) => entry.hull)],
+            ['CARGO', capacity, capacity - current.cargo, 0, best((entry) => entry.cargo)],
+            ['AFTERBURNER', displaySpeed(ship.afterburnSpeed), displaySpeed(ship.afterburnSpeed) - displaySpeed(current.afterburnSpeed), 0, best((entry) => displaySpeed(entry.afterburnSpeed))],
+            ['FUEL', ship.fuel, ship.fuel - current.fuel, 0, best((entry) => entry.fuel)],
         ];
         const specLabel=label=>t({'CRUISE SPEED':'Speed','ACCELERATION':'Accel.','TURN RATE':'Turning','SHIELD':'Shield','HULL INTEGRITY':'Hull','CARGO':'Cargo'}[label]??label);
         const missingCredits = Math.max(0, amountDue - Number(this.save.player.credits ?? 0));
         const excessCargo = Math.max(0, carriedMass - capacity);
-        const blockedMessage = quote.code === 'stored-elsewhere' ? `Stored at ${LOCATIONS[stored.locationId]?.name ?? stored.locationId}` : quote.code === 'reputation-required' ? `Alliance standing ${quote.requiredReputation} required` : quote.code === 'insufficient-credits'
+        const blockedMessage = quote.code === 'stored-elsewhere' ? t('Stored at {place}', { place: LOCATIONS[stored.locationId]?.name ?? stored.locationId }) : quote.code === 'reputation-required' ? t('Alliance standing {value} required', { value: quote.requiredReputation }) : quote.code === 'insufficient-credits'
             ? t('{credits} MORE NEEDED', { credits: formatCredits(missingCredits) })
             : quote.code === 'cargo-over-capacity'
                 ? t('UNLOAD {mass} CARGO MASS', { mass: formatNumber(excessCargo) })
                 : !quote.ok && !active
                     ? t('TRADE UNAVAILABLE')
                     : '';
+        const spec = ([label, value, delta, digits = 0, max]) => `<div class="ship-spec"><span title="${t(label)}">${specLabel(label)}</span><b>${value}</b>${active ? '' : this.statDelta(delta, digits)}<i class="ship-spec-bar" aria-hidden="true"><i style="width:${Math.max(4, Math.min(100, Number(value) / max * 100)).toFixed(1)}%"></i></i></div>`;
+        const mounts = [['Weapon','Weapon','weapons',hardpoints.weapons?.length??hardpoints.guns.length],['Utility','Utility','equipment',hardpoints.utility.length],['Drone bays','Drones','drones',hardpoints.droneBays?.length??0],['Turret','Turret','bounty',hardpoints.turrets?.length??0]];
         return `<article class="ship-showroom ${active ? 'is-current' : ''}">
-          <section class="ship-showroom-stage" aria-labelledby="ship-showroom-name">
-            <div class="ship-stage-heading"><span>T${ship.tier} · ${escapeHtml(t(shipRoleLabel(ship.role)))}</span><b>${escapeHtml(t(ship.className))}</b></div>
+          <section class="ship-showroom-stage sx-panel" aria-labelledby="ship-showroom-name">
+            <div class="ship-stage-heading"><span class="sx-label">T${ship.tier} · ${escapeHtml(t(shipRoleLabel(ship.role)))}</span><b>${escapeHtml(t(ship.className))}</b></div>
             <div class="ship-silhouette ship-silhouette-large ${saleId}" data-variant="${ship.variant}" role="img" aria-label="${t('{name} ship preview', { name: ship.name })}"></div>
             <div class="ship-stage-title"><div><h3 id="ship-showroom-name">${escapeHtml(ship.name)}</h3><p>${escapeHtml(t(ship.personality ?? ''))}</p></div></div>
           </section>
-          <section class="ship-showroom-sheet">
-            <div class="ship-sheet-scroll"><div class="ship-spec-grid">${stats.filter(([label])=>!['AFTERBURNER','FUEL'].includes(label)).map(([label, value, delta, digits = 0]) => `<div><span title="${t(label)}">${specLabel(label)}</span><b>${value}</b>${this.statDelta(delta, digits)}</div>`).join('')}</div>
-            <div class="ship-hardpoints" aria-label="${t('INSTALLED EQUIPMENT')}">
-              ${[['Weapon','Weapon',hardpoints.weapons?.length??hardpoints.guns.length],['Utility','Utility',hardpoints.utility.length],['Drone bays','Drones',hardpoints.droneBays?.length??0],['Turret','Turret',hardpoints.turrets?.length??0]].map(([label,icon,n])=>`<div title="${t(label)}" aria-label="${t(label)}"><span>${t(icon)}</span><b>${n}</b></div>`).join('')}
+          <section class="ship-showroom-sheet sx-panel">
+            <header class="sx-panel-head"><h3>${t('Specifications')}</h3><span class="sx-spacer"></span>${active ? `<span class="sx-label">${t('CURRENT SHIP')}</span>` : `<span class="sx-label">${t('Compared with {name}', { name: current.name })}</span>`}</header>
+            <div class="ship-sheet-scroll">
+              <div class="ship-spec-grid">${stats.slice(0, 6).map(spec).join('')}</div>
+              <div class="ship-hardpoints" aria-label="${t('INSTALLED EQUIPMENT')}">${mounts.map(([label, short, icon, n]) => `<div title="${t(label)}" aria-label="${t(label)}">${uiIcon(icon, 18)}<span>${t(short)}</span><b>${n}</b></div>`).join('')}</div>
+              <div class="ship-spec-grid ship-spec-more">${stats.slice(6).map(spec).join('')}</div>
+              <p class="ship-description sx-copy">${escapeHtml(t(ship.description))}</p>
+              <p class="ship-career-note">${(ship.progressesTo ?? []).length ? t('Suggested next ships: {ships}', { ships: ship.progressesTo.map(id=>SHIPS[id].name).join(' · ') }) : t('Top tier in this role')}${ship.price ? ` · ${t('Outfitting budget: {low}–{high} extra.', { low: formatCredits(Math.round(ship.price*.2)), high: formatCredits(Math.round(ship.price*.35)) })}` : ''}</p>
+              <p class="ship-handling-note">${t('Handling falls up to 24% as the cargo hold fills.')}</p>
             </div>
-            <details class="ui-details ship-details"><summary>${t('Details')}</summary><div class="ship-spec-grid">${stats.filter(([label])=>['AFTERBURNER','FUEL'].includes(label)).map(([label,value,delta,digits=0])=>`<div><span>${t(label)}</span><b>${value}</b>${this.statDelta(delta,digits)}</div>`).join('')}</div><p class="ship-description">${escapeHtml(t(ship.description))}</p><p class="ship-career-note">${(ship.progressesTo ?? []).length ? `Suggested next ships: ${ship.progressesTo.map(id=>SHIPS[id].name).join(" · ")}` : "Top tier in this role"}</p>${ship.price ? `<p class="ship-career-note">Outfitting budget: ${formatCredits(Math.round(ship.price*.2))}–${formatCredits(Math.round(ship.price*.35))} extra.</p>` : ""}<p class="ship-handling-note">${t('Handling falls up to 24% as the cargo hold fills.')}</p></details></div>
             ${active ? '' : `<div class="ship-trade-panel">
-              ${stored || !tradeIn ? "" : `<div class="ship-trade-numbers"><span><small>${t('TRADE-IN · {name}', { name: current.name })}</small><b>${tradeIn > 0 ? '−' : ''}${formatCredits(tradeIn)}</b></span></div>`}
-              ${stored?`<small>${escapeHtml(LOCATIONS[stored.locationId]?.name ?? stored.locationId)}</small>`:''}
-              <button type="button" class="primary ship-trade-button" data-ship-id="${saleId}" ${quote.ok ? '' : 'disabled'}><span>${stored?t('SWITCH'):t('Exchange')} · ${stored?escapeHtml(ship.name):formatCredits(Math.abs(amountDue))}${!stored&&amountDue<0?' +':''}</span>${blockedMessage ? `<small>${escapeHtml(blockedMessage)}</small>` : ''}</button>
-              ${stored ? '' : `<button type="button" class="ship-trade-button" data-ship-id="${saleId}" data-keep-ship="true" ${keepQuote.ok ? '' : 'disabled'}>${t('Buy')} · ${formatCredits(ship.price)}<small>${t('Keep')} ${escapeHtml(current.name)}</small></button>`}
+              ${stored || !tradeIn ? '' : `<div class="ship-trade-numbers"><span><small>${t('TRADE-IN · {name}', { name: current.name })}</small><b>${tradeIn > 0 ? '−' : ''}${formatCredits(tradeIn)}</b></span></div>`}
+              ${stored ? `<small class="ship-trade-stored">${escapeHtml(LOCATIONS[stored.locationId]?.name ?? stored.locationId)}</small>` : ''}
+              <button type="button" class="primary ship-trade-button sx-btn sx-btn-primary" data-ship-id="${saleId}" ${quote.ok ? '' : 'disabled'}><span>${stored ? t('SWITCH') : t('Exchange')} · ${stored ? escapeHtml(ship.name) : formatCredits(Math.abs(amountDue))}${!stored && amountDue < 0 ? ' +' : ''}</span>${blockedMessage ? `<small>${escapeHtml(blockedMessage)}</small>` : ''}</button>
+              ${stored ? '' : `<button type="button" class="ship-trade-button sx-btn sx-btn-secondary" data-ship-id="${saleId}" data-keep-ship="true" ${keepQuote.ok ? '' : 'disabled'}><span>${t('Buy')} · ${formatCredits(ship.price)}</span><small>${t('Keep')} ${escapeHtml(current.name)}</small></button>`}
             </div>`}
           </section>
         </article>`;
@@ -4308,7 +4412,7 @@ export class GameUI {
     renderGuilds() {
         const guildIds = this.localGuildIds();
         return `
-      <div class="guild-terminal">
+      <div class="guild-terminal guild-board">
         <div class="guild-grid">
         ${guildIds.map((id) => {
             const rep = this.save.player.guildRep[id];
@@ -4323,7 +4427,7 @@ export class GameUI {
             const affordable = this.save.player.credits >= cost;
             const nextItems = Object.values(OUTFIT_ITEMS).filter((item) => item.requiredGuild === id && item.requiredRank === rank + 1).map((item) => equipmentName(item));
             const benefits = GUILD_BENEFIT_KEYS[id] ?? [];
-            return `<article class="guild-card guild-${id}">
+            return `<article class="guild-card sx-panel guild-${id} ${joined ? 'is-member' : ''}">
             <header class="guild-card-head">${representative ? this.portraitImage(representative.id, representative.name) : '<span class="guild-terminal-avatar">◇</span>'}<div><span class="eyebrow">${escapeHtml(t(GUILD_NAMES[id]))}</span><h3>${joined ? t(GUILD_RANK_NAMES[id][rank]) : t('NOT REGISTERED')}</h3><small>${representative ? `${escapeHtml(representative.name)} · ${escapeHtml(t(representative.role))}` : t('AUTOMATED DESK')}</small></div></header>
             <details class="guild-info"><summary>${t('Details')}</summary><p class="guild-presence">${t('Independent guild')} · ${t((LOCATIONS[this.save.player.dockedAt]?.guildPresence?.[id]??0)>=.75?'Strong local presence':'Local presence')}<br>${t('Preferred ships')}: ${(GUILD_SHIP_PREFERENCES[id]??[]).map(h=>escapeHtml(SHIPS[h]?.name??h)).join(', ')}</p></details>
             <div class="guild-meter"><i><b style="width:${progress}%"></b></i><em>${rep} ${t('REPUTATION')}</em></div>
@@ -4331,11 +4435,11 @@ export class GameUI {
             ${!joined
                 ? `<div class="guild-next"><span>${t('ENTRY RANK')} · ${escapeHtml(t(GUILD_RANK_NAMES[id][0]))}</span></div>`
                 : rank < 3 ? `<div class="guild-next"><span>${t('NEXT RANK')} · ${escapeHtml(t(GUILD_RANK_NAMES[id][rank + 1]))} · ${nextThreshold} ${t('REPUTATION')}</span><p>${escapeHtml(t(benefits[rank + 1] ?? 'Higher-value contracts'))}${nextItems.length ? ` · ${t('UNLOCKS')}: ${escapeHtml(nextItems.join(', '))}` : ''}</p></div>` : `<div class="guild-next is-max"><span>${t('MAXIMUM STANDING')}</span></div>`}
-            <button data-guild-id="${id}" ${joined || !affordable ? 'disabled' : ''}>${joined ? t('MEMBERSHIP ACTIVE') : `${t('JOIN')} · ${formatCredits(cost)}`}</button>
+            <button class="sx-btn ${joined ? 'sx-btn-ghost' : 'sx-btn-primary'}" data-guild-id="${id}" ${joined || !affordable ? 'disabled' : ''}>${joined ? t('MEMBERSHIP ACTIVE') : `${t('JOIN')} · ${formatCredits(cost)}`}</button>
             ${!joined && !affordable ? `<small class="guild-cost-warning">${t('You need {credits} more.', { credits: formatCredits(cost - this.save.player.credits) })}</small>` : ''}
             ${id === 'bounty' ? this.renderBountyRegistry() : ''}
           </article>`;
-        }).join('') || `<div class="guild-empty"><b>${t('NO LOCAL GUILD DESK')}</b><p>${t('This port relays contracts but does not register new members.')}</p></div>`}
+        }).join('') || `<div class="guild-empty sx-panel"><b>${t('NO LOCAL GUILD DESK')}</b><p>${t('This port relays contracts but does not register new members.')}</p></div>`}
         </div>
       </div>
     `;
@@ -6010,16 +6114,18 @@ export class GameUI {
         const journalPanel=`<div class="ship-console-grid ship-journal">${tutorialSection}${distressSection}${explorationSection}<section class="ship-menu-missions"><h3>${t('ACTIVE CONTRACTS · {count}/6',{count:missions.length})}</h3>${missionRows}</section>
           <details class="ship-menu-account"><summary>${t('COMBAT VALUE')} · ${formatCredits(combatValue)}</summary><p>${t('SHIP + EQUIPMENT · HALF CASH · NO CARGO')}</p></details>
           <details class="ship-menu-events"><summary>${t('RECENT EVENTS · {count}',{count:events.length})}</summary>${eventRows}</details></div>`;
+        const prevPane=panel.querySelector('.ship-console')?.dataset.shipPane,wasHidden=panel.classList.contains('is-hidden');
         panel.innerHTML=`<div class="ship-console" data-ship-pane="${tab}">
-          <header class="ship-console-header"><h2>${escapeHtml(ship?.name??'VOIDRUNNER')}</h2><b>${formatCredits(player.credits)}</b><button type="button" class="primary" data-ui-command="close-ship">${t('Resume flight')}</button></header>
+          <header class="ship-console-header"><div class="ship-console-title"><span class="sx-label">${escapeHtml(t(shipRoleLabel(ship?.role ?? '')))}${ship?.tier ? ` · T${ship.tier}` : ''}</span><h2>${escapeHtml(ship?.name??'VOIDRUNNER')}</h2></div><div class="sx-chip ship-console-credits">${uiIcon('credits', 18)}<span><small>${t('CREDIT')}</small><b>${formatCredits(player.credits)}</b></span></div><button type="button" class="primary sx-btn sx-btn-primary" data-ui-command="close-ship">${t('Resume flight')}</button></header>
           ${standoffBanner}
-          <nav class="ship-console-tabs" aria-label="${t('Ship sections')}">${tabs.map(([id,label])=>`<button type="button" data-ui-command="ship-section" data-ship-section="${id}" aria-current="${id===tab?'page':'false'}">${t(label)}</button>`).join('')}</nav>
+          <nav class="ship-console-tabs" role="tablist" aria-label="${t('Ship sections')}">${tabs.map(([id,label])=>`<button type="button" role="tab" class="sx-tab ${id===tab?'is-active':''}" data-ui-command="ship-section" data-ship-section="${id}" aria-selected="${id===tab}" aria-current="${id===tab?'page':'false'}">${uiIcon({flight:'flight',weapons:'weapons',equipment:'cargo',drones:'drones',journal:'journal'}[id]??'info')}<span>${t(label)}</span></button>`).join('')}</nav>
           ${tab==='flight'?`<div class="ship-status-strip">${statusCells}</div>`:''}
           <div class="ship-console-body" data-pane="${tab}">${tab==='flight'?flightPanel:tab==='weapons'?this.renderShipWeaponControls():tab==='equipment'?renderEquipmentInventory(this,{embedded:true}):tab==='drones'?this.renderDroneShipStatus():journalPanel}</div>
         </div>`;
         this.hidePause();
         this.hideMap();
         panel.classList.remove('is-hidden');
+        if (wasHidden || prevPane !== tab) this.markEntering(panel);
         this.updateOrientationNotice();
     }
     hideShipMenu() {

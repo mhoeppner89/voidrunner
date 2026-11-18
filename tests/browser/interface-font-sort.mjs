@@ -12,7 +12,8 @@ for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1440,hei
   await page.goto(`${base}/game.html?revision=0.8.2nk`);await page.waitForFunction(()=>window.__VOID_PRIVATEER__?.newGame);await page.evaluate(()=>document.fonts.ready);
   assert.match(await page.locator('#title-screen .title-actions button').first().evaluate(e=>getComputedStyle(e).fontFamily),/Void VGA Text/);
   await page.locator('#title-screen [data-ui-command="options"]').click();
-  assert.match(await page.locator('#pause-panel .settings-tabs button').first().evaluate(e=>getComputedStyle(e).fontFamily),/Void VGA Text/);
+  // 0.8.2pc hybrid type: menus read in Barlow; titles, prices and map labels keep the pixel face.
+  assert.match(await page.locator('#pause-panel .settings-tabs button').first().evaluate(e=>getComputedStyle(e).fontFamily),/Barlow Semi Condensed/);
   await page.screenshot({path:`${out}/${name}-options.png`});await page.locator('[data-ui-command="close-options"]').click();
   await page.locator('[data-ui-command="new"]').click();await page.locator('[data-ui-command="skip-new-career"]').click();
   await page.waitForFunction(()=>{const r=__VOID_PRIVATEER__.getRuntime();return r?.flightPrepared&&!r.ui.concourseArrivalPending&&r.ui.concourseShip?.model&&document.querySelector('#loading-screen').classList.contains('is-hidden');});
@@ -20,7 +21,7 @@ for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1440,hei
   await page.locator('.equipment-inventory').waitFor();await page.locator('[data-inventory-action="tab"][data-tab="shop"]').click();
   assert.equal(await page.locator('select[data-inventory-sort]').count(),0);
   const summary=page.locator('.inventory-sort > summary');assert.ok(await summary.isVisible());
-  assert.match(await page.locator('.inventory-item b').first().evaluate(e=>getComputedStyle(e).fontFamily),/Void VGA Text/);
+  assert.match(await page.locator('.inventory-item b').first().evaluate(e=>getComputedStyle(e).fontFamily),/Barlow Semi Condensed/);
   await summary.click();assert.ok(await page.locator('.inventory-sort[open] .inventory-sort-menu').isVisible());
   await page.screenshot({path:`${out}/${name}-sort-open.png`});
   await page.locator('[data-inventory-action="sort"][data-sort="tier"]').click();assert.equal(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.inventorySort),'tier');
@@ -37,7 +38,7 @@ for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1440,hei
    await page.setViewportSize(device.viewport);
   }
   await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();r.ui.switchToTerminal('concourse');r.ui.showStory('Pilot, prüfe die Instrumente.');});
-  assert.match(await page.locator('#story-panel p[role="status"]').evaluate(e=>getComputedStyle(e).fontFamily),/Void VGA Text/);await page.screenshot({path:`${out}/${name}-story.png`});
+  assert.match(await page.locator('#story-panel p[role="status"]').evaluate(e=>getComputedStyle(e).fontFamily),/Barlow Semi Condensed/);await page.screenshot({path:`${out}/${name}-story.png`});
   await page.evaluate(async()=>{const r=__VOID_PRIVATEER__.getRuntime();r.ui.hideStory();await r.launch();if(r.save.player.dockedAt)throw Error('Launch was blocked');r.openMap();});
   await page.locator('#map-panel .map-node b').first().waitFor();assert.match(await page.locator('#map-panel .map-node b').first().evaluate(e=>getComputedStyle(e).fontFamily),/Void VGA Text/);await page.screenshot({path:`${out}/${name}-map.png`});
   await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();r.ui.hideMap();r.ui.inventoryView=true;r.openShipMenu();});
