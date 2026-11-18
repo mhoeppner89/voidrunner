@@ -1,3 +1,9 @@
+## 0.8.2pe — Calmer music handovers and a quieter drive
+
+- One fight keeps one piece of music. The combat score now holds for 15 seconds after the last hostile leaves range (strafing runs used to swing out of range and back, dropping to calm music and restarting combat several times in one fight), and a fight that flares up again within 90 seconds resumes its piece with a lighter opening hit instead of starting a new one.
+- Gentler changes between places: the outgoing piece fades over about six seconds, the new one waits for it to thin out and swells in over about six more. Docking and undocking hand over in roughly four seconds; leaving combat lets the resolve chord ring before the calm piece rises. A new calm place must hold for six seconds before the score follows, so skirting a field edge or a planet's range no longer swaps pieces back and forth.
+- The engine bed, turbine, afterburner roar and the afterburner on/off sounds play at 40% of their former level, so the drive sits under weapons, comms and music. Cruise now measures about −28.4 LUFS (was −25); a dogfight stays at about −18.4 with peaks under −1 dBFS.
+
 ## 0.8.2pd — Console menus, station directory and fewer clicks
 
 - Restyle the menus as consoles in the spirit of early-90s space sims: every panel is a screen in a brushed navy-steel bezel with corner screws, a dark navy face with faint scanlines kept under the text, phosphor labels and readouts, and a short power-on when a screen opens. Buttons and tabs are raised hardware keys that press in; lit tabs show a green LED. The dock header is a riveted navy console strip with the place name on an amber display and LCD readouts for cargo and credits. The ship sheet, map, options, conversations, story cards and scene hotspots use the same parts.

@@ -51,6 +51,9 @@ class PinkNoise {
 //
 // Two convolution reverbs: a short cockpit room (own guns, hits, alarms) and
 // a long shared tail (everything outside, plus the score).
+// Seconds the combat score holds after the last hostile leaves range.
+const COMBAT_HOLD_SECONDS = 15;
+
 export class AudioManager {
     context;
     master;
@@ -269,13 +272,20 @@ export class AudioManager {
         const flying = !this.stationMode;
         this.sweepWork(this.context.currentTime);
         this.engine.update(dt, flying ? throttle : 0, flying && afterburner, damage, raceIntensity, flight);
-        if (nearbyEnemies > 0)
+        const now = this.context.currentTime;
+        if (nearbyEnemies > 0) {
             this.dangerLevel = Math.min(1, 0.45 + nearbyEnemies * 0.15);
+            this.combatHoldUntil = now + COMBAT_HOLD_SECONDS;
+        }
         else
             this.dangerLevel = Math.max(0, this.dangerLevel - dt * 0.18);
-        // Combat overrides the location ambience while hostiles are close;
-        // station mode wins over both (you are safe on the pad).
-        this.currentContext = this.stationMode ? 'station' : (this.musicContext === 'stealth' && nearbyEnemies === 0 ? 'stealth' : this.dangerLevel > 0.2 ? 'combat' : this.musicContext);
+        // Combat overrides the location ambience while hostiles are close and
+        // for a while after the last one breaks off: strafing runs swing out of
+        // range and back, and each swing must not restart the score. Station
+        // mode wins over both (you are safe on the pad).
+        const fighting = this.dangerLevel > 0.2 || now < (this.combatHoldUntil ?? 0);
+        // Sneaking past patrols that are not attacking keeps the stealth theme.
+        this.currentContext = this.stationMode ? 'station' : this.musicContext === 'stealth' && nearbyEnemies === 0 ? 'stealth' : fighting ? 'combat' : this.musicContext;
         this.music.update(dt, this.currentContext, this.dangerLevel, flight);
         this.ambience.update(dt, this.currentContext, flight?.dockKind);
         if (flying) this.updateCockpit(dt, afterburner, damage, flight);

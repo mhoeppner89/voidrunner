@@ -102,7 +102,7 @@ test('stealth score yields to actual aggression and uses the audio context trans
  s.ships[0].targetId='player';s.ships[0].holdFire=false;assert.equal(s.tutorialMusicContext(),'combat');
  // The manager resolves stealth/combat/ambient and hands the result to the score.
  const a=Object.create(AudioManager.prototype),changes=[];Object.assign(a,{context:{currentTime:0},enabled:true,stationMode:false,musicContext:'graveyard',currentContext:'graveyard',dangerLevel:.8,musicVolume:0,effectsVolume:0,engine:{update(){}},ambience:{update(){}},music:{update(dt,context){if(changes.at(-1)!==context)changes.push(context);}}});
- a.update(1/60,0,false,0,0,'stealth');assert.equal(a.currentContext,'stealth');a.update(1/60,0,false,0,1,'stealth');assert.equal(a.currentContext,'combat');a.dangerLevel=0;a.update(1/60,0,false,0,0,'graveyard');assert.deepEqual(changes,['stealth','combat','graveyard']);
+ a.update(1/60,0,false,0,0,'stealth');assert.equal(a.currentContext,'stealth');a.update(1/60,0,false,0,1,'stealth');assert.equal(a.currentContext,'combat');a.dangerLevel=0;a.update(1/60,0,false,0,0,'graveyard');assert.equal(a.currentContext,'combat','the fight holds briefly after the last attacker');a.context.currentTime=20;a.update(1/60,0,false,0,0,'graveyard');assert.deepEqual(changes,['stealth','combat','graveyard']);
  // The stealth theme stays sparse and every scheduled value is finite.
  const d=Object.create(MusicDirector.prototype),notes=[];Object.assign(d,{seed:7,beat:60/72,barSeconds:240/72,drum:(...args)=>notes.push(args),pad:(...args)=>notes.push(args)});
  for(let bar=0;bar<4;bar++){d.bar=bar;PIECE_BY_ID['stealth-heart'].bar(d,bar*d.barSeconds,{state:{}});}

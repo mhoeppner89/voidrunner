@@ -146,3 +146,29 @@ test('the service worker precaches every score module',async()=>{
  const worker=readFileSync(new URL('../../sw.js',import.meta.url),'utf8');
  for(const name of ['audioMusic.js','musicKit.js','musicScore.js','musicSpace.js','musicFlight.js','musicDocked.js'])assert.ok(worker.includes(`'./src/game/${name}'`),name);
 });
+
+test('one fight keeps one piece; calm places settle before the score follows; handovers breathe',()=>{
+ const manager=fakeMusicManager(),director=new MusicDirector(manager),ctx=manager.context,place={systemId:'helios-verge'};
+ run(director,2,'open',place);
+ run(director,5,'combat',place,0.6);
+ const fight=director.piece;assert.equal(director.current,'combat');
+ run(director,8,'open',place);assert.equal(director.current,'open');
+ // The resolve chord rings before the calm piece swells in.
+ run(director,20,'combat',place,0.6);assert.equal(director.piece,fight,'a re-engagement resumes the same combat piece');
+ run(director,1,'open',place);
+ const open=director.piece;
+ run(director,3,'planet',place);assert.equal(director.current,'open','a brief excursion does not switch pieces');assert.equal(director.piece,open);
+ run(director,4,'planet',place);assert.equal(director.current,'planet','a held place takes over after it settles');
+ assert.ok(director.nextBar-ctx.currentTime>1.5,'the new piece waits for the outgoing one to thin out');
+});
+
+test('the combat score holds through a strafing run out of range',async()=>{
+ const {AudioManager}=await import('../../src/game/audio.js');
+ const audio=Object.create(AudioManager.prototype),contexts=[];
+ Object.assign(audio,{context:{currentTime:0},enabled:true,stationMode:false,dangerLevel:0,musicContext:'open',engine:{update(){}},ambience:{update(){}},music:{update:(dt,context)=>contexts.push(context)},sweepWork(){},updateCockpit(){}});
+ const frames=(seconds,enemies)=>{for(let i=0;i<seconds*60;i+=1){audio.context.currentTime+=1/60;audio.update(1/60,0.5,false,0,enemies,'open');}};
+ frames(1,0);frames(3,2);assert.equal(audio.currentContext,'combat');
+ frames(10,0);assert.equal(audio.currentContext,'combat','ten seconds out of range is still the same fight');
+ frames(3,1);frames(16,0);assert.equal(audio.currentContext,'open','the fight ends after the hold');
+ assert.equal(contexts.filter((c,i)=>i&&c!==contexts[i-1]).length,2,'exactly one switch into combat and one out');
+});

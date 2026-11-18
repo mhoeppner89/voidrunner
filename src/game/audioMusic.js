@@ -26,8 +26,23 @@ import { PIECE_BY_ID, PIECES_BY_CONTEXT, ROTATION, isApproved, dockThemeFor, pie
 // ensemble, mallets, monophonic synths (persistent oscillators, sequenced by
 // automation: no per-note nodes), and a forged percussion kit from the sound
 // bank (group 'music').
-const FADE_IN_TO = { combat: 0.35, station: 1.2, stealth: 0.8 };
 const LOOKAHEAD = 0.22;
+// A calm place must hold this long before the score follows it, so skirting
+// a field edge or a planet's range does not swap pieces back and forth.
+const SETTLE_SECONDS = 6;
+// A fight that flares up again this soon resumes its piece instead of
+// starting a new one.
+const COMBAT_MEMORY = 90;
+// How one place hands over to the next: the outgoing piece fades for
+// `fadeOut`, the new one starts after `delay` and swells in over `swell`.
+// Combat lands at once on its opening hit; everything else breathes.
+const transition = (previous, context) => {
+    if (context === 'combat') return { fadeOut: 1.2, delay: 0.06, swell: 0 };
+    if (previous === 'combat') return { fadeOut: 4, delay: 3.5, swell: 5 };
+    if (context === 'station' || previous === 'station') return { fadeOut: 3.5, delay: 2, swell: 4 };
+    if (!previous) return { fadeOut: 2, delay: 0.1, swell: 3 };
+    return { fadeOut: 6, delay: 3, swell: 6 };
+};
 // Formants as [frequency, gain, Q]: soft vowels only.
 const VOWELS = {
     oo: [[310, 1, 3.5], [870, 0.32, 6], [2250, 0.08, 9]],
@@ -176,13 +191,22 @@ export class MusicDirector {
         if (now < (this.holdUntil ?? 0)) return;
         if (place) { this.systemId = place.systemId; this.regionId = place.regionId; this.dockId = place.dockId; }
         const slot = context === 'station' ? `station:${this.dockId ?? ''}` : context;
-        if (slot !== this.slot) this.enter(context, slot, now);
-        else if (!this.piece) {
-            if (now < this.restUntil) return;
-            this.begin(this.choose(context), now, 'rest');
+        if (slot !== this.slot) {
+            // Combat, docking and undocking change at once; calm places settle first.
+            // An emptied slot is a forced restart (death, the review page).
+            const urgent = !this.current || !this.slot || context === 'combat' || context === 'station' || this.current === 'combat' || this.current === 'station';
+            if (this.pendingSlot !== slot) { this.pendingSlot = slot; this.pendingSince = now; }
+            if (urgent || now - this.pendingSince >= SETTLE_SECONDS) { this.pendingSlot = ''; this.enter(context, slot, now); }
+        }
+        else {
+            this.pendingSlot = '';
+            if (!this.piece) {
+                if (now < this.restUntil) return;
+                this.begin(this.choose(context), now, 'rest');
+            }
         }
         if (!this.piece) return;
-        if (context === 'combat') this.updateTier(danger, now);
+        if (this.current === 'combat') this.updateTier(danger, now);
         // After a stall (hidden tab, long frame) rejoin the clock instead of bursting.
         if (this.nextBar < now - 0.05) this.nextBar = now + 0.06;
         while (this.piece && this.nextBar < now + LOOKAHEAD) {
@@ -195,13 +219,18 @@ export class MusicDirector {
 
     // A new place: fade out whatever plays and start that place's music.
     enter(context, slot, now) {
-        const previous = this.current;
-        if (this.group) this.retire(this.group, previous === 'combat' ? 2.2 : FADE_IN_TO[context] ?? 1.6);
+        const previous = this.current, outgoing = this.piece;
+        let handover = transition(previous, context);
+        // A forced restart (review page auditions) switches briskly.
+        if (!this.slot) handover = { fadeOut: 1.2, delay: Math.min(0.3, handover.delay), swell: Math.min(1.5, handover.swell) };
+        if (previous === 'combat' && outgoing) this.lastCombat = { piece: outgoing, at: now };
+        if (this.group) this.retire(this.group, handover.fadeOut);
+        // Resting (no group) there is nothing to wait for.
+        if (!this.group && context !== 'combat') handover.delay = Math.min(handover.delay, 0.1);
         this.group = null;
         this.current = context; this.slot = slot;
-        const outgoing = this.piece;
         this.piece = null;
-        this.begin(this.choose(context), now, previous, outgoing);
+        this.begin(this.choose(context), now, previous, outgoing, handover);
     }
 
     // Which piece plays here. Weighted by system/region, never the same
@@ -210,6 +239,9 @@ export class MusicDirector {
         const audition = this.audition && PIECE_BY_ID[this.audition.id];
         if (audition?.context === context) return audition;
         if (context === 'station') return dockThemeFor(this.dockId);
+        // One fight, one piece: a quick re-engagement picks up where it left off.
+        const last = this.lastCombat;
+        if (context === 'combat' && last && this.context.currentTime - last.at < COMBAT_MEMORY && isApproved(last.piece)) return last.piece;
         const pool = (PIECES_BY_CONTEXT[context] ?? PIECES_BY_CONTEXT.open).filter(isApproved);
         if (pool.length <= 1) return pool[0];
         const recent = this.history.get(context) ?? [];
@@ -220,7 +252,7 @@ export class MusicDirector {
         return pool[Math.max(0, index)];
     }
 
-    begin(piece, now, previous, outgoing) {
+    begin(piece, now, previous, outgoing, handover = transition(previous === 'rest' ? undefined : previous, this.current)) {
         if (!piece) return;
         const context = this.current;
         this.piece = piece;
@@ -240,25 +272,31 @@ export class MusicDirector {
         const group = this.group = { bus: fresh(this.out), pad: fresh(this.padIn), echo: fresh(this.echoIn), wet: fresh(this.manager.musicReverbGain), synths: [], nodes: [], trim, state: {} };
         group.nodes.push(group.bus, group.pad, group.echo, group.wet);
         const combat = context === 'combat';
-        // Ambient themes swell in under the outgoing tail (or out of a rest);
-        // combat lands at once.
-        if (!combat && previous) {
-            const swell = previous === 'rest' ? 3 : Math.min(2.5, (previous === 'combat' ? 2.2 : FADE_IN_TO[context] ?? 1.6) + 0.6);
-            for (const node of group.nodes) { node.gain.setValueAtTime(0.0001, now); node.gain.linearRampToValueAtTime(trim, now + swell); }
+        // Ambient themes wait for the outgoing piece to thin out, then swell
+        // in (out of a rest they simply rise); combat lands at once.
+        const delay = previous === 'rest' ? 0.1 : handover.delay;
+        const swell = previous === 'rest' ? 3 : handover.swell;
+        if (!combat && swell > 0) {
+            for (const node of group.nodes) {
+                node.gain.setValueAtTime(0.0001, now);
+                node.gain.setValueAtTime(0.0001, now + delay);
+                node.gain.linearRampToValueAtTime(trim, now + delay + swell);
+            }
         }
         const echo = this.beat * (piece.echo ?? 0.75);
         this.echoLeft.delayTime.setTargetAtTime(echo, now, 0.05);
         this.echoRight.delayTime.setTargetAtTime(echo, now, 0.05);
         piece.setup?.(this, group);
         if (combat) {
-            // The fight opens with a hit, not a fade.
-            this.drum(now + 0.02, 'm-impact', 0.6, { wet: 0.6 }, this.sting);
-            this.drum(now + 0.02, 'm-sub-drop', 0.35, {}, this.sting);
+            // The fight opens with a hit, not a fade; a resumed fight gets a lighter one.
+            const resumed = this.lastCombat?.piece === piece;
+            this.drum(now + 0.02, 'm-impact', resumed ? 0.32 : 0.6, { wet: 0.6 }, this.sting);
+            if (!resumed) this.drum(now + 0.02, 'm-sub-drop', 0.35, {}, this.sting);
             this.nextBar = now + 0.06;
         }
         else {
             if (previous === 'combat') this.resolveCombat(now, outgoing);
-            this.nextBar = now + (previous && previous !== 'rest' ? 0.5 : 0.1);
+            this.nextBar = now + Math.max(0.1, delay);
         }
     }
 

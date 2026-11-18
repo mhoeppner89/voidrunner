@@ -28,7 +28,8 @@ export class ShipEngineAudio {
         this.manager = manager;
         const context = manager.context;
         this.bus = context.createGain();
-        this.bus.gain.value = 0.62;
+        // 0.25 (was 0.62): the drive sits well under weapons, comms and music.
+        this.bus.gain.value = 0.25;
         this.bus.connect(manager.engineBus);
         // A little of the drive reaches the long tail so it sits in a space.
         const tail = context.createGain(); tail.gain.value = 0.05;
@@ -81,8 +82,8 @@ export class ShipEngineAudio {
         // Reactor inertia: quick to answer the throttle, slower to wind down.
         this.spool = clamp(this.spool + (thrust - this.spool) * Math.min(1, dt * (thrust > this.spool ? 2.6 : 1.5)), 0, 1);
         this.burn = clamp(this.burn + ((afterburner ? 1 : 0) - this.burn) * Math.min(1, dt * (afterburner ? 5 : 2.5)), 0, 1);
-        if (afterburner && !this.wasBurning) { manager.play('afterburnerOn', 0.65); this.burnStartedAt = now; }
-        else if (!afterburner && this.wasBurning && now - this.burnStartedAt > 0.35 && !manager.stationMode) manager.play('afterburnerOff', 0.7);
+        if (afterburner && !this.wasBurning) { manager.play('afterburnerOn', 0.26); this.burnStartedAt = now; }
+        else if (!afterburner && this.wasBurning && now - this.burnStartedAt > 0.35 && !manager.stationMode) manager.play('afterburnerOff', 0.28);
         this.wasBurning = Boolean(afterburner);
         this.updateTunnel(Boolean(flight?.hyper) && !manager.stationMode, now);
         if (manager.stationMode) return;
