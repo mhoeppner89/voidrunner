@@ -16,7 +16,10 @@ function fixture(shipId,count) {
 }
 const single=fixture('wayfarer',1), s=single.preparePdcDroneContext();
 const anchor=s.escortAnchors['pdc-0'];
-near(anchor.position[0],100);assert.ok(anchor.position[1]>215,'single drone opposite belly turret');
+// A lone escort holds station on the side its bay opens, clear of the hull,
+// so it never crosses the player ship right after launch.
+const baySide=Math.sign(s.bayAnchors['pdc-0'].mount[1]);
+near(anchor.position[0],100);assert.equal(Math.sign(anchor.position[1]-200),baySide,'single drone stays on its bay side');assert.ok(Math.abs(anchor.position[1]-200)>15,'single drone holds clear of the hull');
 const fixed=[...anchor.position];single.save.world.time=3;single.preparePdcDroneContext();assert.deepEqual(anchor.position,fixed);
 for(const count of [2,3]) {
  const rt=fixture('prospector',count), p=rt.save.player;

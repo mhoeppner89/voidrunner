@@ -49,6 +49,6 @@ test('live traffic waits for station geometry and parked bounds to load',()=>{
 test('NPC hard collisions use visible station surfaces without a docking exemption',()=>{
  const model=new THREE.Mesh(new THREE.BoxGeometry(20,20,20)),collider=buildStationCollider(model,LOCATIONS.helix.position),p=LOCATIONS.helix.position;
  const ship={variant:'kestrel',hull:100,maxHull:100,position:[p[0]+10.8,p[1],p[2]],velocity:[-1,0,0],rotation:[0,0,0,1],stationDock:{id:'helix',phase:'landing'}};
- const s=Object.create(GameSession.prototype);Object.assign(s,{save:{player:{systemId:LOCATIONS.helix.systemId}},tmpA:new THREE.Vector3(),tmpB:new THREE.Vector3(),tmpQ:new THREE.Quaternion(),tmpQ2:new THREE.Quaternion(),tmpCollide:new THREE.Vector3(),npcHullExtents:()=>[1,1,1],renderer:{stationColliders:new Map([['helix',collider]])},forEachObstacleInBox(){},damageShip(){throw Error('slow contact should not damage');}});
+ const s=Object.create(GameSession.prototype);Object.assign(s,{save:{player:{systemId:LOCATIONS.helix.systemId},world:{time:0}},tmpA:new THREE.Vector3(),tmpB:new THREE.Vector3(),tmpQ:new THREE.Quaternion(),tmpQ2:new THREE.Quaternion(),tmpCollide:new THREE.Vector3(),npcHullExtents:()=>[1,1,1],renderer:{stationColliders:new Map([['helix',collider]])},forEachObstacleInBox(){},damageShip(){throw Error('slow contact should not damage');}});
  s.resolveNpcCollisions(ship);assert.ok(ship.position[0]>p[0]+11);assert.ok(ship.velocity[0]>0);assert.equal(ship.stationDock.phase,'landing');
 });

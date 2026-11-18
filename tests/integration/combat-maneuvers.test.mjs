@@ -102,3 +102,18 @@ test('real flight executes the climbing turn with bounded displacement and retur
  }
  assert.ok(sawClimb);assert.ok(vertical>5);assert.ok(shots>0,'the return must produce another attack opportunity');
 });
+
+test('aces vary their reversal: a burning Immelmann keeps way on, snipers and brawlers keep the flip',()=>{
+ const loop=pilot('ace');loop.aiRng=()=>.7;loop.combatFit.weapons=['pulse','pulse','mortar'];
+ const move=choose(loop,{nose:-.8,travel:-.8});assert.equal(move?.kind,'immelmann');
+ const lead=new THREE.Vector3(0,0,1),out=new THREE.Vector3();
+ assert.ok(move.pull>1.8&&move.until-move.started>move.pull,'the loop is sized to the hull: thrust along the nose limits a speed-keeping radius');
+ maneuverHeading(move,move.started+move.pull/2,lead,160,235,out);assert.ok(Math.abs(out.y)>.9,'the nose pulls through the vertical');
+ maneuverHeading(move,move.until,lead,160,235,out);assert.ok(out.dot(lead)>.999,'and rolls out on the firing line');
+ for(const main of ['gauss','ripper','ion']){
+  const flip=pilot('ace');flip.aiRng=()=>.7;flip.combatFit.weapons=['pulse',main];
+  assert.equal(choose(flip,{nose:-.8,travel:-.8})?.kind,'boost-reversal',main);
+ }
+ const steady=pilot('ace');steady.aiRng=()=>.3;steady.combatFit.weapons=['pulse'];
+ assert.equal(choose(steady,{nose:-.8,travel:-.8})?.kind,'boost-reversal','the flip-and-burn stays in the repertoire');
+});

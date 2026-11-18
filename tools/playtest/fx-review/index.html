@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="/">
+<link rel="icon" href="data:,">
+<title>Voidrunner — Combat FX review</title>
+<script type="importmap">{"imports":{"three":"/vendor/three.module.min.js"}}</script>
+<style>
+:root { --navy: #0b1424; --panel: #131f36cc; --line: #2a3a5c; --gold: #e8b84a; --text: #dfe7f5; --dim: #8fa0bf; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #02040a; color: var(--text); font: 13px/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace; overflow: hidden; }
+canvas { display: block; width: 100vw; height: 100vh; }
+#panel { position: fixed; top: 10px; left: 10px; width: 300px; max-height: calc(100vh - 20px); overflow: auto; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+#panel.is-hidden { display: none; }
+h1 { margin: 0 0 6px; font-size: 14px; color: var(--gold); letter-spacing: .08em; }
+h2 { margin: 10px 0 5px; font-size: 11px; color: var(--gold); letter-spacing: .12em; text-transform: uppercase; }
+p { margin: 0 0 6px; color: var(--dim); }
+.grid { display: flex; flex-wrap: wrap; gap: 4px; }
+button { font: inherit; color: var(--text); background: #1b2a48; border: 1px solid var(--line); border-radius: 4px; padding: 5px 7px; cursor: pointer; }
+button:hover { border-color: var(--gold); }
+button.is-on { background: var(--gold); color: var(--navy); border-color: var(--gold); }
+label { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0; }
+input[type=range] { flex: 1; accent-color: var(--gold); }
+#hint { position: fixed; right: 10px; bottom: 10px; color: var(--dim); }
+</style>
+</head>
+<body>
+<div id="panel">
+  <h1>COMBAT FX REVIEW</h1>
+  <p>The game's own projectile, impact and explosion effects around a real hull. Drag to orbit, wheel to zoom, H hides this panel.</p>
+  <h2>Fire at the hull</h2>
+  <div class="grid" id="weapons"></div>
+  <h2>Target</h2>
+  <div class="grid" id="surfaces"></div>
+  <h2>Explosions</h2>
+  <div class="grid" id="explosions"></div>
+  <p style="margin-top:6px">Variant</p>
+  <div class="grid" id="variants"></div>
+  <h2>Playback</h2>
+  <label><span>Time</span><input id="speed" type="range" min="0.1" max="1" step="0.05" value="1"><b id="speedValue">1.00×</b></label>
+  <label><span>Distance</span><input id="distance" type="range" min="15" max="220" step="1" value="60"><b id="distanceValue">60 m</b></label>
+  <div class="grid"><button id="demo">Auto demo</button><button id="clear">Clear</button></div>
+</div>
+<div id="hint">H: panel</div>
+<script type="module" src="tools/playtest/fx-review/review.js"></script>
+</body>
+</html>

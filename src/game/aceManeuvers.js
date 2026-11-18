@@ -9,6 +9,11 @@ const STYLES={
     aggressive:{duration:.86,width:.82,vertical:.78,cut:1.15,cooldown:.88},
     flamboyant:{duration:1.08,width:1.16,vertical:1.2,cut:1.04,cooldown:.94},
 };
+// The Immelmann's pull time comes from the hull: thrust acts along the nose,
+// so holding speed through a half loop needs a radius near v^2/a, i.e. about
+// pi*v/a seconds. Pulling at 65% of that keeps roughly half the speed at the
+// top (a quicker pull bleeds it to a near stop like the flip-and-burn).
+export const immelmannPull=stats=>stats?clamp(.65*Math.PI*stats.maxSpeed/Math.max(1,stats.acceleration),1.8,4.2):2.4;
 const styleFor=ship=>STYLES[ship.pilot?.temperament]??STYLES.steady;
 function finish(ship,time,ace,kind=ship.aceMove?.kind) {
     const style=styleFor(ship);
@@ -67,7 +72,7 @@ export function aceManeuver(ship,time,distance,noseDot,travelDot,range,safe,inFi
     const age=move?(time-move.started)/(move.durationScale??1):0;
     const collisionBreak=time<(plan?.passUntil??0)||distance<=(plan?.clearance??0);
     const offensiveCut=move?.kind==='lead-cut'||move?.kind==='high-yo-yo';
-    const recovered=move&&age>(move.kind==='boost-reversal'?.9:.4)&&firingDot>.99&&velocityDot>.2&&distance>Math.max(45,range*.3)&&!plan?.overshoot;
+    const recovered=move&&age>(move.kind==='boost-reversal'?.9:move.kind==='immelmann'?(move.pull??2.4):.4)&&firingDot>.99&&velocityDot>.2&&distance>Math.max(45,range*.3)&&!plan?.overshoot;
     const receding=move&&age>.6&&travelDot<-.6&&distance>(move.kind==='scissors'?Math.max(220,range*1.5):range*1.15);
     if(move&&(time>=move.until||recovered||receding||offensiveCut&&collisionBreak||move.targetId!==undefined&&move.targetId!==ship.targetId)){
         finish(ship,time,ace);return;
@@ -107,7 +112,14 @@ export function aceManeuver(ship,time,distance,noseDot,travelDot,range,safe,inFi
         // In a field, a powered rolling return keeps more control than a
         // coasting reversal. Both the drift corridor and exit must be clear.
         if(inField&&canRepeat(ship,'rolling-break',time))return begin(ship,'rolling-break',time,2,speed,agile);
-        if(canRepeat(ship,'boost-reversal',time))return begin(ship,'boost-reversal',time,3.4,speed,agile);
+        // Two reversals: the coasting flip-and-burn, or an afterburner
+        // Immelmann that keeps the speed. Mid-range fits alternate so neither
+        // becomes a tell; magrail snipers keep the flip to hold their standoff,
+        // scatter and ion brawlers to stop inside the fight.
+        const main=ship.combatFit?.weapons?.at?.(-1);
+        const flip=canRepeat(ship,'boost-reversal',time),loop=canRepeat(ship,'immelmann',time)&&speed>ship.speed*.7&&main!=='gauss'&&main!=='ripper'&&main!=='ion';
+        if(loop&&(!flip||(ship.aiRng?.()??0)>=.6)){const pull=immelmannPull(stats),move=begin(ship,'immelmann',time,pull+1.05,speed,agile);move.pull=pull;return move;}
+        if(flip)return begin(ship,'boost-reversal',time,3.4,speed,agile);
     }
     if(agile&&speed>ship.speed*(evading?.85:.5)&&noseDot>-.2&&Math.abs(travelDot)<(timid?.78:.92)&&(evading?travelDot<.25:distance<range*1.05)&&canRepeat(ship,'drift-pass',time))
         return begin(ship,'drift-pass',time,ace?1.6:1.1,speed,agile);
@@ -118,6 +130,16 @@ export function aceManeuver(ship,time,distance,noseDot,travelDot,range,safe,inFi
 export function maneuverHeading(move,time,lead,distance,range,out) {
     const age=(time-move.started)/(move.durationScale??1),width=move.width??1,vertical=move.vertical??1,cutStrength=move.cut??1;
     if(move.kind==='boost-reversal'&&age<.65)return out.fromArray(move.entry);
+    if(move.kind==='immelmann'){
+        // Afterburner half loop: pull the nose up through the vertical with
+        // the burner lit, then roll out onto the firing line. A wide, burning
+        // reversal that keeps way on, a contrast to the coasting flip-and-burn.
+        const span=move.pull??2.4,pull=Math.PI*clamp(age/span,0,1),up=move.up,sign=move.sign*(move.vertical??1)>=0?1:-1;
+        out.fromArray(move.entry);
+        const c=Math.cos(pull),s=Math.sin(pull);
+        out.x=out.x*c+up[0]*s*sign;out.y=out.y*c+up[1]*s*sign;out.z=out.z*c+up[2]*s*sign;
+        return out.normalize().lerp(lead,clamp((age-span+.3)/.7,0,1)).normalize();
+    }
     if(move.kind==='break-turn'){
         const returnToAim=clamp((age-.55)/.85,0,1);
         out.fromArray(move.escape).normalize();

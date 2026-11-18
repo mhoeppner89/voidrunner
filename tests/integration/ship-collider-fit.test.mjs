@@ -14,7 +14,7 @@ import {stationModel} from '../helpers/station-model.mjs';
 import {buildStationCollider} from '../../src/game/stationCollision.js';
 import {STATION_DOCKS} from '../../src/game/stationDocks.js';
 import {LOCATIONS} from '../../src/game/data.js';
-import {stationBerth,stationPlayerBerths} from '../../src/game/stationTraffic.js';
+import {stationBerth,stationPlayerBerths,stationDockRoute} from '../../src/game/stationTraffic.js';
 import {fittedPlayerBerths} from '../../src/game/shipLanding.js';
 import {FLEET_EQUIPMENT} from '../../src/game/fleetEquipmentData.js';
 globalThis.createImageBitmap=async()=>({width:1,height:1,close(){}});
@@ -97,12 +97,14 @@ test('all player hulls and NPC hulls clear every actual station landing and depa
    for(const npc of [false,true]){
     const scale=npc?n:PLAYER_CONTACT_SCALE,berths=npc?STATION_DOCKS[id].lanes.map((_,i)=>stationBerth(id,i,p.extent[1]*scale)):fittedPlayerBerths(id,data.variant,collider);
     assert.ok(berths.length>0,`${id}/${hull}: a usable berth must exist`);
-    for(const berth of berths)for(let i=0;i<=20;i++){
-     const pos=new T.Vector3(...berth.gate).lerp(new T.Vector3(...berth.pad),i/20),contact={};
-     const facing=new T.Quaternion().setFromUnitVectors(new T.Vector3(0,0,-1),new T.Vector3(...berth.pad).sub(new T.Vector3(...berth.gate)).normalize());
-     if(shipVsStation(pos,facing,data.variant,scale,collider,contact))failures.push(`${id}/${hull}/${npc?'NPC':'player'} at ${i}/20 ${JSON.stringify(contact)}`);
+    // Walk the route ships actually fly: through the throat where a station has a shared entry.
+    for(const berth of berths){const route=stationDockRoute(berth);for(let leg=0;leg<route.length-1;leg++)for(let i=0;i<=20;i++){
+     const from=new T.Vector3(...route[leg]),to=new T.Vector3(...route[leg+1]),pos=from.clone().lerp(to,i/20),contact={};
+     // updateStationDock keeps the gate→throat heading for both legs.
+     const facing=new T.Quaternion().setFromUnitVectors(new T.Vector3(0,0,-1),new T.Vector3(...(berth.throat??berth.pad)).sub(new T.Vector3(...berth.gate)).normalize());
+     if(shipVsStation(pos,facing,data.variant,scale,collider,contact))failures.push(`${id}/${hull}/${npc?'NPC':'player'} leg ${leg+1}/${route.length-1} at ${i}/20 ${JSON.stringify(contact)}`);
      if(id==='blackglass'&&shipVsSphere(pos,facing,data.variant,scale,...LOCATIONS[id].position,LOCATIONS[id].radius*.82,contact))failures.push(`${id}/${hull}: host moon blocks the approach`);
-    }
+    }}
    }
   }
  }

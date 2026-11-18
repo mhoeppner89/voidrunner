@@ -6,7 +6,9 @@ import {stationYaw,stationRotatePoint} from '../../src/game/stationOrientation.j
 
 // Geometry-only GLB reader: test the shipping vertices and node transforms,
 // without a browser/image decoder or an invented collision proxy.
-export function stationModel(id) {
+// `authored: true` keeps the authoring frame (no system yaw): assertions
+// written in source coordinates sample the right places on every station.
+export function stationModel(id, {authored = false} = {}) {
     const b=fs.readFileSync(new URL(`../../assets/models/stations/${id}.glb`,import.meta.url));
     const jsonLength=b.readUInt32LE(12), gltf=JSON.parse(b.toString('utf8',20,20+jsonLength));
     const binary=20+jsonLength+8;
@@ -33,6 +35,8 @@ export function stationModel(id) {
     });
     gltf.nodes.forEach((n,i)=>{for(const c of n.children??[])nodes[i].add(nodes[c]);});
     const root=new THREE.Group();for(const i of gltf.scenes[gltf.scene??0].nodes)root.add(nodes[i]);
-    root.scale.setScalar(stationVisualSurfaceRadius(id)/100);root.position.fromArray(stationRotatePoint(id,[0,0,stationModelOffsetZ(id)]));root.rotation.y=stationYaw(id);
+    root.scale.setScalar(stationVisualSurfaceRadius(id)/100);
+    if(authored){root.position.set(0,0,stationModelOffsetZ(id));return root;}
+    root.position.fromArray(stationRotatePoint(id,[0,0,stationModelOffsetZ(id)]));root.rotation.y=stationYaw(id);
     return root;
 }

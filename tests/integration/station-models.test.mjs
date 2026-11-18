@@ -59,7 +59,7 @@ test('capital service lifts stand on the drydock deck rather than floating besid
 // Test the actual shipped mesh at the authored touchdown, not just metadata.
 test('landing spaces have solid floors and the expected open sky or enclosing roof',()=>{
  for(const [id,r]of Object.entries(reports)){
-  const model=stationModel(id);model.updateMatrixWorld(true);model.traverse(o=>{if(o.isMesh)o.material.side=THREE.DoubleSide;});
+  const model=stationModel(id,{authored:true});model.updateMatrixWorld(true);model.traverse(o=>{if(o.isMesh)o.material.side=THREE.DoubleSide;});
   const scale=LOCATIONS[id].radius*(id==='blackglass'?.2:.95)/r.sourceRadius,offset=id==='blackglass'?LOCATIONS[id].radius*.835:0;
   const convert=([x,y,z])=>new THREE.Vector3(x*scale,z*scale,-y*scale+offset);
   const [x,y,z]=r.concourse.touchdowns[0],base=convert([x,y,z]);
@@ -77,7 +77,7 @@ test('landing spaces have solid floors and the expected open sky or enclosing ro
 
 test('the inspection doorway and factory rear opening continue into the larger station',()=>{
  for(const [id,a,b]of [['gatehouse-twelve',[-9,-9,-10.5],[-9,8,-10.5]],['league-yard',[0,-67,-11],[0,-48,-11]]]){
-  const model=stationModel(id);model.updateMatrixWorld(true);model.traverse(o=>{if(o.isMesh)o.material.side=THREE.DoubleSide;});
+  const model=stationModel(id,{authored:true});model.updateMatrixWorld(true);model.traverse(o=>{if(o.isMesh)o.material.side=THREE.DoubleSide;});
   const s=LOCATIONS[id].radius*.95/reports[id].sourceRadius,convert=([x,y,z])=>new THREE.Vector3(x*s,z*s,-y*s),start=convert(a),end=convert(b),direction=end.sub(start);
   const ray=new THREE.Raycaster(start,direction.clone().normalize(),0,direction.length());
   assert.equal(ray.intersectObject(model,true).length,0,`${id}: doorway leads through the real body`);
@@ -124,7 +124,7 @@ test('former platform stations have substantial real surfaces below their landin
 test('Helix preserves its circular decks and Rook closes the marked underside gap',()=>{
  assert.equal(reports.helix.sourceRadius,84.42890708589043);
  for(const id of ['helix','rook']){
-  const model=stationModel(id),scale=reports[id].detailScale.sourceToWorld;
+  const model=stationModel(id,{authored:true}),scale=reports[id].detailScale.sourceToWorld;
   model.updateMatrixWorld(true);
   const rayAt=(x,z)=>{
    const ray=new THREE.Raycaster(new THREE.Vector3(x*scale,z*scale,80*scale),new THREE.Vector3(0,0,-1));
@@ -142,7 +142,7 @@ test('Helix preserves its circular decks and Rook closes the marked underside ga
 });
 
 test('Rook central upper slot is covered by a continuous armored roof',()=>{
- const r=reports.rook,s=r.detailScale.sourceToWorld,model=stationModel('rook');model.updateMatrixWorld(true);
+ const r=reports.rook,s=r.detailScale.sourceToWorld,model=stationModel('rook',{authored:true});model.updateMatrixWorld(true);
  for(const y of [-28,-12,4]){
   const ray=new THREE.Raycaster(new THREE.Vector3(0,70*s,-y*s),new THREE.Vector3(0,-1,0));
   const hit=ray.intersectObject(model,true)[0];

@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v684-0-8-2pe-music-handover';
+const CACHE = 'voidrunner-v686-0-8-2pg-combat-fx-foresight';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -91,6 +91,7 @@ const CORE_ASSETS = [
   './src/game/independentPaints.js',
   './src/game/wayfarerLiveries.js',
   './src/game/explosionFx.js',
+  './src/game/impactFx.js',
   './src/game/shipWreckFx.js',
     './src/game/graveyardArt.js',
   './src/game/capitalEngineExhaust.js',

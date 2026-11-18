@@ -103,7 +103,7 @@ test('projectile disposal keeps shared ordnance geometry and material alive for 
 
 test('all in-game rocket and torpedo bodies keep authored size at near and far camera distances',()=>{
  const s=session(),r=Object.create(SpaceRenderer.prototype);
- Object.assign(r,{projectileMeshes:new Map(),projectileSyncRevision:0,dynamicRoot:new THREE.Group(),camera:new THREE.PerspectiveCamera(),tmpPrevPos:new THREE.Vector3(),forward:new THREE.Vector3(),tmpQuaternion:new THREE.Quaternion(),skyTime:0,radialTexture:()=>new THREE.Texture(),laserFx:{attenuate:LaserFx.prototype.attenuate}});
+ Object.assign(r,{projectileMeshes:new Map(),projectileSyncRevision:0,dynamicRoot:new THREE.Group(),camera:new THREE.PerspectiveCamera(),tmpPrevPos:new THREE.Vector3(),forward:new THREE.Vector3(),tmpQuaternion:new THREE.Quaternion(),skyTime:0,radialTexture:()=>new THREE.Texture(),laserFx:new LaserFx(new THREE.Scene(),[])});
  for(const id of Object.keys(LAUNCHERS)){
   const slot=s.projStore.alloc();s.projStore.setPos(slot,0,0,0);s.projStore.setVel(slot,0,0,-100);
   s.projectiles.push({slot,kind:'missile',launcherId:id,shield:12});

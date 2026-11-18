@@ -7,11 +7,14 @@ import {terrainFlightDistance} from '../../src/game/asteroidTerrain.js';
 import {fieldCombatSteering} from '../../src/game/fieldCombatNav.js';
 
 function fight(arena){
- const s=session();s.arena=arena?{run:true}:null;s.save.player.position=[0,0,-180];
+ const s=session();s.save.player.position=[0,0,-180];
  s.announceSearchStart=()=>{};s.playerExposureRange=()=>2000;s.tmpCollide=new THREE.Vector3();s.tmpEuler=new THREE.Euler();
  const ship=s.spawnShip('pirate',[100,0,180],undefined,undefined,{tier:'veteran',temperament:'steady'},{hullId:'talon'});
  Object.assign(ship,{targetId:'player',hostile:true,noSurrender:true,playerAwareness:1,resolvedPlayerLast:true,lastResolvedPlayer:[0,0,-180]});
  ship.rotation=[0,0,0,1];ship.velocity=[0,0,-40];ship.combatFit.turrets=[];ship.combatFit.missiles=0;
+ // Career spawns roll loot affixes onto the guns; Arena uses base items.
+ // Spawn once outside Arena so both fights compare flight with one loadout.
+ s.arena=arena?{run:true}:null;
  s.obstacles=[{id:'cover',shape:'asteroid',x:0,y:0,z:0,radius:65,collisionRadius:65,losRadius:65}];
  let search=0,combat=0;
  for(let i=0;i<900;i++){

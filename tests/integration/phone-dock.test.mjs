@@ -88,7 +88,7 @@ test('play and skip are explicit once-only choices before a new career begins',(
 function inventoryFixture(save, session) {
     const ui = Object.create(GameUI.prototype), handlers = {};
     ui.save=save;ui.dockLocation='helix';
-    ui.root={querySelector:()=>null,addEventListener:(name,handler)=>{handlers[name]=handler;}};
+    ui.root={querySelector:()=>null,querySelectorAll:()=>[],addEventListener:(name,handler)=>{handlers[name]=handler;}};
     let markup='';
     ui.refreshDock=()=>{markup=renderEquipmentInventory(ui);};
     ui.actions={inventoryCommand:(...args)=>session.inventoryCommand(...args)};

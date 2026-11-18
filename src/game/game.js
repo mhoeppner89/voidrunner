@@ -9280,7 +9280,7 @@ export class GameSession {
         // Aggressive pilots (afterburnMul > 1.2) burn afterburn in pursuit too,
         // not just when running or being chased.
         const burnInPursuit = (ship.pilot?.afterburnMul ?? 1) > 1.2 && ship.attackPhase === 'approach';
-        ship.burning = Boolean(ship.afterburnSpeed) && !holdingCover && !ship.covering && (fleeing || targetBehind || burnInPursuit || aceMove?.kind==='boost-reversal');
+        ship.burning = Boolean(ship.afterburnSpeed) && !holdingCover && !ship.covering && (fleeing || targetBehind || burnInPursuit || aceMove?.kind==='boost-reversal' || aceMove?.kind==='immelmann');
         if(fieldNav){ship.burning=ship.burning&&fieldNav.canBoost;}
         const cruise = ship.burning ? ship.afterburnSpeed : ship.speed;
         // Brake only when a collision is truly imminent (rock dead ahead and close);
@@ -9297,7 +9297,7 @@ export class GameSession {
             desiredSpeed = Math.max(desiredSpeed, ship.speed * (tactics?.role === 'gunship' ? 0.5 : 0.65));
         if (flightStats) {
             desiredSpeed=combatThrottle(ship,this.save.world.time,distance,closing,targetVelocity?.dot(direct)??0,forward.dot(direct),tactics?.range??235,fieldNav.canBoost,headingChange);
-            if(aceMove?.kind==='boost-reversal'&&fieldNav.canBoost){ship.burning=true;desiredSpeed=ship.afterburnSpeed;}
+            if((aceMove?.kind==='boost-reversal'||aceMove?.kind==='immelmann')&&fieldNav.canBoost){ship.burning=true;desiredSpeed=ship.afterburnSpeed;}
             const maneuverThrottle=maneuverSpeed(aceMove,this.save.world.time,desiredSpeed,ship.speed);
             if(maneuverThrottle<desiredSpeed)ship.burning=false;
             desiredSpeed=maneuverThrottle;
@@ -9412,7 +9412,7 @@ export class GameSession {
         // near-stationary controller. Authored actors retain their route planner.
         const navOut = this.tmpNavDesired ?? (this.tmpNavDesired = new THREE.Vector3());
         const goalDirection=(this.tmpTravelGoalDirection ??= new THREE.Vector3()).copy(destination).sub(position).normalize();
-        const fieldNav=flightStats?fieldCombatSteering(this,ship,destination,goalDirection,dt,navOut):undefined;
+        const fieldNav=flightStats?fieldCombatSteering(this,ship,destination,goalDirection,dt,navOut,false):undefined;
         const brake = fieldNav?0:steerToward(this, ship, destination, {
             speed: velocity.length(),
             horizon: 2.0,
@@ -10736,7 +10736,7 @@ export class GameSession {
         this.onDistressActorDefeated(ship);
         this.resolveHyperdriveIntercept(ship);
         const explosionScale = (CAPITAL_SHIP_STATS[ship.capitalClass]?.explosionScale ?? (ship.role === 'trader' ? 1.5 : 1)) * npcShipScaleForVariant(npcFlightVariant(ship));
-        const explosion = this.renderer.spawnExplosion(ship.position, ship.hostile, explosionScale);
+        const explosion = this.renderer.spawnExplosion(ship.position, ship.hostile, explosionScale, ship.velocity);
         const wreckAnchor = this.renderer.spawnShipWreck?.(ship, npcFlightVariant(ship), explosionScale);
         if (explosion && wreckAnchor)
             explosion.followObject = wreckAnchor;

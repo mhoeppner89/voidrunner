@@ -23,7 +23,7 @@ test('shield impact placement respects ship rotation and does not mutate gamepla
 });
 test('weapon impacts use the shield while bypassing shots and depleted shields hit hull',()=>{
  const r=Object.create(SpaceRenderer.prototype);let impact;
- r.spawnImpact=p=>impact=[...p];
+ r.laserFx={weaponImpact:o=>impact=[...o.position]};
  r.weaponImpact(actor,extents,actor.position,[-100,20,30],{},0);
  assert.ok(Math.abs(impact[0]-6.4)<1e-9);
  r.weaponImpact(actor,extents,actor.position,[-100,20,30],{shieldBypass:1},0);assert.deepEqual(impact,actor.position);

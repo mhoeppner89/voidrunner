@@ -1,10 +1,21 @@
 import * as THREE from 'three';
 import { seededRandom } from './random.js';
+import { createStreakBurst, createShockRing } from './impactFx.js';
 
-// Two batched draws per blast. All motion and cooling are GPU-driven; no
-// per-frame particle allocations, dynamic lights, or postprocessing passes.
-export function createShipExplosion(position, scale = 1) {
-    const random = seededRandom(position.join(':') + ':blast');
+// Explosion variants. All are GPU-driven batched draws: one instanced
+// fireball/smoke cloud (secondary blasts are extra instances with a delay and
+// an offset, not extra draws), one spark-streak burst, one burning-debris
+// burst and a shock ring. No per-frame particle allocations, dynamic lights or
+// postprocessing passes.
+//   fireball — the classic: flash, rolling fire, smoke.
+//   chain    — a chain reaction: two or more secondaries cook off across the hull.
+//   breach   — an energy core breach: blue-white core flash and a wide shock
+//              ring in a random plane.
+//   breakup  — the hull snaps in two: blasts at both ends along one axis.
+export const EXPLOSION_VARIANTS = ['fireball', 'chain', 'breach', 'breakup'];
+export function createShipExplosion(position, scale = 1, { velocity, variant, seed } = {}) {
+    const random = seededRandom(seed ?? position.join(':') + ':blast');
+    const kind = EXPLOSION_VARIANTS.includes(variant) ? variant : EXPLOSION_VARIANTS[Math.floor(random() * EXPLOSION_VARIANTS.length)];
     const root = new THREE.Group();
     root.position.fromArray(position);
     root.scale.setScalar(Math.max(.1, scale));
@@ -14,38 +25,62 @@ export function createShipExplosion(position, scale = 1) {
     const capital = Math.max(0, Math.min(1, (scale - 3) / 9));
     const pace = { value: 1 + capital * 1.8 };
     const delay = capital * 3;
-    const count = 14;
+    // Blast centres: [x, y, z, start]. Secondaries scale with the hull.
+    const axis = new THREE.Vector3(random() * 2 - 1, (random() * 2 - 1) * .4, random() * 2 - 1).normalize();
+    const centres = [[0, 0, 0, 0]];
+    if (kind === 'chain') {
+        const count = 2 + Math.round(capital * 3);
+        for (let i = 0; i < count; i++) {
+            const z = random() * 2 - 1, a = random() * Math.PI * 2, r = Math.sqrt(1 - z * z), reach = 1.6 + random() * 1.6;
+            centres.push([Math.cos(a) * r * reach, z * reach * .6, Math.sin(a) * r * reach, .2 + i * (.2 + random() * .14) + capital * i * .4]);
+        }
+    }
+    if (kind === 'breakup') centres.push([axis.x * 3.6, axis.y * 3.6, axis.z * 3.6, .1], [-axis.x * 3.3, -axis.y * 3.3, -axis.z * 3.3, .38]);
+    const perCentre = kind === 'fireball' || kind === 'breach' ? 14 : 9;
+    const count = centres.length * perCentre;
     const geometry = new THREE.InstancedBufferGeometry();
     geometry.setIndex([0, 1, 2, 0, 2, 3]);
     geometry.setAttribute('position', new THREE.Float32BufferAttribute([-1,-1,0, 1,-1,0, 1,1,0, -1,1,0], 3));
-    const drift = new Float32Array(count * 3), params = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-        const z = random()*2-1, a = random()*Math.PI*2, r = Math.sqrt(1-z*z);
-        drift.set([Math.cos(a)*r, Math.sin(a)*r, z], i*3);
-        params.set(i === 0 ? [0, 0, 0] : [1.8+random()*2, random()*19, random()*(.14+delay)], i*3);
+    const drift = new Float32Array(count * 3), params = new Float32Array(count * 3), offsets = new Float32Array(count * 3);
+    let index = 0;
+    for (const [cx, cy, cz, start] of centres) {
+        const secondary = start > 0, size = secondary ? .7 : 1;
+        for (let i = 0; i < perCentre; i++, index++) {
+            const z = random() * 2 - 1, a = random() * Math.PI * 2, r = Math.sqrt(1 - z * z);
+            drift.set([Math.cos(a) * r, Math.sin(a) * r, z], index * 3);
+            offsets.set([cx, cy, cz], index * 3);
+            // params: spread (0 marks the centre's flash), noise seed, start time.
+            params.set(i === 0 ? [0, size, start + delay * (secondary ? 1 : 0)] : [(1.8 + random() * 2) * size, random() * 19, start + random() * (.14 + delay)], index * 3);
+        }
     }
     geometry.setAttribute('drift', new THREE.InstancedBufferAttribute(drift, 3));
     geometry.setAttribute('params', new THREE.InstancedBufferAttribute(params, 3));
+    geometry.setAttribute('offset', new THREE.InstancedBufferAttribute(offsets, 3));
     geometry.instanceCount = count;
+    // Breach burns hotter and whiter, with thin smoke; chains leave more soot.
+    const heat = { value: kind === 'breach' ? .35 : 0 }, soot = { value: kind === 'chain' || kind === 'breakup' ? 1.25 : 1 };
+    const flashTint = { value: new THREE.Color(kind === 'breach' ? 0xcfe8ff : 0xffe3a6) };
     const material = new THREE.ShaderMaterial({
-        uniforms: { time, pace }, transparent: true, depthWrite: false,
+        uniforms: { time, pace, heat, soot, flashTint }, transparent: true, depthWrite: false,
         vertexShader: `
-            attribute vec3 drift; attribute vec3 params; uniform float time; uniform float pace;
+            attribute vec3 drift; attribute vec3 params; attribute vec3 offset; uniform float time; uniform float pace;
             varying vec2 blastUv; varying float age; varying float seed; varying float flash;
             void main() {
                 blastUv=position.xy; age=max(0.,(time-params.z)/pace); seed=params.y;
                 flash=1.-step(.1,params.x);
-                if(flash>.5) age=time;
+                if(flash>.5) age=max(0.,time-params.z);
+                float started=step(params.z,time);
                 float spread=1.-exp(-age*2.2);
-                vec3 centre=drift*params.x*spread*2.2;
+                vec3 centre=offset+drift*params.x*spread*2.2;
                 vec4 view=modelViewMatrix*vec4(centre,1.);
-                float radius=mix((.65+spread*2.8)*(0.85+params.x*.12), 2.+age*32., flash);
+                float radius=mix((.65+spread*2.8)*(0.85+params.x*.12), (2.+age*32.)*params.y, flash)*started;
                 float worldScale=length(modelMatrix[0].xyz);
                 view.xy+=position.xy*radius*worldScale;
                 gl_Position=projectionMatrix*view;
             }`,
         fragmentShader: `
             precision highp float;
+            uniform float heat; uniform float soot; uniform vec3 flashTint;
             varying vec2 blastUv; varying float age; varying float seed; varying float flash;
             float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
             float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
@@ -55,41 +90,47 @@ export function createShipExplosion(position, scale = 1) {
                 if(r>1.) discard;
                 if(flash>.5){
                     float a=exp(-r*r*5.)*max(0.,1.-age/.22);
-                    gl_FragColor=vec4(1.,.89,.65,a); return;
+                    gl_FragColor=vec4(flashTint,a); return;
                 }
                 vec2 p=blastUv*3.8+seed;
                 float n=noise(p+age*.23)*.6+noise(p*2.1-age*.31)*.28+noise(p*4.3)*.12;
                 float density=smoothstep(.02,.55,1.-r+(n-.5)*.65);
-                float heat=clamp(1.3-age*.9+(n-.5)*1.3-r*.3,0.,1.);
-                vec3 smoke=vec3(.14,.12,.105)*(0.8+n*.7);
-                vec3 fire=mix(vec3(.62,.075,.009),vec3(1.,.48,.055),smoothstep(.1,.65,heat));
-                fire=mix(fire,vec3(1.,.94,.69),smoothstep(.7,1.,heat));
-                vec3 color=mix(smoke,fire,smoothstep(.12,.55,heat));
-                float fade=(1.-smoothstep(1.3,2.5,age))*smoothstep(0.,.08,age);
+                float h=clamp(1.3+heat-age*.9/soot+(n-.5)*1.3-r*.3,0.,1.);
+                vec3 smoke=vec3(.14,.12,.105)*(0.8+n*.7)/soot;
+                vec3 fire=mix(vec3(.62,.075,.009),vec3(1.,.48,.055),smoothstep(.1,.65,h));
+                fire=mix(fire,mix(vec3(1.,.94,.69),vec3(.86,.94,1.),heat*2.),smoothstep(.7,1.,h));
+                vec3 color=mix(smoke,fire,smoothstep(.12,.55,h));
+                float fade=(1.-smoothstep(1.3*soot,2.5*soot,age))*smoothstep(0.,.08,age);
                 gl_FragColor=vec4(color,density*fade*.86);
             }`,
     });
     const cloud = new THREE.Mesh(geometry, material);
     cloud.frustumCulled = false; cloud.raycast = () => undefined;
     root.add(cloud);
-    const streakGeometry = new THREE.BufferGeometry();
-    const vectors = new Float32Array(36*2*3), ends = new Float32Array(36*2);
-    for(let i=0;i<36;i++) {
-        const z=random()*2-1,a=random()*Math.PI*2,r=Math.sqrt(1-z*z),speed=8+random()*17;
-        for(let end=0;end<2;end++) {vectors.set([Math.cos(a)*r*speed,Math.sin(a)*r*speed,z*speed],(i*2+end)*3);ends[i*2+end]=end;}
-    }
-    streakGeometry.setAttribute('position',new THREE.BufferAttribute(vectors,3));
-    streakGeometry.setAttribute('tail',new THREE.BufferAttribute(ends,1));
-    const streakMaterial=new THREE.ShaderMaterial({uniforms:{time,pace},transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
-        vertexShader:`attribute float tail; uniform float time; uniform float pace; varying float brightness;
-            void main(){float age=max(0.,time/pace-tail*.055); float travel=(1.-exp(-age*.7))/.7;
-                brightness=(1.-tail*.8)*pow(max(0.,1.-time/pace/1.65),1.5);
-                gl_Position=projectionMatrix*modelViewMatrix*vec4(position*travel,1.);}`,
-        fragmentShader:`varying float brightness; void main(){gl_FragColor=vec4(1.,.48,.09,brightness);}`});
-    const streaks=new THREE.LineSegments(streakGeometry,streakMaterial);
-    streaks.frustumCulled=false;streaks.raycast=()=>undefined;root.add(streaks);
-    const duration = 2.65 * pace.value + delay;
-    return {object:root,life:duration,maxLife:duration,update(dt){time.value+=dt;}};
+    // Hot sparks, then a few long-burning chunks trailing fire. Both live in
+    // the root's scaled frame, so a frigate's sparks fly proportionally.
+    const parts = [
+        createStreakBurst({ count: kind === 'breach' ? 34 : 26, speedMin: 12, speedMax: 34, drag: 1.7, lifeMin: .45 * pace.value, lifeMax: 1.05 * pace.value, width: .15, lag: .06,
+            hot: 0xfffbe8, cool: kind === 'breach' ? 0x5aa8ff : 0xff6a1e, random, delay: (i) => centres[i % centres.length][3] }),
+        createStreakBurst({ count: kind === 'breakup' ? 9 : 5, direction: kind === 'breakup' ? (i, out, rnd) => out.copy(axis).multiplyScalar(i % 2 ? 1 : -1).add(new THREE.Vector3(rnd() - .5, rnd() - .5, rnd() - .5).multiplyScalar(.9)) : undefined,
+            speedMin: 5, speedMax: 11, drag: .55, lifeMin: 1.5 * pace.value, lifeMax: 2.4 * pace.value, width: .34, lag: .35, hot: 0xffd27a, cool: 0xc02a08, random }),
+        createShockRing({ radius: kind === 'breach' ? 9 : 4.5, life: kind === 'breach' ? .55 : .32, hex: kind === 'breach' ? 0xbfe2ff : 0xffd9a0, opacity: kind === 'breach' ? .8 : .45, thickness: kind === 'breach' ? .12 : .22,
+            normal: kind === 'breach' ? [axis.x, axis.y + .6, axis.z] : undefined }),
+    ];
+    for (const part of parts) root.add(part.object);
+    const duration = Math.max(2.65 * pace.value + delay + Math.max(...centres.map((c) => c[3])), ...parts.map((part) => part.life));
+    // The blast keeps the dying ship's momentum and slowly sheds it.
+    const momentum = velocity ? new THREE.Vector3().fromArray(velocity) : undefined;
+    return {
+        object: root, life: duration, maxLife: duration, variant: kind,
+        update(dt) {
+            time.value += dt;
+            for (const part of parts) part.update(dt);
+            // A followed wreck already carries the momentum (renderer followObject).
+            if (momentum && !this.followObject) { root.position.addScaledVector(momentum, dt); momentum.multiplyScalar(Math.exp(-.45 * dt)); }
+        },
+        dispose() { root.removeFromParent(); geometry.dispose(); material.dispose(); for (const part of parts) part.dispose(); },
+    };
 }
 
 // Actual opaque armor shards, separate from the short-lived glowing trails.

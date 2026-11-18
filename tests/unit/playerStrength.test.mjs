@@ -3,6 +3,7 @@ import test from 'node:test';
 import { createNewSave } from '../../src/game/save.js';
 import { createOutfittingState } from '../../src/game/outfitting.js';
 import { playerStrengthBreakdown, playerStrengthValue } from '../../src/game/playerStrength.js';
+import { SHIPS } from '../../src/game/data.js';
 
 test('combat-strength proxy uses full hull and equipment value, half cash, and no cargo', () => {
     const save = createNewSave(0x51, { tutorial: true });
@@ -17,13 +18,15 @@ test('combat-strength proxy uses full hull and equipment value, half cash, and n
     player.outfitting.locker['torpedo-launcher'] = 1;
 
     const breakdown = playerStrengthBreakdown(player);
-    assert.equal(breakdown.shipValue, 105000);
+    // The hull counts at its full current list price.
+    const hullPrice = SHIPS.vanguard.price;
+    assert.equal(breakdown.shipValue, hullPrice);
     assert.equal(breakdown.installedEquipmentValue, 1620 + 6500 + 1800 + 4800 + 5400);
     assert.equal(breakdown.storedEquipmentValue, 14850);
     assert.equal(breakdown.cashValue, 500);
     assert.equal(breakdown.cargoValue, 0);
-    assert.equal(breakdown.total, 140470);
-    assert.equal(playerStrengthValue(player), 140470);
+    assert.equal(breakdown.total, hullPrice + 35470);
+    assert.equal(playerStrengthValue(player), hullPrice + 35470);
     assert.equal(player.cargo.gold, 999, 'cargo remains outside the proxy and unchanged');
 });
 

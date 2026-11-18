@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="/">
+<link rel="icon" href="data:,">
+<title>Combat Review 0.8.2pg</title>
+<script type="importmap">{"imports":{"three":"/vendor/three.module.min.js"}}</script>
+<link rel="stylesheet" href="tools/playtest/combat-review/review.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">VOIDRUNNER <span>· combat review · 0.8.2pg</span></div>
+  <nav>
+    <a href="tools/playtest/combat-review/index.html#overview">Overview</a>
+    <a href="tools/playtest/combat-review/index.html#foresight">NPC foresight</a>
+    <a href="tools/playtest/combat-review/index.html#reversals">Reversals</a>
+    <a href="tools/playtest/combat-review/index.html#effects">Hits &amp; explosions</a>
+    <a href="tools/playtest/combat-review/index.html#lab">FX lab</a>
+    <a href="tools/playtest/combat-review/index.html#other">Everything else</a>
+  </nav>
+</header>
+<main>
+
+<section id="overview">
+  <h1>What changed in this round</h1>
+  <p class="lead">Two goals from your brief: NPCs that stop bouncing between cliffs (approach rock, brake, turn, accelerate into the next rock) and weapon fire, impacts and explosions with more character, all within the existing compute budget. The flip-and-burn is untouched; an Immelmann was added for variety.</p>
+  <div class="cards" id="cards"></div>
+  <div class="howto">
+    <div><b>Play it</b><a class="button" href="game.html?revision=0.8.2pg" target="_blank" rel="noopener">Open game 0.8.2pg</a><small>Fly into the Shardbelt and pick a fight near the cliffs.</small></div>
+    <div><b>Audition effects</b><a class="button" href="tools/playtest/fx-review/index.html" target="_blank" rel="noopener">Open FX review</a><small>Every weapon at a real hull, shields, explosion kinds, slow motion.</small></div>
+    <div><b>Re-measure</b><code>node --import ./tests/helpers/offline-imports.mjs tools/playtest/probes/cliff-duel.mjs</code></div>
+  </div>
+</section>
+
+<section id="foresight">
+  <h2>1 · NPC foresight around rock</h2>
+  <div class="explain">
+    <div>
+      <h3>What was wrong</h3>
+      <p>A fighter only noticed a wall when its straight braking ray reached it: about <b>1.5 s</b> of warning. Turning a combat-speed hull away needs about <b>2.5 s</b> in this flight model, so it braked to a standstill, turned, accelerated toward its target and met the next rock.</p>
+    </div>
+    <div>
+      <h3>What it does now</h3>
+      <ul>
+        <li>Looks as far ahead as its hull needs to turn away (turn rate and slip of that hull).</li>
+        <li>Predicts the curved path it can really fly from its momentum and prefers exits it can reach at speed.</li>
+        <li>Checks its live attack line 10× a second and re-routes as soon as that line meets rock, instead of pulsing the brakes against it.</li>
+        <li>Braking itself stays on the cautious straight momentum ray (predicted-path braking caused wall contacts).</li>
+      </ul>
+    </div>
+  </div>
+  <h3>Live in the game: the same moment, previous build and this build</h3>
+  <p class="note">Both panes run the real game in spectator mode in the Shardbelt, side by side: left the previous build (0.8.2pe, last commit), right this one. Each duel starts both fighters at the same spot near the cliffs where the old pilots cycled most. Ships are made indestructible so you can watch the flying; use “Destroy red” to see a live explosion. The game's own spectator controls (zoom, speed, pause) work inside each pane.</p>
+  <div class="duel-bar">
+    <label>Start <select id="liveStart"></select></label>
+    <label>Pilots <select id="liveTier"><option value="novice">novice</option><option value="veteran">veteran</option><option value="ace" selected>ace</option></select></label>
+    <label>Hull <select id="liveHull"><option value="scrapper" selected>Balor (pirate fighter)</option><option value="talon">Mercury (interceptor)</option><option value="lancer">Lancer</option><option value="demon">Morrigan</option></select></label>
+    <button id="liveGo">Load live duel</button>
+    <button class="ghost" id="liveRestart" disabled>Restart moment</button>
+    <button class="ghost" id="liveKill" disabled>Destroy red</button>
+    <span class="note" id="liveStatus"></span>
+  </div>
+  <div class="duel-views live">
+    <figure><figcaption>Previous build · 0.8.2pe</figcaption><iframe id="liveBefore" title="Previous build"></iframe></figure>
+    <figure><figcaption>This build · 0.8.2pg</figcaption><iframe id="liveAfter" title="This build"></iframe></figure>
+  </div>
+
+  <h3>Measured: 24 close-quarters duels per skill tier, 70–160 m from Shardbelt rock</h3>
+  <p class="note">Per ship and minute of combat. Lower is better except speed. Same starts, same seeds; “before” is the previous commit.</p>
+  <div class="charts" id="bench"></div>
+
+  <h3>Recorded flight paths: the same duel before and after</h3>
+  <p class="note">The duels where the old pilots cycled most against rock. Trails are coloured by speed (<span class="sw slow"></span> stopped → <span class="sw mid"></span> half → <span class="sw fast"></span> full → <span class="sw burn"></span> afterburner). Markers: <span class="mk bump"></span> wall contact, <span class="mk stop"></span> terrain stop, <span class="mk brake"></span> terrain hard brake. Drag to orbit (both views follow), wheel to zoom.</p>
+  <div class="duel-bar">
+    <label>Duel <select id="duel"></select></label>
+    <button id="play">Pause</button>
+    <label>Speed <select id="rate"><option value="1">1×</option><option value="2">2×</option><option value="4" selected>4×</option><option value="8">8×</option></select></label>
+    <input id="scrub" type="range" min="0" max="1000" value="0">
+    <b id="clock">0.0 s</b>
+  </div>
+  <div class="duel-views">
+    <figure><figcaption>Before <span id="countBefore"></span></figcaption><canvas id="viewBefore"></canvas><canvas class="speed" id="speedBefore"></canvas></figure>
+    <figure><figcaption>After <span id="countAfter"></span></figcaption><canvas id="viewAfter"></canvas><canvas class="speed" id="speedAfter"></canvas></figure>
+  </div>
+</section>
+
+<section id="reversals">
+  <h2>2 · Two ways to turn back</h2>
+  <p>The flip-and-burn stays exactly as it was: the nose swings round while the ship coasts, then the burner kills the old momentum, passing through a near stop. New beside it, the <b>afterburner Immelmann</b>: a wide half loop sized to the hull (thrust only acts along the nose, so a speed-keeping loop needs a radius near v²/a), keeping most of its speed and rolling out on the firing line. Aces with mid-range guns alternate the two; magrail snipers and scatter/ion brawlers keep the flip, which suits their range.</p>
+  <p class="note">Each manoeuvre's own steering law flown through the real flight integrator (Mercury hull, target 180 m behind). Side view; trails coloured by speed as above.</p>
+  <div class="duel-views">
+    <figure><figcaption>Flip-and-burn <span id="revFlip"></span></figcaption><canvas id="viewFlip"></canvas><canvas class="speed" id="speedFlip"></canvas></figure>
+    <figure><figcaption>Immelmann (new) <span id="revLoop"></span></figcaption><canvas id="viewLoop"></canvas><canvas class="speed" id="speedLoop"></canvas></figure>
+  </div>
+</section>
+
+<section id="effects">
+  <h2>3 · Hits and explosions</h2>
+  <div class="explain">
+    <div>
+      <h3>Hits by weapon and surface</h3>
+      <ul>
+        <li><b>Pulse / beam</b>: molten sparks spray off the struck plate (mirrored about the surface) and a cooling glow stays on the hull for a second.</li>
+        <li><b>Shield</b>: a cool splash, sparks skittering across the shell; no scorch.</li>
+        <li><b>Magrail</b>: spall punched out of the far side along the shot, back-spray, shock ring.</li>
+        <li><b>Ion</b>: electric arcs crawling over the plate, re-striking.</li>
+        <li><b>Plasma mortar / missile</b>: big bloom, slow ember fountain, broad ring.</li>
+        <li><b>PDC / scatter</b>: small pops.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Explosions in four kinds</h3>
+      <ul>
+        <li><b>Fireball</b>: flash, rolling fire, smoke.</li>
+        <li><b>Chain reaction</b>: secondaries cook off across the hull (more on capital ships).</li>
+        <li><b>Core breach</b>: blue-white flash, wide shock ring in a tilted plane.</li>
+        <li><b>Break-up</b>: blasts at both ends of the hull.</li>
+      </ul>
+      <p>All add hot spark streaks and burning debris trailing fire, and keep the dying ship's momentum. Sparks are now motion streaks cooling from white-hot, not square dots. Every burst is one GPU draw, no dynamic lights. Distant bolts keep their screen size and distant muzzle flashes grow, so incoming fire reads at range.</p>
+    </div>
+  </div>
+  <h3>Live: each moment with the old and the new effect code</h3>
+  <p class="note">Both panes run the game's effect code live around a real hull and repeat the chosen moment: left the previous build's impacts and explosions, right this build's. Drag either pane to orbit (both follow), wheel to zoom.</p>
+  <div class="duel-bar">
+    <div class="moments" id="moments"></div>
+  </div>
+  <div class="duel-bar">
+    <label>Time <select id="fxSpeed"><option value="1">1×</option><option value="0.5">0.5×</option><option value="0.25" selected>0.25×</option><option value="0.1">0.1×</option></select></label>
+    <button class="ghost" id="fxReplay">Replay now</button>
+  </div>
+  <div class="duel-views live">
+    <figure><figcaption>Previous effects</figcaption><iframe id="fxBefore" title="Previous effects"></iframe></figure>
+    <figure><figcaption>New effects</figcaption><iframe id="fxAfter" title="New effects"></iframe></figure>
+  </div>
+</section>
+
+<section id="lab">
+  <h2>4 · Free-play FX lab</h2>
+  <p>The full FX review with its panel: fire any weapon, switch bare hull / shield, trigger explosion kinds, slow time down. <a href="tools/playtest/fx-review/index.html" target="_blank" rel="noopener">Open full screen</a>.</p>
+  <div class="lab"><iframe id="labFrame" title="Combat FX review" loading="lazy"></iframe><button id="labLoad">Load the FX lab</button></div>
+</section>
+
+<section id="other">
+  <h2>5 · Everything else in this batch</h2>
+  <div class="explain">
+    <div>
+      <h3>Tests and correctness</h3>
+      <ul>
+        <li><b>0.8.2pf</b>: all remaining Node test failures fixed, none deleted (station checks in authored coordinates, Rook's real throat route, current prices, starter cargo, drone escort side, phone mocks). The phone mock exposed a real slip: remote station names used the price font.</li>
+        <li><b>Career/Arena parity</b>: the test only passed by luck. Career spawns roll loot affixes onto NPC guns, Arena uses base items, so the fights compared different weapons. Both now share one loadout; flight is identical in both modes from 16 of 16 starts.</li>
+        <li>A clear path probe was stored at its look distance; when the ship sped up it read as an obstacle (found and fixed during this work, never released).</li>
+        <li>Effects build their glow textures from data instead of a 2D canvas, so they also construct headless.</li>
+        <li>Node suite: <b>1,374 passed, 0 failed</b>. Browser: combat-feedback, npc-flight, render-finite, ship-wrecks, weapon-groups, salvage-shooting and gameplay-smoke pass. <code>space-pickups</code> is stale (its review scene was renamed earlier) and is logged in <code>docs/REPOSITORY_CLEANUP.md</code>.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Files</h3>
+      <ul class="files">
+        <li><code>src/game/fieldCombatNav.js</code> foresight, turn model, live-line re-route</li>
+        <li><code>src/game/aceManeuvers.js</code> Immelmann, hull-sized pull</li>
+        <li><code>src/game/impactFx.js</code> new: spark streaks, shock rings, ion arcs</li>
+        <li><code>src/game/laserFx.js</code> weapon/surface impacts, scorches, projectile visuals, range compensation</li>
+        <li><code>src/game/explosionFx.js</code> four explosion kinds, momentum</li>
+        <li><code>src/game/render.js</code> impact geometry, muzzle flash scaling, warm-up</li>
+        <li><code>src/game/game.js</code> Immelmann burn, travel steering flag, blast velocity</li>
+        <li><code>tools/playtest/probes/cliff-duel.mjs</code>, <code>tools/playtest/fx-review/</code>, this page</li>
+        <li>Tests: <code>combat-maneuvers</code> (new case), <code>combat-mode-parity</code>, <code>ordnance</code>, <code>shield-impact</code></li>
+        <li>Docs: <code>CHANGELOG.md</code>, <code>AGENTS.md</code>, <code>README.md</code>, <code>docs/REPOSITORY_CLEANUP.md</code>; version 0.8.2pg</li>
+      </ul>
+      <p class="note">Nothing is committed yet.</p>
+    </div>
+  </div>
+</section>
+</main>
+<script type="module" src="tools/playtest/combat-review/review.js"></script>
+</body>
+</html>

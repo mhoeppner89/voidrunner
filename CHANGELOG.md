@@ -1,3 +1,17 @@
+## 0.8.2pg — Pilots look ahead, hits and blasts tell their weapon
+
+- NPC fighters plan around rock instead of bouncing between cliffs. They look as far ahead as their hull needs to turn away (about 2.5 s at combat speed instead of their stopping distance, about 1.5 s), predict the curved path they can actually fly from their momentum, and re-route as soon as their live attack line runs into a surface rather than pulsing the brakes against it. Measured in close-quarters duels in the shardbelt (`tools/playtest/probes/cliff-duel.mjs`, 24 duels per skill tier): terrain-forced hard brakes fall by about half (novice 1.06 → 0.58, veteran 1.03 → 0.53, ace 0.83 → 0.39 per minute), terrain stops by a third to a half, wall contacts by a third to a half, and time spent speed-limited by terrain halves, at the same CPU cost.
+- Aces have a second reversal next to the flip-and-burn: an afterburner Immelmann, a wide half loop sized to the hull (about 3.4–4 s, 220–280 m high) that keeps 70–80% of its speed where the flip passes through a near stop, then rolls out on the firing line. Pilots with mid-range guns alternate the two; magrail snipers and scatter/ion brawlers keep the flip.
+- Every weapon hits differently. Pulse and beam hits spray molten sparks off the struck plate and leave a cooling glow on the hull; shield hits splash cool sparks across the shell; magrail slugs punch spall out of the far side with a shock ring; ion strikes crawl over the plate as electric arcs; plasma mortar and missile hits throw a slow ember fountain and a broad ring; PDC and scatter rounds pop in small sparks. Sparks are now motion streaks cooling from white-hot instead of square points.
+- Ship explosions come in four kinds — fireball, chain reaction (secondary blasts across the hull), energy core breach (blue-white flash and a wide shock ring) and break-up (blasts at both ends) — with hot spark streaks, burning debris trailing fire, and the dying ship's momentum. All effects stay single GPU-driven draws per burst, with no dynamic lights.
+- Bolts keep roughly their screen size at long range, and distant muzzle flashes grow, so incoming fire reads at a distance; close tracers keep their small size.
+- A combat FX review page (`/tools/playtest/fx-review/index.html`) fires every weapon at a real hull, shows shield and hull hits and all explosion kinds with slow motion; `node tools/playtest/fx-review/capture.mjs` screenshots it.
+
+## 0.8.2pf — Clean test suite
+
+- Equipment cards in Other stations name their station in plain text instead of the pixel price face.
+- The full Node suite passes (1,373 of 1,373): the remaining failures were stale expectations (station checks sampled without the system yaw, a straight-line route through Rook's shared entry instead of the flown throat route, old hull prices, starter cargo, the cheapest upgrade, the escort side) and incomplete test mocks. See `docs/REPOSITORY_CLEANUP.md`.
+
 ## 0.8.2pe — Calmer music handovers and a quieter drive
 
 - One fight keeps one piece of music. The combat score now holds for 15 seconds after the last hostile leaves range (strafing runs used to swing out of range and back, dropping to calm music and restarting combat several times in one fight), and a fight that flares up again within 90 seconds resumes its piece with a lighter opening hit instead of starting a new one.

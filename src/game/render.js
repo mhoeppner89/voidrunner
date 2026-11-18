@@ -19,7 +19,6 @@ import {createCruiserTurret,createCruiserPdc,createCruiserEngineDamage,updateCru
 import { createShipExplosion, createHullDebris } from './explosionFx.js';
 import {derelictSurfaceObstacles,createDerelictVents} from './derelictFx.js';
 import {ShipWreckFactory} from './shipWreckFx.js';
-import { createOrdnanceModel } from './ordnanceModels.js';
 import { skipHiddenWorldMatrices, markAttributeSpan, configureShaderDiagnostics, prepareRenderScene, freezeStaticTransforms, waitForRenderWork } from './renderWork.js';
 import { DRONE_PORTS } from './droneFlight.js';
 import {cockpitDamageStage} from './cockpitDamage.js';
@@ -44,7 +43,7 @@ import { playerBerth } from './playerDocking.js';
 import { buildStationColliderAsync } from './stationCollision.js';
 import { stationModelOffsetZ, stationVisualSurfaceRadius } from './stationTraffic.js';
 import {stationYaw,stationRotatePoint} from './stationOrientation.js';
-import { LaserFx } from './laserFx.js';
+import { LaserFx, stepTransientEffect } from './laserFx.js';
 const tupleToVector = (tuple, out = new THREE.Vector3()) => out.set(tuple[0], tuple[1], tuple[2]);
 const NEG_Z = new THREE.Vector3(0, 0, -1);
 const UP_AXIS = new THREE.Vector3(0, 1, 0);
@@ -4042,113 +4041,9 @@ export class SpaceRenderer {
         return mesh;
     }
     createProjectileMesh(projectile) {
-        let mesh;
-        if (projectile.kind === 'laser') {
-            // Gauntlet overhaul: hot core + crossed additive glow pair
-            // + head sprite (see laserFx.js). Shared assets per faction;
-            // the per-bolt cost is just the small group wrapper.
-            this.laserFx ??= new LaserFx(this.scene, this.effects);
-            mesh = this.laserFx.boltFor(projectile.faction);
-        }
-        else if (projectile.kind === 'gauss') {
-            // Magrail slug: a long hypervelocity tracer — thin white-blue
-            // core, three times the laser bolt's length so the lane it
-            // owns reads at a glance, plus a cold additive glow at the head.
-            this.laserFx ??= new LaserFx(this.scene, this.effects);
-            mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 6.4, 3, 6), new THREE.MeshBasicMaterial({ color: 0xcfeeff }));
-            mesh.geometry.rotateX(Math.PI / 2);
-            const glow = new THREE.Sprite(new THREE.SpriteMaterial({
-                map: this.radialTexture('#eaffff', '#4fb8d8'),
-                transparent: true,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-            }));
-            glow.scale.setScalar(1.0);
-            mesh.add(glow);
-        }
-        else if (projectile.kind === 'pdc') {
-            // Point-defense stub: a short COLD white-blue dart — kept
-            // far from the pulse laser's amber so the two streams
-            // never read as the same gun at combat distance.
-            mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.065, 3.2, 4), new THREE.MeshBasicMaterial({
-                color: projectile.faction === 'player' ? 0xdce9ff : 0xff8a5b,
-            }));
-            mesh.geometry.rotateX(Math.PI / 2);
-        }
-        else if (projectile.kind === 'ripper') {
-            // Scattergun pellet: a small warm spark; seven per shell
-            // reads as a cloud without any one pellet drawing attention.
-            mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.48, 2, 4), new THREE.MeshBasicMaterial({ color: 0xffb066 }));
-            const glint = new THREE.Sprite(new THREE.SpriteMaterial({
-                map: this.radialTexture('#ffe9c9', '#ff7a2b'),
-                transparent: true,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-            }));
-            mesh.geometry.rotateX(Math.PI/2);
-            glint.scale.setScalar(0.42);
-            glint.material.opacity=.55;
-            mesh.add(glint);
-        }
-        else if (projectile.kind === 'ion') {
-            // Ion Lance bolt: a cool cyan blob with an arcing halo —
-            // reads as energy discharge rather than a kinetic round.
-            mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.2, 0), new THREE.MeshBasicMaterial({ color: 0x69e4f2 }));
-            const arc = new THREE.Sprite(new THREE.SpriteMaterial({
-                map: this.weaponCloudTexture('ion'), color: 0x6bdfff,
-                transparent: true,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-            }));
-            arc.scale.setScalar(1.25);
-            arc.material.opacity=.65;
-            mesh.add(arc);
-        }
-        else if (projectile.kind === 'mortar') {
-            // Sunlance orb: big slow ember with a heavy additive halo —
-            // the slowest thing in the sky, so it must look dangerous.
-            mesh = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffe2a0 }));
-            const halo = new THREE.Sprite(new THREE.SpriteMaterial({
-                map: this.weaponCloudTexture('plasma'), color:0xff7729,
-                transparent: true,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-            }));
-            halo.scale.setScalar(2.3);
-            halo.material.opacity=.8;
-            mesh.add(halo);
-        }
-        else {
-            // Same Blender-authored, textured geometry as the ordnance review.
-            const group = new THREE.Group();
-            const body = createOrdnanceModel(projectile.launcherId);
-            group.add(body);
-            const exhaust = new THREE.Group();
-            exhaust.name = 'ordnance-exhaust';
-            group.add(exhaust);
-            const flare = new THREE.Sprite(new THREE.SpriteMaterial({
-                map: this.radialTexture('#fff1ad', '#ff5029'),
-                transparent: true,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-            }));
-            flare.position.z = body.userData.length*.49;
-            flare.scale.setScalar(projectile.launcherId==='torpedo'?1.6:(projectile.launcherId?.includes('swarm') ? .5 : .8));
-            exhaust.add(flare);
-            // Engine plume: an additive teardrop behind the nozzle —
-            // tagged so the frame pass can flicker it. Sized so the
-            // missile reads as a moving ember at 30-60 units.
-            const plume = new THREE.Mesh(new THREE.ConeGeometry(.28,2.8,5,1,true),new THREE.MeshBasicMaterial({
-                color:0xffb66b,transparent:true,blending:THREE.AdditiveBlending,
-                depthWrite:false,opacity:.4,side:THREE.DoubleSide,forceSinglePass:true,
-            }));
-            plume.geometry.rotateX(Math.PI/2);
-            plume.position.z=body.userData.length*.5+1.4;
-            plume.name = 'plume';
-            exhaust.add(plume);
-            mesh = group;
-        }
-        return mesh;
+        // Projectile visuals live in laserFx.js, shared with the FX review.
+        this.laserFx ??= new LaserFx(this.scene, this.effects);
+        return this.laserFx.projectileFor(projectile);
     }
     syncProjectiles(projectiles, store, alpha = 0) {
         const revision = ++this.projectileSyncRevision;
@@ -4196,7 +4091,7 @@ export class SpaceRenderer {
                 // Same treatment for missiles: the plume must not wash the
                 // frame when one crosses the camera's own space.
                 const exhaust = mesh.getObjectByName('ordnance-exhaust');
-                if (exhaust) this.laserFx.attenuate(mesh, this.camera.position, exhaust.scale);
+                if (exhaust) this.laserFx.attenuate(mesh, this.camera.position, exhaust.scale, false);
             }
             if(projectile.kind==='ion' || projectile.kind==='mortar') {
                 const halo=mesh.children[0];
@@ -5458,8 +5353,8 @@ export class SpaceRenderer {
         this.utilityBeamMaterial.opacity = 0.54 + Math.sin(performance.now() * 0.03) * 0.18;
         this.utilityBeam.visible = true;
     }
-    spawnExplosion(position, hostile = true, scale = 1) {
-        const effect = createShipExplosion(position, scale);
+    spawnExplosion(position, hostile = true, scale = 1, velocity) {
+        const effect = createShipExplosion(position, scale, { velocity });
         this.scene.add(effect.object);
         this.effects.push(effect);
         return effect;
@@ -5507,7 +5402,23 @@ export class SpaceRenderer {
     weaponImpact(actor, extents, impact, origin, weapon, color, heavy = false) {
         const shielded=actor?.shield>0 && (weapon?.shieldBypass ?? 0)<1;
         const point=shielded ? this.shieldImpactPoint(actor,extents,impact,origin) : impact;
-        this.spawnImpact(point?.isVector3 ? point.toArray() : point,color,heavy);
+        const position=point?.isVector3 ? point.toArray() : point;
+        // Surface normal from the hull/shield ellipsoid and the shot direction
+        // let the hit spray, skitter or punch through like the weapon would.
+        const centre=(this.impactCentre ??= new THREE.Vector3()).fromArray(actor.position);
+        const inverse=(this.impactInverse ??= new THREE.Quaternion()).fromArray(actor.rotation).invert();
+        const local=(this.impactLocal ??= new THREE.Vector3()).fromArray(position).sub(centre).applyQuaternion(inverse);
+        local.set(local.x/Math.max(.1,extents[0]**2),local.y/Math.max(.1,extents[1]**2),local.z/Math.max(.1,extents[2]**2));
+        if(local.lengthSq()<1e-12)local.set(0,0,1);
+        const normal=local.applyQuaternion(inverse.invert()).normalize().toArray();
+        const from=(this.impactFrom ??= new THREE.Vector3());
+        if(origin?.isVector3)from.copy(origin);else if(origin)from.fromArray(origin);else from.copy(centre).addScaledVector(local,4);
+        const direction=from.sub(this.impactLocal.fromArray(position)).negate().normalize().toArray();
+        this.laserFx ??= new LaserFx(this.scene, this.effects);
+        const kind=weapon?.kind ?? (heavy ? 'missile' : 'laser');
+        // Scorches ride on a rendered NPC hull; the player's hull is the camera.
+        const attach=shielded||actor?.id===undefined ? undefined : this.shipMeshes?.get(actor.id);
+        this.laserFx.weaponImpact({position,normal,direction,kind,color,heavy,shielded,attach,noScorch:!attach});
         return point;
     }
     flashShield(actor, extents, remaining, player = false, impact, origin) {
@@ -5805,9 +5716,12 @@ export class SpaceRenderer {
         }
     }
     spawnMuzzleFlash(x, y, z, color = 0xffc35a) {
-        // Brief additive flash at a gun port on fire (see laserFx.js).
+        // Brief additive flash at a gun port on fire (see laserFx.js). Distant
+        // guns flash larger, so incoming fire announces itself; the player's
+        // own ports sit next to the camera and keep the small pop.
         this.laserFx ??= new LaserFx(this.scene, this.effects);
-        this.laserFx.muzzleFlash(x, y, z, color);
+        const c = this.camera.position, distance = Math.hypot(x - c.x, y - c.y, z - c.z);
+        this.laserFx.muzzleFlash(x, y, z, color, clamp(distance / 70, 1, 4.5));
     }
     // An NPC hyperdrive departure: a short additive warp streak along the
     // ship's heading that flares and fades as the hull jumps away to another
@@ -5850,50 +5764,7 @@ export class SpaceRenderer {
             const ratio = clamp(effect.life / effect.maxLife, 0, 1);
             if (effect.followObject?.parent)
                 effect.followObject.getWorldPosition(effect.object.position);
-            if (effect.update) effect.update(dt);
-            else if (effect.points) {
-                const positions = effect.points.geometry.getAttribute('position');
-                const vel = effect.velocities;
-                const count = vel.length / 3;
-                for (let i = 0; i < count; i += 1) {
-                    positions.setXYZ(i, positions.getX(i) + vel[i * 3] * dt, positions.getY(i) + vel[i * 3 + 1] * dt, positions.getZ(i) + vel[i * 3 + 2] * dt);
-                }
-                // Damped bursts (rock chips/dust) shed speed so they read as
-                // solid debris — sparks keep flying at constant velocity.
-                if (effect.damping) {
-                    const damp = Math.max(0, 1 - effect.damping * dt);
-                    for (let i = 0; i < count; i += 1) {
-                        vel[i * 3] *= damp;
-                        vel[i * 3 + 1] *= damp;
-                        vel[i * 3 + 2] *= damp;
-                    }
-                }
-                positions.needsUpdate = true;
-                const material = effect.points.material;
-                if (material instanceof THREE.PointsMaterial)
-                    material.opacity = ratio;
-            }
-            else if (effect.streak) {
-                // The warp streak extends along the heading as it fades.
-                effect.streak.scale.y += dt * 300;
-                const material = effect.streak.material;
-                if (material instanceof THREE.MeshBasicMaterial)
-                    material.opacity = ratio * 0.85;
-            }
-            else if (effect.muzzle) {
-                // Muzzle pops fade at half opacity and do NOT grow — a flash,
-                // not a bloom (the generic sprite branch below grows ×4.2/s,
-                // which strobed the screen on every shot).
-                const material = effect.object.material;
-                if (material instanceof THREE.SpriteMaterial)
-                    material.opacity = ratio * 0.5;
-            }
-            else if (effect.object instanceof THREE.Sprite) {
-                effect.object.scale.multiplyScalar(1 + dt * 4.2);
-                const material = effect.object.material;
-                if (material instanceof THREE.SpriteMaterial)
-                    material.opacity = ratio;
-            }
+            stepTransientEffect(effect, dt, ratio);
             if (effect.life <= 0) {
                 this.scene.remove(effect.object);
                 if(effect.dispose)effect.dispose();else this.disposeObject(effect.object);
@@ -6228,9 +6099,13 @@ export class SpaceRenderer {
         const first = this.effects.length;
         this.laserFx.muzzleFlash(0,0,0);
         this.laserFx.impact([0,0,0],0xffc36a,true);
+        // Streak, ring and arc programs (impactFx.js) compile here, not on
+        // the first hit of a fight.
+        this.laserFx.weaponImpact({position:[0,0,0],normal:[0,0,1],kind:'ion',noScorch:true});
+        this.laserFx.weaponImpact({position:[0,0,0],normal:[0,0,1],kind:'gauss',shielded:true});
         this.laserFx.rockImpact([0,0,1],[0,0,0]);
         for (const effect of this.effects.splice(first)) root.add(effect.object);
-        root.add(createShipExplosion([0,0,0]).object);
+        root.add(createShipExplosion([0,0,0],1,{variant:'breach'}).object);
         const actor = {id:'combat-warmup',position:[0,0,0],rotation:[0,0,0,1],hull:1,shield:1};
         this.flashShield(actor,[1,1,1],.25,false,[0,0,1],[0,0,10]);
         root.add(this.shieldFields.get(actor.id));
