@@ -26,12 +26,15 @@ test('skipping pays once, keeps an armed opening, and boosts only the next round
  for(const e of launcherMagazineEntries(s.player))assert.equal(e.rounds,e.capacity);
  assert.equal(skipRunReward(s),false);assert.equal(r.rarityBonusWave,2);
  r.wave=2;r.rewardChosen=false;r.offers=runOffers(s);
- const equipment=r.offers.filter(id=>OUTFIT_ITEMS[id]);assert.ok(equipment.length>0);assert.ok(equipment.every(id=>{const d=OUTFIT_ITEMS[id],grades=['common','uncommon','rare','named'];return grades.indexOf(d.rarity)>grades.indexOf(OUTFIT_ITEMS[d.baseId].rarity??RUN_EQUIPMENT_RARITY[d.baseId]??'common');}));
+ const equipment=r.offers.filter(id=>OUTFIT_ITEMS[id]);assert.ok(equipment.length>0);assert.ok(equipment.every(id=>{const d=OUTFIT_ITEMS[id],grades=['common','uncommon','rare','epic','named'];return grades.indexOf(d.rarity)>grades.indexOf(OUTFIT_ITEMS[d.baseId].rarity??RUN_EQUIPMENT_RARITY[d.baseId]??'common');}));
  assert.deepEqual(runOffers(s),r.offers,'no reroll on redraw');writeArenaRun(s);equipment.forEach(forgetEquipmentDefinition);
  const restored=readArenaRun();assert.ok(restored);assert.deepEqual(restored.arenaRun.offers,r.offers);
  assert.equal(chooseRunReward(restored,equipment[0]),true);writeArenaRun(restored);equipment.forEach(forgetEquipmentDefinition);
  const again=readArenaRun();assert.ok(count(again,equipment[0])>0);assert.notEqual(OUTFIT_ITEMS[equipment[0]].rarity,'common');
- again.arenaRun.wave=3;again.arenaRun.rewardChosen=false;assert.ok(runOffers(again).filter(id=>OUTFIT_ITEMS[id]).every(id=>!id.startsWith('eq-arena-')));
+ again.arenaRun.wave=3;again.arenaRun.rewardChosen=false;
+ // Without the bonus, every offer keeps its pool's usual grade (coloured pool items are records of that grade).
+ const pool=id=>id.match(/^eq-arena-\d+-\d+-(.+)-t\d-[a-z]+$/)?.[1]??id;
+ assert.ok(runOffers(again).filter(id=>OUTFIT_ITEMS[id]).every(id=>(OUTFIT_ITEMS[id].rarity??'common')===(RUN_EQUIPMENT_RARITY[pool(id)]??'common')));
 });
 test('a spare earned launcher starts full once; repeatedly refitting a spent launcher cannot reload it',()=>{
  const s=ready('wayfarer');s.arenaRun.offers=['torpedo-launcher'];assert.ok(chooseRunReward(s,'torpedo-launcher'));

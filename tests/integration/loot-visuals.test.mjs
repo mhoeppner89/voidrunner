@@ -13,13 +13,18 @@ import {EQUIPMENT_RARITIES} from '../../src/game/equipmentCatalog.js';
 test('loot appearance uses the best remaining rarity and treats cargo/invalid rarity as common',()=>{
  const item=rarity=>({item:{rarity}});
  assert.equal(highestLootRarity([]),'common');assert.equal(highestLootRarity([{kind:'cargo'},item('unknown')]),'common');
- const entries=['uncommon','rare','common','named'].map(item);assert.equal(highestLootRarity(entries),'named');
- for(const rarity of ['common','uncommon','rare','named'])assert.equal(highestLootRarity([item(rarity)]),rarity);
+ const entries=['uncommon','rare','epic','common','named'].map(item);assert.equal(highestLootRarity(entries),'named');
+ assert.equal(highestLootRarity(['uncommon','epic','rare'].map(item)),'epic');
+ for(const rarity of ['common','uncommon','rare','epic','named'])assert.equal(highestLootRarity([item(rarity)]),rarity);
  const res=createLootVisualResources();
- for(const rarity of ['common','uncommon','rare','named']){
+ for(const rarity of ['common','uncommon','rare','epic','named']){
   const root=createLootVisual({radius:3,position:[0,0,0],lootRarity:rarity},res);
   assert.equal(root.userData.lootFrame.material.color.getHexString(),EQUIPMENT_RARITIES[rarity].color.slice(1));
-  assert.equal(root.children.length,1);assert.equal(root.children[0].children.length,1);
+  // Rare and better crates add one light beam; the crate itself is unchanged.
+  const beam=['rare','epic','named'].includes(rarity);
+  assert.equal(root.children.length,beam?2:1);assert.equal(root.children[0].children.length,1);
+  if(beam){assert.equal(root.userData.lootBeam.material.color.getHexString(),EQUIPMENT_RARITIES[rarity].color.slice(1));assert.equal(root.userData.lootBeam.material.depthWrite,false);}
+  setLootVisualRarity(root,res,'common');assert.equal(root.userData.lootBeam?.visible??false,false,'a downgraded crate drops its beam');
   assert.ok(root.userData.lootFrame.material.depthTest,'world occlusion stays enabled');
  }
  disposeLootVisualResources(res);

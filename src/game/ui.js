@@ -5,10 +5,11 @@ import {explorationDialogue,explorationJournal,explorationText} from './explorat
 import {distressDialogue,distressJournal,distressText} from './distressData.js';
 import {installRetroDisplay,monitorRasterRatio} from './retroDisplay.js';
 import {RACE_HULLS} from './raceHulls.js';
-import {EQUIPMENT_RARITIES,equipmentName,modifiedWeapon,equipmentBaseId} from './equipmentCatalog.js';
+import {EQUIPMENT_RARITIES,equipmentName,modifiedWeapon,equipmentBaseId,rarityRank} from './equipmentCatalog.js';
 import {normalizeEquipmentInventory} from './equipmentInventory.js';
 import {PDC_TURRET} from './turrets.js';
 import {renderEquipmentInventory,bindEquipmentInventory} from './equipmentUi.js';
+import {renderArenaRun} from './arenaRunView.js';
 import {FLEET_PAINTS,fleetHullId} from './fleetPaintCatalog.js';
 import {PAINT_LAYOUTS,paintPatternsForHull,PAINT_PALETTES,editablePaint,normalizePaintDesign,samePaint} from './paintDesign.js';
 import {SHIP_PAINT_MASKS} from './shipPaintMaskCatalog.js';
@@ -477,7 +478,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2pg';
+const GAME_VERSION = '0.8.2ph';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -4508,7 +4509,10 @@ export class GameUI {
         if(existing){existing.quantity+=quantity;existing.markup=undefined;if(existing===current)existing.until=this.save.world.time+5;return;}
         // Bound transient presentation only; the actual cargo is already saved.
         if(queue.length>=32)queue.shift();
-        queue.push({key,quantity,item,commodity:commodity?.id,name:entry.tutorialRecorder?t('Recorder'):commodity?t(commodity.name):equipmentName(item)});
+        // Rare and better finds jump the queue and stay up longer.
+        const rank=item&&entry.kind==='equipment'?rarityRank(item.rarity):0;
+        const receipt={key,quantity,item,rank,commodity:commodity?.id,name:entry.tutorialRecorder?t('Recorder'):commodity?t(commodity.name):equipmentName(item)};
+        if(rank>=2)queue.unshift(receipt);else queue.push(receipt);
     }
     updateSpacePickup() {
         if (!this.spacePickupReceipt && !this.spacePickupQueue?.length) return;
@@ -4518,7 +4522,7 @@ export class GameUI {
         let receipt=this.spacePickupReceipt;
         if(!blocked&&(!receipt||now>=receipt.until)){
             receipt=this.spacePickupReceipt=this.spacePickupQueue?.shift();
-            if(receipt)receipt.until=now+5;
+            if(receipt)receipt.until=now+(receipt.rank>=2?8:5);
         }
         const visible=Boolean(receipt&&!blocked&&receipt.until>now);
         layout.classList.toggle('has-space-pickup',visible);
@@ -4527,8 +4531,8 @@ export class GameUI {
         if(!panel)return;
         if (panel.hidden !== !visible) panel.hidden = !visible;
         if(visible){
-            if(!receipt.markup)receipt.markup=`${receipt.item?equipmentIcon(receipt.item):commodityIcon(receipt.commodity)}<b>+${formatNumber(receipt.quantity)}</b><span>${escapeHtml(receipt.name)}</span>`;
-            if(panel.receiptMarkup!==receipt.markup){panel.innerHTML=receipt.markup;panel.receiptMarkup=receipt.markup;panel.title=`+${receipt.quantity} ${receipt.name}`;panel.setAttribute('aria-label',panel.title);panel.style?.setProperty('--item-color',EQUIPMENT_RARITIES[receipt.item?.rarity??'common']?.color??'currentColor');}
+            if(!receipt.markup)receipt.markup=`${receipt.item?equipmentIcon(receipt.item):commodityIcon(receipt.commodity)}<b>+${formatNumber(receipt.quantity)}</b>${receipt.rank>=2?`<small class="space-pickup-rarity">${escapeHtml(t(EQUIPMENT_RARITIES[receipt.item.rarity].name))}</small>`:''}<span>${escapeHtml(receipt.name)}</span>`;
+            if(panel.receiptMarkup!==receipt.markup){panel.innerHTML=receipt.markup;panel.receiptMarkup=receipt.markup;panel.title=`+${receipt.quantity} ${receipt.name}`;panel.setAttribute('aria-label',panel.title);panel.style?.setProperty('--item-color',EQUIPMENT_RARITIES[receipt.item?.rarity??'common']?.color??'currentColor');if(panel.dataset)panel.dataset.rarity=receipt.rank>=2?receipt.item.rarity:'';}
         }
     }
     updateHud(model) {
@@ -6328,85 +6332,10 @@ export class GameUI {
         if(previousCount!==rail.children.length){this.scheduleCommsFit();this.cockpitArtwork?.invalidate();}
     }
     showArenaRun(save) {
-        const r=save.arenaRun,p=save.player,stats=getEffectiveShipStats(p),wave=RUN_WAVES[r.wave],fit=loadoutFor(p),spec=HARDPOINT_SPECS[p.shipId];
-        const done=r.phase==='won'||r.phase==='lost',pending=!done&&isPendingDecision(save);
-        const command=(action,value,label,extra='')=>`<button type="button" data-ui-command="run-action" data-run-action="${action}" data-run-value="${value}" ${extra}>${label}</button>`;
-        const quality=id=>OUTFIT_ITEMS[id]?.rarity??RUN_EQUIPMENT_RARITY[id]??'common';
-        const paint=id=>`data-rarity="${quality(id)}" style="--item-color:var(--loot-${quality(id)})"`;
-        const name=id=>equipmentName(OUTFIT_ITEMS[id],{affixes:false});
-        const image=id=>equipmentIcon(OUTFIT_ITEMS[id],'run-item-image');
-        const itemLabel=id=>`<span class="run-item-label" ${paint(id)}>${escapeHtml(name(id))}</span>`;
-        const labelItems=ids=>{
-            const counts={};ids.forEach(id=>counts[id]=(counts[id]??0)+1);
-            return Object.entries(counts).map(([id,n])=>`<span class="run-item-chip" ${paint(id)} title="${escapeHtml(equipmentName(OUTFIT_ITEMS[id]))}">${image(id)}${itemLabel(id)}${n>1?`<b>×${n}</b>`:''}</span>`).join('');
-        };
-        const formatter=new Intl.NumberFormat(getLanguage(),{maximumFractionDigits:1});
-        const number=value=>formatter.format(Number(value));
-        const metric=(label,value,icon='')=>`<i title="${escapeHtml(t(label))}"><small>${icon||escapeHtml(t(label))}</small><b>${typeof value==='string'?escapeHtml(value):number(value)}</b></i>`;
-        const metrics=id=>{
-            const d=OUTFIT_ITEMS[id],w=d.category==='turret'?modifiedWeapon(d.turretKind==='pdc'?PDC_TURRET:TRACKING_LASER,d):weaponForOutfit(id)??launcherForOutfit(id);
-            if(w){
-                const damage=(w.damageFlat??w.damage),shots=w.volley??w.pellets??1;
-                const amount=value=>shots>1?`${shots}×${number(value)}`:value;
-                if(d.category==='launcher')return `<span class="run-metrics run-weapon-metrics">${metric('Shield damage',amount(damage*(1-(w.shieldBypass??0))*(w.shieldMul??1)))}${metric('Hull damage',amount(damage*(w.hullMul??1)))}${metric('Energy per shot',w.energyCost??0)}${metric('Range',`${number(w.range??w.lockRange??0)} km`)}</span>`;
-                return `<span class="run-metrics">${metric('Damage',amount(damage))}${metric('Energy per shot',w.energyCost??0)}${metric('Range',`${number(w.range??w.lockRange??0)} km`)}</span>`;
-            }
-            // Preview the actual installed outcome, rather than another prose description.
-            const plan=runRewardPlan(save,id),outfitting=JSON.parse(JSON.stringify(p.outfitting)),afterFit=outfitting.loadouts[p.shipId];
-            for(const c of plan?.changes??[]){afterFit[c.key][c.index]=id;if(c.otherKey)afterFit[c.otherKey][c.index]=null;}
-            const after=getEffectiveShipStats({...p,outfitting});
-            const affected=equipmentStatChanges(stats,after,d),primary=affected.filter(row=>row.primary),tradeoffs=affected.filter(row=>!row.primary);
-            const delta=row=>row.delta==null?'':`${row.delta>0?'+':''}${number(row.delta)}%`;
-            return `<span class="run-metrics run-utility-metrics">${primary.map(row=>`<i data-stat="${row.key}"><small>${escapeHtml(t(row.label))}</small><b>${number(row.after)}${row.unit?`<span class="stat-unit">${row.unit}</span>`:''}</b><em class="${row.improved?'up':'down'}">${delta(row)}</em></i>`).join('')}</span>${tradeoffs.length?`<span class="run-tradeoffs">${tradeoffs.map(row=>`<i data-stat="${row.key}" title="${number(row.before)} → ${number(row.after)} ${row.unit??''}"><small>${escapeHtml(t(row.label))}</small><em class="${row.improved?'up':'down'}">${delta(row)}</em></i>`).join('')}</span>`:''}`;
-        };
-        const leave=`<button type="button" data-ui-command="quit-title" aria-label="${t('Save and leave')}" title="${t('Save and leave')}">⌂</button>`;
-        let body='',footer='',view=done?'result':pending?'hulls':!r.rewardChosen?'rewards':this.runFitOpen?'fitting':'ready';
-        if(done){
-            body=`<div class="run-result"><h3>${t(r.phase==='won'?'Run complete':'Run ended')}</h3><b>${runScore(r)}</b><p>${t('Waves cleared')}: ${r.cleared}/${r.totalWaves??RUN_WAVES.length} · ${t('Damage taken')}: ${Math.round(r.damage)}</p></div>`;
-            footer=`${leave}<button class="primary" data-ui-command="new-arena-run">${t('New run')}</button>`;
-        }else if(pending){
-            const stage=DECISION_STAGES[r.wave],isHull=stage.type==='hull';
-            const hulls=isHull?(r.hullOffers?.length?r.hullOffers:runHullOffers(save)):[];
-            const candidates=isHull?[]:(r.wingmanOffers?.length?r.wingmanOffers:runWingmanOffers(save));
-            const currentWing=r.wingmen?.[stage.wingIndex],upgrading=stage.type==='wingman-upgrade'&&currentWing?.alive!==false&&Boolean(currentWing);
-            const hullDetail=id=>{
-                const h=SHIPS[id],mounts=HARDPOINT_SPECS[id],profile=shipTopDownProfile(h.variant);
-                return `<span class="run-hull-role">T${h.tier} · ${escapeHtml(t(shipRoleLabel(h.role)))}</span><svg class="run-hull-image" viewBox="${profile.minX-1} ${profile.minZ-1} ${profile.maxX-profile.minX+2} ${profile.maxZ-profile.minZ+2}" role="img" aria-label="${escapeHtml(h.name)}"><path d="${shipProfilePath(profile)}" fill="none" stroke="currentColor" stroke-width=".5" stroke-linejoin="round"/><path d="${shipProfilePath(profile,true)}" fill="none" stroke="currentColor" stroke-width=".32" opacity=".65" stroke-linejoin="round"/></svg><span class="run-mount-counts">${[['Weapon','Weapons',mounts.weapons.length],['Turret','Turrets',mounts.turrets.length],['Drone bays','Drones',mounts.droneBays.length]].map(([label,icon,n])=>`<i title="${t(label)}" aria-label="${t(label)}"><small>${t(icon)}</small><b>${n}</b></i>`).join('')}</span><span class="run-metrics">${metric('SHIELD',h.shield)}${metric('HULL',h.hull)}${metric('Speed',displaySpeed(h.maxSpeed))}</span>`;
-            };
-            const cards=isHull?hulls.map(id=>command('hull',id,`<b>${escapeHtml(SHIPS[id].name)}</b>${hullDetail(id)}`)).join('')
-                :candidates.map(candidate=>command('wingman',candidate.id,`<b>${escapeHtml(SHIPS[candidate.hullId].name)}</b><span class="run-pilot">${escapeHtml(upgrading?currentWing.name:candidate.name)}</span>${hullDetail(candidate.hullId)}`)).join('');
-            body=`<div class="run-offers ${isHull?'run-hulls':'run-wingmen'}">${cards}</div>`;
-            footer=leave;
-        }else if(!r.rewardChosen){
-            body=`<div class="run-offers">${r.offers.map(id=>{
-                const plan=runRewardPlan(save,id);if(!plan)return '';
-                const service=['repair','rearm','resupply'].includes(id);
-                const title=id==='resupply'?t('Refuel and recharge'):id==='rearm'?t('Reload missiles'):id==='repair'?t('Field repairs'):name(id);
-                const visual=service?`<span class="run-art"><span class="run-service-icon">${id==='repair'?'✚':id==='rearm'?'⟐':'⚡'}</span></span><span class="run-metrics">${id==='repair'?metric('HULL',50,'+ %')+metric('MISSILES',100,'%'):id==='rearm'?metric('MISSILES',100,'%'):metric('ENERGY',100,'%')+metric('FUEL',100,'%')}</span>`:`<span class="run-art">${image(id)}${plan.count>1?`<em class="run-quantity">×${plan.count}</em>`:''}</span>${metrics(id)}<span class="run-replacement" aria-label="${t('REPLACES')}">${[...new Set(plan.replaced)].map(image).join('')||'<span class="run-empty-mount">+</span>'}<i>→</i>${image(id)}</span>`;
-                return command('reward',id,`<b>${escapeHtml(title)}</b>${visual}<span class="run-selected-mark" aria-hidden="true">✓</span>`,`class="${r.selectedReward===id?'is-selected':''}" ${service?'data-service="true"':paint(id)} title="${escapeHtml(service?title:equipmentName(OUTFIT_ITEMS[id]))}" aria-label="${escapeHtml((service?'':plan.count+'× ')+title+(service?'':' · '+t(EQUIPMENT_RARITIES[quality(id)].name)))}" aria-pressed="${r.selectedReward===id}"`);
-            }).join('')}</div>`;
-            if(fit.guns.some(Boolean))body+=`<p class="run-reward-hint">${t('Skip: +50% hull, full missiles. Next draw: rarity +1.')}</p>`;
-            const selected=r.offers.includes(r.selectedReward)&&runRewardPlan(save,r.selectedReward);
-            footer=`${leave}${fit.guns.some(Boolean)?command('skip','',t('Skip draw'),`title="${t('Repair 50% hull, refill missiles; next round rewards are one rarity higher.')}"`):''}${r.wave===0&&r.openingPicks===0?'':command('equip','',t('Fitting'),selected?'':'disabled')}${command('accept','',t(r.wave===0&&r.openingPicks===0?'NEXT':'LAUNCH'),`class="primary" ${selected?'':'disabled'}`)}`;
-        }else{
-            const slots=['weapons','turrets','utility'].flatMap(key=>spec[key].map((mount,index)=>({key,mount,index,id:key==='weapons'?fit.guns[index]??fit.launchers[index]:fit[key][index]})));
-            if(this.runFitOpen){
-                const selected=slots.find(s=>s.mount.id===this.runMountId)??slots[0];this.runMountId=selected.mount.id;
-                const label=s=>`${t(s.key==='weapons'?'Weapon':s.key==='turrets'?'Turret':'Utility')} ${s.index+1}`;
-                const attrs=`data-run-key="${selected.key}" data-run-index="${selected.index}"`;
-                const locker=Object.entries(p.outfitting.locker).filter(([id,n])=>n>0&&itemFitsMount(OUTFIT_ITEMS[id],selected.mount));
-                body=`<div class="run-fit-layout"><nav class="run-mount-list" aria-label="${t('INSTALLED EQUIPMENT')}">${slots.map(s=>`<button type="button" data-ui-command="run-mount" data-run-value="${s.mount.id}" aria-pressed="${s.mount.id===selected.mount.id}" ${s.id?paint(s.id):''}>${s.id?image(s.id):'<span class="run-empty-mount">+</span>'}<span><small>${label(s)}</small>${s.id?itemLabel(s.id):`<b>${t('EMPTY')}</b>`}</span></button>`).join('')}</nav><section class="run-fit-stock"><header><div><small>${label(selected)}</small>${selected.id?itemLabel(selected.id):`<b>${t('EMPTY')}</b>`}</div>${selected.key==='weapons'&&fit.guns[selected.index]?command('group',selected.mount.id,fit.fireGroups.assignments[selected.mount.id],`title="${t('FIRE GROUP')}" aria-label="${t('FIRE GROUP')}"`):''}${command('fit','', '×',`${attrs} title="${t('REMOVE')}" aria-label="${t('REMOVE')}" ${selected.id?'':'disabled'}`)}</header><div class="run-locker-list">${locker.map(([id,n])=>command('fit',id,`${image(id)}${itemLabel(id)}<b>×${n}</b>`,`${attrs} ${paint(id)}`)).join('')||`<span class="run-empty-stock">${t('No equipment here.')}</span>`}</div></section></div>`;
-            }else{
-                body=`<div class="run-loadout-summary">${labelItems(LOADOUT_KEYS.flatMap(k=>fit[k]).filter(Boolean))}</div>`;
-                const wingCrew=(Array.isArray(r.wingmen)?r.wingmen:[]).filter(w=>w.alive!==false);
-                if(wingCrew.length)body+=`<details class="run-crew"><summary>${t('WING')} · ${wingCrew.length}</summary>${wingCrew.map((w,i)=>{const current=wingmanOrder(w,r);return `<div class="run-orders run-orders-wing"><b>${escapeHtml(w.name)}</b>${WING_ORDERS.map(order=>command('order',order,t(WING_ORDER_LABEL[order]),`data-run-index="${i}" class="${current===order?'is-selected':''}" aria-pressed="${current===order}"`)).join('')}</div>`;}).join('')}</details>`;
-            }
-            footer=`${leave}<button type="button" data-ui-command="run-fit-toggle" aria-pressed="${Boolean(this.runFitOpen)}">${this.runFitOpen?t('BACK'):t('Fitting')}</button><button class="primary" data-ui-command="run-launch">${t('LAUNCH')}</button>`;
-        }
-        const step=done?'':pending?t(DECISION_STAGES[r.wave].type==='hull'?'HULL CHOICE':'WINGMAN CHOICE'):!r.rewardChosen?t(r.wave===0&&r.openingPicks===0?'WEAPONS · 1/2':r.wave===0&&r.openingPicks===1?'EQUIPMENT · 2/2':'EQUIPMENT CHOICE'):this.runFitOpen?t('Fitting'):t('READY TO LAUNCH');
-        const count=done?r.cleared:r.wave+1,total=r.totalWaves??RUN_WAVES.length;
-        this.root.querySelector('#arena-panel').innerHTML=`<div class="modal-card arena-card run-card" data-run-view="${view}"><header><div class="run-title"><h2>${t('Arena Run')}</h2><b class="run-wave" title="${t('Waves cleared')}: ${r.cleared}">${String(count).padStart(2,'0')}<small>/${total}</small></b>${r.hard?`<small>${t('HARD')}</small>`:''}</div>${done?'':`<div class="run-stage"><b>${escapeHtml(step)}</b><details class="run-next"><summary>${t(wave.name)}</summary><p>${t(waveAct(r.wave).name)} · ${t(wave.hint)}</p></details></div>`}<span class="run-ship-status">${escapeHtml(SHIPS[p.shipId].name)}<span class="run-health" role="progressbar" aria-valuemin="0" aria-valuemax="${stats.hull}" aria-valuenow="${Math.max(0,p.hull)}" aria-label="${t('HULL')}" title="${t('HULL')} ${Math.round(p.hull/stats.hull*100)}%"><i style="width:${percent(p.hull,stats.hull)}%"></i></span></span></header>${done?'':`<div class="run-progress" role="progressbar" aria-label="${t('Waves cleared')}" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${r.cleared}">${Array.from({length:total},(_,i)=>`<i class="${i<r.cleared?'is-cleared':i===r.wave?'is-current':''}"></i>`).join('')}</div>`}<div class="run-scroll">${this.runFitNotice?`<p class="run-notice" role="status">${escapeHtml(this.runFitNotice)}</p>`:''}${body}</div><footer>${footer}</footer></div>`;
-        this.root.querySelector('#arena-panel').classList.remove('is-hidden');this.updateOrientationNotice();
+        // Markup lives in arenaRunView.js; the click handler reads its data-run-* attributes.
+        const panel=this.root.querySelector('#arena-panel');
+        panel.innerHTML=renderArenaRun(this,save);
+        panel.classList.remove('is-hidden');this.updateOrientationNotice();
     }
 
     showArena() {

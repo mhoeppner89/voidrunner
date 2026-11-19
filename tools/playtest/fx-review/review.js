@@ -16,6 +16,7 @@ const LaserFx = fxModule.LaserFx;
 if (!LaserFx.prototype.projectileFor) for (const name of ['projectileFor', 'cloudTexture']) LaserFx.prototype[name] = CurrentLaserFx.prototype[name];
 import { loadPreviewGlb } from '../../../src/game/shipPreview.js';
 import { WEAPONS } from '../../../src/game/weapons.js';
+import { EQUIPMENT_AFFIXES, NAMED_EQUIPMENT } from '../../../src/game/equipmentCatalog.js';
 import { SCENARIOS } from './scenarios.js';
 
 // ?seed=N makes every random choice (aim, sparks) repeatable for captures.
@@ -126,6 +127,10 @@ const SHOTS = [
     { label: 'Torpedo', kind: 'missile', faction: 'player', launcherId: 'torpedo', speed: 110 },
 ];
 let surface = params.get('surface') ?? 'hull';
+// Signature tints: the specialising affixes and the weapon legendaries.
+const SIGNATURES = [['none'], ...['overcharged', 'disruptive', 'piercing', 'siphoning'].map((id) => [EQUIPMENT_AFFIXES[id].name, EQUIPMENT_AFFIXES[id].signature]),
+    ...['pulse-cannon', 'beam-emitter', 'gauss-cannon', 'ripper', 'ion-blaster', 'mortar'].map((id) => [NAMED_EQUIPMENT[id].name, NAMED_EQUIPMENT[id].signature])];
+let tint = params.has('tint') ? parseInt(params.get('tint'), 16) : undefined;
 const projectiles = [];
 const raycaster = new THREE.Raycaster();
 const tmp = new THREE.Vector3(), tmpQ = new THREE.Quaternion(), NEG_Z = new THREE.Vector3(0, 0, -1);
@@ -167,13 +172,14 @@ function fire(shot) {
             const direction = aim.clone().sub(muzzle).normalize();
             if (count > 1) direction.add(new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(weapon.spreadRad * 2)).normalize();
             const hit = hitPoint(muzzle, direction);
-            const mesh = fx.projectileFor({ kind: shot.kind, faction: shot.faction, launcherId: shot.launcherId });
+            const shotTint = shot.kind === 'missile' || shot.kind === 'pdc' ? undefined : tint;
+            const mesh = fx.projectileFor({ kind: shot.kind, faction: shot.faction, launcherId: shot.launcherId, tint: shotTint });
             mesh.position.copy(muzzle);
             mesh.quaternion.copy(tmpQ.setFromUnitVectors(NEG_Z, direction));
             scene.add(mesh);
             projectiles.push({ mesh, shot, direction, speed, travelled: 0, delay: b * (weapon?.shotInterval ?? .07), length: hit ? hit.point.distanceTo(muzzle) : 400, hit });
         }
-        if (b === 0) fx.muzzleFlash(muzzle.x, muzzle.y, muzzle.z, shot.faction === 'pirates' ? 0xff4b39 : shot.faction === 'patrol' ? 0x75cfff : shot.kind === 'gauss' ? 0xbfe9ff : 0xffc35a);
+        if (b === 0) fx.muzzleFlash(muzzle.x, muzzle.y, muzzle.z, tint && shot.kind !== 'missile' ? tint : shot.faction === 'pirates' ? 0xff4b39 : shot.faction === 'patrol' ? 0x75cfff : shot.kind === 'gauss' ? 0xbfe9ff : 0xffc35a);
     }
 }
 
@@ -181,10 +187,10 @@ function impact(p) {
     const { shot, hit } = p;
     if (!hit) return;
     const heavy = shot.kind === 'missile' || shot.kind === 'mortar';
-    const color = shot.kind === 'laser' && shot.faction !== 'player' ? (shot.faction === 'pirates' ? 0xff7050 : 0x7cffff) : IMPACT_COLOR[shot.kind] ?? 0xffcb62;
+    const color = tint && shot.kind !== 'missile' && shot.kind !== 'pdc' ? tint : shot.kind === 'laser' && shot.faction !== 'player' ? (shot.faction === 'pirates' ? 0xff7050 : 0x7cffff) : IMPACT_COLOR[shot.kind] ?? 0xffcb62;
     if (!fx.weaponImpact) fx.impact(hit.point.toArray(), color, heavy);
     else fx.weaponImpact({ position: hit.point.toArray(), normal: hit.normal.toArray(), direction: p.direction.toArray(), kind: shot.kind, color, heavy,
-        shielded: surface === 'shield', attach: surface === 'shield' ? undefined : hull });
+        shielded: surface === 'shield', attach: surface === 'shield' ? undefined : hull, tint: shot.kind === 'missile' || shot.kind === 'pdc' ? undefined : tint });
     if (shot.kind === 'missile') explode(hit.point.toArray(), .65);
 }
 
@@ -213,6 +219,11 @@ function button(parent, label, action) {
     return b;
 }
 for (const shot of SHOTS) button('weapons', shot.label, () => fire(shot));
+const signatureButtons = SIGNATURES.map(([label, color]) => button('signatures', label, () => {
+    tint = color;
+    for (const b of signatureButtons) b.classList.toggle('is-on', b.textContent === label);
+}));
+(signatureButtons.find((_, i) => SIGNATURES[i][1] === tint) ?? signatureButtons[0]).classList.add('is-on');
 const surfaceButtons = ['hull', 'shield'].map((name) => button('surfaces', name === 'hull' ? 'Bare hull' : 'Shield', () => {
     surface = name;
     for (const b of surfaceButtons) b.classList.toggle('is-on', b.textContent === (name === 'hull' ? 'Bare hull' : 'Shield'));

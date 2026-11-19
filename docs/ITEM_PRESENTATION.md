@@ -57,12 +57,18 @@ The earlier scratch palette was removed during repository cleanup; the current r
 
 Approved names from the exported review live in `src/game/equipmentNaming.js`, including German overrides for legacy translation aliases. The reinforced pulse entry is retired; its save IDs migrate to the single pulse-laser family.
 
-## Pulse family — 0.8.2fz
+## Pulse family — 0.8.2ph
+
+Pulse tiers follow the shared `TIER_CURVE` like every other gun since 0.8.2ph:
 
 | Tier | Damage / shot | Energy / shot |
 | --- | ---: | ---: |
-| I | 9.2 | 3.2 |
-| II | 10.8 | 3.6 |
-| III | 12.4 | 4 |
+| I | 12 | 3.2 |
+| II | 15.6 | 3.58 |
+| III | 19.8 | 4 |
 
 All tiers retain 450 km range and 0.17 s cadence. Former reinforced base items become II; higher-tier reinforced records become III. Migration changes the base/tier once and preserves item identity, rarity, affixes and ownership. Hidden runtime references for non-inventory modes carry the same stats as career records; they are not separate catalog families.
+
+## Rarity, affixes and rating — 0.8.2ph
+
+Rarity colours are tokens in `style.css` (`--loot-common/uncommon/rare/epic/named`). Item cards show the rating (100 = common tier I of that hardware) bottom-left on the art, or beside the name in phone rows, with a green ▲ when it beats the fitted copy of the same hardware. Details list each affix with its effect and a roll-quality bar, then the legendary trait. Affix corner marks exist for all fourteen affixes in `itemIcons.js`. Tier II/III sprites add family-specific hardware and titanium / black-alloy-and-gold paint (`TIER_PARTS`, `TIER_PAINT` in `tools/icons/itemGlyphs.mjs`, regenerate with `npm run icons:pixelize`); the accent light is recoloured at runtime to the item's signature colour, the same colour as its shots.

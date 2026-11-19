@@ -106,6 +106,7 @@ export const ArenaRunMethods={
   r.checkpointWingmen=clone(r.wingmen??[]);
   r.countdown=3;r.startedAt=this.save.world.time;r.entry=null;r.nextEnemy=0;r.warned=-1;r.waveMissiles=this.save.player.missiles??0;delete r.clearAt;
   writeArenaRun(this.save);this.ui.hideArena();this.ui.hidePause();this.ui.showHud();
+  this.audio.freshFight?.();
   this.ui.pushEvent(t('Wave {wave} of {total}',{wave:r.wave+1,total:RUN_WAVES.length})+' · '+t(wave.name),'info',5000);
   this.ui.showRunCountdown?.(3,t(wave.name));
  },

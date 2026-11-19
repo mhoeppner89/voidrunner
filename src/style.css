@@ -57,7 +57,8 @@
   --loot-common: #f1f4f7;
   --loot-uncommon: #72df95;
   --loot-rare: #79b8ff;
-  --loot-named: #e5bc61;
+  --loot-epic: #c18cff;
+  --loot-named: #ffa046;
   --drone-miner: var(--void-gold);
   --drone-pdc: var(--void-cyan);
   --void-cream: #fff3cf;
@@ -8198,45 +8199,11 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 
 .simple-outfitting{position:relative}.fit-help-popup{position:absolute;inset:8px;z-index:12;background:#101b29;border:1px solid #75c8d1;padding:16px;overflow-y:auto;font-size:16px}.fit-help-popup button{min-height:44px}
 
-/* Arena Run: fixed controls and one scrolling preparation surface. */
-.run-card{display:flex;flex-direction:column;width:min(940px,96vw);max-height:90dvh;gap:10px;padding:16px;box-sizing:border-box}
-.run-card header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;flex:none}
-.run-card h2{font-size:20px;margin:0}.run-card p,.run-card button{font-size:16px;line-height:1.4}
-.run-card small{font-size:12px;line-height:1.4}.run-scroll{overflow-y:auto;min-height:0;overscroll-behavior:contain;flex:1;padding-right:4px}
-.run-offers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-.run-offers button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:10px;padding:14px;border:1px solid #628b9b;background:#142536;min-width:0;white-space:normal}
-.run-offers button b{color:#f0cf8e}.run-offers button span{font-weight:normal}.run-hulls{grid-template-columns:repeat(3,minmax(0,1fr))}
-.run-card footer{flex:none;display:flex;justify-content:space-between;gap:12px}.run-card button{min-height:44px;white-space:normal}
-.run-fitting{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
-
-@media(max-height:500px){.run-card{max-height:94dvh;gap:6px;padding:10px}.run-card header h2{font-size:18px}.run-offers button{padding:10px}.run-card footer{padding-top:6px}}
-@media(max-width:600px){.run-offers,.run-fitting,.run-hulls,.run-wingmen{grid-template-columns:1fr}}
-
 .run-inbound{position:absolute;z-index:15;pointer-events:none;transform:translate(-50%,-50%);color:#ffdb8e;background:#142536dd;border:1px solid #ffdb8e;padding:6px 10px;font-size:14px}
 
-.run-wingmen{grid-template-columns:repeat(3,minmax(0,1fr))}
-.run-orders{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
-.run-orders button{min-height:40px;padding:8px 12px;border:1px solid #628b9b;background:#142536;color:#e0eaf0;font:inherit}
-.run-orders button.is-selected{border-color:#f0cc83;background:#273b3f;color:#f0cf8e}
-.run-orders-wing{align-items:center}
-.run-orders-wing>b{flex:1 0 100%;font-size:12px;letter-spacing:.06em;color:#b2c8d3;margin-bottom:-4px}
-
-.arena-card:not(.run-card){display:flex;flex-direction:column;max-height:94dvh;height:auto;overflow:hidden}.arena-menu-scroll{overflow-y:auto;min-height:0;overscroll-behavior:contain}.arena-card:not(.run-card)>header,.arena-card:not(.run-card)>footer{flex:none}.arena-card.run-card>header h2{font-size:18px}.arena-card.run-card>footer{min-height:44px}
-/* Short, readable reward choices with a stable action row on landscape phones. */
-.run-card{width:min(980px,calc(100vw - 24px));height:min(460px,calc(100dvh - 20px));max-height:calc(100dvh - 20px);padding:14px;gap:10px;background:linear-gradient(135deg,#111e29,#0b121c);border:1px solid #63808d}
-.run-card header{align-items:flex-start;flex-wrap:nowrap;padding-bottom:8px;border-bottom:1px solid #354956}
-.run-card header span{font-size:13px;color:#aec4cd}.run-card .run-next{max-width:45%;font-size:13px;position:relative;text-align:right}
-.run-next summary{cursor:pointer;padding:8px;min-height:32px}.run-next p{position:absolute;right:0;top:24px;z-index:2;width:min(360px,70vw);padding:14px;background:#192b38;border:1px solid #63808d;text-align:left;box-shadow:0 8px 24px #000a}
-.run-card .run-scroll{display:flex;flex-direction:column;padding:0;gap:0}
-.run-card .run-offers{flex:1 0 auto;align-items:stretch;gap:12px}.run-card .run-offers button{justify-content:flex-start;gap:10px;padding:14px;background:#152632;border:1px solid #46616e;border-radius:9px;box-shadow:none}
-.run-card .run-offers button.is-selected{background:#273b3f;border:2px solid #f0cc83;padding:13px}
-.run-card .run-offers b{font-size:17px;line-height:1.25}.run-card .run-offers span{font-size:15px;line-height:1.35;color:#e0eaf0}.run-card .run-offers small{margin-top:auto;color:#acc3ce;font-size:13px;line-height:1.3}
-.run-card footer{padding-top:8px;border-top:1px solid #354956;align-items:center;gap:8px}.run-card footer button{font-size:14px;padding:8px 12px}.run-card footer .primary{margin-left:auto;min-width:150px;background:#c8a765;color:#121b21;border-color:#f0cc83;font-weight:700}.run-card footer button:disabled{opacity:.45}
-.run-loadout-summary{font-size:15px;line-height:1.5;margin:8px 0 12px;color:#e4cf9f}.run-result{text-align:center;margin:auto}.run-result b{font-size:30px;color:#e4cf9f}
+.arena-card:not(.run-card){display:flex;flex-direction:column;max-height:94dvh;height:auto;overflow:hidden}.arena-menu-scroll{overflow-y:auto;min-height:0;overscroll-behavior:contain}.arena-card:not(.run-card)>header,.arena-card:not(.run-card)>footer{flex:none}
 #run-countdown{position:fixed;left:50%;top:30%;transform:translateX(-50%);pointer-events:none;text-align:center;z-index:40;color:#f7dea5;text-shadow:0 2px 8px #000}
 #run-countdown span{display:block;font-size:18px}#run-countdown b{display:block;font-size:56px}#run-countdown[hidden]{display:none}
-@media(max-height:450px) and (min-width:601px){.run-card{padding:9px;gap:6px}.run-card header{padding-bottom:4px}.run-card header h2{font-size:16px}.run-card .run-offers{gap:8px}.run-card .run-offers button{padding:10px;gap:7px}.run-card .run-offers button.is-selected{padding:9px}.run-card .run-offers b{font-size:16px}.run-card .run-offers span{font-size:14px}.run-card .run-offers small{font-size:12px}.run-card footer{padding-top:4px}.run-card .run-hulls{grid-template-columns:repeat(3,minmax(0,1fr))}.run-card .run-hulls span{font-size:12px}}
-@media(max-width:600px){.run-card .run-offers{grid-template-columns:1fr}.run-card{height:calc(100dvh - 20px)}.run-card footer{flex-wrap:wrap}.run-card header{flex-wrap:wrap}.run-card .run-next{max-width:100%}}
 
 /* Mining is a tap action on the primary pad; the secondary remains SCAN. */
 .touch-fire #touch-drone-label { font: 700 clamp(9px, 1.4vw, 14px)/1 var(--pixel-font); }
@@ -9056,13 +9023,6 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   #game-shell .comms-channel #comms-bar.active { height:auto; padding:4px 6px; }
 }
 
-/* Arena Run preparation: clear stage progress without covering flight. */
-.run-progress{display:grid;grid-template-columns:1fr auto;gap:4px 12px;flex:none;font-size:11px;color:var(--void-gold)}
-.run-progress progress{grid-column:1/-1;width:100%;height:4px;accent-color:var(--void-gold)}
-
-.run-card .run-offers button:focus-visible{outline:2px solid #f0cc83;outline-offset:2px}
-.run-card .run-loadout-summary{flex-shrink:0}
-
 .observer-unit-bars > i[hidden] { display: none; }
 #observer-preset-hull { display: block; margin-top: 6px; color: #b9c9bf; font-size: .48rem; }
 
@@ -9191,147 +9151,10 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
  .observer-editor:not(.is-hidden) ~ .observer-legend { display:none; }
 }
 
-/* Choice screens: the item is the focus; actions and the current wave stay anchored. */
-.run-card { width:min(980px,calc(100vw - 24px)); height:min(560px,calc(100dvh - 24px)); padding:18px; gap:10px; border:1px solid var(--console-edge); border-top:2px solid var(--void-gold); background:linear-gradient(140deg,var(--console-recess),var(--void-navy)); box-shadow:0 20px 80px #000a; font-family:var(--ui-font); text-shadow:none; }
-.run-card > header { align-items:center; padding:0 0 10px; flex-wrap:nowrap; }
-.run-title { display:flex; align-items:center; gap:14px; }
-.arena-card.run-card > header h2 { font:600 20px/1.1 var(--ui-font); letter-spacing:0; text-transform:none; color:var(--void-cream); }
-.run-card .run-wave { padding-left:14px; border-left:1px solid var(--console-edge); color:var(--void-gold); font:600 22px/1 var(--pixel-font); }
-.run-card .run-wave small { font-size:13px; color:var(--void-muted); }
-.run-card .run-ship-status { display:flex; align-items:center; gap:10px; font:500 13px/1 var(--ui-font); }
-.run-health { display:inline-block; width:64px; height:5px; overflow:hidden; background:var(--console-edge); border-radius:0; }
-.run-health > i { display:block; height:100%; background:var(--loot-uncommon); }
-.run-stage { display:flex; align-items:center; justify-content:space-between; gap:10px; flex:1; min-width:0; padding:0 12px; }
-.run-stage > b { font:500 13px/1.3 var(--ui-font); color:var(--void-muted); }
-.run-card .run-next { max-width:45%; font:400 13px/1.3 var(--ui-font); color:var(--void-muted); }
-.run-card .run-next summary { min-height:28px; padding:4px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.run-next p { top:20px; color:var(--void-cream); font:400 14px/1.5 var(--ui-font); }
-.run-card .run-progress { display:flex; gap:3px; height:3px; }
-.run-progress > i { flex:1; background:var(--console-edge); }
-.run-progress > i.is-cleared { background:var(--void-gold); }
-.run-progress > i.is-current { background:var(--void-cyan); }
-.run-card .run-scroll { gap:10px; overflow:hidden; }
-.run-card[data-run-view="ready"] .run-scroll, .run-card[data-run-view="result"] .run-scroll { overflow:auto; }
-.run-card .run-offers { min-height:0; flex:1; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
-.run-card .run-offers button { position:relative; display:flex; gap:8px; min-height:0; padding:16px; border:1px solid var(--console-edge); border-top:3px solid var(--item-color,var(--void-cyan)); border-radius:4px; background:radial-gradient(ellipse at 50% 42%,color-mix(in srgb,var(--item-color,var(--void-cyan)),transparent 93%),transparent 65%),var(--console-recess); color:var(--void-cream); text-transform:none; letter-spacing:0; font-family:var(--ui-font); transition:border-color .12s,background-color .12s; }
-.run-card .run-offers button[data-rarity] { border-left-width:1px; }
-.run-card .run-offers button.is-selected { padding:16px; border:1px solid var(--item-color,var(--void-gold)); border-top-width:3px; background-color:var(--console-face); box-shadow:inset 0 0 0 1px var(--item-color,var(--void-gold)); }
-.run-card .run-offers button > b { width:100%; padding-right:16px; font:600 22px/1.2 var(--ui-font); color:var(--item-color,var(--void-cream)); }
-.run-card .run-art { position:relative; display:grid; place-items:center; width:100%; min-height:0; flex:1; }
-.run-card .run-art > .run-item-image { position:absolute; inset:0; margin:auto; width:100%; height:100%; max-width:132px; max-height:132px; object-fit:contain; image-rendering:auto; }
-.run-card .run-quantity { position:absolute; right:0; bottom:4px; font:500 13px/1 var(--pixel-font); font-style:normal; color:var(--void-muted); }
-.run-card .run-metrics { display:flex; width:100%; justify-content:space-between; gap:8px; padding-top:10px; border-top:1px solid var(--console-edge); }
-.run-metrics i { display:flex; flex-direction:column; min-width:0; gap:3px; font-style:normal; }
-.run-card .run-metrics small { margin:0; color:var(--void-muted); font:400 12px/1.2 var(--ui-font); }
-.run-card .run-metrics b { color:var(--void-cream); font:500 21px/1.2 var(--ui-font); font-variant-numeric:tabular-nums; }
-.run-card .run-metrics em { color:var(--void-muted); font:400 11px/1 var(--ui-font); }
-.run-card .run-metrics em.up { color:var(--loot-uncommon); }
-.run-card .run-metrics em.down { color:var(--retro-red); }
-.run-item-image { color:var(--item-color,var(--void-cyan)); }
-.run-card .run-replacement { display:flex; align-items:center; gap:6px; height:34px; flex-shrink:0; margin-top:4px; }
-.run-card .run-replacement .run-item-image { width:28px; height:28px; object-fit:contain; }
-.run-replacement i { color:var(--void-muted); font-style:normal; }
-.run-empty-mount { display:grid; place-items:center; width:28px; height:28px; border:1px dashed var(--console-edge); color:var(--void-muted); }
-.run-selected-mark { display:none; position:absolute; right:10px; top:12px; color:var(--item-color,var(--void-gold)); }
-.is-selected > .run-selected-mark { display:block; }
-.run-service-icon { font-size:60px; color:var(--void-gold); }
-.run-card .run-hull-image { width:100%; height:170px; min-height:0; flex:1; color:var(--void-cyan); }
-.run-card .run-hull-role, .run-card .run-pilot { font:400 13px/1.2 var(--ui-font); color:var(--void-muted); }
-.run-mount-counts { display:flex; gap:12px; color:var(--void-muted); }
-.run-mount-counts i { font:500 14px/1.2 var(--ui-font); }
-.run-card > footer { border-top:1px solid var(--console-edge); padding:10px 0 0; gap:8px; flex-wrap:nowrap; }
-.run-card > footer button { padding:8px 14px; border:1px solid var(--console-edge); box-shadow:none; background:var(--console-face); font:500 14px/1 var(--ui-font); letter-spacing:0; text-transform:none; }
-.run-card > footer > button:first-child { min-width:44px; padding:0; font-size:20px; }
-.run-card > footer .primary { min-width:150px; color:var(--console-recess); background:var(--void-gold); border-color:var(--void-gold); }
-.run-card button:focus-visible { outline:2px solid var(--void-gold); outline-offset:2px; }
-.run-card .run-loadout-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:0; max-height:none; }
-.run-item-label { color:var(--item-color,var(--loot-common)); font:500 14px/1.3 var(--ui-font); }
-.run-item-chip { display:flex; align-items:center; min-width:0; gap:10px; padding:10px; border-left:3px solid var(--item-color); background:var(--console-face); }
-.run-item-chip .run-item-image { width:44px; height:44px; object-fit:contain; }
-.run-item-chip > b { margin-left:auto; font:500 13px/1 var(--ui-font); }
-.run-crew { margin-top:10px; font:400 14px/1.4 var(--ui-font); }
-.run-crew summary { min-height:44px; padding:12px 0; cursor:pointer; color:var(--void-muted); }
-.run-card .run-orders button { font:500 13px/1 var(--ui-font); letter-spacing:0; text-transform:none; }
-.run-fit-layout { display:grid; grid-template-columns:230px minmax(0,1fr); gap:12px; flex:1; min-height:0; }
-.run-mount-list { overflow:auto; display:flex; flex-direction:column; gap:6px; padding:2px; }
-.run-card .run-mount-list button { display:flex; text-align:left; align-items:center; gap:8px; padding:8px; min-width:0; border:1px solid var(--console-edge); border-left:3px solid var(--item-color); background:var(--console-recess); text-transform:none; letter-spacing:0; box-shadow:none; }
-.run-mount-list button[aria-pressed="true"] { outline:1px solid var(--void-gold); background:var(--console-face); }
-.run-mount-list button > span { display:flex; flex-direction:column; gap:3px; min-width:0; }
-.run-mount-list .run-item-image { width:34px; height:34px; flex-shrink:0; object-fit:contain; }
-.run-mount-list .run-item-label { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
-.run-mount-list small { font:400 11px/1.2 var(--ui-font); color:var(--void-muted); }
-.run-mount-list b { font:500 13px/1.2 var(--ui-font); color:var(--void-muted); }
-.run-fit-stock { display:flex; flex-direction:column; min-height:0; min-width:0; border:1px solid var(--console-edge); background:var(--console-recess); }
-.run-fit-stock > header { display:flex; align-items:center; gap:6px; margin:0; padding:8px; }
-.run-fit-stock > header > div { flex:1; display:flex; flex-direction:column; gap:3px; min-width:0; }
-.run-fit-stock > header button { min-width:44px; padding:4px; font:500 18px/1 var(--ui-font); }
-.run-fit-stock > header small { font:400 12px/1.2 var(--ui-font); }
-.run-card .run-fit-stock .run-item-label { color:var(--item-color); }
-.run-locker-list { flex:1; min-height:0; overflow:auto; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:start; gap:8px; padding:8px; }
-.run-locker-list button { display:flex; align-items:center; gap:8px; padding:8px; border:1px solid var(--console-edge); border-left:3px solid var(--item-color); background:var(--console-face); min-width:0; text-transform:none; letter-spacing:0; }
-.run-locker-list .run-item-image { width:44px; height:44px; object-fit:contain; flex-shrink:0; }
-.run-locker-list button > b { font:500 12px/1 var(--ui-font); margin-left:auto; }
-.run-empty-stock { color:var(--void-muted); margin:auto; grid-column:1/-1; font:400 14px/1.4 var(--ui-font); }
-.run-card .run-notice { flex-shrink:0; margin:0; color:var(--retro-red); font:400 13px/1.3 var(--ui-font); }
-@media(max-height:520px) and (orientation:landscape) {
- .run-card { height:calc(100dvh - 20px); padding:10px 12px; gap:6px; }
- .run-card > header { padding-bottom:6px; }
- .arena-card.run-card > header h2 { font-size:17px; }
- .run-card .run-wave { font-size:18px; }
- .run-card .run-offers { gap:10px; }
- .run-card .run-offers button, .run-card .run-offers button.is-selected { padding:10px; gap:5px; }
- .run-card .run-offers button > b { font-size:17px; }
- .run-card .run-art > .run-item-image { max-width:90px; max-height:90px; }
- .run-card .run-metrics { padding-top:6px; gap:5px; }
- .run-card .run-metrics b { font-size:17px; }
- .run-card .run-metrics small { font-size:12px; }
- .run-card .run-hull-image { height:80px; }
- .run-card .run-replacement { height:24px; margin:0; }
- .run-card .run-replacement .run-item-image { width:24px; height:24px; }
- .run-card > footer { padding-top:6px; }
- .run-fit-layout { grid-template-columns:180px minmax(0,1fr); gap:8px; }
- .run-card .run-mount-list button { padding:5px; }
- .run-card .run-loadout-summary { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
- .run-item-chip { padding:6px; }
-}
-@media(max-width:600px) and (orientation:landscape) {
- .run-card .run-ship-status { font-size:12px; }
- .run-health { width:36px; }
- .run-title { gap:8px; }
- .run-card .run-wave { padding-left:8px; }
- .run-card .run-offers { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
- .run-card .run-offers button, .run-card .run-offers button.is-selected { padding:8px; }
- .run-card .run-art > .run-item-image { max-width:65px; max-height:65px; }
- .run-card .run-offers button > b { font-size:15px; }
- .run-card .run-metrics b { font-size:15px; }
- .run-card .run-metrics small { font-size:11px; }
- .run-fit-layout { grid-template-columns:140px minmax(0,1fr); }
- .run-locker-list { grid-template-columns:1fr; }
- .run-card .run-loadout-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
- .arena-card.run-card > header h2, .run-card .run-ship-status { display:none; }
- .run-stage { padding:0; }
-}
-@media(orientation:portrait) and (max-width:700px) {
- .run-card { height:calc(100dvh - 24px); }
- .run-card .run-offers { grid-template-columns:1fr; overflow:auto; }
- .run-card .run-offers button { flex:none; min-height:240px; }
- .run-card .run-art { min-height:100px; }
- .run-card .run-loadout-summary { grid-template-columns:1fr; }
- .run-fit-layout { grid-template-columns:130px minmax(0,1fr); }
- .run-locker-list { grid-template-columns:1fr; }
- .run-card .run-ship-status { display:none; }
-}
-@media(prefers-reduced-motion:reduce) { .run-card .run-offers button { transition:none; } }
-
 @media(max-height:520px) and (orientation:landscape) {
  #dock-screen:has(.ship-broker) .dock-content { overflow:hidden; }
 
 }
-
-.run-card .run-mount-counts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; width:100%; }
-.run-mount-counts i { display:flex; flex-direction:column; gap:2px; min-width:0; font-style:normal; }
-.run-card .run-mount-counts small { margin:0; font:400 11px/1.1 var(--ui-font); color:var(--void-muted); white-space:normal; overflow-wrap:anywhere; }
-.run-card .run-mount-counts b { font:500 15px/1.1 var(--ui-font); color:var(--void-cream); }
 
 /* Settings are grouped under one header, rather than seven expanded sections. */
 #pause-panel .pause-card { display:flex; flex-direction:column; width:min(1050px,calc(100vw - 24px)); height:min(540px,calc(100dvh - 24px)); padding:0; overflow:hidden; }
@@ -9544,60 +9367,6 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 
 /* Pixel item sprites (itemIcons.js): hardware art, tier pips and modifier marks. */
 .item-icon { display:block; width:40px; height:40px; flex-shrink:0; color:var(--item-color,currentColor); }
-
-.run-card .run-utility-metrics, .run-card .run-weapon-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 12px; }
-
-.run-card .run-utility-metrics small { overflow-wrap:anywhere; white-space:normal; }
-@media(max-height:500px),(max-width:900px) {
- .run-card .run-utility-metrics, .run-card .run-weapon-metrics { gap:4px 8px; padding-top:6px; }
- .run-card .run-utility-metrics small, .run-card .run-weapon-metrics small { font-size:10px; }
- .run-card .run-utility-metrics b, .run-card .run-weapon-metrics b { font-size:16px; }
- .run-card .run-utility-metrics em { font-size:10px; }
-
-}
-
-.run-card .run-tradeoffs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px 12px; width:100%; }
-.run-card .run-tradeoffs i { display:flex; flex-direction:column; gap:2px; font-style:normal; min-width:0; }
-.run-card .run-tradeoffs small { margin:0; font:400 11px/1.2 var(--ui-font); color:var(--void-muted); }
-.run-card .run-tradeoffs em { font:500 12px/1.2 var(--ui-font); }
-.run-card .run-tradeoffs em.up { color:var(--loot-uncommon); }
-.run-card .run-tradeoffs em.down { color:var(--retro-red); }
-@media(max-height:500px),(max-width:900px) {
- .run-card .run-tradeoffs { gap:3px 8px; }
- .run-card .run-tradeoffs small { font-size:10px; }
- .run-card .run-tradeoffs em { font-size:11px; }
-}
-@media(min-width:601px) {
- .run-card[data-run-view="rewards"] .run-art { min-height:40px; }
-}
-@media(max-width:600px) and (orientation:landscape) {
- .run-card[data-run-view="rewards"] .run-offers button { padding:5px 6px; gap:3px; }
- .run-card[data-run-view="rewards"] .run-art { display:contents; }
- .run-card[data-run-view="rewards"] .run-art > .run-quantity { top:10px; right:8px; bottom:auto; }
- .run-card[data-run-view="rewards"] .run-offers button > b { padding-left:32px; min-height:24px; }
- .run-card[data-run-view="rewards"] .run-art > .run-item-image { inset:auto; top:5px; left:6px; width:26px; height:26px; }
- .run-card .run-utility-metrics { grid-template-columns:1fr; padding-top:4px; }
- .run-card .run-utility-metrics i { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:4px; align-items:baseline; }
- .run-card .run-utility-metrics small { font-size:9px; }
- .run-card .run-utility-metrics b { font-size:13px; }
- .run-card .run-utility-metrics em { font-size:9px; }
- .run-card[data-run-view="rewards"] .run-replacement { height:16px; margin-top:0; }
- .run-card[data-run-view="rewards"] .run-replacement .run-item-image { width:16px; height:16px; }
- .run-card .run-tradeoffs { gap:2px 6px; }
- .run-card .run-tradeoffs small { font-size:9px; }
- .run-card .run-tradeoffs em { font-size:10px; }
-}
-
-/* Full equipment names retain their tier on compact reward cards. */
-@media (max-height:500px) and (orientation:landscape) {
- .run-card[data-run-view="rewards"] .run-offers button > b { font-size:14px; line-height:1.15; flex-shrink:0; }
- .run-card[data-run-view="rewards"] .run-art { min-height:18px; }
- .run-card[data-run-view="rewards"] .run-offers button { gap:3px; }
- .run-card[data-run-view="rewards"] .run-metrics:not(.run-utility-metrics):not(.run-weapon-metrics) { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
- .run-card[data-run-view="rewards"] .run-metrics:not(.run-utility-metrics):not(.run-weapon-metrics) small { font-size:10px; white-space:normal; }
- .run-card[data-run-view="rewards"] .run-replacement { height:18px; }
- .run-card[data-run-view="rewards"] .run-replacement .run-item-image { width:18px; height:18px; }
-}
 
 /* Story radio stays on the existing comms strip, with one small speaker image. */
 #game-shell .comms-channel #comms-bar.has-portrait { display:flex; align-items:flex-start; gap:6px; text-align:left; }
@@ -9853,6 +9622,13 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   font:inherit; line-height:1.1; pointer-events:none;
 }
 #game-shell .space-pickup-receipt[hidden] { display:none; }
+#game-shell .space-pickup-receipt .space-pickup-rarity { grid-column:2; grid-row:1; align-self:end; color:var(--item-color); font-size:clamp(7px,.65vw,11px); letter-spacing:.08em; text-transform:uppercase; }
+#game-shell .space-pickup-receipt:has(.space-pickup-rarity) b { align-self:start; }
+#game-shell .space-pickup-receipt :is(b,span) { color:inherit; }
+#game-shell .space-pickup-receipt:is([data-rarity="rare"],[data-rarity="epic"],[data-rarity="named"]) span { color:var(--item-color); }
+#game-shell .space-pickup-receipt:is([data-rarity="epic"],[data-rarity="named"]) .item-icon { animation:pickup-glow 1.1s ease-in-out 4; }
+@keyframes pickup-glow { 50% { filter:drop-shadow(0 0 4px var(--item-color)) brightness(1.35); } }
+@media (prefers-reduced-motion: reduce) { #game-shell .space-pickup-receipt .item-icon { animation:none; } }
 #game-shell .space-pickup-receipt .item-icon {
   width:100%; height:100%; min-width:0; min-height:0; max-width:64px; max-height:64px;
   justify-self:center; grid-column:1; grid-row:1;
@@ -9862,8 +9638,6 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   grid-column:1 / -1; text-align:center; font-size:clamp(8px,.75vw,12px);
   overflow-wrap:anywhere; max-height:2.2em; overflow:hidden; letter-spacing:0;
 }
-
-.run-reward-hint { color:var(--void-muted); margin:6px 0 0; font:12px/1.25 var(--ui-font); }
 
 /* Controller focus uses the existing palette and never covers the flight view. */
 .controller-focus { outline: 3px solid var(--void-gold); outline-offset: 3px; scroll-margin: 8px; }

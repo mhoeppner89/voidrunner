@@ -5,26 +5,29 @@ import {CRUISER_MOUNTS} from './cruiserModelData.js';
 import {registerInventoryDefinitions,refreshInventoryProjection} from './equipmentInventory.js';
 import {weaponForOutfit} from './weapons.js';
 import {OUTFIT_ITEMS,BASE_OUTFIT_ITEMS,LOADOUT_KEYS} from './outfitting.js';
-import {createEquipmentRecord,rollEquipmentRecord,receiveEquipment,ITEM_SURVIVAL_CHANCE,CARGO_SURVIVAL_CHANCE} from './equipmentInventory.js';
-import {equipmentBaseId,migratePulseRecord,forgetEquipmentDefinition} from './equipmentCatalog.js';
+import {createEquipmentRecord,rollEquipmentRecord,receiveEquipment,itemSurvivalChance,ownedLegendaries,CARGO_SURVIVAL_CHANCE} from './equipmentInventory.js';
+import {equipmentBaseId,migratePulseRecord,forgetEquipmentDefinition,rarityRank,EQUIPMENT_RARITIES} from './equipmentCatalog.js';
 import {seededRandom} from './random.js';
 import {getEffectiveShipStats} from './shipStats.js';
 import {cargoFree} from './economy.js';
 import {hasSystem} from './galaxy.js';
 import {COMMODITIES} from './data.js';
 import {createDroneUnit,DRONE_TYPES,canonicalDroneType} from './droneData.js';
+const DRONE_SURVIVAL_CHANCE=.18;
 export function equipCareerItems(session,ship,{tutorialMiningPirate=false}={}){
  if(session.arena||ship.capitalClass||ship.equipmentRecords)return;
  const fit=ship.combatFit;if(!fit)return;
  const serial=++session.save.world.lootShipCounter|| (session.save.world.lootShipCounter=1);
  ship.lootKey=`loot-${session.save.world.seed}-${serial}`;
  const rng=seededRandom(ship.lootKey),region=session.careerRegionAt(ship.position),tier=region.danger>=2.1?3:region.danger>=1.15?2:1;
+ // Deeper space and better pilots carry better hardware (and drop it).
+ const luck=(tier-1)*.25+({veteran:.15,ace:.35}[ship.pilot?.tier]??0),owned=ownedLegendaries(session.save.player);
  ship.equipmentRecords=[];
  for(const key of LOADOUT_KEYS)for(let i=0;i<(fit[key]?.length??0);i++)if(fit[key][i]){
   const baseId=equipmentBaseId(fit[key][i]),id=`${ship.lootKey}-${key}-${i}`;
   // The first pirate carries the exact green tier I weapon that introduces loot.
   const guaranteed=tutorialMiningPirate&&key==='launchers'&&!ship.guaranteedLootId;
-  const item=guaranteed?createEquipmentRecord(baseId,{id,tier:1,rarity:'uncommon',affixes:['efficient']}):rollEquipmentRecord(baseId,rng,Math.max(tier,OUTFIT_ITEMS[fit[key][i]]?.tier??1),id);if(!item)continue;
+  const item=guaranteed?createEquipmentRecord(baseId,{id,tier:1,rarity:'uncommon',affixes:['efficient']}):rollEquipmentRecord(baseId,rng,Math.max(tier,OUTFIT_ITEMS[fit[key][i]]?.tier??1),id,{luck,owned});if(!item)continue;
   if(guaranteed)ship.guaranteedLootId=item.id;
   fit[key][i]=item.id;ship.equipmentRecords.push({item,key,index:i});
  }
@@ -62,7 +65,7 @@ export function makeCareerWreck(session,ship,{captured=false}={}){
   if(tutorialOnly&&item.id!==ship.guaranteedLootId){forgetEquipmentDefinition(item.id);continue;}
   if(['turrets','capital'].includes(key)&&ship.capitalMountHull?.[index]<=0){forgetEquipmentDefinition(item.id);continue;}
   const rack=ship.combatFit?.racks?.find(r=>r.itemId===item.id);if(rack)item.rounds=rack.missiles;
-  if(captured||rng()<ITEM_SURVIVAL_CHANCE||item.id===ship.guaranteedLootId)contents.push({id:item.id,kind:'equipment',item:{...item,factory:false,location:{kind:'wreck'}}});
+  if(captured||rng()<itemSurvivalChance(item.rarity)||item.id===ship.guaranteedLootId)contents.push({id:item.id,kind:'equipment',item:{...item,factory:false,location:{kind:'wreck'}}});
   else forgetEquipmentDefinition(item.id);
  }
  for(const [commodity,raw] of Object.entries(tutorialOnly?{}:ship.cargo??{})){
@@ -72,7 +75,7 @@ export function makeCareerWreck(session,ship,{captured=false}={}){
  }
  for(const unit of Object.values(tutorialOnly?{}:ship.droneFleet?.unitsById??{}))if(unit.hull>0){
   if(!captured&&unit.state!=='stowed'&&unit.position){unit.orphaned=true;unit.state='orphaned';unit.targetId=undefined;session.save.world.orphanDrones??={};session.save.world.orphanDrones[unit.id]={id:unit.id,type:unit.type,hull:unit.hull,ammo:unit.ammo,position:[...unit.position],velocity:[...(unit.velocity??[0,0,0])],rotation:[...(unit.rotation??[0,0,0,1])],systemId:session.save.player.systemId};continue;}
-  if(captured||rng()<ITEM_SURVIVAL_CHANCE)contents.push({id:`${ship.lootKey}-${unit.id}`,kind:'drone',type:unit.type,hull:unit.hull,ammo:unit.ammo});
+  if(captured||rng()<DRONE_SURVIVAL_CHANCE)contents.push({id:`${ship.lootKey}-${unit.id}`,kind:'drone',type:unit.type,hull:unit.hull,ammo:unit.ammo});
  }
  // Cosmetic debris always appears; an empty hull does not advertise loot.
  if(!contents.length)return null;
@@ -140,7 +143,7 @@ export function updateCombatLoot(session,dt=0){
   }
   if(recovered){
    if(range>0&&beams<4){session.renderer?.showCombatBeam?.('loot-collector-'+beams++,session.tmpP3.fromArray(session.save.player.position),session.tmpP4.fromArray(wreck.position),0x74d5c4,session.save.player);}
-   session.setOwnMonitorStatus?.('+'+t('Loot'));
+   if(!(session.lootStatusUntil>session.save.world.time))session.setOwnMonitorStatus?.('+'+t('Loot'));
   }
   if(wreck.contents.length)retry.set(wreck,session.save.world.time+.5);
  }
@@ -176,6 +179,9 @@ function transferWreckEntry(session,wreck,entryId,bulk){
  }
  if(!result.ok)return result;
  session.ui.queueSpacePickup?.({...entry,quantity:result.amount??1});
+ // A rare or better part is an event: a sting and its grade on the monitor.
+ const rank=entry.kind==='equipment'?rarityRank(entry.item?.rarity):0;
+ if(rank>=2){session.audio?.play?.('reward',[.55,.8,1][rank-2]);session.setOwnMonitorStatus?.(`+${t(EQUIPMENT_RARITIES[entry.item.rarity].name).toUpperCase()}`,rank>=3?4200:3000);session.lootStatusUntil=session.save.world.time+3;}
  session.recordExtractionProgress?.('salvage',result.amount??1);
  if(entry.kind==='cargo' && entry.sourceNodeId && entry.sourceClaimId && entry.commodity===session.wreckNodes.find(n=>n.id===entry.sourceNodeId)?.salvage)
   session.recordClaimSalvage?.(entry.sourceNodeId,result.amount??1,entry.sourceClaimId);

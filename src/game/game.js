@@ -4718,7 +4718,7 @@ export class GameSession {
             if(hit!==undefined&&hit<nearest){nearest=hit;victim=undefined;droneVictim=unit;}
         }
         end.lerpVectors(start,end,nearest);
-        const color=weapon.kind==='pdc'?(ownerId==='player'?0xdce9ff:0xff8a5b):(ownerId==='player'?0x7cffff:0xff7050);
+        const color=weapon.tint??(weapon.kind==='pdc'?(ownerId==='player'?0xdce9ff:0xff8a5b):(ownerId==='player'?0x7cffff:0xff7050));
         const hullHit = tuple(end);
         const impactActor = victim === 'player' ? this.save.player : victim;
         if (impactActor && this.renderer.weaponImpact) {
@@ -4730,8 +4730,16 @@ export class GameSession {
         if(droneVictim){if(droneVictim.ownerId)damageNpcDrone(this,droneVictim,weapon.damageFlat);else this.damagePdcDrone(droneVictim.id,weapon.damageFlat,'beam fire');}
         else if(victim==='player')this.damagePlayer(weapon.damageFlat,weapon.kind==='pdc'?'weapons fire':'beam fire',false,weapon,hullHit,start);
         else if(victim)this.damageShip(victim,weapon.damageFlat,ownerId,hullHit,weapon,start);
+        if(weapon.siphon>0&&victim)this.siphonWeaponEnergy(ownerId,(weapon.energyCost??0)*weapon.siphon);
         if(weapon.kind==='pdc')this.renderer.showPdcTracer?.(start,end,color);
         else this.renderer.showCombatBeam?.(`${ownerId}:${beamId}`,start,end,color,ownerId==='player'?this.save.player:undefined);
+    }
+    // Siphoning affixes and Quiet Sun return part of a landed shot's energy.
+    siphonWeaponEnergy(ownerId,amount) {
+        if(!(amount>0))return;
+        if(ownerId==='player'){const p=this.save.player;p.energy=Math.min(this.playerStats().energyCapacity,(Number(p.energy)||0)+amount);return;}
+        const ship=this.ships.find(s=>s.id===ownerId),cap=ship?.combatFit?.stats?.energyCapacity;
+        if(ship&&Number.isFinite(ship.energy)&&cap)ship.energy=Math.min(cap,ship.energy+amount);
     }
     spawnPlayerGunProjectile(weapon,direction,x,y,z,velocity,targetId,mountId) {
         const heavy = weapon.kind === 'gauss' || weapon.kind === 'mortar';
@@ -4745,8 +4753,14 @@ export class GameSession {
         const shotVel=this.tmpP0.copy(direction).multiplyScalar(weapon.speed).add(this.tmpP3.fromArray(velocity));
         this.projStore.setVelV(slot,shotVel);
         const owner=ownerId==='player'?undefined:this.ships.find(s=>s.id===ownerId);
+        // Legendary crit cadence counts each owner's shots of that weapon.
+        let damage=weaponShotDamage(weapon),crit=false;
+        if(weapon.critEvery>0){const counts=this.critShotCounts??={},key=mountId??ownerId;counts[key]=(counts[key]??0)+1;if(counts[key]%weapon.critEvery===0){damage*=weapon.critMultiplier??2;crit=true;}}
+        // hitWeapon carries the rolled definition (shield/hull multipliers,
+        // traits) to the hit; siphonEnergy is this shot's share of the refund.
         const projectile={id:`p-${++this.projectileCounter}`,kind:weapon.kind,ownerId,slot,
-            damage:weaponShotDamage(weapon),life:weapon.life,targetId,faction:ownerId==='player'?'player':owner?.faction,
+            damage,crit,life:weapon.life,targetId,faction:ownerId==='player'?'player':owner?.faction,hitWeapon:weapon,tint:weapon.tint,
+            siphonEnergy:weapon.siphon>0?(weapon.energyCost??0)*weapon.siphon/(weapon.pellets??1):0,
             weaponId:weapon.id,visualScale:weapon.visualScale,mountId,pierce:weapon.pierce??0,splashRadius:weapon.splashRadius,splashMin:weapon.splashMin,splashDamage:weapon.splashDamage};
         this.projectiles.push(projectile);return projectile;
     }
@@ -4795,7 +4809,7 @@ export class GameSession {
             const anchor = SHIP_MOUNT_ANCHORS[player.shipId]?.guns?.[0] ?? [0, -0.6, -2.8];
             const muzzle = (this.tmpPlayerGunMuzzle ??= new THREE.Vector3()).set(...anchor).applyQuaternion(orientation).add(position);
             const direction = this.weaponAimDirection(position, velocity, weapon, target, baseDirection, this.tmpP6, muzzle);
-            this.renderer.spawnMuzzleFlash(muzzle.x, muzzle.y, muzzle.z, weapon.kind === 'gauss' ? 0xbfe9ff : 0xffc35a);
+            this.renderer.spawnMuzzleFlash(muzzle.x, muzzle.y, muzzle.z, weapon.tint ?? (weapon.kind === 'gauss' ? 0xbfe9ff : 0xffc35a));
             this.spawnPlayerGunProjectile(weapon, direction, muzzle.x, muzzle.y, muzzle.z, velocity, targetId, `${player.shipId}-gun-0`);
             if (weapon.ammoId)
                 player.ammo[weapon.ammoId] -= 1;
@@ -4849,29 +4863,26 @@ export class GameSession {
                 const muzzleX = anchorX + bolt.x * 0.35;
                 const muzzleY = anchorY + bolt.y * 0.35;
                 const muzzleZ = anchorZ + bolt.z * 0.35;
-                this.renderer.spawnMuzzleFlash(muzzleX, muzzleY, muzzleZ, 0xcfe4ff);
+                this.renderer.spawnMuzzleFlash(muzzleX, muzzleY, muzzleZ, weapon.tint ?? 0xcfe4ff);
                 this.spawnPlayerGunProjectile(weapon, bolt, muzzleX, muzzleY, muzzleZ, velocity, targetId, mount.id);
             }
             else if (weapon.kind === 'ripper') {
                 const rng = seededRandom(`${this.save.world.seed}:wpn:${Math.floor(this.save.world.time * 1000)}:${this.projectileCounter}:${mount.id}`);
-                const up = this.tmpP3.copy(UP).applyQuaternion(orientation);
+                const up = this.tmpP4.copy(UP).applyQuaternion(orientation);
                 const pelletCount = weapon.pellets ?? 7;
+                this.haptics?.pulse(35, .04, .22);
                 for (let pellet = 0; pellet < pelletCount; pellet += 1) {
                     const pelletDirection = this.spreadDirection(direction, right, up, weapon.spreadRad ?? 0, rng, this.tmpP0);
-                    const pelletSpeed = weapon.speed;
                     const muzzleX = anchorX + pelletDirection.x * 0.35;
                     const muzzleY = anchorY + pelletDirection.y * 0.35;
                     const muzzleZ = anchorZ + pelletDirection.z * 0.35;
                     if (pellet === 0)
-                        this.renderer.spawnMuzzleFlash(muzzleX, muzzleY, muzzleZ, 0xffc9a0);
-                    const slot = this.projStore.alloc();
-                    this.projStore.setPos(slot, muzzleX, muzzleY, muzzleZ);
-                    this.projStore.setVel(slot, pelletDirection.x * pelletSpeed + velocity[0], pelletDirection.y * pelletSpeed + velocity[1], pelletDirection.z * pelletSpeed + velocity[2]);
-                    this.projectiles.push({ id: `p-${++this.projectileCounter}`, kind: weapon.kind, ownerId: 'player', slot, damage: weaponShotDamage(weapon), life: weapon.life, targetId, faction: 'player', weaponId: weapon.id, mountId: mount.id });
+                        this.renderer.spawnMuzzleFlash(muzzleX, muzzleY, muzzleZ, weapon.tint ?? 0xffc9a0);
+                    this.spawnGunProjectile('player', weapon, anchorWorld.set(muzzleX, muzzleY, muzzleZ), pelletDirection, velocity, targetId, mount.id);
                 }
             }
             else {
-                const color = weapon.kind === 'gauss' ? 0xbfe9ff : weapon.kind === 'ion' ? 0x9be8f2 : weapon.kind === 'mortar' ? 0xffb066 : 0xffc35a;
+                const color = weapon.tint ?? (weapon.kind === 'gauss' ? 0xbfe9ff : weapon.kind === 'ion' ? 0x9be8f2 : weapon.kind === 'mortar' ? 0xffb066 : 0xffc35a);
                 if(weapon.kind!=='beam')this.renderer.spawnMuzzleFlash(anchorX, anchorY, anchorZ, color);
                 this.spawnPlayerGunProjectile(weapon, direction, anchorX, anchorY, anchorZ, velocity, targetId, mount.id);
             }
@@ -5033,6 +5044,7 @@ export class GameSession {
                     faction: 'player',
                     weaponId: launcher.id,
                     launcherId: launcher.id,
+                    hitWeapon: launcher,
                     ordnanceId: launcher.ordnanceId,
                     shield: launcher.projectileShield,
                     targetMount: this.capitalSubtarget?.id===ship.id?this.capitalSubtarget.index:undefined,
@@ -9719,7 +9731,7 @@ export class GameSession {
             if(launcher.spreadRad){shot.x+=(ship.aiRng()-.5)*launcher.spreadRad;shot.y+=(ship.aiRng()-.5)*launcher.spreadRad;shot.normalize();}
             this.projStore.setPosV(slot,muzzle);shot.multiplyScalar(launcher.speed).add(vec(ship.velocity));this.projStore.setVelV(slot,shot);
             this.projectiles.push({id:`p-${++this.projectileCounter}`,kind:'missile',ownerId:ship.id,slot,damage:launcher.damage,life:launcher.life,
-                targetId:ship.targetId,faction:ship.faction,launcherId:launcher.id,homingSpeed:launcher.homingSpeed,homingTurn:launcher.homingTurn,
+                targetId:ship.targetId,faction:ship.faction,launcherId:launcher.id,hitWeapon:launcher,homingSpeed:launcher.homingSpeed,homingTurn:launcher.homingTurn,
                 shield:launcher.projectileShield,acceleration:launcher.acceleration,splashRadius:launcher.splashRadius,splashMin:launcher.splashMin});
         }
         this.playWorldSound('missile',.8,start.x,start.y,start.z);
@@ -9757,7 +9769,7 @@ export class GameSession {
                     }
                     this.spawnGunProjectile(ship.id,weapon,start,shot,ship.velocity,opportunity?.targetId??ship.targetId,`${ship.id}-${index}`);
                 }
-                this.renderer.spawnMuzzleFlash(start.x,start.y,start.z,0xff6540);
+                this.renderer.spawnMuzzleFlash(start.x,start.y,start.z,weapon.tint??0xff6540);
             }
             this.playWorldSound(weapon.audioKey ?? 'laser', 0.55, start.x, start.y, start.z);
             ship.fireCooldown=0;
@@ -9920,19 +9932,23 @@ export class GameSession {
                     const playerPosition = vec(this.save.player.position, this.tmpP5);
                     const playerOrientation = quat(this.save.player.rotation, this.tmpAudioOrientation);
                     const localHit = this.tmpAudioLocal.copy(hitPosition).sub(playerPosition).applyQuaternion(playerOrientation.invert());
-                    const impactWeapon = WEAPONS[projectile.weaponId] ?? (projectile.weaponId===CRUISER_GUN.id ? CRUISER_GUN : LAUNCHERS[projectile.launcherId]);
+                    const impactWeapon = projectile.hitWeapon ?? WEAPONS[projectile.weaponId] ?? (projectile.weaponId===CRUISER_GUN.id ? CRUISER_GUN : LAUNCHERS[projectile.launcherId]);
                     const impactActor = hitKind === 'player' ? this.save.player : hitKind === 'ship' ? hitShip : null;
                     if (impactActor && this.renderer.weaponImpact)
-                        this.renderer.weaponImpact(impactActor, hitKind === 'player' ? this.playerHullExtents() : this.npcHullExtents(hitShip), hitPosition, sweepFrom, impactWeapon, projectile.kind === 'missile' ? 0xff7a42 : projectile.kind === 'gauss' ? 0xbfe9ff : projectile.kind === 'ion' ? 0x8fe4f0 : projectile.kind === 'mortar' ? 0xffa04d : 0xffcb62, projectile.kind === 'missile' || projectile.kind === 'mortar');
+                        this.renderer.weaponImpact(impactActor, hitKind === 'player' ? this.playerHullExtents() : this.npcHullExtents(hitShip), hitPosition, sweepFrom, impactWeapon, projectile.crit ? 0xfff0b0 : projectile.tint ?? (projectile.kind === 'missile' ? 0xff7a42 : projectile.kind === 'gauss' ? 0xbfe9ff : projectile.kind === 'ion' ? 0x8fe4f0 : projectile.kind === 'mortar' ? 0xffa04d : 0xffcb62), projectile.kind === 'missile' || projectile.kind === 'mortar' || projectile.crit);
                     else this.renderer.spawnImpact(tuple(hitPosition), projectile.kind === 'missile' ? 0xff7a42 : projectile.kind === 'gauss' ? 0xbfe9ff : projectile.kind === 'ion' ? 0x8fe4f0 : projectile.kind === 'mortar' ? 0xffa04d : 0xffcb62, projectile.kind === 'missile' || projectile.kind === 'mortar');
                     if (hitKind === 'player') {
-                        this.damagePlayer(projectile.damage, projectile.kind === 'missile' ? 'missile strike' : 'weapons fire', true, WEAPONS[projectile.weaponId]??(projectile.weaponId===CRUISER_GUN.id?CRUISER_GUN:LAUNCHERS[projectile.launcherId]), tuple(hitPosition), sweepFrom);
+                        this.damagePlayer(projectile.damage, projectile.kind === 'missile' ? 'missile strike' : 'weapons fire', true, impactWeapon, tuple(hitPosition), sweepFrom);
+                        if(projectile.siphonEnergy>0)this.siphonWeaponEnergy(projectile.ownerId,projectile.siphonEnergy);
                         // A landed shot is a moment worth talking about: ace and
                         // flamboyant pilots get a seeded chance to rub it in.
                         this.maybeHitTaunt(projectile.ownerId);
                     }
                     else if (hitKind === 'ship' && hitShip)
-                        this.damageShip(hitShip, projectile.damage, projectile.ownerId, tuple(hitPosition), WEAPONS[projectile.weaponId]??(projectile.weaponId===CRUISER_GUN.id?CRUISER_GUN:LAUNCHERS[projectile.launcherId]), sweepFrom, true);
+                    {
+                        this.damageShip(hitShip, projectile.damage, projectile.ownerId, tuple(hitPosition), impactWeapon, sweepFrom, true);
+                        if(projectile.siphonEnergy>0)this.siphonWeaponEnergy(projectile.ownerId,projectile.siphonEnergy);
+                    }
                     else if (hitKind === 'drone' && hitDrone)
                         hitDrone.ownerId?damageNpcDrone(this,hitDrone,projectile.damage):this.damagePdcDrone(hitDrone.id, projectile.damage, isMissile ? 'missile strike' : 'weapons fire');
                     if(projectile.kind==='mortar' || (projectile.kind==='missile'&&projectile.splashRadius>0)){

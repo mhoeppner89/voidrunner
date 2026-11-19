@@ -77,6 +77,8 @@ const LASER_FACTION_COLORS = {
 };
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+// Toward white: the hot core of a tinted (signature) projectile.
+const lighten = (hex, t = .6) => [16, 8, 0].reduce((n, shift) => n | Math.round((hex >> shift & 255) + (255 - (hex >> shift & 255)) * t) << shift, 0);
 const hexRgb = (hex) => { const n = parseInt(hex.slice(1, 7), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
 // A small sRGB texture from a function of (u, v) in [-1, 1]. Built from data,
 // not a 2D canvas, so effects also construct headless (tests, workers).
@@ -170,16 +172,17 @@ export class LaserFx {
             // Gauntlet overhaul: hot core + crossed additive glow pair
             // + head sprite (boltFor). Shared assets per faction;
             // the per-bolt cost is just the small group wrapper.
-            mesh = this.boltFor(projectile.faction);
+            mesh = this.boltFor(projectile.faction, projectile.tint);
         }
         else if (projectile.kind === 'gauss') {
             // Magrail slug: a long hypervelocity tracer — thin white-blue
             // core, three times the laser bolt's length so the lane it
             // owns reads at a glance, plus a cold additive glow at the head.
-            mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 6.4, 3, 6), new THREE.MeshBasicMaterial({ color: 0xcfeeff }));
+            const tint = projectile.tint;
+            mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 6.4, 3, 6), new THREE.MeshBasicMaterial({ color: tint ? lighten(tint, .5) : 0xcfeeff }));
             mesh.geometry.rotateX(Math.PI / 2);
             const glow = new THREE.Sprite(new THREE.SpriteMaterial({
-                map: this.radialTexture('sprite-#eaffff-#4fb8d8', '#eaffff', '#4fb8d8'),
+                map: tint ? this.radialTexture(`sprite-tint-${tint}`, cssHex(lighten(tint, .75)), cssHex(tint)) : this.radialTexture('sprite-#eaffff-#4fb8d8', '#eaffff', '#4fb8d8'),
                 transparent: true,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
@@ -199,9 +202,10 @@ export class LaserFx {
         else if (projectile.kind === 'ripper') {
             // Scattergun pellet: a small warm spark; seven per shell
             // reads as a cloud without any one pellet drawing attention.
-            mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.48, 2, 4), new THREE.MeshBasicMaterial({ color: 0xffb066 }));
+            const tint = projectile.tint;
+            mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.48, 2, 4), new THREE.MeshBasicMaterial({ color: tint ? lighten(tint, .35) : 0xffb066 }));
             const glint = new THREE.Sprite(new THREE.SpriteMaterial({
-                map: this.radialTexture('sprite-#ffe9c9-#ff7a2b', '#ffe9c9', '#ff7a2b'),
+                map: tint ? this.radialTexture(`sprite-tint-${tint}`, cssHex(lighten(tint, .75)), cssHex(tint)) : this.radialTexture('sprite-#ffe9c9-#ff7a2b', '#ffe9c9', '#ff7a2b'),
                 transparent: true,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
@@ -214,9 +218,9 @@ export class LaserFx {
         else if (projectile.kind === 'ion') {
             // Ion Lance bolt: a cool cyan blob with an arcing halo —
             // reads as energy discharge rather than a kinetic round.
-            mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.2, 0), new THREE.MeshBasicMaterial({ color: 0x69e4f2 }));
+            mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.2, 0), new THREE.MeshBasicMaterial({ color: projectile.tint ? lighten(projectile.tint, .4) : 0x69e4f2 }));
             const arc = new THREE.Sprite(new THREE.SpriteMaterial({
-                map: this.cloudTexture('ion'), color: 0x6bdfff,
+                map: this.cloudTexture('ion'), color: projectile.tint ?? 0x6bdfff,
                 transparent: true,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
@@ -228,9 +232,9 @@ export class LaserFx {
         else if (projectile.kind === 'mortar') {
             // Sunlance orb: big slow ember with a heavy additive halo —
             // the slowest thing in the sky, so it must look dangerous.
-            mesh = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffe2a0 }));
+            mesh = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), new THREE.MeshBasicMaterial({ color: projectile.tint ? lighten(projectile.tint, .6) : 0xffe2a0 }));
             const halo = new THREE.Sprite(new THREE.SpriteMaterial({
-                map: this.cloudTexture('plasma'), color:0xff7729,
+                map: this.cloudTexture('plasma'), color: projectile.tint ?? 0xff7729,
                 transparent: true,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
@@ -294,13 +298,14 @@ export class LaserFx {
         }
         return this.shared;
     }
-    factionAssets(faction) {
+    // Signature-tinted bolts share assets per colour, like factions do.
+    factionAssets(faction, tint) {
         const shared = this.sharedAssets();
-        const key = LASER_FACTION_COLORS[faction] ? faction : 'patrol';
+        const key = tint ? `tint-${tint}` : LASER_FACTION_COLORS[faction] ? faction : 'patrol';
         let assets = shared.factions.get(key);
         if (!assets) {
             const tuning = LASER_FX_TUNING;
-            const palette = LASER_FACTION_COLORS[key];
+            const palette = tint ? { bolt: tint, core: lighten(tint, .7) } : LASER_FACTION_COLORS[key];
             const coreMaterial = new THREE.MeshBasicMaterial({ color: palette.core, fog: false, toneMapped: false });
             coreMaterial.userData.shared = true;
             const glowMaterial = new THREE.MeshBasicMaterial({
@@ -334,9 +339,9 @@ export class LaserFx {
     // A laser bolt: group aligned by the renderer's velocity quaternion (the
     // bolt's local -Z points along travel). Per-bolt allocation is the group,
     // two meshes and one sprite — no canvases, no compiles.
-    boltFor(faction) {
+    boltFor(faction, tint) {
         const tuning = LASER_FX_TUNING;
-        const assets = this.factionAssets(faction);
+        const assets = this.factionAssets(faction, tint);
         const group = new THREE.Group();
         const core = new THREE.Mesh(this.sharedAssets().coreGeometry, assets.coreMaterial);
         core.rotation.x = Math.PI / 2;
@@ -448,7 +453,9 @@ export class LaserFx {
     // Weapon- and surface-specific hit. `normal` points out of the struck
     // surface, `direction` along the shot; both are optional unit arrays.
     // `shielded` hits stay on the shield shell (the renderer adds its ripple).
-    weaponImpact({ position, normal, direction, kind = 'laser', color = 0xffc36a, heavy = false, shielded = false, attach, noScorch = false }) {
+    weaponImpact({ position, normal, direction, kind = 'laser', color = 0xffc36a, heavy = false, shielded = false, attach, noScorch = false, tint }) {
+        // A signature weapon's hits take its colour in place of the kind's own.
+        const T = (hex) => tint ?? hex;
         this.noScorch = noScorch;
         const dir = direction ?? (normal ? [-normal[0], -normal[1], -normal[2]] : [0, 0, -1]);
         const out = normal ?? [-dir[0], -dir[1], -dir[2]];
@@ -458,46 +465,46 @@ export class LaserFx {
         if (shielded) {
             // Energy splashes across the shell: a cool flash and sparks that
             // skitter almost tangent to it. No hull damage, so no scorch.
-            const cool = kind === 'ion' ? 0x7ff3ff : 0x9fd8ff;
+            const cool = T(kind === 'ion' ? 0x7ff3ff : 0x9fd8ff);
             this.flash(position, cool, kind === 'gauss' || heavy ? 4.2 : 2.6, .16);
-            this.add(createStreakBurst({ position, count: heavy ? 16 : 10, direction: coneDirections(out, 1.45), speedMin: 14, speedMax: 34, drag: 4, lifeMin: .18, lifeMax: .36, width: .1, hot: 0xeefbff, cool: 0x3d8bff }));
-            if (kind === 'gauss' || heavy) this.add(createShockRing({ position, normal: out, radius: heavy ? 7 : 4.5, life: .32, hex: 0x8fd4ff, opacity: .7 }));
-            if (kind === 'ion') this.add(createArcBurst({ position, radius: 3.2, branches: 5, life: .32, around: out }));
+            this.add(createStreakBurst({ position, count: heavy ? 16 : 10, direction: coneDirections(out, 1.45), speedMin: 14, speedMax: 34, drag: 4, lifeMin: .18, lifeMax: .36, width: .1, hot: 0xeefbff, cool: T(0x3d8bff) }));
+            if (kind === 'gauss' || heavy) this.add(createShockRing({ position, normal: out, radius: heavy ? 7 : 4.5, life: .32, hex: T(0x8fd4ff), opacity: .7 }));
+            if (kind === 'ion') this.add(createArcBurst({ position, radius: 3.2, branches: 5, life: .32, around: out, ...(tint ? { hex: tint } : {}) }));
             return;
         }
         switch (kind) {
         case 'gauss':
             // A slug punches through: pinpoint flash, spall thrown out of the
             // far side along the shot, a little back-spray and a shock ring.
-            this.flash(position, 0xd8f4ff, 3.2, .14);
-            this.add(createStreakBurst({ position, count: 16, direction: coneDirections(dir, .42), speedMin: 55, speedMax: 120, drag: 2.2, lifeMin: .2, lifeMax: .42, width: .11, lag: .03, hot: 0xffffff, cool: 0x7fc8ff }));
-            this.add(createStreakBurst({ position, count: 7, direction: coneDirections(bounce, .8), speedMin: 20, speedMax: 45, drag: 3, lifeMin: .2, lifeMax: .4, width: .1, hot: 0xfff1c4, cool: 0xff7a2a }));
-            this.add(createShockRing({ position, radius: 3.6, life: .22, hex: 0xcfeeff, opacity: .75 }));
+            this.flash(position, T(0xd8f4ff), 3.2, .14);
+            this.add(createStreakBurst({ position, count: 16, direction: coneDirections(dir, .42), speedMin: 55, speedMax: 120, drag: 2.2, lifeMin: .2, lifeMax: .42, width: .11, lag: .03, hot: 0xffffff, cool: T(0x7fc8ff) }));
+            this.add(createStreakBurst({ position, count: 7, direction: coneDirections(bounce, .8), speedMin: 20, speedMax: 45, drag: 3, lifeMin: .2, lifeMax: .4, width: .1, hot: 0xfff1c4, cool: T(0xff7a2a) }));
+            this.add(createShockRing({ position, radius: 3.6, life: .22, hex: T(0xcfeeff), opacity: .75 }));
             this.scorch(position, attach, 1.3, 1.1);
             return;
         case 'ion':
             // Ion discharge: electric arcs crawl over the plate, a cold ring.
-            this.flash(position, 0x7ff3ff, 2.4, .14);
-            this.add(createArcBurst({ position, radius: 3.6, branches: 6, life: .42, around: out }));
-            this.add(createShockRing({ position, radius: 4.2, life: .3, hex: 0x6be6ff, opacity: .6 }));
-            this.add(createStreakBurst({ position, count: 6, direction: coneDirections(out, 1.2), speedMin: 10, speedMax: 26, drag: 4, lifeMin: .2, lifeMax: .35, width: .08, hot: 0xeaffff, cool: 0x3fc4ff }));
+            this.flash(position, T(0x7ff3ff), 2.4, .14);
+            this.add(createArcBurst({ position, radius: 3.6, branches: 6, life: .42, around: out, ...(tint ? { hex: tint } : {}) }));
+            this.add(createShockRing({ position, radius: 4.2, life: .3, hex: T(0x6be6ff), opacity: .6 }));
+            this.add(createStreakBurst({ position, count: 6, direction: coneDirections(out, 1.2), speedMin: 10, speedMax: 26, drag: 4, lifeMin: .2, lifeMax: .35, width: .08, hot: 0xeaffff, cool: T(0x3fc4ff) }));
             return;
         case 'mortar':
         case 'missile':
             // Plasma or warhead splash: a big bloom, a slow ember fountain
             // off the surface and a broad ring. Missiles add the game's blast.
-            this.flash(position, kind === 'mortar' ? 0xffb35c : 0xff8a4d, kind === 'mortar' ? 6.5 : 5, .22);
-            this.add(createStreakBurst({ position, count: 22, direction: coneDirections(out, 1.35), speedMin: 10, speedMax: 34, drag: 1.6, lifeMin: .5, lifeMax: 1.05, width: .16, lag: .07, hot: 0xfff0b0, cool: kind === 'mortar' ? 0xff5418 : 0xff3a10 }));
-            this.add(createShockRing({ position, radius: kind === 'mortar' ? 10 : 8, life: .4, hex: kind === 'mortar' ? 0xffc06a : 0xffa060, opacity: .42, thickness: .14 }));
+            this.flash(position, T(kind === 'mortar' ? 0xffb35c : 0xff8a4d), kind === 'mortar' ? 6.5 : 5, .22);
+            this.add(createStreakBurst({ position, count: 22, direction: coneDirections(out, 1.35), speedMin: 10, speedMax: 34, drag: 1.6, lifeMin: .5, lifeMax: 1.05, width: .16, lag: .07, hot: 0xfff0b0, cool: T(kind === 'mortar' ? 0xff5418 : 0xff3a10) }));
+            this.add(createShockRing({ position, radius: kind === 'mortar' ? 10 : 8, life: .4, hex: T(kind === 'mortar' ? 0xffc06a : 0xffa060), opacity: .42, thickness: .14 }));
             this.scorch(position, attach, 2.4, 1.8);
             return;
         case 'pdc':
             this.flash(position, color, 1.1, .08);
-            this.add(createStreakBurst({ position, count: 4, direction: coneDirections(bounce, .9), speedMin: 16, speedMax: 34, drag: 3.5, lifeMin: .12, lifeMax: .24, width: .06, lag: .03, hot: 0xfff6dc, cool: 0xffa040 }));
+            this.add(createStreakBurst({ position, count: 4, direction: coneDirections(bounce, .9), speedMin: 16, speedMax: 34, drag: 3.5, lifeMin: .12, lifeMax: .24, width: .06, lag: .03, hot: 0xfff6dc, cool: T(0xffa040) }));
             return;
         case 'ripper':
             this.flash(position, color, 1.5, .1);
-            this.add(createStreakBurst({ position, count: 5, direction: coneDirections(bounce, 1), speedMin: 14, speedMax: 32, drag: 3, lifeMin: .15, lifeMax: .3, width: .08, hot: 0xfff1c4, cool: 0xff7a2a }));
+            this.add(createStreakBurst({ position, count: 5, direction: coneDirections(bounce, 1), speedMin: 14, speedMax: 32, drag: 3, lifeMin: .15, lifeMax: .3, width: .08, hot: 0xfff1c4, cool: T(0xff7a2a) }));
             if (Math.random() < .35) this.scorch(position, attach, .9, .8);
             return;
         default:

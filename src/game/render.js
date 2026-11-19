@@ -4,7 +4,7 @@ import {createPixelResolveMaterial,createPixelSceneTarget,pixelTargetSamples,bin
 import {pixelRenderSize} from './retroDisplay.js';
 import { createAsteroidTerrain } from './asteroidTerrain.js';
 import {createAsteroidFragmentMaterials, ASTEROID_FINISH_PALETTES,configureAsteroidShadows} from './asteroidMaterials.js';
-import {createLootVisualResources,createLootVisual,setLootVisualRarity,disposeLootVisualResources} from './lootVisuals.js';
+import {createLootVisualResources,createLootVisual,setLootVisualRarity,disposeLootVisualResources,pulseLootBeams} from './lootVisuals.js';
 import {FLEET_EQUIPMENT,equipmentHullId,droneDock} from './fleetEquipmentData.js';
 import {applyFleetPaint} from './fleetPaint.js';
 import {applyIndependentPaint} from './independentPaints.js';
@@ -4031,7 +4031,7 @@ export class SpaceRenderer {
         this.pooledProjectileCount = 0;
     }
     takeProjectileMesh(projectile) {
-        const key = `${projectile.kind}|${projectile.faction ?? ''}|${projectile.launcherId ?? ''}`;
+        const key = `${projectile.kind}|${projectile.faction ?? ''}|${projectile.launcherId ?? ''}|${projectile.tint ?? ''}`;
         const mesh = this.projectilePools?.get(key)?.pop();
         if (mesh) {
             this.pooledProjectileCount--;
@@ -4052,7 +4052,7 @@ export class SpaceRenderer {
         const prevPos = store.prevPos;
         projectiles.forEach((projectile) => {
             let mesh = this.projectileMeshes.get(projectile.slot);
-            if (mesh && (mesh.userData.projectileKind !== projectile.kind || mesh.userData.projectileFaction !== projectile.faction || mesh.userData.projectileLauncher !== projectile.launcherId)) {
+            if (mesh && (mesh.userData.projectileKind !== projectile.kind || mesh.userData.projectileFaction !== projectile.faction || mesh.userData.projectileLauncher !== projectile.launcherId || mesh.userData.projectileTint !== projectile.tint)) {
                 this.retireProjectileMesh(mesh);
                 this.projectileMeshes.delete(projectile.slot);
                 mesh = undefined;
@@ -4063,7 +4063,8 @@ export class SpaceRenderer {
                 mesh.userData.projectileKind = projectile.kind;
                 mesh.userData.projectileFaction = projectile.faction;
                 mesh.userData.projectileLauncher = projectile.launcherId;
-                mesh.userData.projectilePoolKey = `${projectile.kind}|${projectile.faction ?? ''}|${projectile.launcherId ?? ''}`;
+                mesh.userData.projectileTint = projectile.tint;
+                mesh.userData.projectilePoolKey = `${projectile.kind}|${projectile.faction ?? ''}|${projectile.launcherId ?? ''}|${projectile.tint ?? ''}`;
                 this.projectileMeshes.set(projectile.slot, mesh);
             }
             const i = projectile.slot * 3;
@@ -5418,7 +5419,7 @@ export class SpaceRenderer {
         const kind=weapon?.kind ?? (heavy ? 'missile' : 'laser');
         // Scorches ride on a rendered NPC hull; the player's hull is the camera.
         const attach=shielded||actor?.id===undefined ? undefined : this.shipMeshes?.get(actor.id);
-        this.laserFx.weaponImpact({position,normal,direction,kind,color,heavy,shielded,attach,noScorch:!attach});
+        this.laserFx.weaponImpact({position,normal,direction,kind,color,heavy,shielded,attach,noScorch:!attach,tint:weapon?.tint});
         return point;
     }
     flashShield(actor, extents, remaining, player = false, impact, origin) {
@@ -5817,6 +5818,7 @@ export class SpaceRenderer {
         this.pendingWorldVisualDt = 0;
         if (dt <= 0) return;
         for(const mesh of this.combatLootMeshes?.values()??[])if(mesh.userData.derelictEffect?.object.visible)mesh.userData.derelictVents?.update(dt);
+        if(this.combatLootResources)pulseLootBeams(this.combatLootResources,this.skyTime??0);
         this.updatePdcTracers(dt);
         this.updateRailPlumes(dt);
         for(const beam of this.combatBeams?.values() ?? []) {

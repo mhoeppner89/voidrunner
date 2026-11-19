@@ -1,5 +1,5 @@
 import {BASE_OUTFIT_ITEMS,OUTFIT_ITEMS,HULL_HARDPOINTS,LOADOUT_KEYS,normalizeOutfitting,normalizeLoadout,projectLegacyEquipment,projectLegacyWeaponId,itemAvailable} from './outfitting.js';
-import {resolveEquipmentDefinition,migratePulseRecord,runtimeEquipmentId,registerEquipmentDefinition,equipmentBaseId,forgetEquipmentDefinition,EQUIPMENT_RARITIES,EQUIPMENT_AFFIXES,NAMED_EQUIPMENT} from './equipmentCatalog.js';
+import {resolveEquipmentDefinition,migratePulseRecord,runtimeEquipmentId,registerEquipmentDefinition,equipmentBaseId,forgetEquipmentDefinition,EQUIPMENT_RARITIES,EQUIPMENT_AFFIXES,NAMED_EQUIPMENT,RARITY_ORDER} from './equipmentCatalog.js';
 import {getEffectiveShipStats} from './shipStats.js';
 import {normalizeLauncherMagazines,launcherMagazineEntries,mountedLauncherEntries,weaponForOutfit} from './weapons.js';
 import {DRONE_ITEM_IDS,DRONE_TYPES,createDroneUnit,droneInventoryId,droneUnitAccessible} from './droneData.js';
@@ -7,7 +7,16 @@ import {LOCATIONS,COMMODITIES} from './data.js';
 import {cargoMass} from './economy.js';
 import {seededRandom} from './random.js';
 const clone=value=>JSON.parse(JSON.stringify(value));
-export const ITEM_SURVIVAL_CHANCE=.18;
+// Common parts usually burn with their ship; better hardware is sturdier and
+// legendary parts always survive (EQUIPMENT_RARITIES[rarity].survival).
+export const ITEM_SURVIVAL_CHANCE=EQUIPMENT_RARITIES.common.survival;
+export const itemSurvivalChance=rarity=>(EQUIPMENT_RARITIES[rarity]??EQUIPMENT_RARITIES.common).survival;
+// Ordinary drop weights. Luck (deeper space, better pilots) multiplies each
+// grade by (1+luck)^rank, so dangerous fights pay out visibly better parts.
+// Scarce on purpose: dealers are the dependable source of hardware, drops are
+// the exciting one. Roughly 88% common, 9% uncommon, 2.2% rare, 0.45% epic and
+// 0.15% legendary before luck.
+export const RARITY_WEIGHTS=Object.freeze({common:88,uncommon:9.2,rare:2.2,epic:.45,named:.15});
 export const CARGO_SURVIVAL_CHANCE=.55;
 export function registerInventoryDefinitions(inventory){
  for(const [id,record] of Object.entries(inventory?.items??{})){
@@ -15,21 +24,37 @@ export function registerInventoryDefinitions(inventory){
   if(base.id==='beam-emitter')record.factory=false;
   record.tier=Math.max(base.tier??1,Math.min(3,Math.floor(Number(record.tier)||1)));
   if(!EQUIPMENT_RARITIES[record.rarity])record.rarity='common';
-  if(record.rarity==='named'&&!NAMED_EQUIPMENT[record.baseId]&&!id.startsWith('eq-arena-'))record.rarity='rare';
-  record.affixes=[...new Set((Array.isArray(record.affixes)?record.affixes:[]).filter(a=>EQUIPMENT_AFFIXES[a]?.categories.includes(base.category)))].slice(0,EQUIPMENT_RARITIES[record.rarity].affixes);
+  if(record.rarity==='named'&&!NAMED_EQUIPMENT[record.baseId]&&!id.startsWith('eq-arena-'))record.rarity='epic';
+  const raw=Array.isArray(record.affixes)?record.affixes:[],rolls=Array.isArray(record.rolls)?record.rolls:[],kept=[],keptRolls=[];
+  for(const [i,a] of raw.entries())if(EQUIPMENT_AFFIXES[a]?.categories.includes(base.category)&&!kept.includes(a)&&kept.length<EQUIPMENT_RARITIES[record.rarity].affixes){kept.push(a);keptRolls.push(Number.isFinite(Number(rolls[i]))?Math.max(0,Math.min(1,Number(rolls[i]))):.5);}
+  record.affixes=kept;if(kept.length)record.rolls=keptRolls;else delete record.rolls;
   registerEquipmentDefinition(id,resolveEquipmentDefinition(base,record));
  }
 }
-export function createEquipmentRecord(baseId,{id,tier=1,rarity='common',affixes=[],factory=false,location={kind:'cargo'}}={}){
+export function createEquipmentRecord(baseId,{id,tier=1,rarity='common',affixes=[],rolls,factory=false,location={kind:'cargo'}}={}){
  tier=Math.max(tier,OUTFIT_ITEMS[baseId]?.tier??1);baseId=equipmentBaseId(baseId);if(!Object.hasOwn(BASE_OUTFIT_ITEMS,baseId))return null;
- const item={id:id??`eq-${globalThis.crypto?.randomUUID?.()??Date.now()+'-'+Math.random().toString(36).slice(2)}`,baseId,tier,rarity,affixes:[...affixes],factory,location:{...location}};
+ const item={id:id??`eq-${globalThis.crypto?.randomUUID?.()??Date.now()+'-'+Math.random().toString(36).slice(2)}`,baseId,tier,rarity,affixes:[...affixes],...(rolls?{rolls:[...rolls]}:{}),factory,location:{...location}};
  registerInventoryDefinitions({items:{[item.id]:item}});return item;
 }
-export function rollEquipmentRecord(baseId,rng,tier=1,id){
- const chance=rng(),rarity=BASE_OUTFIT_ITEMS[baseId]?.category==='drone'?'common':chance<.003&&NAMED_EQUIPMENT[baseId]?'named':chance<.025?'rare':chance<.12?'uncommon':'common';
- const candidates=Object.keys(EQUIPMENT_AFFIXES).filter(a=>EQUIPMENT_AFFIXES[a].categories.includes(BASE_OUTFIT_ITEMS[baseId]?.category));
- const affixes=[];while(affixes.length<EQUIPMENT_RARITIES[rarity].affixes&&candidates.length)affixes.push(candidates.splice(Math.floor(rng()*candidates.length),1)[0]);
- return createEquipmentRecord(baseId,{id,tier,rarity,affixes});
+// Legendaries are unique: one you already own rolls as epic instead.
+export const ownedLegendaries=player=>new Set(Object.values(player?.inventory?.items??{}).filter(item=>item?.rarity==='named').map(item=>item.baseId));
+export function rollRarity(rng,{luck=0,named=true}={}){
+ const weights=RARITY_ORDER.map((rarity,rank)=>RARITY_WEIGHTS[rarity]*(1+Math.max(0,luck))**rank);
+ if(!named){weights[3]+=weights[4];weights[4]=0;}
+ let pick=rng()*weights.reduce((a,b)=>a+b,0);
+ for(const [rank,weight] of weights.entries()){pick-=weight;if(pick<0)return RARITY_ORDER[rank];}
+ return 'common';
+}
+// Distinct affixes from the hardware's pool, each with a roll quality in [0,1].
+export function rollAffixes(category,rarity,rng){
+ const pool=Object.keys(EQUIPMENT_AFFIXES).filter(a=>EQUIPMENT_AFFIXES[a].categories.includes(category)),affixes=[],rolls=[];
+ while(affixes.length<(EQUIPMENT_RARITIES[rarity]?.affixes??0)&&pool.length){affixes.push(pool.splice(Math.floor(rng()*pool.length),1)[0]);rolls.push(Math.round(rng()*100)/100);}
+ return {affixes,rolls};
+}
+export function rollEquipmentRecord(baseId,rng,tier=1,id,{luck=0,owned}={}){
+ const category=BASE_OUTFIT_ITEMS[baseId]?.category;
+ const rarity=category==='drone'?'common':rollRarity(rng,{luck,named:Boolean(NAMED_EQUIPMENT[baseId])&&!owned?.has(baseId)});
+ return createEquipmentRecord(baseId,{id,tier,rarity,...rollAffixes(category,rarity,rng)});
 }
 export function refreshInventoryProjection(player){
  const inventory=player.inventory;if(!inventory)return;
@@ -108,11 +133,10 @@ export function specialEquipmentOffers(player, stationId, world = {}) {
  for(let i=0;i<2&&candidates.length;i++){
   const base=candidates.splice(Math.floor(rng()*candidates.length),1)[0];
   const tiers=shopEquipmentTiers(stationId).filter(t=>t>=(base.tier??1));if(!tiers.length)continue;
-  const tier=tiers[Math.floor(rng()*tiers.length)],rarity=rng()<.22?'rare':'uncommon';
-  const pool=Object.keys(EQUIPMENT_AFFIXES).filter(id=>EQUIPMENT_AFFIXES[id].categories.includes(base.category));
-  const affixes=[];while(affixes.length<EQUIPMENT_RARITIES[rarity].affixes&&pool.length)affixes.push(pool.splice(Math.floor(rng()*pool.length),1)[0]);
+  const tier=tiers[Math.floor(rng()*tiers.length)],grade=rng(),rarity=grade<.06?'epic':grade<.3?'rare':'uncommon';
+  const {affixes,rolls}=rollAffixes(base.category,rarity,rng);
   const offerId=`${stationId}:${period}:${i}`;
-  if(!player.inventory?.shopPurchases?.[offerId])result.push({offerId,baseId:base.id,tier,rarity,affixes});
+  if(!player.inventory?.shopPurchases?.[offerId])result.push({offerId,baseId:base.id,tier,rarity,affixes,rolls});
  }
  return result;
 }
@@ -144,7 +168,7 @@ export function equipmentAction(player,action,{id,baseId,tier=1,mountId,stationI
   const type=BASE_OUTFIT_ITEMS[baseId].droneType,fleet=draft.droneFleet;
   if(type&&(Number(tier)!==1||!Number.isSafeInteger(fleet?.nextUnitId)||fleet.nextUnitId>=Number.MAX_SAFE_INTEGER))return {ok:false,code:'Equipment unavailable.'};
   const unitId=type?`drone-unit-${fleet.nextUnitId}`:undefined;
-  const record=createEquipmentRecord(baseId,{id:unitId?droneInventoryId(unitId):undefined,tier:Number(tier),rarity:offer?.rarity??'common',affixes:offer?.affixes??[],location:{kind:'station',stationId}}),price=OUTFIT_ITEMS[record.id].price;
+  const record=createEquipmentRecord(baseId,{id:unitId?droneInventoryId(unitId):undefined,tier:Number(tier),rarity:offer?.rarity??'common',affixes:offer?.affixes??[],rolls:offer?.rolls,location:{kind:'station',stationId}}),price=OUTFIT_ITEMS[record.id].price;
   if(draft.credits<price){forgetEquipmentDefinition(record.id);return {ok:false,code:'Not enough credits.'};}inventory.items[record.id]=record;draft.credits-=price;item=record;id=record.id;credit=-price;
   if(offer){inventory.shopPurchases??={};inventory.shopPurchases[offer.offerId]=true;}
   if(type){record.droneUnitId=unitId;fleet.nextUnitId++;fleet.unitsById[unitId]=createDroneUnit(unitId,type);fleet.lockerIds.push(unitId);}

@@ -33,6 +33,9 @@ const SETTLE_SECONDS = 6;
 // A fight that flares up again this soon resumes its piece instead of
 // starting a new one.
 const COMBAT_MEMORY = 90;
+// How many recent pieces a context avoids. Combat has the largest pool and
+// fights come back to back (Arena waves), so it remembers one more.
+const HISTORY = { combat: 3 };
 // How one place hands over to the next: the outgoing piece fades for
 // `fadeOut`, the new one starts after `delay` and swells in over `swell`.
 // Combat lands at once on its opening hit; everything else breathes.
@@ -223,7 +226,14 @@ export class MusicDirector {
         let handover = transition(previous, context);
         // A forced restart (review page auditions) switches briskly.
         if (!this.slot) handover = { fadeOut: 1.2, delay: Math.min(0.3, handover.delay), swell: Math.min(1.5, handover.swell) };
-        if (previous === 'combat' && outgoing) this.lastCombat = { piece: outgoing, at: now };
+        // A fight that ends is remembered twice: briefly, so a re-engagement
+        // resumes it, and in the history, so the next fresh fight gets another
+        // piece (combat never runs out its length, so it never reaches finish()).
+        if (previous === 'combat' && outgoing) {
+            this.remember('combat', outgoing.id);
+            this.lastCombat = this.freshFightPending ? null : { piece: outgoing, at: now };
+        }
+        this.freshFightPending = false;
         if (this.group) this.retire(this.group, handover.fadeOut);
         // Resting (no group) there is nothing to wait for.
         if (!this.group && context !== 'combat') handover.delay = Math.min(handover.delay, 0.1);
@@ -250,6 +260,25 @@ export class MusicDirector {
         const fresh = weights.map((weight, index) => (recent.includes(pool[index].id) ? 0 : weight));
         const index = weightedIndex(fresh.some((weight) => weight > 0) ? fresh : weights, this.random());
         return pool[Math.max(0, index)];
+    }
+
+    // A new fight by design (an Arena wave): it never resumes the previous
+    // piece. Mid-fight (the score still holding from the last wave) it lands
+    // on a new piece at once, with the full opening hit.
+    freshFight() {
+        this.lastCombat = null;
+        if (this.current !== 'combat' || !this.piece) return;
+        this.freshFightPending = true;
+        this.enter('combat', 'combat', this.context.currentTime);
+    }
+
+    remember(context, id) {
+        const recent = this.history.get(context) ?? [];
+        const index = recent.indexOf(id);
+        if (index >= 0) recent.splice(index, 1);
+        recent.unshift(id);
+        recent.length = Math.min(recent.length, HISTORY[context] ?? 2);
+        this.history.set(context, recent);
     }
 
     begin(piece, now, previous, outgoing, handover = transition(previous === 'rest' ? undefined : previous, this.current)) {
@@ -306,9 +335,7 @@ export class MusicDirector {
         piece.end?.(this, at, this.sting);
         this.retire(this.group, Math.min(4, this.barSeconds * 1.2));
         this.group = null; this.piece = null;
-        const recent = this.history.get(this.current) ?? [];
-        recent.unshift(piece.id); recent.length = Math.min(recent.length, 2);
-        this.history.set(this.current, recent);
+        this.remember(this.current, piece.id);
         const rest = this.audition?.id === piece.id ? this.audition.rest ?? 4 : this.pace?.rest ?? this.range(...rotation.rest);
         this.restUntil = at + rest;
     }

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {SHIPS, LOCATIONS} from '../../src/game/data.js';
 import {BASE_OUTFIT_ITEMS, HULL_HARDPOINTS} from '../../src/game/outfitting.js';
-import {resolveEquipmentDefinition, NAMED_EQUIPMENT} from '../../src/game/equipmentCatalog.js';
+import {resolveEquipmentDefinition, NAMED_EQUIPMENT, TIER_CURVE, EQUIPMENT_RARITIES, equipmentRating} from '../../src/game/equipmentCatalog.js';
 import {createEquipmentRecord, equipmentAction, specialEquipmentOffers, rollEquipmentRecord} from '../../src/game/equipmentInventory.js';
 import {createEnemyLoadout} from '../../src/game/enemyLoadouts.js';
 import {getEffectiveShipStats} from '../../src/game/shipStats.js';
@@ -21,13 +21,18 @@ test('each non-drone model gains a real primary benefit with tier and rarity',()
   const tier=base.tier??1, rank=x=>{
    if(['gun','launcher','turret'].includes(base.category))return x.modifiers.damage;
    if(base.id==='loot-collector')return x.effects.lootRange;
-   const effect=Object.entries(x.effects).find(([k,v])=>typeof v==='number'&&(k.endsWith('Multiplier')&&v>1||['shieldCapacity','hullCapacity','cargoCapacity','salvageRange','salvageRate'].includes(k)));
-   assert.ok(effect,base.id);return effect[1];
+   // The model's own primary effect, not a bonus a legendary trait adds.
+   const key=Object.keys(base.effects).find(k=>typeof base.effects[k]==='number'&&(k.endsWith('Multiplier')&&base.effects[k]>1||['shieldCapacity','hullCapacity','cargoCapacity','salvageRange','salvageRate'].includes(k)));
+   assert.ok(key,base.id);return x.effects[key];
   };
-  const common=def(base,tier),green=def(base,tier,'uncommon'),blue=def(base,tier,'rare');
-  assert.ok(rank(green)>rank(common),`${base.id} green`);assert.ok(rank(blue)>rank(green),`${base.id} blue`);
-  if(NAMED_EQUIPMENT[base.id])assert.ok(rank(def(base,tier,'named'))>rank(blue),`${base.id} named`);
-  if(tier<3)assert.ok(rank(def(base,tier+1))>rank(common),`${base.id} tier`);
+  const common=def(base,tier),green=def(base,tier,'uncommon'),blue=def(base,tier,'rare'),purple=def(base,tier,'epic');
+  assert.ok(rank(green)>rank(common),`${base.id} green`);assert.ok(rank(blue)>rank(green),`${base.id} blue`);assert.ok(rank(purple)>rank(blue),`${base.id} epic`);
+  if(NAMED_EQUIPMENT[base.id])assert.ok(rank(def(base,tier,'named'))>=rank(purple),`${base.id} named`);
+  if(tier<3){
+   assert.ok(rank(def(base,tier+1))>rank(common),`${base.id} tier`);
+   // A technology generation is worth more than a rarity step.
+   if(base.id!=='loot-collector')assert.ok(rank(def(base,tier+1))/rank(common)>rank(purple)/rank(common)*.99,`${base.id} tier outweighs rarity`);
+  }
  }
 });
 test('all hulls gain defenses and energy from matching fitted upgrades without flight penalties',()=>{
@@ -87,7 +92,7 @@ test('matching guns sustain more fire than oversized guns after the capacitor is
  const traces=fits.map(fit=>firingTrace(fit,{duration:60}));
  assert.ok(traces[0].shots>traces[1].shots&&traces[1].shots>traces[2].shots);
  assert.ok(traces[0].hullDamage>traces[1].hullDamage&&traces[1].hullDamage>traces[2].hullDamage);
- for(let i=0;i<3;i++)assert.ok(Math.abs(weaponForOutfit(guns[i].id).energyCost-3.5*(1+i*.06))<1e-9,'shared per-shot cost stays independent of the hull');
+ for(let i=0;i<3;i++)assert.ok(Math.abs(weaponForOutfit(guns[i].id).energyCost-3.5*TIER_CURVE.energy[i])<1e-9,'shared per-shot cost stays independent of the hull');
 });
 test('oversized power modules also pay the load, while returning to matching gear removes it',()=>{
  const records=[1,2,3].map(tier=>createEquipmentRecord('sustained-reactor',{tier}));
@@ -95,11 +100,51 @@ test('oversized power modules also pay the load, while returning to matching gea
  assert.equal(fits[0].overTierLoad,0);assert.ok(fits[0].reactorOutput>fits[1].reactorOutput&&fits[1].reactorOutput>fits[2].reactorOutput);
  const returned=balanceFit('wayfarer',[],[records[0].id]).stats;assert.deepEqual(returned,fits[0]);
 });
-test('colored equipment is rare in ordinary rolls while the named tutorial drop remains explicit',()=>{
- const counts={common:0,uncommon:0,rare:0,named:0};let x=123456;
- const rng=()=>{x=(Math.imul(x,1664525)+1013904223)>>>0;return x/4294967296;};
- for(let i=0;i<10000;i++){const r=rollEquipmentRecord('beam-emitter',rng,1,`eq-roll-${i}`);counts[r.rarity]++;}
- assert.ok(counts.common>8600,JSON.stringify(counts));assert.ok(counts.uncommon>700&&counts.uncommon<1200,JSON.stringify(counts));assert.ok(counts.rare>150&&counts.rare<300,JSON.stringify(counts));assert.ok(counts.named<50,JSON.stringify(counts));
+test('ordinary rolls are mostly plain, and luck from danger and pilot rank shifts them toward better grades',()=>{
+ const roll=luck=>{const counts={common:0,uncommon:0,rare:0,epic:0,named:0};let x=123456;
+  const rng=()=>{x=(Math.imul(x,1664525)+1013904223)>>>0;return x/4294967296;};
+  for(let i=0;i<10000;i++){const r=rollEquipmentRecord('beam-emitter',rng,1,`eq-roll-${i}`,{luck});counts[r.rarity]++;}return counts;};
+ const base=roll(0),deep=roll(.85);
+ // Drops stay scarce: dealers are the dependable source, colour is an event.
+ assert.ok(base.common>8600&&base.common<9000,JSON.stringify(base));assert.ok(base.uncommon>780&&base.uncommon<1060,JSON.stringify(base));
+ assert.ok(base.rare>160&&base.rare<290,JSON.stringify(base));assert.ok(base.epic>20&&base.epic<80,JSON.stringify(base));assert.ok(base.named<35,JSON.stringify(base));
+ assert.ok(deep.common<base.common*.9&&deep.epic>base.epic*3&&deep.named>base.named*4,JSON.stringify(deep));
+ // Hardware without a legendary design rolls epic instead.
+ let y=7;const rng=()=>{y=(Math.imul(y,1664525)+1013904223)>>>0;return y/4294967296;};
+ for(let i=0;i<4000;i++)assert.notEqual(rollEquipmentRecord('radar-mk2',rng,1,`eq-radar-${i}`,{luck:2}).rarity,'named');
+ // A legendary you already own is unique: it rolls as epic instead.
+ let z=11;const lucky=()=>{z=(Math.imul(z,1664525)+1013904223)>>>0;return z/4294967296;};const owned=new Set(['pulse-cannon']);
+ for(let i=0;i<4000;i++)assert.notEqual(rollEquipmentRecord('pulse-cannon',lucky,1,`eq-unique-${i}`,{luck:3,owned}).rarity,'named');
+});
+test('signature colours follow the specialising affix or the legendary and reach the flight weapon',()=>{
+ const base=BASE_OUTFIT_ITEMS['pulse-cannon'];
+ assert.equal(def(base,1).signature,undefined);assert.equal(weaponForOutfit('pulse-cannon').tint,undefined);
+ const two=resolveEquipmentDefinition(base,{id:'sig',baseId:base.id,tier:1,rarity:'rare',affixes:['disruptive','siphoning'],rolls:[.2,.9]});
+ assert.equal(two.signature.id,'siphoning','the better-rolled specialisation wins');
+ const plainAffix=resolveEquipmentDefinition(base,{id:'sig2',baseId:base.id,tier:1,rarity:'uncommon',affixes:['rapid'],rolls:[1]});assert.equal(plainAffix.signature,undefined);
+ const named=createEquipmentRecord('gauss-cannon',{rarity:'named'});assert.equal(weaponForOutfit(named.id).tint,NAMED_EQUIPMENT['gauss-cannon'].signature);
+});
+test('rarity grades roll more and stronger affixes, and rating orders tier and rarity',()=>{
+ const rng=()=>.5;
+ for(const [rarity,count] of Object.entries({common:0,uncommon:1,rare:2,epic:3})){
+  let n=0;const r=rollEquipmentRecord('pulse-cannon',()=>{n++;return rarity==='common'?.01:rarity==='uncommon'?.9:rarity==='rare'?.985:.996;},1,`eq-grade-${rarity}`);
+  assert.equal(r.rarity,rarity);assert.equal(r.affixes.length,count);assert.equal(r.rolls?.length??0,count);
+ }
+ const base=BASE_OUTFIT_ITEMS['pulse-cannon'],low=resolveEquipmentDefinition(base,{id:'lo',baseId:base.id,tier:1,rarity:'rare',affixes:['overcharged'],rolls:[0]}),high=resolveEquipmentDefinition(base,{id:'hi',baseId:base.id,tier:1,rarity:'epic',affixes:['overcharged'],rolls:[0]});
+ assert.ok(high.modifiers.damage>low.modifiers.damage,'better grades raise the roll floor');
+ const ratings=[1,2,3].map(tier=>['common','uncommon','rare','epic','named'].map(rarity=>equipmentRating(def(base,tier,rarity))));
+ for(const row of ratings)for(let i=1;i<row.length;i++)assert.ok(row[i]>row[i-1],JSON.stringify(ratings));
+ for(let t=1;t<3;t++)assert.ok(ratings[t][0]>ratings[t-1][2],'a new generation outclasses last generation rares');
+ assert.equal(equipmentRating(def(base,1)),100);
+});
+test('legendary traits change the hardware and better parts survive destruction more often',()=>{
+ const named=id=>weaponForOutfit(createEquipmentRecord(id,{tier:1,rarity:'named'}).id);
+ assert.equal(named('ripper').pellets,10);assert.equal(named('gauss-cannon').pierce,1);assert.equal(named('ion-blaster').jamSeconds,2);
+ assert.equal(named('pulse-cannon').critEvery,4);assert.ok(named('beam-emitter').siphon>=.35);
+ const plain=weaponForOutfit('mortar'),dawn=named('mortar');assert.ok(dawn.splashRadius>plain.splashRadius*1.5);
+ const order=['common','uncommon','rare','epic','named'].map(r=>EQUIPMENT_RARITIES[r].survival);
+ assert.ok(order[0]>=.15&&order[0]<=.18,'common parts survive at about the former rate');
+ for(let i=1;i<order.length;i++)assert.ok(order[i]>order[i-1]);assert.equal(order.at(-1),1);
 });
 test('special dealer offers are expensive, fixed within a rotation, bought once and persist across saves',()=>{
  let found;for(let seed=0;seed<100&&!found;seed++){

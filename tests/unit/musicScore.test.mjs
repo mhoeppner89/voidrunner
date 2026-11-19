@@ -162,6 +162,35 @@ test('one fight keeps one piece; calm places settle before the score follows; ha
  assert.ok(director.nextBar-ctx.currentTime>1.5,'the new piece waits for the outgoing one to thin out');
 });
 
+test('Arena waves are fresh fights: each wave lands on a new combat piece, never one of the last three',()=>{
+ const manager=fakeMusicManager(),director=new MusicDirector(manager),place={systemId:'helios-verge'};
+ run(director,2,'open',place);
+ const played=[];
+ for(let wave=0;wave<10;wave+=1){
+  director.freshFight();
+  run(director,20,'combat',place,0.6);
+  played.push(director.piece.id);
+  // Odd waves: the score still holds from the last fight when the next wave
+  // starts; even waves: a short calm stretch between them.
+  if(wave%2)run(director,8,'open',place);
+ }
+ for(let i=1;i<played.length;i+=1)assert.ok(!played.slice(Math.max(0,i-3),i).includes(played[i]),`wave ${i+1} repeats a recent piece: ${played.join(', ')}`);
+ assert.ok(new Set(played).size>=5,`a ten-wave run hears at least five pieces: ${played.join(', ')}`);
+});
+
+test('a new fight after the memory has passed avoids the previous combat piece',()=>{
+ const manager=fakeMusicManager(),director=new MusicDirector(manager),place={systemId:'helios-verge'};
+ for(let round=0;round<6;round+=1){
+  run(director,2,'open',place);
+  run(director,5,'combat',place,0.6);
+  const fight=director.piece.id;
+  run(director,100,'open',place);
+  run(director,5,'combat',place,0.6);
+  assert.notEqual(director.piece.id,fight,'a fight after COMBAT_MEMORY is not the previous one again');
+  run(director,100,'open',place);
+ }
+});
+
 test('the combat score holds through a strafing run out of range',async()=>{
  const {AudioManager}=await import('../../src/game/audio.js');
  const audio=Object.create(AudioManager.prototype),contexts=[];

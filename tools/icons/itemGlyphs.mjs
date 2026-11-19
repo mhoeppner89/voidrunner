@@ -77,6 +77,32 @@ export const SIGNALS={
  'frigate-battery':'M24 10h6m8 0h6M24 16h6m8 0h6',
  'cruiser-battery':'M23 6h7m9 0h7M23 18h7m9 0h7',
 };
+// Technology tiers keep each weapon family's silhouette and add hardware:
+// tier II adds the first part, tier III both (heat sinks, coils, pods, shrouds).
+// Paths share the 64-unit glyph space and join the body layer.
+export const TIER_PARTS={
+ 'pulse-cannon':['M20 11h11v6H20zm13 0h11v6H33zM21 20h10v3H21zm12 0h10v3H33z','M8 33h8v12H8zm40 0h8v12h-8zM22 5h8v4h-8zm12 0h8v4h-8z'],
+ 'beam-emitter':['M12 34h40v6H12z','M5 27h9v11H5zm45 0h9v11h-9z'],
+ 'gauss-cannon':['M20 11h24v4H20zM20 21h24v4H20z','M10 34h8v13h-8zm36 0h8v13h-8zM22 1h20v4H22z'],
+ ripper:['M7 32h11v12H7zm39 0h11v12H46z','M19 7h26v4H19z'],
+ 'ion-blaster':['M23 5h5v10h-5zm13 0h5v10h-5z','M5 27h7v13H5zm47 0h7v13h-7z'],
+ mortar:['M20 14h24v6H20z','M8 32h9v10H8zm39 0h9v10h-9z'],
+ 'seeker-launcher':['M14 21h6v14h-6zm30 0h6v14h-6z','M26 50h12v4H26zM10 30h4v8h-4zm40 0h4v8h-4z'],
+ 'swarm-launcher':['M14 5h36v5H14z','M3 24h7v16H3zm51 0h7v16h-7z'],
+ 'shield-seeker-launcher':['M16 50h20v4H16z','M9 20h7v14H9z'],
+ 'shield-swarm-launcher':['M12 6h20v5H12z','M2 26h7v14H2z'],
+ 'torpedo-launcher':['M18 23h28v6H18z','M11 17h7v17h-7zm35 0h7v17h-7z'],
+ pdc:['M22 11h20v5H22z','M9 27h9v10H9zm37 0h9v10h-9z'],
+ 'tracking-turret':['M23 11h18v5H23z','M11 28h9v8h-9zm33 0h9v8h-9z'],
+};
+// Tier paint: I blue steel, II titanium, III black alloy with gold edges.
+export const TIER_PAINT={
+ 1:{body:'#2f4f68',face:'#5e86a3',edge:'#c6deec',line:'#8fb1c7'},
+ 2:{body:'#4b5160',face:'#8a93a6',edge:'#eef2f8',line:'#b4bccb'},
+ 3:{body:'#262a3b',face:'#4b5372',edge:'#f0cc72',line:'#a08a58'},
+};
+// Items that only exist at tier III keep a single sprite.
+export const SINGLE_TIER=new Set(['frigate-battery','cruiser-battery','capital-shield-generator','mining-drone','pdc-drone','repair-drone']);
 // Body paint is independent of rarity. Rarity stays on the tier/affix markers.
 export const STEEL={body:'#203b50',face:'#496b83',edge:'#a9c5d5',line:'#799aaf'};
 export const ACCENTS={

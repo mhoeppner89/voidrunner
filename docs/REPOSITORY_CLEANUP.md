@@ -36,9 +36,9 @@ The cleaner intentionally leaves Git history, unmerged branches, `authoring/`, `
 
 ### Remaining active test failures
 
-None. Full suite: **1,374 passed / 0 failed** (0.8.2pg).
+None. Full suite: **1,388 passed / 0 failed** (0.8.2ph).
 
-Browser: `tests/browser/space-pickups.mjs` is stale (found in 0.8.2pg). Its exploration-review scene `convoy` was renamed `distress-convoy` and the convoy choice it presses is no longer shown on that scene; the test needs the current distress flow. It also requires `node tools/playtest/exploration-review.mjs` to have generated `output/exploration-review/`.
+Browser, fixed in 0.8.2ph: `controller.mjs` asserted the long-gone 0.8.2of title version (now any 0.8.x build), and `menu-clarity.mjs` failed on the desktop concourse's sideways overflow (the composite canvas is now clipped by its host). Browser: `tests/browser/space-pickups.mjs` is stale (found in 0.8.2pg). Its exploration-review scene `convoy` was renamed `distress-convoy` and the convoy choice it presses is no longer shown on that scene; the test needs the current distress flow. It also requires `node tools/playtest/exploration-review.mjs` to have generated `output/exploration-review/`.
 
 ### Resolved: stale balance and mock expectations
 

@@ -233,6 +233,34 @@ export const EQUIPMENT_NAMING = {
     "compact": {
       "en": "Compact",
       "de": "Kompakt"
+    },
+    "overcharged": {
+      "en": "Overcharged",
+      "de": "Überladen"
+    },
+    "disruptive": {
+      "en": "Disruptive",
+      "de": "Schildbrechend"
+    },
+    "piercing": {
+      "en": "Armor-piercing",
+      "de": "Panzerbrechend"
+    },
+    "siphoning": {
+      "en": "Siphoning",
+      "de": "Abzapfend"
+    },
+    "reinforced": {
+      "en": "Reinforced",
+      "de": "Verstärkt"
+    },
+    "warded": {
+      "en": "Warded",
+      "de": "Geschirmt"
+    },
+    "overclocked": {
+      "en": "Overclocked",
+      "de": "Übertaktet"
     }
   },
   "named": {
@@ -255,6 +283,38 @@ export const EQUIPMENT_NAMING = {
     "shield-mk2": {
       "en": "Bastion",
       "de": "Bastion"
+    },
+    "ripper": {
+      "en": "Hailstorm",
+      "de": "Hailstorm"
+    },
+    "ion-blaster": {
+      "en": "Static Bloom",
+      "de": "Static Bloom"
+    },
+    "mortar": {
+      "en": "Dawnbreaker",
+      "de": "Dawnbreaker"
+    },
+    "seeker-launcher": {
+      "en": "Longbow",
+      "de": "Longbow"
+    },
+    "armor-mk2": {
+      "en": "Ironclad",
+      "de": "Ironclad"
+    },
+    "sustained-reactor": {
+      "en": "Heartfire",
+      "de": "Heartfire"
+    },
+    "engine-mk2": {
+      "en": "Comet Tail",
+      "de": "Comet Tail"
+    },
+    "thrusters-mk2": {
+      "en": "Dervish",
+      "de": "Dervish"
     }
   }
 };

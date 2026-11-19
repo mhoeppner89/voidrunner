@@ -36,7 +36,7 @@ test('equal-count projectile replacement pools the old slot visual for reuse', (
     const old = r.projectileMeshes.get(0); let disposed = 0; old.geometry.addEventListener('dispose', () => disposed++);
     r.syncProjectiles([{ slot: 1, kind: 'pdc', faction: 'player' }], store);
     assert.deepEqual([...r.projectileMeshes.keys()], [1]); assert.equal(disposed, 0); assert.equal(old.parent, null);
-    assert.equal(r.projectilePools.get('pdc|player|')?.includes(old),true,'the retired mesh remains available in its matching pool');
+    assert.equal(r.projectilePools.get('pdc|player||')?.includes(old),true,'the retired mesh remains available in its matching pool');
     const replacement=r.projectileMeshes.get(1);
     r.syncProjectiles([], store);
     r.syncProjectiles([{ slot: 2, kind: 'pdc', faction: 'player' }], store);

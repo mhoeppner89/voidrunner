@@ -1,5 +1,5 @@
-import {equipmentBaseId} from './equipmentCatalog.js';
-import {createEquipmentRecord,registerInventoryDefinitions,normalizeEquipmentInventory} from './equipmentInventory.js';
+import {equipmentBaseId,RARITY_ORDER,NAMED_EQUIPMENT} from './equipmentCatalog.js';
+import {createEquipmentRecord,rollAffixes,registerInventoryDefinitions,normalizeEquipmentInventory} from './equipmentInventory.js';
 import {createNewSave,hydrateSave} from './save.js';
 import {HULL_HARDPOINTS,OUTFIT_ITEMS,canonicalOutfitId,LOADOUT_KEYS,loadoutFor,createOutfittingState,itemFitsMount,validateLoadout,projectLegacyEquipment,projectLegacyWeaponId} from './outfitting.js';
 import {getEffectiveShipStats} from './shipStats.js';
@@ -147,8 +147,10 @@ export function writeArenaRun(save){try{const clean={...save,player:{...save.pla
 export function arenaRecord(){try{return JSON.parse(window.localStorage.getItem(ARENA_RECORD_KEY))??{};}catch{return {};}}
 export function recordArenaRun(save){const r=save.arenaRun,old=arenaRecord();try{window.localStorage.setItem(ARENA_RECORD_KEY,JSON.stringify({unlockedHard:old.unlockedHard||r.phase==='won',best:Math.max(old.best??0,runScore(r)),last:{cleared:r.cleared,score:runScore(r)}}));}catch{}}
 export const runScore=r=>Math.max(0,Math.round(r.cleared*1000+(r.phase==='won'?2000:0)-r.elapsed*2-r.damage*2-r.missiles*20));
-// Arena Run uses fixed reward pools without rolled career affixes. Hull-tier
-// upgrades and skip bonuses use the same real equipment records as career loot.
+// Arena Run draws from fixed pools. RUN_EQUIPMENT_RARITY is each pool item's
+// usual grade; coloured grades, hull-tier upgrades and skip bonuses become
+// deterministic eq-arena records with rolled affixes (and, at the top, a
+// legendary trait) from the shared equipment catalog.
 export const RUN_EQUIPMENT_RARITY=Object.freeze({
  'pulse-cannon':'common','beam-emitter':'common','ripper':'common','seeker-launcher':'common','pdc':'common',
  'gauss-cannon':'uncommon','ion-blaster':'uncommon','mortar':'uncommon','tracking-turret':'uncommon',
@@ -161,18 +163,26 @@ const rewardPools={
  handling:['engine-mk2','thrusters-mk2','capacitor-bank','sustained-reactor'],
 };
 const rewardWave={'pulse-cannon-t2':3,'pulse-cannon-t3':8,'swarm-launcher':3,'torpedo-launcher':5,'mortar':2,'gauss-cannon':2};
-const REWARD_GRADES=['common','uncommon','rare','named'];
+const REWARD_GRADES=RARITY_ORDER;
 function runRewardItem(save,id){
  const item=OUTFIT_ITEMS[id];if(!item)return id;
  const r=save.arenaRun,hull=Math.max(1,hullTier(save.player.shipId)??1);
  const bonus=r.rarityBonusWave===r.wave;
  const tier=Math.max(item.tier??1,hull===2&&seededRandom(`${r.seed}:reward-tier:${r.wave}:${id}`)()<.2?3:hull);
- if(tier<=(item.tier??1)&&!bonus)return id;
+ const baseId=equipmentBaseId(id);
  const usual=item.rarity??RUN_EQUIPMENT_RARITY[id]??'common';
- const rarity=REWARD_GRADES[Math.min(3,REWARD_GRADES.indexOf(usual)+(bonus?1:0))];
+ // A coloured reward is a real record of that grade (bonus and rolled
+ // affixes), so its colour means the same as in career. Only plain common
+ // stock at the item's own tier stays a base id.
+ if(tier<=(item.tier??1)&&!bonus&&usual==='common')return id;
+ const baseRank=Math.max(0,REWARD_GRADES.indexOf(usual));
+ let rank=Math.min(REWARD_GRADES.length-1,baseRank+(hull>=3?1:0)+(bonus?1:0));
+ if(hull>=3&&bonus&&rank===3&&NAMED_EQUIPMENT[baseId]&&seededRandom(`${r.seed}:reward-named:${r.wave}:${id}`)()<.4)rank=4;
+ if(rank===4&&!NAMED_EQUIPMENT[baseId])rank=3;
+ const rarity=REWARD_GRADES[rank];
  const key=`eq-arena-${r.seed}-${r.wave}-${id}-t${tier}-${rarity}`;
  r.rewardRecords??={};
- const record=r.rewardRecords[key]??createEquipmentRecord(id,{id:key,tier,rarity});
+ const record=r.rewardRecords[key]??createEquipmentRecord(id,{id:key,tier,rarity,...rollAffixes(item.category,rarity,seededRandom(`${r.seed}:reward-affix:${r.wave}:${id}:${tier}:${rarity}`))});
  r.rewardRecords[key]=record;return record.id;
 }
 function enoughRunEquipment(save,id,owned){

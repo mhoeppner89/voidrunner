@@ -34,6 +34,6 @@ export function equipmentEffectStats(item){
   if(!effect)return [];
   const ratio=effect.endsWith('Multiplier')||effect==='salvageRate';
   const value=ratio?(item.effects[effect]-1)*100:item.effects[effect];
-  return [{key:field.key,label:field.label,value,unit:ratio?'%':['salvageRange','lootRange'].includes(effect)?' km':''}];
+  return [{key:field.key,label:field.label,value,unit:ratio?'%':['salvageRange','lootRange'].includes(effect)?' km':'',...(field.lowerBetter?{lowerBetter:true}:{})}];
  });
 }

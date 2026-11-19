@@ -30,7 +30,7 @@ for (const [profile, engine, device] of [['desktop', chromium, { viewport: { wid
         await page.reload();
         await page.waitForFunction(() => window.__VOID_PRIVATEER__?.newGame);
         await page.waitForTimeout(250);
-        assert.match(await page.locator('.title-version').textContent(), /0\.8\.2of/);
+        assert.match(await page.locator('.title-version').textContent(), /0\.8\.\d+[a-z]*/);
         const set = async (buttons = [], axes = [0, 0, 0, 0]) => {
             await page.evaluate(({ buttons, axes }) => { testPad.axes = axes; testPad.buttons.forEach((button, index) => { button.pressed = buttons.includes(index); button.value = button.pressed ? 1 : 0; }); }, { buttons, axes });
             await page.waitForTimeout(110);

@@ -208,6 +208,11 @@ export class AudioManager {
         if (this.musicVolume > 0.01) void this.bank?.load('music');
     }
 
+    // An Arena wave is a new fight: it gets its own combat piece.
+    freshFight() {
+        this.music?.freshFight();
+    }
+
     setStationMode(station) {
         this.stationMode = station;
         if (!this.context)

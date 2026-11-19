@@ -68,7 +68,7 @@ test('German Arena reward names use complete weapon types and tiers',async()=>{
 
 test('unmounted utility bonuses use concrete stat labels and actual rolled effects',()=>{
  const base=BASE_OUTFIT_ITEMS['capacitor-bank'];const item=resolveEquipmentDefinition(base,{id:'tier2',baseId:base.id,tier:2,rarity:'common',affixes:[]});
- const rows=equipmentEffectStats(item);assert.deepEqual(rows.map(r=>r.label),['Energy capacity']);assert.equal(rows[0].unit,'%');assert(Math.abs(rows[0].value-44)<.001);
+ const rows=equipmentEffectStats(item);assert.deepEqual(rows.map(r=>r.label),['Energy capacity']);assert.equal(rows[0].unit,'%');assert(Math.abs(rows[0].value-56)<.001,'tier II scales the +40% bonus by 1.4');
  for(const base of Object.values(BASE_OUTFIT_ITEMS).filter(d=>!['gun','launcher','turret','drone'].includes(d.category)))assert(equipmentEffectStats(base).length,base.id);
 });
 
@@ -89,4 +89,29 @@ test('commodity labels stay short in both languages, with legality separate from
  for(const [id,label]of Object.entries(expected))assert.equal(DE_CATALOG[COMMODITIES[id].name],label,id);
  assert.equal(COMMODITIES.arms.legal,false);assert.equal(COMMODITIES.arms.name,'Weapons');
  const {ADVENTURE_DIALOGUES}=await import('../../src/game/adventureDialogues.js');assert.match(ADVENTURE_DIALOGUES.rin.nodes.legal.text.de,/rot markierte Waffenfracht.*Schmuggelware/);
+});
+
+test('icons keep their family silhouette, change hardware by tier and take the signature accent',async()=>{
+ const {resolveEquipmentDefinition}=await import('../../src/game/equipmentCatalog.js');
+ const base=BASE_OUTFIT_ITEMS['pulse-cannon'],make=(tier,rarity='common',affixes=[])=>resolveEquipmentDefinition(base,{id:`icon-${tier}-${rarity}-${affixes}`,baseId:base.id,tier,rarity,affixes,rolls:affixes.map(()=>.5)});
+ const shapes=svg=>[...svg.matchAll(/<path d="([^"]+)" fill/g)].map(m=>m[1]).join('|');
+ const tiers=[1,2,3].map(tier=>equipmentIcon(make(tier)));assert.equal(new Set(tiers.map(shapes)).size,3,'each tier has its own hardware');
+ for(const svg of tiers)assert.match(svg,/data-icon="pulse-cannon"/);
+ const plain=equipmentIcon(make(2)),siphon=equipmentIcon(make(2,'rare',['siphoning']));
+ assert.match(siphon,/data-signature="siphoning"/);assert.doesNotMatch(plain,/data-signature/);
+ const fills=svg=>[...svg.matchAll(/fill="#([0-9a-f]{6})"/g)].map(m=>m[1]);
+ assert.notDeepEqual(fills(siphon),fills(plain),'the accent light takes the signature colour');assert.equal(shapes(siphon),shapes(plain),'without changing the silhouette');
+});
+
+test('unmounted Comet Tail marks reduced boost fuel use as an improvement',async()=>{
+ const {createEquipmentRecord}=await import('../../src/game/equipmentInventory.js');
+ const {renderEquipmentInventory}=await import('../../src/game/equipmentUi.js');
+ const s=createNewSave(99,{tutorial:false});
+ const comet=createEquipmentRecord('engine-mk2',{tier:2,rarity:'named',location:{kind:'station',stationId:'vesper'}});
+ s.player.inventory.items[comet.id]=comet;
+ const rows=equipmentEffectStats(resolveEquipmentDefinition(BASE_OUTFIT_ITEMS['engine-mk2'],comet));
+ const fuel=rows.find(r=>r.key==='burnFuelMultiplier');
+ assert.equal(fuel?.lowerBetter,true);assert.ok(fuel.value<0);
+ const html=renderEquipmentInventory({save:s,inventoryTab:'remote',inventoryItemId:comet.id});
+ assert.match(html,/class="inventory-stat is-better" data-stat="burnFuelMultiplier"/);
 });

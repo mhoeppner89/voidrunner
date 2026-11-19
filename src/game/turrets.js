@@ -171,7 +171,7 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
                         state.fireAt=now+laser.cooldown*disruption;
                         session.fireBeam(ownerId,laser,state.muzzle,state.direction,`${ownerId}-turret-${index}`);
                     }
-                    session.renderer.spawnMuzzleFlash?.(state.muzzle.x,state.muzzle.y,state.muzzle.z,pdc?color:0x7cffff);
+                    session.renderer.spawnMuzzleFlash?.(state.muzzle.x,state.muzzle.y,state.muzzle.z,pdc?(pdcWeapon.tint??color):(laser.tint??0x7cffff));
                     if(now>=(state.soundAt??0)){
                         const offset=state.scratch.fromArray(actor.position).sub(state.local.fromArray(session.save.player.position));
                         const distance=offset.length();offset.applyQuaternion(state.turn.fromArray(session.save.player.rotation).invert());

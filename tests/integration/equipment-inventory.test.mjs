@@ -100,7 +100,7 @@ test('survival rolls have the intended per-item and per-unit frequencies',()=>{
   const s=session(i),item=createEquipmentRecord('pulse-cannon',{id:`loot-frequency-${i}`}),a={lootKey:`loot-rate-${i}`,name:'Rate probe',position:[0,0,0],velocity:[0,0,0],equipmentRecords:[{item,key:'guns',index:0}],cargo:{ore:10}};
   const w=makeCareerWreck(s,a);equipment+=w?.contents.filter(e=>e.kind==='equipment').length??0;cargo+=w?.contents.find(e=>e.kind==='cargo')?.quantity??0;
  }
- assert.ok(equipment>145&&equipment<215,`equipment survivors: ${equipment}/1000`);assert.ok(cargo>5200&&cargo<5800,`cargo survivors: ${cargo}/10000`);
+ assert.ok(equipment>105&&equipment<175,`common equipment survivors: ${equipment}/1000`);assert.ok(cargo>5200&&cargo<5800,`cargo survivors: ${cargo}/10000`);
 });
 
 test('inventory recovery cannot reach through a blocked salvage line',()=>{
@@ -126,14 +126,14 @@ test('multiple launchers spend one energy charge per canister and cannot overdra
 });
 
 test('pulse tiers replace reinforced variants with shared player and NPC firepower',async()=>{
- const {WEAPONS,WEAPON_ORDER}=await import('../../src/game/weapons.js'),{equipmentName,resolveEquipmentDefinition,modifiedWeapon}=await import('../../src/game/equipmentCatalog.js'),{setLanguage,getLanguage}=await import('../../src/game/i18n.js');
+ const {WEAPONS,WEAPON_ORDER}=await import('../../src/game/weapons.js'),{equipmentName,resolveEquipmentDefinition,modifiedWeapon,TIER_CURVE}=await import('../../src/game/equipmentCatalog.js'),{setLanguage,getLanguage}=await import('../../src/game/i18n.js');
  assert(!Object.hasOwn(BASE_OUTFIT_ITEMS,'pulse-mk2'));assert(!WEAPON_ORDER.includes('pulse-mk2'));
- const previous=getLanguage();try{setLanguage('de');for(const [tier,damage,energy]of [[1,12,3.2],[2,12*27/23,3.6],[3,12*31/23,4]]){
+ const previous=getLanguage();try{setLanguage('de');for(const [tier,damage,energy]of [1,2,3].map(tier=>[tier,12*TIER_CURVE.damage[tier-1],3.2*TIER_CURVE.energy[tier-1]])){
   const item=resolveEquipmentDefinition(BASE_OUTFIT_ITEMS['pulse-cannon'],{id:'probe',baseId:'pulse-cannon',tier,rarity:'common',affixes:[]}),weapon=modifiedWeapon(WEAPONS.pulse,item);
   assert(Math.abs(weapon.damageFlat-damage)<1e-8);assert(Math.abs(weapon.energyCost-energy)<1e-8);assert.equal(weapon.cooldown,.17);assert.equal(weapon.range,450);assert.equal(equipmentName(item),'Pulslaser\u00a0'+['I','II','III'][tier-1]);
  }}finally{setLanguage(previous);}
  const ship={hullId:'lancer',position:[0,0,0],pilot:{tier:'veteran'}};ship.combatFit=createEnemyLoadout(ship,0);
- assert.equal(ship.combatFit.guns[0],'pulse-cannon-t2');assert.equal(ship.combatFit.weapons[0],'pulse');assert(Math.abs(ship.combatFit.weaponDefinitions[0].damageFlat-12*27/23)<1e-8);
+ assert.equal(ship.combatFit.guns[0],'pulse-cannon-t2');assert.equal(ship.combatFit.weapons[0],'pulse');assert(Math.abs(ship.combatFit.weaponDefinitions[0].damageFlat-12*TIER_CURVE.damage[1])<1e-8);
  const session={save:make(),arena:false,careerRegionAt:()=>({danger:.5})};equipCareerItems(session,ship);
  const pulse=ship.equipmentRecords.find(({item})=>item.baseId==='pulse-cannon').item;assert.equal(pulse.tier,2,'low-danger career does not discard the NPC weapon tier');
 });
