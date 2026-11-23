@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v687-0-8-2ph-equipment-rpg';
+const CACHE = 'voidrunner-v689-0-8-2pj-range-control';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -185,6 +185,10 @@ const CORE_ASSETS = [
   './src/game/equipmentInventory.js',
   './src/game/equipmentUi.js',
   './src/game/arenaRunView.js',
+  './src/game/arenaSites.js',
+  './src/game/arenaStaging.js',
+  './src/game/arenaSweep.js',
+  './src/game/fieldRoadmap.js',
   './src/game/itemIcons.js',
   './src/game/itemSprites.js',
   './src/game/equipmentStatPresentation.js',

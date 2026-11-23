@@ -219,7 +219,7 @@ export const tutorialCardContent = save => {
     if (campaign.stepId === 'mining-contract' && quest.flags.miningExplained) objective = 'Accept the marked mining contract on the mission board.';
     if (campaign.stepId === 'defeat-raider' && quest.flags.firstRaiderSurrendered) {
         objective = 'Capture the surrendered pirate.';
-        instruction = 'Keep the pirate targeted, approach and press M or tap capture.';
+        instruction = 'Fly within 400 km of the pirate and hold there for two seconds to board.';
     }
     if (campaign.stepId === 'hide-patrol' && save.player.transponder === false) {
         objective = 'Hide inside the marked carrier hangar.';

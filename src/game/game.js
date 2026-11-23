@@ -41,6 +41,10 @@ import {guideMissile,relativeIntercept,closestHullPoint} from './weaponFlight.js
 import {fieldCombatSteering} from './fieldCombatNav.js';
 import {DEFAULT_NPC_AIM_ERROR,npcTrackedVelocity,npcGunneryProfile,npcTriggerCone,npcTriggerReady,npcShotDirection,recordNpcShot,applyNpcTurnLead} from './npcGunnery.js';
 import {ArenaRunMethods} from './arenaRunSession.js';
+import {ArenaStagingMethods} from './arenaStaging.js';
+import {advanceFieldRoadmap,combatRouteWaypoint} from './fieldRoadmap.js';
+import {updateArenaSweep} from './arenaSweep.js';
+import {arenaSite} from './arenaSites.js';
 import {CampaignWingMethods, campaignWingUnlocked} from './campaignWing.js';
 import {writeArenaRun} from './arenaRun.js';
 import { updateAutomaticTurrets } from './turrets.js';
@@ -690,6 +694,11 @@ const SCAN_COMMODITY_LABELS = {
 // jettison cargo or pay and run, or power down (optionally after dumping the
 // hold). Timid pilots give up everything; aggressive pilots mostly run and
 // almost never power down.
+// Boarding a surrendered ship needs no button: hold within scan range of a
+// powered-down prize for BOARDING_SECONDS and the prize crew takes it. Taking a
+// pilot alive pays more than a kill and keeps the whole hold and every fitting.
+export const BOARDING_SECONDS = 2;
+export const CAPTURE_BOUNTY_MULTIPLIER = 1.2;
 const SURRENDER_WEIGHTS = {
     timid: { flee: 1, eject: 3, pay: 3, down: 2, downEject: 4, downPay: 4 },
     steady: { flee: 3, eject: 2, pay: 2, down: 2, downEject: 1, downPay: 1 },
@@ -2306,7 +2315,10 @@ export class GameSession {
         // disposable.
         if(!config.run){this.configureArenaImpulseFit(config.fit ?? 'balanced');
         this.resetArenaWeaponState();}
-        const environment = config.environment ?? 'open';
+        // An Arena site stages itself (system, start, entry points); the plain
+        // environments keep the original three simulator layouts.
+        const site = config.site ? arenaSite(config.site) : undefined;
+        const environment = site?.environment ?? config.environment ?? 'open';
         const scenario = config.scenario ?? '1v1';
         const debrisCollisionTest = config.testMode === 'debris-collision';
         const freeFlight = scenario === 'free-flight';
@@ -2315,18 +2327,25 @@ export class GameSession {
             'asteroid-field': vec(LOCATIONS.shardbelt.position),
             'debris-field': vec(LOCATIONS['mourning-line'].position),
         };
-        const instanceId = environment === 'asteroid-field' ? 'shardbelt' : environment === 'debris-field' ? 'mourning-line' : undefined;
+        const instanceId = site ? site.instanceId : environment === 'asteroid-field' ? 'shardbelt' : environment === 'debris-field' ? 'mourning-line' : undefined;
         const center = centers[environment]?.clone() ?? centers.open.clone();
+        if (!site && this.save.player.systemId !== 'helios-verge') {
+            this.save.player.systemId = 'helios-verge';
+            this.renderer?.setSystem?.('helios-verge');
+        }
         // Field combat sims begin in a protected pocket inside the cloud so
         // the player sees the relict scene immediately. Mourning hyperdrive
         // arrivals use their own approach-facing battleship pocket; the
         // asteroid field retains its edge entry below.
         let stagedForward;
-        if (instanceId) {
+        if (site) {
+            this.arenaStage = undefined;
+        }
+        else if (instanceId) {
             if (debrisCollisionTest)
                 stagedForward = this.setDebrisCollisionTestPosition(center);
-            else if (environment === 'debris-field' || (config.run && this.save.arenaRun?.wave===9))
-                this.setFieldArenaPosition(center, instanceId, config.run && this.save.arenaRun?.wave===9 ? 90 : ARENA_FIELD_SAFE_CLEARANCE);
+            else if (environment === 'debris-field')
+                this.setFieldArenaPosition(center, instanceId);
             else
                 this.setFieldEntryPosition(center, instanceId, FORWARD);
         }
@@ -2337,6 +2356,11 @@ export class GameSession {
         // engine must come back on — otherwise the silo's stationMode leaves
         // the arena flight silent until the first restart.
         this.audio.setStationMode(false);
+        if (site) {
+            this.stageArenaSite(config.site);
+            center.fromArray(player.position);
+        }
+        else {
         player.position = tuple(center);
         // The interior debris arena faces the normal -Z scene direction. The
         // edge-start asteroid arena still turns inward from its boundary.
@@ -2350,6 +2374,7 @@ export class GameSession {
         else {
             player.rotation = [0, 0, 0, 1];
         }
+        }
         player.velocity = [0, 0, 0];
         player.angularVelocity = [0, 0, 0];
         if(!config.run)player.throttle = debrisCollisionTest ? 0 : 0.35;
@@ -2358,7 +2383,7 @@ export class GameSession {
         player.hull = stats.hull;
         player.energy = stats.energyCapacity;
         fillLauncherMagazines(player);}
-        player.navTargetId = environment === 'asteroid-field' ? 'shardbelt' : environment === 'debris-field' ? 'mourning-line' : 'helix';
+        if (!site) player.navTargetId = environment === 'asteroid-field' ? 'shardbelt' : environment === 'debris-field' ? 'mourning-line' : 'helix';
         this.resetPlayerInterpolation(true);
         if (!freeFlight) {
             const hostileCount = scenario === '1v2' ? 2 : scenario === '1v3' || scenario === '2v3' ? 3 : 1;
@@ -3026,6 +3051,8 @@ export class GameSession {
         }
     }
     updateSimulation(dt, actions) {
+        // The combat roadmap builds in slices, also during an Arena countdown.
+        if (this.fieldRoadmap && !this.fieldRoadmap.ready) advanceFieldRoadmap(this, 4);
         if(this.arena?.run&&this.save.arenaRun.phase!=='combat')return;
         if(this.arena?.run&&this.save.arenaRun.countdown>0){this.tickArenaRun(dt);return;}
         // Headless drivers (probes, tests) may pass sparse action objects:
@@ -3133,12 +3160,14 @@ export class GameSession {
         updateNpcDrones(this,dt);
         this.updateProjectiles(dt);
         this.updatePickups(dt);
+        this.updateBoarding(dt);
         this.updateMiningDrones(dt);
         this.updateDroneDeparture();
         this.updateDiscovery();
         this.updateRegeneration(dt);
         this.cleanupEntities();
         if(this.arena?.run)this.tickArenaRun(dt);
+        if(this.arena&&!this.arena.observer)updateArenaSweep(this,dt);
         if (this.save.world.time - this.lastMissionCheck > 0.8) {
             this.lastMissionCheck = this.save.world.time;
             failExpiredMissions(this.save).forEach((message) => this.ui.pushEvent(message, 'danger', 4800));
@@ -3150,7 +3179,7 @@ export class GameSession {
     }
     handleActions(actions) {
         if (this.playerDocking) return;
-        if(this.save.player.raceReturn){actions.missile=actions.utility=actions.miningDrones=actions.autopilot=actions.jettison=actions.capture=actions.weaponSelect=actions.weaponCycle=actions.launcherCycle=false;}
+        if(this.save.player.raceReturn){actions.missile=actions.utility=actions.miningDrones=actions.autopilot=actions.jettison=actions.weaponSelect=actions.weaponCycle=actions.launcherCycle=false;}
         // Absolute slider input is an edge: apply even on a zero-step frame.
         if (actions.throttleSet !== undefined) {
             this.save.player.throttle = clamp(actions.throttleSet, 0, 1);
@@ -3171,8 +3200,6 @@ export class GameSession {
             this.targetNearestHostile();
         else if (actions.targetNext)
             this.cycleTarget();
-        if (actions.capture)
-            this.captureTarget();
         if (actions.scan)
             this.scanTarget();
         if (actions.jettison)
@@ -3198,8 +3225,11 @@ export class GameSession {
             if (target?.kind !== 'ship' && (asteroid || this.save.player.mode === 'mining')) {
                 if (missileEdge) this.toggleMiningDrones();
             }
-            else if (ship?.surrendered && !ship.claimed && !ship.captured && (ship.bountyValue > 0 || ship.missionId))
-                this.captureTarget();
+            // No warhead on a prize: a locked, boardable surrender is taken by
+            // flying close (guns can still finish it on purpose).
+            else if (this.boardable(ship)) {
+                if (missileEdge) this.setMonitorStatus(t('PRIZE · CLOSE IN TO BOARD'));
+            }
             else if (!((this.save.player.mode === 'mining' && target?.kind === 'asteroid') || (this.save.player.mode === 'salvage' && target?.kind === 'wreck')))
                 this.fireMissile();
         }
@@ -6311,30 +6341,37 @@ export class GameSession {
         this.audio.play('scan');
         this.renderer.setTarget(target.kind === 'ship' ? target.id : undefined, target.kind === 'asteroid' ? target.id : undefined, target.kind === 'wreck' ? target.id : undefined);
     }
-    captureTarget() {
-        const target = this.getTargetRef();
-        if (!target || target.kind !== 'ship') {
-            this.setMonitorStatus(t('NO SURRENDERED SHIP LOCKED'));
-            return;
+    // A prize can be boarded: it surrendered, powered down (a pilot still
+    // running must be disabled first), is worth a claim and is still in one piece.
+    boardable(ship) {
+        return Boolean(ship?.surrendered && !ship.fleeing && !ship.claimed && !ship.captured && ship.hull > 0 && (ship.bountyValue > 0 || ship.missionId));
+    }
+    // Boarding without a button, like docking: staying within scan range of a
+    // prize for BOARDING_SECONDS captures it. The locked target boards first,
+    // otherwise the nearest prize in range; flying off pauses the progress.
+    updateBoarding(dt) {
+        const player = this.save.player;
+        if (this.arena || player.dockedAt || player.raceReturn || !(player.hull > 0) || !this.ships?.length) { this.boardingShipId = undefined; return; }
+        const range = this.playerStats().scanRange, position = vec(player.position, this.tmpP0);
+        let prize, nearest = Infinity;
+        for (const ship of this.ships) {
+            if (!this.boardable(ship)) continue;
+            const distance = this.surfaceDistance(position, { kind: 'ship', id: ship.id, position: ship.position });
+            if (distance > range) continue;
+            const rank = ship.id === player.currentTargetId ? -1 : distance;
+            if (rank < nearest) { nearest = rank; prize = ship; }
         }
-        const ship = this.ships.find((entry) => entry.id === target.id);
-        if (!ship || ship.hull <= 0)
-            return;
-        if (!ship.surrendered || ship.captured) {
-            this.setMonitorStatus(t('PILOT HAS NOT SURRENDERED'));
-            return;
+        if (!prize) { this.boardingShipId = undefined; return; }
+        if (this.boardingShipId !== prize.id) {
+            this.boardingShipId = prize.id;
+            this.audio?.play?.('ui', 0.5);
         }
-        const stats = this.playerStats();
-        const distance = this.surfaceDistance(vec(this.save.player.position), target);
-        if (distance > stats.scanRange) {
-            this.setMonitorStatus(t('OUT OF RANGE · {current}/{max} km', { current: Math.round(distance), max: stats.scanRange }));
-            return;
+        prize.boardingProgress = Math.min(1, (prize.boardingProgress ?? 0) + dt / BOARDING_SECONDS);
+        this.setMonitorStatus(t('BOARDING {percent}%', { percent: Math.round(prize.boardingProgress * 100) }), 400);
+        if (prize.boardingProgress >= 1) {
+            this.boardingShipId = undefined;
+            this.claimSurrendered(prize);
         }
-        if (!(ship.bountyValue > 0 || ship.missionId)) {
-            this.setMonitorStatus(t('NO CAPTURE CLAIM AVAILABLE'));
-            return;
-        }
-        this.claimSurrendered(ship);
     }
     cycleTarget() {
         const candidates = this.targetCandidates();
@@ -9189,10 +9226,20 @@ export class GameSession {
             navGoal = (this.tmpNavGoal ?? (this.tmpNavGoal = new THREE.Vector3())).set(position.x + desired.x * 400, position.y + desired.y * 400, position.z + desired.z * 400);
         else if (ship.covering && ship.coverPoint)
             navGoal = (this.tmpNavGoal ?? (this.tmpNavGoal = new THREE.Vector3())).set(ship.coverPoint[0], ship.coverPoint[1], ship.coverPoint[2]);
+        // Terrain between pilot and target: fly the roadmap route to a firing
+        // position instead of grinding along the surface (fieldRoadmap.js).
+        const routed = flightStats && navGoal === targetPosition && !ship.combatPlan?.finishing
+            ? combatRouteWaypoint(this, ship, position, targetPosition, clamp((ship.fireRange || tactics?.range || 400) * 0.9, 250, 700), this.tmpRouteWaypoint ??= new THREE.Vector3())
+            : undefined;
+        if (routed) {
+            navGoal = routed;
+            desired.copy(routed).sub(position).normalize();
+            spiraling = false;
+        }
         // Tactical terrain choices use the previous broadphase. They suggest a
         // local route; normal hull clearance, braking and ship avoidance follow.
         const judgment=flightStats?pilotJudgment(ship,this.save.world.time,desired,distance,closing):undefined;
-        const terrainMove=flightStats?terrainCombatManeuver(this,ship,targetPosition,lead,navOut):undefined;
+        const terrainMove=flightStats&&!routed?terrainCombatManeuver(this,ship,targetPosition,lead,navOut):undefined;
         if(terrainMove){
             desired.copy(navOut);navGoal=terrainMove.waypoint;spiraling=false;
             if(terrainMove.started===this.save.world.time){ship.fieldNav.until=0;ship.fieldNav.nextPlan=0;}
@@ -9211,7 +9258,7 @@ export class GameSession {
             desired.add(shipAvoidance);
         desired.normalize();
         let aceMove;
-        if (!judgment && !terrainMove && flightStats && (ship.pilot?.tier==='ace'||ship.pilot?.tier==='veteran'||ship.pilot?.tier==='novice')) {
+        if (!judgment && !terrainMove && !routed && flightStats && (ship.pilot?.tier==='ace'||ship.pilot?.tier==='veteran'||ship.pilot?.tier==='novice')) {
             const nose=(this.tmpAceNose ??= new THREE.Vector3()).copy(FORWARD).applyQuaternion(orientation);
             const travel=(this.tmpAceTravel ??= new THREE.Vector3()).copy(velocity).normalize();
             const ahead=(this.tmpAceAhead ??= new THREE.Vector3()).copy(position).addScaledVector(velocity,Math.max(1.8,currentSpeed/flightStats.acceleration+1.6));
@@ -9422,6 +9469,12 @@ export class GameSession {
         // Combat, lost-contact searches and transit share the same bounded
         // navigation so an occlusion cannot hand a fast pursuit back to a
         // near-stationary controller. Authored actors retain their route planner.
+        // A search flying to the last-known spot routes round terrain the same
+        // way a blocked pursuit does (fieldRoadmap.js).
+        if (flightStats && ship.search?.phase === 'approach') {
+            const routed = combatRouteWaypoint(this, ship, position, destination, 150, this.tmpRouteWaypoint ??= new THREE.Vector3());
+            if (routed) destination = routed;
+        }
         const navOut = this.tmpNavDesired ?? (this.tmpNavDesired = new THREE.Vector3());
         const goalDirection=(this.tmpTravelGoalDirection ??= new THREE.Vector3()).copy(destination).sub(position).normalize();
         const fieldNav=flightStats?fieldCombatSteering(this,ship,destination,goalDirection,dt,navOut,false):undefined;
@@ -9460,7 +9513,14 @@ export class GameSession {
         if (ship.search?.phase === 'approach' && !ship.hostile)
             travelSpeed = ship.speed * PATROL_SEARCH_SPEED_MUL;
         travelSpeed *= 1 - brake;
-        if (flightStats) this.integrateNpcFlight(ship,position,velocity,orientation,this.tmpQ2,Math.min(travelSpeed,fieldNav.speedLimit),false,true,dt);
+        // A search seeded by fresh intel (Arena range control, a teammate's
+        // callout: arenaSweep.js) burns long, clear, nose-on legs, keeping the
+        // same 35 % fuel reserve as the closing burn.
+        const urgentBurn = Boolean(flightStats && ship.search?.urgent && ship.search.phase === 'approach' && !brake
+            && position.distanceTo(destination) > 650 && forward.dot(goalDirection) > .8
+            && fieldNav.canBoost && ship.fuel > flightStats.fuel * .35);
+        if (urgentBurn) travelSpeed = ship.afterburnSpeed;
+        if (flightStats) this.integrateNpcFlight(ship,position,velocity,orientation,this.tmpQ2,Math.min(travelSpeed,fieldNav.speedLimit),urgentBurn,true,dt);
         else {
             velocity.lerp(forward.multiplyScalar(travelSpeed), 1 - Math.exp(-0.55 * dt));
             position.addScaledVector(velocity, dt);
@@ -10159,6 +10219,18 @@ export class GameSession {
                 }
             }
         }
+        // A pilot who surrendered by running gives up for good when hit again:
+        // the drive cuts and the ship can be boarded.
+        if (attackerId === 'player' && ship.hull > 0 && ship.surrendered && ship.fleeing && !ship.captured) {
+            ship.fleeing = false;
+            ship.poweredDown = true;
+            ship.destination = undefined;
+            ship.burning = false;
+            this.audio?.play?.('ui', 0.6);
+            if (this.chatterOpen()) this.sayPilotLine(ship, t('All right, all right! Drive is cold, I am not running.'));
+            const surrenderedTo = this.save.world.surrenderedTo ?? (this.save.world.surrenderedTo = {});
+            surrenderedTo[ship.recognitionName ?? ship.name] = 'captured';
+        }
         if (attackerId === 'player' && ship.hull > 0 && !ship.poweredDown && !ship.captured) {
             // A staged mug has not opened its demand yet. Shooting any member
             // is an unambiguous refusal: cancel the pending hail for the whole
@@ -10681,6 +10753,7 @@ export class GameSession {
     claimSurrendered(ship) {
         if (!ship.surrendered || ship.claimed || ship.hull <= 0 || !(ship.bountyValue > 0 || ship.missionId))
             return false;
+        this.audio?.play?.('reward', 0.7);
         const lootWreck=this.addCareerWreck(ship,true);
         ship.cargo={};
         ship.claimed = true;
@@ -10699,11 +10772,11 @@ export class GameSession {
         }
         this.save.player.stats.kills += 1;
         if (ship.bountyValue > 0) {
-            const payment = ship.bountyValue;
+            const payment = Math.round(ship.bountyValue * CAPTURE_BOUNTY_MULTIPLIER);
             this.save.player.credits += payment;
             recordSortieCredit(this.save, payment, 'bounties');
             this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + 1, -100, 100);
-            this.ui.pushEvent(t('Pilot captured. You collected a bounty of {credits}.', { credits: formatCredits(payment) }), 'success', 4200, t('Bounty collected'));
+            this.ui.pushEvent(t('Pilot captured alive. You collected a bounty of {credits} (+20%).', { credits: formatCredits(payment) }), 'success', 4200, t('Bounty collected'));
         }
         if (ship.missionId) {
             const result = completeBountyMission(this.save, ship.missionId);
@@ -14458,13 +14531,15 @@ export class GameSession {
                 const targetLocal = targetForward.applyQuaternion(playerInv);
                 const heading = Math.atan2(targetLocal.x, -targetLocal.z);
                 const claimable = ship.surrendered && !ship.claimed && !ship.captured && ship.hull > 0 && (ship.bountyValue > 0 || ship.missionId);
-                const captureAvailable = claimable && distance <= stats.scanRange;
+                const captureAvailable = claimable && this.boardable(ship) && distance <= stats.scanRange;
                 const surrenderReadout = ship.captured
                     ? t('CAPTURED · HULL DRIFTING')
                     : claimable
-                        ? captureAvailable
-                            ? t('SURRENDERED · CLAIM READY')
-                            : t('SURRENDERED · APPROACH TO CLAIM')
+                        ? ship.fleeing
+                            ? t('SURRENDERED · RUNNING · HIT TO DISABLE')
+                            : captureAvailable
+                                ? t('BOARDING {percent}%', { percent: Math.round((ship.boardingProgress ?? 0) * 100) })
+                                : t('SURRENDERED · CLOSE IN TO BOARD')
                         : t('SURRENDERED · NO CLAIM');
                 const identified = Boolean(ship.identifiedByPlayer || ship.scanned);
                 hudTarget = {
@@ -14487,6 +14562,7 @@ export class GameSession {
                     captured: ship.captured,
                     captureClaimable: Boolean(claimable),
                     captureAvailable,
+                    boardable: this.boardable(ship),
                     variant: ship.variant ?? shipVariantForRole(ship.role),
                     heading,
                     subtitle: identified
@@ -15227,7 +15303,7 @@ export class GameSession {
 }
 const FACTION_LABEL = faction => FACTION_NAMES[faction] ?? faction;
 
-Object.assign(GameSession.prototype,ArenaRunMethods);
+Object.assign(GameSession.prototype,ArenaRunMethods,ArenaStagingMethods);
 Object.assign(GameSession.prototype,CampaignWingMethods);
 Object.assign(GameSession.prototype,TutorialRuntimeMethods);
 

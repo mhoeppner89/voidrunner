@@ -85,15 +85,14 @@ test('the edited first-combat lines and branches agree in German and English',()
  const d=ADVENTURE_DIALOGUES;
  assert.match(d.combat.nodes.scrapper.text.de,/ein Pirat in einer rostigen Balor/);
  assert.match(d.combat.nodes.scrapper.text.en,/one pirate in a rusty Balor/i);
- assert.match(d.surrender.nodes.capture.text.de,/400 km.*rechts unten/);
- assert.match(d.surrender.nodes.capture.text.en,/400 km.*bottom right/);
+ assert.match(d.surrender.nodes.capture.text.de,/400 km.*zwei Sekunden/);assert.match(d.surrender.nodes.capture.text.en,/400 km.*two seconds/);assert.doesNotMatch(d.surrender.nodes.capture.text.en,/press M/);
  assert.match(d.loot.nodes.find.text.de,/Aus dem Wrack.*Teile oder die Fracht/);
  assert.match(d.loot.nodes.find.text.en,/recover equipment or cargo/);
  assert.match(d.loot.nodes.rarity.text.de,/aktuelles Schiff.*Stufe I/);
  assert.match(d.loot.nodes.rarity.text.en,/current ship.*tier I/);
  assert.equal(d['loot-surrender-killed'].nodes.find.text.de,'Aus dem Wrack kannst du manchmal noch einige Teile oder die Fracht retten und später einbauen oder verkaufen.');
  assert.match(d['loot-surrender-killed'].nodes.reproach.text.en,/surrendered/);
- for(const lang of ['de','en']){setLanguage(lang);assert.match(t('Keep the pirate targeted, fly within 400 km and press M or tap Capture.'),/400 km/);assert.match(t('Nice cargo. I will take it! Cut your drive and drop the ore, then you can go.'),lang==='de'?/Nette Fracht/:/Nice cargo/);}
+ for(const lang of ['de','en']){setLanguage(lang);assert.match(t('Fly within 400 km of the pirate and hold there for two seconds to board.'),/400 km/);assert.match(t('Nice cargo. I will take it! Cut your drive and drop the ore, then you can go.'),lang==='de'?/Nette Fracht/:/Nice cargo/);}
  setLanguage('en');
 });
 

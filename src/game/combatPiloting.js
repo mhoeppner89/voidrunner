@@ -62,6 +62,13 @@ export function holdingFiringWindow(ship,now) {
 
 export function combatThrottle(ship,now,distance,closing,targetRadial,noseDot,preferred,canBoost,turnAngle=0) {
  const crossfire=ship.combatPlan?.crossfire;
+ const fuelReserve=(ship.combatFit?.stats?.fuel??0)*.35;
+ // Flying a route round terrain: cruise, and burn the long clear legs.
+ const route=ship.combatRoute;
+ if(route?.active&&!ship.fleeing&&!ship.combatPlan?.recovery?.active){
+  ship.burning=Boolean(canBoost&&ship.fuel>fuelReserve&&route.leg>320&&noseDot>.3);
+  return ship.burning?ship.afterburnSpeed:ship.speed;
+ }
  const recovery=ship.combatPlan?.recovery;
  if(recovery?.active){
   const extend=recovery.mode==='range'?(distance<recovery.safeRange+80||distance<recovery.safeRange+200&&closing>5):recovery.coverDistance>100;
@@ -92,6 +99,9 @@ export function combatThrottle(ship,now,distance,closing,targetRadial,noseDot,pr
   ship.combatBoostUntil=now+duration;
   ship.combatBoostReadyAt=ship.combatBoostUntil+(novice?1.8:1.1)+(ship.aiRng?.()??.5)*.6;
  }
+ // Closing burn: a long, clear approach is flown on the afterburner instead
+ // of crawling in at cruise; the reserve stays for the fight itself.
+ if(hunting&&!threatened&&canBoost&&noseDot>.8&&distance>Math.max(preferred*2.6,650)&&ship.fuel>fuelReserve){ship.burning=true;return ship.afterburnSpeed;}
  ship.burning=Boolean(canBoost&&ship.fuel>.5&&now<(ship.combatBoostUntil??0));
  if(ship.burning)return ship.afterburnSpeed;
  const turningShot=hunting&&ship.combatPlan?.aimingRun&&ship.combatPlan.angularRate>.15&&!threatened;

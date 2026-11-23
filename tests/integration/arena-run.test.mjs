@@ -569,7 +569,8 @@ test('the target monitor never offers a docking prompt inside an arena run',()=>
  s.pickups=[];s.wreckNodes=[];s.asteroids=[];
  s.startRunWave();
  assert.equal(s.arena.run,true,'starting a run wave retains the run mode');
- s.save.player.position=[...LOCATIONS.helix.position];s.activeInstanceId='helix';
+ // Wave 6 flies in Meridian; park the pilot beside Helix to probe the guard.
+ s.save.player.systemId='helios-verge';s.save.player.position=[...LOCATIONS.helix.position];s.activeInstanceId='helix';
  s.save.player.currentTargetId='helix';
  s.renderer.projectTargetToScreen=()=>({x:0,y:0,visible:true,behind:false});
  const model=s.buildHudModel();

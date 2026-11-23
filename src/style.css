@@ -848,12 +848,6 @@ button.compact {
   border: 2px solid rgba(160, 240, 188, 0.7);
 }
 
-.touch-missile.is-capture {
-  color: #fff1c4;
-  background: radial-gradient(circle at 38% 32%, rgba(226, 172, 76, 0.98), rgba(101, 57, 22, 0.98));
-  border: 2px solid rgba(255, 214, 124, 0.86);
-}
-
 .touch-missile.is-mining {
   min-width: 72px;
   color: var(--drone-miner);
@@ -8199,11 +8193,17 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 
 .simple-outfitting{position:relative}.fit-help-popup{position:absolute;inset:8px;z-index:12;background:#101b29;border:1px solid #75c8d1;padding:16px;overflow-y:auto;font-size:16px}.fit-help-popup button{min-height:44px}
 
-.run-inbound{position:absolute;z-index:15;pointer-events:none;transform:translate(-50%,-50%);color:#ffdb8e;background:#142536dd;border:1px solid #ffdb8e;padding:6px 10px;font-size:14px}
+/* Arena entry marker: a hollow diamond where the next contact appears, or a
+   chevron pinned to the screen edge. No filled box: it sits over the fight. */
+.run-inbound{position:absolute;left:0;top:0;z-index:15;width:0;height:0;pointer-events:none;color:#ffdb8e;opacity:.85}
+.run-inbound i{position:absolute;left:-9px;top:-9px;width:18px;height:18px;box-sizing:border-box;border:2px solid currentColor;transform:rotate(45deg);filter:drop-shadow(0 0 2px #000)}
+.run-inbound b{position:absolute;left:12px;top:-20px;font-size:12px;font-weight:700;line-height:1;text-shadow:0 0 3px #000,0 1px 1px #000}
+.run-inbound.is-edge i{left:-8px;top:-8px;width:16px;height:16px;border-width:3px 0 0 3px;transform:rotate(calc(var(--inbound-angle) + 45deg))}
+.run-inbound.is-edge b{left:-4px;top:12px}
 
 .arena-card:not(.run-card){display:flex;flex-direction:column;max-height:94dvh;height:auto;overflow:hidden}.arena-menu-scroll{overflow-y:auto;min-height:0;overscroll-behavior:contain}.arena-card:not(.run-card)>header,.arena-card:not(.run-card)>footer{flex:none}
 #run-countdown{position:fixed;left:50%;top:30%;transform:translateX(-50%);pointer-events:none;text-align:center;z-index:40;color:#f7dea5;text-shadow:0 2px 8px #000}
-#run-countdown span{display:block;font-size:18px}#run-countdown b{display:block;font-size:56px}#run-countdown[hidden]{display:none}
+#run-countdown span{display:block;font-size:18px}#run-countdown small{display:block;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#bfe9ff;margin-top:2px}#run-countdown b{display:block;font-size:56px}#run-countdown[hidden]{display:none}
 
 /* Mining is a tap action on the primary pad; the secondary remains SCAN. */
 .touch-fire #touch-drone-label { font: 700 clamp(9px, 1.4vw, 14px)/1 var(--pixel-font); }
@@ -9684,7 +9684,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 #game-shell[data-cockpit-paint] .touch-right button{border-color:var(--cockpit-control-edge);border-radius:6px;background:linear-gradient(145deg,var(--cockpit-control-hi),var(--cockpit-control-bg) 65%,var(--cockpit-control-low));box-shadow:inset 0 1px var(--cockpit-control-glint),inset 0 -3px var(--cockpit-control-shadow),0 2px 2px #0008;color:var(--cockpit-control-ink)}
 #game-shell[data-cockpit-paint] .touch-right #touch-fire{border-color:var(--cockpit-control-gold)}
 #game-shell[data-cockpit-paint] .touch-right :is(.touch-fire,.touch-missile).is-mining{color:var(--void-gold)}
-#game-shell[data-cockpit-paint] .touch-right :is(.is-salvage,.is-capture,.is-scan){color:var(--void-cyan)}
+#game-shell[data-cockpit-paint] .touch-right :is(.is-salvage,.is-scan){color:var(--void-cyan)}
 #game-shell[data-cockpit-paint] .touch-right button:is(:active,.is-active,.is-engaged){box-shadow:inset 0 2px 3px var(--cockpit-control-pressed);filter:brightness(1.2)}
 #game-shell[data-cockpit-paint] .touch-right button:focus-visible{outline:2px solid var(--cockpit-control-focus);outline-offset:3px}
 #game-shell[data-cockpit-paint] .touch-right :is(.touch-boost-right,#touch-launcher-cycle){position:relative;overflow:visible}

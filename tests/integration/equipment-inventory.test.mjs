@@ -7,7 +7,7 @@ import {weaponForOutfit,mountedLauncherEntries,normalizeLauncherMagazines} from 
 import {getEffectiveShipStats} from '../../src/game/shipStats.js';
 import {cargoMass} from '../../src/game/economy.js';
 import {createEnemyLoadout} from '../../src/game/enemyLoadouts.js';
-import {equipCareerItems,makeCareerWreck,combatWreckNode,recoverWreckEntry} from '../../src/game/careerLoot.js';
+import {equipCareerItems,makeCareerWreck,combatWreckNode,recoverWreckEntry,CAPTURE_SURVIVAL_MULTIPLIER} from '../../src/game/careerLoot.js';
 const make=()=>createNewSave(714,{tutorial:false});
 const ids=p=>Object.keys(p.inventory.items).sort();
 test('all hulls expose four physical mount types without size restrictions',()=>{
@@ -54,11 +54,11 @@ test('arena, arena run and spectator never roll career loot or instantiate rarit
  for(const arena of [{},{run:true},{observer:true}]){const s=session();s.arena=arena;const a=ship(s);assert.equal(a.equipmentRecords,undefined);assert.equal(makeCareerWreck(s,a),null);assert.equal(s.save.world.combatWrecks,undefined);}
 });
 test('capture preserves intact modules, destroyed turrets cannot drop, and recovery cannot duplicate',()=>{
- const s=session(),a=ship(s);a.capitalMountHull=[0];a.equipmentRecords.push({key:'turrets',index:0,item:createEquipmentRecord('pdc')});const w=makeCareerWreck(s,a,{captured:true});s.wreckNodes.push(combatWreckNode(w));assert.equal(w.contents.some(e=>e.item?.baseId==='pdc'),false);
+ const s=session(),a=ship(s);a.capitalMountHull=[0];a.equipmentRecords.push({key:'turrets',index:0,item:createEquipmentRecord('pdc')});const w=makeCareerWreck(s,a,{intact:true});s.wreckNodes.push(combatWreckNode(w));assert.equal(w.contents.some(e=>e.item?.baseId==='pdc'),false);
  const e=w.contents.find(e=>e.kind==='equipment'),before=ids(s.save.player).length;assert.ok(recoverWreckEntry(s,w.id,e.id).ok);assert.equal(ids(s.save.player).length,before+1);assert.equal(recoverWreckEntry(s,w.id,e.id).ok,false);assert.equal(s.save.player.inventory.items[e.id].location.kind,'cargo');
 });
 test('a full hold leaves the selected salvage in the wreck',()=>{
- const s=session(),a=ship(s),w=makeCareerWreck(s,a,{captured:true});s.wreckNodes.push(combatWreckNode(w));s.save.player.cargo.ore=1000;const e=w.contents.find(e=>e.kind==='equipment');assert.equal(recoverWreckEntry(s,w.id,e.id).ok,false);assert.ok(w.contents.includes(e));assert.equal(receiveEquipment(s.save.player,e.item).ok,false);
+ const s=session(),a=ship(s),w=makeCareerWreck(s,a,{intact:true});s.wreckNodes.push(combatWreckNode(w));s.save.player.cargo.ore=1000;const e=w.contents.find(e=>e.kind==='equipment');assert.equal(recoverWreckEntry(s,w.id,e.id).ok,false);assert.ok(w.contents.includes(e));assert.equal(receiveEquipment(s.save.player,e.item).ok,false);
 });
 
 test('launcher ammunition follows its item through refits and save reloads',()=>{
@@ -78,7 +78,7 @@ test('trade-in preserves paid instances and retained ship switches preserve the 
  assert.ok(commitShipTrade(p,quoteShipTrade(p,'talon')).ok);assert.deepEqual(ids(p),ownIds);assert.ok(before.every(id=>ownIds.includes(id)));
 });
 test('save boundary rejects invalid and duplicated loot without rerolling intact gear',()=>{
- const s=session(),a=ship(s),w=makeCareerWreck(s,a,{captured:true}),item=w.contents.find(e=>e.item).item;
+ const s=session(),a=ship(s),w=makeCareerWreck(s,a,{intact:true}),item=w.contents.find(e=>e.item).item;
  s.save.world.combatWrecks.bad={id:'bad',position:[null,1,2],contents:[null]};w.contents.push({id:'bad',kind:'equipment',item:{id:'bad',baseId:'constructor'}});
  s.save.world.orphanDrones={bad:{id:'bad',type:'attack',systemId:s.save.player.systemId,position:[null,0,0],hull:1}};
  const next=hydrateSave(JSON.parse(JSON.stringify(s.save)));assert.equal(next.world.combatWrecks.bad,undefined);assert.deepEqual(next.world.orphanDrones,{});assert.equal(next.world.combatWrecks[w.id].contents.some(e=>e.id==='bad'),false);assert.ok(next.world.combatWrecks[w.id].contents.some(e=>e.id===item.id));
@@ -88,7 +88,7 @@ test('deployed drones remain recoverable and stored drones keep their damage and
  const s=session(),a=ship(s);a.droneFleet=createDroneFleet();const active=createDroneUnit('deployed','pdc');Object.assign(active,{state:'escort',position:[5,0,0],hull:12,ammo:7});a.droneFleet.unitsById[active.id]=active;
  makeCareerWreck(s,a);assert.equal(active.orphaned,true);assert.equal(s.save.world.orphanDrones.deployed.hull,12);
  const b=ship(s);b.droneFleet=createDroneFleet();const stored=createDroneUnit('stored','pdc');Object.assign(stored,{hull:9,ammo:11});b.droneFleet.unitsById[stored.id]=stored;
- const w=makeCareerWreck(s,b,{captured:true});s.wreckNodes.push(combatWreckNode(w));const entry=w.contents.find(e=>e.kind==='drone');assert.ok(recoverWreckEntry(s,w.id,entry.id).ok);const recovered=Object.values(s.save.player.droneFleet.unitsById).find(u=>u.type==='pdc');assert.equal(recovered.hull,9);assert.equal(recovered.ammo,11);
+ const w=makeCareerWreck(s,b,{intact:true});s.wreckNodes.push(combatWreckNode(w));const entry=w.contents.find(e=>e.kind==='drone');assert.ok(recoverWreckEntry(s,w.id,entry.id).ok);const recovered=Object.values(s.save.player.droneFleet.unitsById).find(u=>u.type==='pdc');assert.equal(recovered.hull,9);assert.equal(recovered.ammo,11);
 });
 test('unknown actions and unavailable items are rejected without spending credits',()=>{
  const p=make().player,before=p.credits;assert.equal(equipmentAction(p,'invent',{id:ids(p)[0]}).ok,false);assert.equal(equipmentAction(p,'buy',{baseId:'capital-shield-generator',tier:3}).ok,false);assert.equal(p.credits,before);
@@ -103,8 +103,21 @@ test('survival rolls have the intended per-item and per-unit frequencies',()=>{
  assert.ok(equipment>105&&equipment<175,`common equipment survivors: ${equipment}/1000`);assert.ok(cargo>5200&&cargo<5800,`cargo survivors: ${cargo}/10000`);
 });
 
+test('a boarded prize keeps its whole hold but only 1.2× the fittings a wreck would',()=>{
+ let kill=0,capture=0,hold=0;
+ for(let i=0;i<1000;i++){
+  const probe=(captured,tag)=>{const s=session(i),item=createEquipmentRecord('pulse-cannon',{id:`capture-rate-${tag}-${i}`}),a={lootKey:`capture-rate-${tag}-${i}`,name:'Rate probe',position:[0,0,0],velocity:[0,0,0],equipmentRecords:[{item,key:'guns',index:0}],cargo:{ore:10}};return makeCareerWreck(s,a,{captured});};
+  kill+=probe(false,'k')?.contents.filter(e=>e.kind==='equipment').length??0;
+  const w=probe(true,'c');capture+=w?.contents.filter(e=>e.kind==='equipment').length??0;hold+=w?.contents.find(e=>e.kind==='cargo')?.quantity??0;
+ }
+ assert.equal(CAPTURE_SURVIVAL_MULTIPLIER,1.2);assert.equal(hold,10000,'the cargo hold survives a capture in full');
+ assert.ok(capture>150&&capture<235,`common parts surviving a capture: ${capture}/1000`);assert.ok(capture>kill,`capture ${capture} beats kill ${kill}`);
+ const named=createEquipmentRecord('pulse-cannon',{rarity:'named',id:'capture-named'}),s=session(5);
+ assert.equal(makeCareerWreck(s,{lootKey:'capture-named',name:'Ace',position:[0,0,0],velocity:[0,0,0],equipmentRecords:[{item:named,key:'guns',index:0}]},{captured:true}).contents.length,1,'legendaries always survive');
+});
+
 test('inventory recovery cannot reach through a blocked salvage line',()=>{
- const s=session(),a=ship(s),w=makeCareerWreck(s,a,{captured:true});s.wreckNodes.push(combatWreckNode(w));
+ const s=session(),a=ship(s),w=makeCareerWreck(s,a,{intact:true});s.wreckNodes.push(combatWreckNode(w));
  s.tmpP3=s.tmpP4={fromArray(){return this;}};s.lineBlocked=()=>true;
  const entry=w.contents.find(e=>e.item);assert.equal(recoverWreckEntry(s,w.id,entry.id).code,'BEAM OBSTRUCTED');assert.ok(w.contents.includes(entry));
 });

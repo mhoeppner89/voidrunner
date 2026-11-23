@@ -36,7 +36,7 @@ export const MENU_CONTROLLER_BINDINGS = Object.freeze({
 
 export const CONTROLLER_ACTIONS = Object.freeze({
     flight: [
-        ['fire','Primary fire'],['secondary','Missile / capture / mining drones'],['afterburner','Boost / afterburner'],
+        ['fire','Primary fire'],['secondary','Missile / mining drones'],['afterburner','Boost / afterburner'],
         ['targetNext','Cycle target'],['targetNearestHostile','Nearest hostile'],['weaponCycle','Cycle fire group'],
         ['launcherCycle','Cycle launcher'],['autopilot','Hyperdrive'],['shipMenu','Ship / cargo menu'],
         ['map','Navigation map'],['pause','Pause'],['navNext','Cycle navigation destination'],['wingOrder','Cycle wing order'],

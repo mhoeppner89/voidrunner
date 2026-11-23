@@ -36,8 +36,8 @@ for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1440,hei
    u.updateWeaponButtons({kind:'asteroid'},'mining',drones);check(missile.dataset.touchAction==='miningDrones'&&!missile.disabled,'mine action');
    drones.phase='recalling';drones.action={ok:false,label:'Returning'};u.updateWeaponButtons({kind:'asteroid'},'mining',drones);check(missile.disabled&&missile.classList.contains('is-recalling'),'recall updates immediately');
    u.updateWeaponButtons({kind:'wreck'},'salvage',drones);check(missile.classList.contains('is-hidden')&&fire.dataset.touchAction==='fire'&&!fire.disabled,'wreck salvage uses fire');
-   u.updateWeaponButtons({kind:'ship',surrendered:true,captureAvailable:false,captureClaimable:true},'combat',drones);check(missile.disabled,'distant capture disabled');
-   u.updateWeaponButtons({kind:'ship',surrendered:true,captureAvailable:true,captureClaimable:true},'combat',drones);check(!missile.disabled&&missile.dataset.touchAction==='capture','capture ready');
+   u.updateWeaponButtons({kind:'ship',surrendered:true,boardable:true},'combat',drones);check(missile.disabled&&missile.dataset.touchAction==='missile','no warhead on a boardable prize');
+   u.updateWeaponButtons({kind:'ship',surrendered:true,boardable:false},'combat',drones);check(!missile.disabled&&missile.dataset.touchAction==='missile','a running surrender can still take a missile');
    model.launcher={name:'Test launcher',shortCode:'M',displayCode:'M2',current:2,capacity:4,index:0,count:2};u.lastHud=model;
    u.updateWeaponButtons(undefined,'combat',drones);check(count.textContent==='2'&&!u.el('#touch-launcher-cycle').disabled,'launcher loaded');
    model.launcher.current=0;u.updateWeaponButtons(undefined,'combat',drones);check(count.textContent==='0'&&missile.classList.contains('is-empty'),'empty magazine updates');
@@ -45,7 +45,7 @@ for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1440,hei
    delete r.save.player.raceReturn;u.updateWeaponButtons(undefined,'combat',drones);check(!fire.querySelector('[data-icon="fire"]').classList.contains('is-hidden'),'normal fire restored');
    u.weaponButtonState=undefined;reads=0;u.updateWeaponButtons({kind:'asteroid'});check(reads===1,'direct selection still reads current drone status');
    u.actions.miningDrones=action;r.ui.updateHud(r.buildHudModel());r.renderer.render();
-   return{before,after,controls:'mining, recall, salvage, capture, launcher, racing, direct selection'};
+   return{before,after,controls:'mining, recall, salvage, prize, launcher, racing, direct selection'};
   });
   assert.equal(result.after.droneReads,0);assert.equal(result.before.droneReads,280);assert.ok(result.after.mutations<result.before.mutations*.7,JSON.stringify(result));
   await page.screenshot({path:`${out}/${name}.png`});assert.deepEqual(errors,[]);await writeFile(`${out}/${name}.json`,JSON.stringify({...result,errors},null,2));console.log(name,JSON.stringify(result));

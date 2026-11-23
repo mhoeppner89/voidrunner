@@ -448,7 +448,7 @@ export const TutorialRuntimeMethods={
             if(p.throttle>.01||Math.hypot(...p.velocity)>=12)return say('stop','Set thrust to zero inside the hangar.');
             return say('hidden','Stay hidden while the patrol passes.');
         }
-        if(s==='defeat-raider'&&q.flags.firstRaiderSurrendered)return say('capture','Keep the pirate targeted, fly within 400 km and press M or tap Capture.');
+        if(s==='defeat-raider'&&q.flags.firstRaiderSurrendered)return say('capture','Fly within 400 km of the pirate and hold there for two seconds to board.');
         const oneTask={'rescue-paul':'Help Paul defeat the two Balors.','defeat-raider':'Fire as the pirate crosses your sights: hold Space on desktop or FIRE on phone.','black-box-fight':'Defeat the four pirate ships.','carrier-wait':'Stay near the carrier while Paul checks the flight deck.','talk-paul':'Open Paul’s transmission.'};
         if(oneTask[s])return say(s,oneTask[s]);
     },

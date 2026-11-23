@@ -54,7 +54,7 @@ export const ADVENTURE_DIALOGUES={
     }},
     surrender:{start:'stop',nodes:{
         stop:{text:pair('Er hat aufgegeben. Du kannst aufhören zu feuern.','He has surrendered. You can stop firing.'),next:'capture'},
-        capture:{text:pair('Lass ihn als Ziel ausgewählt und flieg auf 400 km heran, um ihn gefangen zu nehmen. Drück dann M am Computer oder tippe auf die Taste rechts unten am Handy (mit der du vorhin die Drohnen losgeschickt hast).','Keep him selected and fly within 400 km to capture him. Then press M on desktop or tap the button at the bottom right of your phone screen (the one you used to launch the drones earlier).'),choices:[end('Verstanden.','Understood.')]},
+        capture:{text:pair('Flieg auf 400 km an ihn heran und bleib zwei Sekunden in der Nähe, dann entert ihn unsere Prisenmannschaft. Lebend bringt er mehr Kopfgeld als ein Wrack, und seine Fracht gehört dir. Von seinen Modulen hat allerdings nicht jedes den Kampf überstanden.','Fly within 400 km and stay close for two seconds, and our prize crew boards him. Alive he pays more bounty than a wreck, and his cargo is yours. Not every module of his made it through the fight, though.'),choices:[end('Verstanden.','Understood.')]},
     }},
     loot:{start:'find',nodes:{
         find:{text:pair('Gut gemacht! Aus dem Wrack kannst du manchmal noch einige Teile oder die Fracht retten und später einbauen oder verkaufen.','Well done! You can sometimes recover equipment or cargo from a wreck and install or sell it later.'),choices:[

@@ -46,7 +46,7 @@ test('Rin’s loot lesson restores while its wreck exists and does not repeat on
  session.finishTutorialBriefing('tutorial-loot',true);session.restoreTutorialRuntime();assert.equal(calls.length,1);assert.equal(quest.flags['briefingRead-loot'],true);
  assert.ok(save.world.combatWrecks[wreck.id]);
 });
-test('first pirate surrenders at 40%, survives a lethal volley and can be captured for its unique loot',()=>{
+test('first pirate surrenders at 40%, survives a lethal volley and is boarded by holding close for two seconds',()=>{
  const {session:s,enemy,save,quest,lines}=pirate(42),briefings=[];
  s.playTutorialBriefing=id=>briefings.push(id);enemy.shield=0;
  s.damageShip(enemy,enemy.maxHull*.59,'player',enemy.position);
@@ -56,9 +56,15 @@ test('first pirate surrenders at 40%, survives a lethal volley and can be captur
  assert.equal(quest.flags.firstRaiderSurrendered,true);assert.deepEqual(briefings,['surrender']);
  s.damageShip(enemy,10000,'player',enemy.position);assert.equal(enemy.hull,enemy.maxHull*.4,'same volley cannot destroy the surrendering ship');
  save.player.position.splice(0,3,enemy.position[0]+2000,enemy.position[1],enemy.position[2]);save.player.currentTargetId=enemy.id;
- s.captureTarget();assert.equal(enemy.captured,false,'capture still requires approaching');assert.equal(quest.stepId,'defeat-raider');
+ const step=seconds=>{for(let i=0;i<Math.round(seconds*60);i++)s.updateBoarding(1/60);};
+ step(3);assert.equal(enemy.captured,false,'boarding needs the ship within scan range');assert.equal(quest.stepId,'defeat-raider');
  save.player.position.splice(0,3,enemy.position[0]+399,enemy.position[1],enemy.position[2]);
- s.captureTarget();assert.equal(enemy.captured,true);assert.equal(quest.stepId,'land-mining');
+ step(1);assert.equal(enemy.captured,false,'one second is not enough');assert.ok(Math.abs(enemy.boardingProgress-.5)<.02);
+ save.player.position.splice(0,3,enemy.position[0]+2000,enemy.position[1],enemy.position[2]);step(2);assert.ok(Math.abs(enemy.boardingProgress-.5)<.02,'flying off pauses boarding');
+ save.player.position.splice(0,3,enemy.position[0]+399,enemy.position[1],enemy.position[2]);
+ const credits=save.player.credits,bounty=enemy.bountyValue;
+ step(1.05);assert.equal(enemy.captured,true);assert.equal(quest.stepId,'land-mining');
+ assert.equal(save.player.credits-credits,Math.round(bounty*1.2),'a live capture pays 120% of the bounty');
  const wreck=save.world.combatWrecks[quest.flags.tutorialLootWreckId];assert.ok(wreck);assert.equal(wreck.contents.length,1);assert.equal(wreck.contents[0].item.id,enemy.guaranteedLootId);assert.deepEqual(briefings,['surrender','loot']);
 });
 test('executing the surrendered first pirate triggers Rin’s reproach before the loot lesson',()=>{

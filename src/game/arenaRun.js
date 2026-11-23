@@ -1,3 +1,4 @@
+import {arenaSite} from './arenaSites.js';
 import {equipmentBaseId,RARITY_ORDER,NAMED_EQUIPMENT} from './equipmentCatalog.js';
 import {createEquipmentRecord,rollAffixes,registerInventoryDefinitions,normalizeEquipmentInventory} from './equipmentInventory.js';
 import {createNewSave,hydrateSave} from './save.js';
@@ -37,54 +38,57 @@ export const RUN_ACTS=[
  {
   id:'talons',name:'Red Talons',faction:'pirates',
   waves:[
-   {name:'First contact',hint:'Choose your starting hull. One novice.',environment:'open',enemies:[enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice'})]},
-   {name:'Scavengers',hint:'Two novice scavengers.',environment:'open',enemies:[enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice'}),enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice',delay:8})]},
-   {name:'Cut loose',hint:'A veteran runner.',environment:'debris-field',enemies:[enemy('demon',{faction:'pirates',role:'pirate',tier:'veteran',missiles:1})]},
-   {name:'Hit and run',hint:'Agile escort pair.',environment:'asteroid-field',enemies:[enemy('speedster',{faction:'pirates',role:'escort',tier:'veteran'}),enemy('speedster',{faction:'pirates',role:'escort',tier:'novice',delay:6})]},
-   {name:'Tier climb',hint:'Upgrade to a tier-2 hull.',environment:'open',enemies:[enemy('demon',{faction:'pirates',role:'pirate',tier:'veteran',missiles:2}),enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice',delay:10})]},
+   {name:'First contact',hint:'Choose your starting hull. One novice.',site:'verge-lanes',enemies:[enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice'})]},
+   {name:'Scavengers',hint:'Two novice scavengers.',site:'acheron-horizon',enemies:[enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice'}),enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice',delay:8})]},
+   {name:'Cut loose',hint:'A veteran runner.',site:'mourning-carrier',enemies:[enemy('demon',{faction:'pirates',role:'pirate',tier:'veteran',missiles:1})]},
+   {name:'Hit and run',hint:'Agile escort pair.',site:'shardbelt-heart',enemies:[enemy('speedster',{faction:'pirates',role:'escort',tier:'veteran'}),enemy('speedster',{faction:'pirates',role:'escort',tier:'novice',delay:6})]},
+   {name:'Tier climb',hint:'Upgrade to a tier-2 hull.',site:'redwake-belt',enemies:[enemy('demon',{faction:'pirates',role:'pirate',tier:'veteran',missiles:2}),enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice',delay:10})]},
   ],
  },
  {
   id:'merchants',name:'Free Merchants',faction:'independents',
   waves:[
-   {name:'Freight lane',hint:'Armed convoy.',environment:'open',enemies:[enemy('wayfarer',{faction:'independents',role:'escort',tier:'veteran',missiles:1}),enemy('mule',{faction:'independents',role:'trader',tier:'novice'})]},
-   {name:'Claim jumpers',hint:'Gaia under escort.',environment:'asteroid-field',enemies:[enemy('prospector',{faction:'independents',role:'miner',tier:'veteran'}),enemy('wayfarer',{faction:'independents',role:'escort',tier:'novice',delay:8})]},
-   {name:'Haul trouble',hint:'Heavy haulers and escort.',environment:'debris-field',enemies:[enemy('torsas',{faction:'independents',role:'trader',tier:'veteran',missiles:2}),enemy('atlas',{faction:'independents',role:'trader',tier:'veteran',delay:6}),enemy('speedster',{faction:'independents',role:'escort',tier:'novice',delay:12})]},
-   {name:'Crossfire',hint:'Three veterans converge.',environment:'open',enemies:[enemy('speedster',{faction:'independents',role:'escort',tier:'veteran'}),enemy('scrapper',{faction:'pirates',role:'pirate',tier:'veteran',delay:3,missiles:1}),enemy('demon',{faction:'pirates',role:'pirate',tier:'veteran',delay:6,missiles:1})]},
-   {name:'Rookie wing',hint:'Freighter and two veteran escorts.',environment:'debris-field',enemies:[enemy('mule',{faction:'independents',role:'trader',tier:'veteran',missiles:1}),enemy('wayfarer',{faction:'independents',role:'escort',tier:'veteran',delay:3}),enemy('speedster',{faction:'independents',role:'escort',tier:'veteran',delay:6,missiles:1})]},
+   {name:'Freight lane',hint:'Armed convoy.',site:'foundry-lanes',enemies:[enemy('wayfarer',{faction:'independents',role:'escort',tier:'veteran',missiles:1}),enemy('mule',{faction:'independents',role:'trader',tier:'novice'})]},
+   {name:'Claim jumpers',hint:'Gaia under escort.',site:'shardbelt-chimney',enemies:[enemy('prospector',{faction:'independents',role:'miner',tier:'veteran'}),enemy('wayfarer',{faction:'independents',role:'escort',tier:'novice',delay:8})]},
+   {name:'Haul trouble',hint:'Heavy haulers and escort.',site:'mourning-center',enemies:[enemy('torsas',{faction:'independents',role:'trader',tier:'veteran',missiles:2}),enemy('atlas',{faction:'independents',role:'trader',tier:'veteran',delay:6}),enemy('speedster',{faction:'independents',role:'escort',tier:'novice',delay:12})]},
+   {name:'Crossfire',hint:'Three veterans converge.',site:'verge-lanes',enemies:[enemy('speedster',{faction:'independents',role:'escort',tier:'veteran'}),enemy('scrapper',{faction:'pirates',role:'pirate',tier:'veteran',delay:3,missiles:1}),enemy('demon',{faction:'pirates',role:'pirate',tier:'veteran',delay:6,missiles:1})]},
+   {name:'Rookie wing',hint:'Freighter and two veteran escorts.',site:'pale-rings',enemies:[enemy('mule',{faction:'independents',role:'trader',tier:'veteran',missiles:1}),enemy('wayfarer',{faction:'independents',role:'escort',tier:'veteran',delay:3}),enemy('speedster',{faction:'independents',role:'escort',tier:'veteran',delay:6,missiles:1})]},
   ],
  },
  {
   id:'league',name:'Frontier League',faction:'alliance',
   waves:[
-   {name:'Patrol shift',hint:'League line.',environment:'open',enemies:[enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',missiles:1}),enemy('speedster',{faction:'alliance',role:'escort',tier:'veteran',delay:4,missiles:1})]},
-   {name:'Courier run',hint:'Three ships working together.',environment:'asteroid-field',enemies:[enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',missiles:1}),enemy('speedster',{faction:'alliance',role:'escort',tier:'veteran',delay:3}),enemy('andromeda',{faction:'alliance',role:'escort',tier:'veteran',delay:6,missiles:1})]},
-   {name:'Strike',hint:'Bomber package.',environment:'open',enemies:[enemy('andromeda',{faction:'alliance',role:'bounty',tier:'ace',missiles:2}),enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',delay:3,missiles:1})]},
-   {name:'Honorguard',hint:'Hunter and two escorts.',environment:'debris-field',enemies:[enemy('lancer',{faction:'alliance',role:'patrol',tier:'veteran',missiles:2}),enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',delay:3}),enemy('speedster',{faction:'alliance',role:'escort',tier:'veteran',delay:6,missiles:1})]},
-   {name:'Veteran wing',hint:'Ace-led League wing.',environment:'asteroid-field',enemies:[enemy('astra',{faction:'alliance',role:'escort',tier:'ace',missiles:1}),enemy('speedster',{faction:'alliance',role:'escort',tier:'veteran',delay:3}),enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
+   {name:'Patrol shift',hint:'League line.',site:'acheron-horizon',enemies:[enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',missiles:1}),enemy('speedster',{faction:'alliance',role:'escort',tier:'veteran',delay:4,missiles:1})]},
+   {name:'Courier run',hint:'Three ships working together.',site:'shardbelt-rim',enemies:[enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',missiles:1}),enemy('speedster',{faction:'alliance',role:'escort',tier:'veteran',delay:3}),enemy('andromeda',{faction:'alliance',role:'escort',tier:'veteran',delay:6,missiles:1})]},
+   {name:'Strike',hint:'Bomber package.',site:'pale-rings',enemies:[enemy('andromeda',{faction:'alliance',role:'bounty',tier:'ace',missiles:2}),enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',delay:3,missiles:1})]},
+   {name:'Honorguard',hint:'Hunter and two escorts.',site:'mourning-battleship',enemies:[enemy('lancer',{faction:'alliance',role:'patrol',tier:'veteran',missiles:2}),enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',delay:3}),enemy('speedster',{faction:'alliance',role:'escort',tier:'veteran',delay:6,missiles:1})]},
+   {name:'Veteran wing',hint:'Ace-led League wing.',site:'shardbelt-chimney',enemies:[enemy('astra',{faction:'alliance',role:'escort',tier:'ace',missiles:1}),enemy('speedster',{faction:'alliance',role:'escort',tier:'veteran',delay:3}),enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
   ],
  },
  {
   id:'concord',name:'Concord Frontier Fleet',faction:'concord',
   waves:[
-   {name:'Show of force',hint:'Concord interception wing.',environment:'open',enemies:[enemy('talon',{faction:'concord',role:'patrol',tier:'ace',missiles:1}),enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',delay:4,missiles:1})]},
-   {name:'Victoria dance',hint:'Heavy fighters with a courier.',environment:'debris-field',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:3}),enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
-   {name:'Battery test',hint:'Bellona with support.',environment:'open',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',delay:3,missiles:1}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
-   {name:'Screened',hint:'Hunter screened by Victoria.',environment:'asteroid-field',enemies:[enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',delay:3}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
-   {name:'Heavy metal',hint:'Elite Concord strike wing.',environment:'open',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('vanguard',{faction:'concord',role:'patrol',tier:'veteran',delay:3,missiles:1}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
+   {name:'Show of force',hint:'Concord interception wing.',site:'verge-lanes',enemies:[enemy('talon',{faction:'concord',role:'patrol',tier:'ace',missiles:1}),enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',delay:4,missiles:1})]},
+   {name:'Victoria dance',hint:'Heavy fighters with a courier.',site:'mourning-carrier',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:3}),enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
+   {name:'Battery test',hint:'Bellona with support.',site:'acheron-horizon',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',delay:3,missiles:1}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
+   {name:'Screened',hint:'Hunter screened by Victoria.',site:'foundry-lanes',enemies:[enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',delay:3}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
+   {name:'Heavy metal',hint:'Elite Concord strike wing.',site:'pale-rings',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('vanguard',{faction:'concord',role:'patrol',tier:'veteran',delay:3,missiles:1}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
   ],
  },
  {
   id:'capital',name:'Concord Capital',faction:'concord',
   waves:[
-   {name:'Picket',hint:'Two heavies and a courier.',environment:'debris-field',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',delay:4,missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:7,missiles:1})]},
-   {name:'Reserves',hint:'Mixed heavy pack.',environment:'asteroid-field',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',delay:3,missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
-   {name:'Ace screen',hint:'Three aces.',environment:'open',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:3,missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'ace',delay:6,missiles:1})]},
-   {name:'Elite guard',hint:'Elite heavy wing.',environment:'debris-field',enemies:[enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',delay:3,missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:6,missiles:1})]},
-   {name:'The line',hint:'Choose your second wingman (Tier 3). Frigate with two Victoria escorts, all aces.',environment:'asteroid-field',enemies:[enemy('concord-frigate',{faction:'concord',role:'frigate',tier:'ace'}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:4,missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:8,missiles:2})]},
+   {name:'Picket',hint:'Two heavies and a courier.',site:'mourning-battleship',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',delay:4,missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:7,missiles:1})]},
+   {name:'Reserves',hint:'Mixed heavy pack.',site:'redwake-belt',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',delay:3,missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
+   {name:'Ace screen',hint:'Three aces.',site:'verge-lanes',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:3,missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'ace',delay:6,missiles:1})]},
+   {name:'Elite guard',hint:'Elite heavy wing.',site:'mourning-center',enemies:[enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',delay:3,missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:6,missiles:1})]},
+   {name:'The line',hint:'Choose your second wingman (Tier 3). Frigate with two Victoria escorts, all aces.',site:'shardbelt-rim',enemies:[enemy('concord-frigate',{faction:'concord',role:'frigate',tier:'ace'}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:4,missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:8,missiles:2})]},
   ],
  },
 ];
+// Each wave names its Arena site; the environment (open / asteroid / debris)
+// follows from the site for the code that still reads it.
+for(const act of RUN_ACTS)act.waves=act.waves.map(wave=>Object.freeze({...wave,environment:arenaSite(wave.site).environment}));
 export const RUN_WAVES=RUN_ACTS.flatMap(act=>act.waves);
 export const waveActIndex=(wave)=>RUN_ACTS.findIndex(act=>act.waves.includes(RUN_WAVES[wave]));
 export const waveAct=(wave)=>RUN_ACTS[waveActIndex(wave)];

@@ -26,7 +26,7 @@ for(const [name,device]of [['desktop',{viewport:{width:1280,height:800}}],['andr
    p.position.splice(0,3,...q.flags.miningEntryPosition);p.velocity.fill(0);p.throttle=.3;r.updateActiveInstance(true);p.cargo.ore=6;
    r.handleTutorialEvent('extracted',{source:'mining',nodeId:q.flags.oreTargetId,instanceId:'shardbelt',amount:6});r.selectTarget('location','vesper','map');returnCheck.aim();r.toggleHyperdrive();
    for(let i=0;i<300&&q.stepId==='return-mining';i++)returnCheck.step();for(let i=0;i<150&&q.stepId==='raider-standoff';i++)returnCheck.step();returnCheck.finish();
-   const enemy=r.ships.find(s=>s.tutorialEncounter==='mining'&&s.hull>0);enemy.shield=0;r.damageShip(enemy,100000,'player',enemy.position);returnCheck.finish();r.selectTarget('ship',enemy.id);r.captureTarget();
+   const enemy=r.ships.find(s=>s.tutorialEncounter==='mining'&&s.hull>0);enemy.shield=0;r.damageShip(enemy,100000,'player',enemy.position);returnCheck.finish();p.position.splice(0,3,enemy.position[0]+120,enemy.position[1],enemy.position[2]);for(let i=0;i<130&&!enemy.captured;i++)r.updateBoarding(1/60);
    if(!enemy.captured||q.stepId!=='land-mining')throw Error('Tutorial capture failed');returnCheck.finish();
    const wreck=r.wreckNodes.find(n=>n.id===q.flags.tutorialLootWreckId);p.position.splice(0,3,...wreck.position);p.position[1]+=wreck.radius+25;for(let i=0;i<40;i++)returnCheck.step();
    r.selectTarget('location','vesper','map');returnCheck.aim();if(r.hyperdriveBlockReason())throw Error(JSON.stringify(r.hyperdriveBlockReason()));r.ui.updateHud(r.buildHudModel());r.renderer.render();

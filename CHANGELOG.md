@@ -1,3 +1,26 @@
+## 0.8.2pj — Arena range control, quieter entry marker
+
+- Hiding in the Arena buys a breather, not a stalemate. Opponents still lose you behind rock exactly as in career, but once none of them has had you for 8 seconds, range control sweeps the field: the cockpit warns three seconds ahead, then every opponent gets your position at that moment and repeats every 6 seconds while you stay hidden. The sweep is a snapshot, so moving after the ping still makes them search.
+- Arena opponents call you out: while one of them sees you, the others fly to that sighting (updated each second) instead of sweeping an old spot or loitering at their entry. A position from range control, a teammate or the entry briefing is flown on the afterburner over long clear legs, keeping the usual fuel reserve. Career searches are unchanged.
+- The carrier-hangar start sits 100 km above the deck axis: a torn hull plate lies across the centreline off the opening and hid the whole deck from the old start, so opponents left the hangar without a shot and searched behind it.
+- The reinforcement marker is a small hollow diamond with the countdown where the contact will appear, instead of a filled "ENTRY" box that covered opponents already in the fight. When the entry is off screen or behind the cockpit frame, a small chevron on the screen edge points to it.
+
+## 0.8.2pi — Boarding without a button, Arena sites
+
+- Arena Run fights across eleven real places instead of three generic ones, in all five systems: the Verge lanes, the Acheron event horizon (facing the black hole), the Shardbelt rim, inside the Heart tunnel, off the Broken chimney mouth, a pocket in the Mourning Line, the carrier wreck's hangar deck, beside the battleship wreck, down the Foundry Lanes freight lane, inside the Redwake Belt and above the Pale Rings ice. No two consecutive waves share a site.
+- Each site stages the fight on purpose: opponents come head-on down the tunnel or the hangar deck, out of the black hole's glare, around the chimney rock, over and under the battleship hull, down the lane, up through the ice, or from behind real cover (planned with line-of-sight checks against the field's geometry). Reinforcements prefer another side than the opening contacts, and the four-second warning names it (flank, astern, behind cover, below, above).
+- The ready room and the countdown name the site, its system and a one-line tactical note; arrival calls say where a contact comes from.
+- The Mourning Line's wreck models are fetched while the preparation screen is up, so its hulls are there when a wave starts.
+- Pilots find their way through terrain: when rock or a wreck hides their target they fly a planned route (a roadmap of each field's free space, including the Shardbelt tunnels and open wreck hangars) to the nearest position with a shot, instead of grinding along the surface or giving up. Career pilots searching for a lost contact route to its last-known position the same way.
+- Pilots inside or entering a wreck's hangar read the real hull instead of its bounding box, so they no longer stall at the hangar mouth; the carrier-hangar start sits on the deck's axis.
+- Long, clear approaches are flown on the afterburner, keeping a reserve for the fight; Arena cover entries sit closer (650–1,150 km) and the Foundry Lanes joust starts 900 km apart. Across the Arena sites the first shot comes about 2 s sooner, opponents spend 6 % instead of 10 % of the time searching and hold a firing line more often, with open-terrain duels unchanged.
+
+- Capturing a surrendered pilot no longer needs a button. Stay within scan range of a powered-down prize for two seconds and the prize crew boards it; the target monitor counts up (BOARDING 0–100%), flying off pauses it, and the locked prize boards before any other in range.
+- Taking a pilot alive pays 120% of their bounty and keeps their whole cargo hold; their fittings went through the fight too, so each part or drone survives 1.2× as often as from a wreck (a common part about 19% instead of 16%; legendaries always). Destroying them still pays the plain bounty.
+- A pilot who surrendered by running gives up for good at the next hit: the drive goes cold and the ship can be boarded.
+- The missile key and touch pad are missile-only again: the pad no longer turns into a capture key, and missiles do not launch at a locked prize (guns still can).
+- Rin's surrender lesson and the tutorial card explain boarding instead of a button press.
+
 ## 0.8.2ph — Equipment progression you can feel
 
 - Technology tiers are real generations. Weapon damage rises by 30% at tier II and 65% at tier III (energy per shot by 12% / 25%); systems scale their bonus by 1.4× / 1.8× (a Speed Booster gives +18% / +25% / +32%, a Shield Capacity Booster +60 / +84 / +108). A common part of the next tier outclasses a rare of the previous one. Fitting above the hull's tier still loads the reactor. Dealers remain the dependable source of each tier.

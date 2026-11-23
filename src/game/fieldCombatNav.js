@@ -19,6 +19,9 @@ function rayDistance(o,p,d,reach,limit,s){
    if(Math.abs(v)<1e-8){if(Math.abs(x)>h)return limit;continue;}
    let enter=(-h-x)/v,leave=(h-x)/v;if(enter>leave){const t=enter;enter=leave;leave=t;}near=Math.max(near,enter);far=Math.min(far,leave);if(near>far)return limit;
   }
+  // A wreck section's box encloses its open hangars and torn midsections.
+  // Once the ray reaches the box, the hull mesh is the real surface.
+  if(o.shape==='wreck-mesh'&&o.meshVerts)return terrainFlightDistance(o,p,d,reach,limit,s,s.safetyProbe?s.forwardReach:0);
   if(inside){
    let face=Infinity,axis=0;for(let i=0;i<3;i++){const gap=(i===0?b.hx:i===1?b.hy:b.hz)+reach-Math.abs(s.local.getComponent(i));if(gap<face){face=gap;axis=i;}}
    if(escaping||s.local.getComponent(axis)*s.ray.getComponent(axis)>0)return limit;

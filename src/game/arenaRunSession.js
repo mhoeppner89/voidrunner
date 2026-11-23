@@ -13,6 +13,8 @@ import {loadoutFor} from './outfitting.js';
 import {SHIPS} from './data.js';
 import {shipVariantForRole} from './voxelModels.js';
 import {t} from './i18n.js';
+import {arenaSite} from './arenaSites.js';
+import {ENTRY_WARNINGS,REINFORCEMENT_DELAY} from './arenaStaging.js';
 const clone=x=>JSON.parse(JSON.stringify(x));
 // A hired wingman flies patrol doctrine on the Free Merchants' colours. That
 // faction opposes the arena's Red Talon opponents (so a wingman fights them and
@@ -54,6 +56,9 @@ export const ArenaRunMethods={
   // syncShips. Start those fetches during the preparation screen/countdown so
   // the first appearance of a new model does not interrupt combat.
   for(const variant of variants)this.renderer?.ensureGlbShipModel?.(variant);
+  // The Mourning Line's wreck models load on first sight; fetch them while
+  // the preparation screen is up so the hulls are there when the wave starts.
+  if(arenaSite(wave.site).instanceId==='mourning-line')void this.renderer?.ensureGraveyardModels?.();
  },
  setupRun(){
   const r=this.save.arenaRun;
@@ -61,7 +66,7 @@ export const ArenaRunMethods={
    // Wingman losses belong to the interrupted attempt: a resumed wave restores
    // the crew that started it, exactly like the player checkpoint above.
    if(Array.isArray(r.checkpointWingmen))r.wingmen=clone(r.checkpointWingmen);delete r.checkpointWingmen;}
-  this.setupArena({run:true,environment:RUN_WAVES[r.wave].environment,scenario:'free-flight'},false);
+  this.setupArena({run:true,site:RUN_WAVES[r.wave].site,environment:RUN_WAVES[r.wave].environment,scenario:'free-flight'},false);
   refreshRunHullOffers(this.save);refreshRunWingmanOffers(this.save);refreshRunRewardOffers(this.save);writeArenaRun(this.save);this.showRunPreparation();
  },
  showRunPreparation(){this.preloadRunWaveModels();this.ui.setWingTactics?.([],0);this.ui.showArenaRun(this.save);},
@@ -97,7 +102,7 @@ export const ArenaRunMethods={
   this.clearTransientSpace();this.autopilot=false;this.deathTimer=0;this.afterburning=false;this.playerShieldDelay=0;
   const wave=RUN_WAVES[r.wave];this.arena.environment=wave.environment;
   this.preloadRunWaveModels();
-  this.setupArena({run:true,environment:wave.environment,scenario:'free-flight'},false);this.updateActiveInstance(true);
+  this.setupArena({run:true,site:wave.site,environment:wave.environment,scenario:'free-flight'},false);this.updateActiveInstance(true);
   this.spawnRunWingmen();
   this.gunCooldown=0;this.mountFireAt={};this.groupFireAt=undefined;this.groupFireHull=undefined;this.missileCooldown=0;this.ui.runFitNotice='';
   this.save.player.mode='combat';this.save.player.currentTargetId=undefined;
@@ -107,8 +112,9 @@ export const ArenaRunMethods={
   r.countdown=3;r.startedAt=this.save.world.time;r.entry=null;r.nextEnemy=0;r.warned=-1;r.waveMissiles=this.save.player.missiles??0;delete r.clearAt;
   writeArenaRun(this.save);this.ui.hideArena();this.ui.hidePause();this.ui.showHud();
   this.audio.freshFight?.();
-  this.ui.pushEvent(t('Wave {wave} of {total}',{wave:r.wave+1,total:RUN_WAVES.length})+' · '+t(wave.name),'info',5000);
-  this.ui.showRunCountdown?.(3,t(wave.name));
+  const site=arenaSite(wave.site);
+  this.ui.pushEvent(t('Wave {wave} of {total}',{wave:r.wave+1,total:RUN_WAVES.length})+' · '+t(wave.name)+' · '+t(site.name)+', '+t(site.place),'info',5000);
+  this.ui.showRunCountdown?.(3,t(wave.name),`${t(site.name)} · ${t(site.place)}`);
  },
  // A hired wingman is a full allied fighter: pool hull, role-fitting equipment
  // and a veteran pilot, flying its own standing order. It stays with the run
@@ -293,9 +299,14 @@ export const ArenaRunMethods={
  spawnRunEnemy(spec,index){
   const r=this.save.arenaRun,{hullId,faction='pirates',role='pirate',tier='novice'}=spec;
   const origin=new THREE.Vector3().fromArray(this.save.player.position);
-  const cached=r.entry;
-  const entry=cached && origin.distanceTo(new THREE.Vector3().fromArray(cached))>=1000 ? cached : this.runEntryPosition(index);if(!entry)return false;
-  const point=new THREE.Vector3().fromArray(entry);r.entry=null;this.ui.setRunInbound?.(null);
+  // The announced entry (a reinforcement warned four seconds ahead) wins;
+  // otherwise the site's staging picks one, with the old line ahead as the
+  // last resort.
+  const cached=r.entry,announced=cached&&origin.distanceTo(new THREE.Vector3().fromArray(cached))>=500?this.runEntryInfo:undefined;
+  const planned=announced??this.arenaSiteEntry(index,(spec.delay??0)>=REINFORCEMENT_DELAY);
+  const entry=announced?cached:planned?.position??this.runEntryPosition(index);if(!entry)return false;
+  const call=announced?.label??planned?.label;
+  const point=new THREE.Vector3().fromArray(entry);r.entry=null;this.runEntryInfo=undefined;this.ui.setRunInbound?.(null);
   if(role==='frigate'){
    const obstacles=this.activeFieldObstacles(),facing=new THREE.Quaternion().fromArray(this.save.player.rotation);let clear=false;
    for(let attempt=0;attempt<80;attempt++){
@@ -312,6 +323,9 @@ export const ArenaRunMethods={
   const ship=this.spawnShip(role,point.toArray(),undefined,undefined,{tier:r.hard?(tier==='novice'?'veteran':tier==='veteran'?'ace':tier):tier},{faction,hullId});
   ship.faction=faction;
   ship.hostile=true;ship.authorizedTarget=true;ship.dark=false;ship.mugCapable=false;ship.targetId='player';ship.arenaRunEnemy=true;ship.noSurrender=true;
+  // Range control briefs an entering contact on the pilot's position: its
+  // first search is fresh intel (arenaSweep.js marks it urgent).
+  ship.arenaEntryIntelUntil=this.save.world.time+6;
   // The opponent flies its hull's real stock fit unless the wave overrides a
   // mount, so an Arena Run Concord Blade is the same Blade the career spawns.
   ship.combatFit=createEnemyLoadout(ship,index,runEnemyFit(spec));
@@ -323,12 +337,13 @@ export const ArenaRunMethods={
   ship.energy=ship.combatFit.stats.energyCapacity;
   ship.rotation=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),origin.clone().sub(point).normalize()).toArray();
   if(!this.ships.some(s=>s.id===this.save.player.currentTargetId&&s.hull>0))this.selectTarget('ship',ship.id);
-  this.ui.pushEvent(ship.combatFit.missiles>0?t('Missile carrier entering ahead: {count} missiles.',{count:ship.combatFit.missiles}):t('Opponent entering ahead.'),'warning',5000);return true;
+  const arrival=call?t(call):t('Opponent entering ahead.');
+  this.ui.pushEvent(ship.combatFit.missiles>0?`${arrival} ${t('Missile carrier: {count} missiles.',{count:ship.combatFit.missiles})}`:arrival,'warning',5000);return true;
  },
  tickArenaRun(dt){
   const r=this.save.arenaRun;if(!r||r.phase!=='combat')return;
   this.syncWingmanOrders();
-  if(r.countdown>0){r.countdown=Math.max(0,r.countdown-dt);this.ui.showRunCountdown?.(Math.ceil(r.countdown),t(RUN_WAVES[r.wave].name));if(r.countdown>0)return;r.startedAt=this.save.world.time;}
+  if(r.countdown>0){r.countdown=Math.max(0,r.countdown-dt);const site=arenaSite(RUN_WAVES[r.wave].site);this.ui.showRunCountdown?.(Math.ceil(r.countdown),t(RUN_WAVES[r.wave].name),`${t(site.name)} · ${t(site.place)}`);if(r.countdown>0)return;r.startedAt=this.save.world.time;}
   r.elapsed+=dt;const wave=RUN_WAVES[r.wave],elapsed=this.save.world.time-r.startedAt;
   // Arena opponents never flee, surrender or hold fire, and they press the
   // player by default — but a lock onto a living wingman is left alone so the
@@ -339,10 +354,20 @@ export const ArenaRunMethods={
   for(const ship of this.ships)if(ship.arenaRunEnemy){ship.fleeing=false;ship.holdFire=false;const alive=ship.targetId==='player'?this.save.player.hull>0:this.livingWingmanId(ship.targetId);if(!alive)ship.targetId=this.arenaThreatTarget(ship);}
   while(r.nextEnemy<wave.enemies.length&&elapsed>=wave.enemies[r.nextEnemy].delay){if(!this.spawnRunEnemy(wave.enemies[r.nextEnemy],r.nextEnemy))break;r.nextEnemy++;}
   const next=wave.enemies[r.nextEnemy];if(next&&r.warned!==r.nextEnemy&&elapsed>=next.delay-4){
-   r.warned=r.nextEnemy;r.entry=this.runEntryPosition(r.nextEnemy);const seconds=Math.ceil(next.delay-elapsed);
-   this.ui.pushEvent(seconds>1?t('Reinforcement ahead in {seconds} seconds.',{seconds}):t('Reinforcement approaching ahead.'),'warning',4000);
+   r.warned=r.nextEnemy;const planned=this.arenaSiteEntry(r.nextEnemy,(next.delay??0)>=REINFORCEMENT_DELAY);
+   r.entry=planned?.position??this.runEntryPosition(r.nextEnemy);this.runEntryInfo=planned;const seconds=Math.ceil(next.delay-elapsed);
+   this.ui.pushEvent(seconds>1?t(ENTRY_WARNINGS[planned?.where]??ENTRY_WARNINGS.ahead,{seconds}):t('Reinforcement approaching ahead.'),'warning',4000);
   }
-  if(r.entry&&next&&this.renderer.camera){this.runMarkerVector??=new THREE.Vector3();this.runMarkerVector.fromArray(r.entry).project(this.renderer.camera);this.ui.setRunInbound?.({x:this.runMarkerVector.x,y:this.runMarkerVector.y,behind:this.runMarkerVector.z>1,seconds:Math.max(0,Math.ceil(next.delay-elapsed))});}
+  // The entry marker is a small hollow diamond where the contact will appear,
+  // or a chevron on the screen edge when that point is off screen or behind
+  // the cockpit frame. It never carries a filled box: it sits over the fight.
+  if(r.entry&&next&&this.renderer.camera){
+   const v=(this.runMarkerVector??=new THREE.Vector3()).fromArray(r.entry).project(this.renderer.camera);
+   const width=this.renderer.viewportWidth,height=this.renderer.viewportHeight,behind=v.z>1;
+   const projection={x:(v.x+1)/2*width,y:(1-v.y)/2*height,visible:true,behind};
+   const edge=this.targetEdge(projection);
+   this.ui.setRunInbound?.({x:edge?.x??projection.x,y:edge?.y??projection.y,angle:edge?.angleDeg,edge:Boolean(edge),seconds:Math.max(0,Math.ceil(next.delay-elapsed))});
+  }
   if(this.save.player.hull<=0)return;
   this.syncRunWingmen();
   if(r.nextEnemy===wave.enemies.length&&!this.ships.some(s=>s.arenaRunEnemy&&s.hull>0&&!s.surrendered)){

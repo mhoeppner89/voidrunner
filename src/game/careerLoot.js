@@ -14,6 +14,11 @@ import {hasSystem} from './galaxy.js';
 import {COMMODITIES} from './data.js';
 import {createDroneUnit,DRONE_TYPES,canonicalDroneType} from './droneData.js';
 const DRONE_SURVIVAL_CHANCE=.18;
+// A boarded prize keeps its whole cargo hold, but its fittings went through the
+// same fight: each part or drone survives 1.2× as often as from a wreck, so a
+// capture is better than a kill without handing over every module. `intact`
+// (scripted handovers, tests) keeps everything.
+export const CAPTURE_SURVIVAL_MULTIPLIER=1.2;
 export function equipCareerItems(session,ship,{tutorialMiningPirate=false}={}){
  if(session.arena||ship.capitalClass||ship.equipmentRecords)return;
  const fit=ship.combatFit;if(!fit)return;
@@ -53,36 +58,37 @@ export function combatWreckNode(wreck){
  const count=wreck.contents.reduce((n,e)=>n+(e.quantity??1),0);
  return {id:wreck.id,name:wreck.name,position:wreck.position,rotation:[0,0,0],radius:wreck.radius,shape:0,salvage:'scrap',remaining:count,scanned:wreck.scanned??false,combatLoot:true,locked:Boolean(wreck.locked),derelict:wreck.derelict,sensorRange:wreck.sensorRange,lootRarity:highestLootRarity(wreck.contents),systemId:wreck.systemId,instanceId:wreck.instanceId};
 }
-export function makeCareerWreck(session,ship,{captured=false}={}){
+export function makeCareerWreck(session,ship,{captured=false,intact=false}={}){
  if(session.arena||ship.lootResolved)return null;
  ship.lootResolved=true;
  session.save.world.combatWrecks??={};
  if(!ship.lootKey){const serial=(session.save.world.lootShipCounter??0)+1;session.save.world.lootShipCounter=serial;ship.lootKey=`loot-${session.save.world.seed}-${serial}`;}
  const rng=seededRandom(`${ship.lootKey}:survival`),contents=[];
+ const survives=chance=>intact||rng()<Math.min(1,chance*(captured?CAPTURE_SURVIVAL_MULTIPLIER:1));
  const tutorialOnly=Boolean(ship.guaranteedLootId);
  const equipment=ship.equipmentRecords??[];
  for(const {item,key,index} of equipment){
   if(tutorialOnly&&item.id!==ship.guaranteedLootId){forgetEquipmentDefinition(item.id);continue;}
   if(['turrets','capital'].includes(key)&&ship.capitalMountHull?.[index]<=0){forgetEquipmentDefinition(item.id);continue;}
   const rack=ship.combatFit?.racks?.find(r=>r.itemId===item.id);if(rack)item.rounds=rack.missiles;
-  if(captured||rng()<itemSurvivalChance(item.rarity)||item.id===ship.guaranteedLootId)contents.push({id:item.id,kind:'equipment',item:{...item,factory:false,location:{kind:'wreck'}}});
+  if(survives(itemSurvivalChance(item.rarity))||item.id===ship.guaranteedLootId)contents.push({id:item.id,kind:'equipment',item:{...item,factory:false,location:{kind:'wreck'}}});
   else forgetEquipmentDefinition(item.id);
  }
  for(const [commodity,raw] of Object.entries(tutorialOnly?{}:ship.cargo??{})){
   if(!COMMODITIES[commodity])continue;let quantity=0;
-  for(let i=0;i<Math.min(100000,Math.max(0,Math.floor(raw)));i++)if(captured||rng()<CARGO_SURVIVAL_CHANCE)quantity++;
+  for(let i=0;i<Math.min(100000,Math.max(0,Math.floor(raw)));i++)if(captured||intact||rng()<CARGO_SURVIVAL_CHANCE)quantity++;
   if(quantity)contents.push({id:`${ship.lootKey}-cargo-${commodity}`,kind:'cargo',commodity,quantity});
  }
  for(const unit of Object.values(tutorialOnly?{}:ship.droneFleet?.unitsById??{}))if(unit.hull>0){
-  if(!captured&&unit.state!=='stowed'&&unit.position){unit.orphaned=true;unit.state='orphaned';unit.targetId=undefined;session.save.world.orphanDrones??={};session.save.world.orphanDrones[unit.id]={id:unit.id,type:unit.type,hull:unit.hull,ammo:unit.ammo,position:[...unit.position],velocity:[...(unit.velocity??[0,0,0])],rotation:[...(unit.rotation??[0,0,0,1])],systemId:session.save.player.systemId};continue;}
-  if(captured||rng()<DRONE_SURVIVAL_CHANCE)contents.push({id:`${ship.lootKey}-${unit.id}`,kind:'drone',type:unit.type,hull:unit.hull,ammo:unit.ammo});
+  if(!captured&&!intact&&unit.state!=='stowed'&&unit.position){unit.orphaned=true;unit.state='orphaned';unit.targetId=undefined;session.save.world.orphanDrones??={};session.save.world.orphanDrones[unit.id]={id:unit.id,type:unit.type,hull:unit.hull,ammo:unit.ammo,position:[...unit.position],velocity:[...(unit.velocity??[0,0,0])],rotation:[...(unit.rotation??[0,0,0,1])],systemId:session.save.player.systemId};continue;}
+  if(survives(DRONE_SURVIVAL_CHANCE))contents.push({id:`${ship.lootKey}-${unit.id}`,kind:'drone',type:unit.type,hull:unit.hull,ammo:unit.ammo});
  }
  // Cosmetic debris always appears; an empty hull does not advertise loot.
  if(!contents.length)return null;
  const velocity=ship.velocity??[0,0,0],speed=Math.hypot(...velocity),scale=speed?Math.min(5,speed*.08)/speed:0;
  const drift=[velocity[0]*scale+(rng()-.5)*4,velocity[1]*scale+(rng()-.5)*4,velocity[2]*scale+(rng()-.5)*4];
  const driftSpeed=Math.hypot(...drift);if(driftSpeed>8)for(let i=0;i<3;i++)drift[i]*=8/driftSpeed;
- const ext=session.npcHullExtents(ship),wreck={id:`wreck-${ship.lootKey}`,name:`${ship.name} — ${t('Loot')}`,position:[...ship.position],velocity:drift,driftActive:true,radius:Math.max(3,Math.min(35,Math.max(...ext)*.5)),systemId:session.save.player.systemId,instanceId:session.activeInstanceId,contents,scanned:captured};
+ const ext=session.npcHullExtents(ship),wreck={id:`wreck-${ship.lootKey}`,name:`${ship.name} — ${t('Loot')}`,position:[...ship.position],velocity:drift,driftActive:true,radius:Math.max(3,Math.min(35,Math.max(...ext)*.5)),systemId:session.save.player.systemId,instanceId:session.activeInstanceId,contents,scanned:captured||intact};
  session.save.world.combatWrecks[wreck.id]=wreck;return wreck;
 }
 // Test the swept hull envelope so a fast fly-over cannot

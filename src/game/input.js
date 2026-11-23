@@ -541,7 +541,6 @@ export class InputManager {
             targetNearestHostile: this.consumePressed('KeyH') || this.consumeTouch('targetNearestHostile') || Boolean(gamepad.targetNearestHostile),
             navNext: this.consumePressed('KeyN') || this.consumeTouch('navNext') || Boolean(gamepad.navNext),
             autopilot: this.consumePressed('KeyJ') || this.consumeTouch('autopilot') || Boolean(gamepad.autopilot),
-            capture: this.consumeTouch('capture') || Boolean(gamepad.capture),
             transponder: this.consumePressed('KeyB') || this.consumeTouch('transponder') || Boolean(gamepad.transponder),
             shipMenu: Boolean(gamepad.shipMenu),
             controllerDisconnected: Boolean(gamepad.controllerDisconnected),
