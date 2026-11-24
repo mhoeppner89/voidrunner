@@ -208,8 +208,12 @@ export class ShipWreckFactory {
             for(const p of section.parts){const slot=template.materials[p.slot],original=slot?(Array.isArray(data.meshes[slot.mesh].mesh.material)?data.meshes[slot.mesh].mesh.material[slot.slot]:data.meshes[slot.mesh].mesh.material):null;
                 const mesh=new THREE.Mesh(p.geometry,p.slot===-1?interior:p.slot===-2?structureMaterial:damaged(original));mesh.userData.wreckCutFace=p.slot===-1;mesh.raycast=()=>undefined;group.add(mesh);}
             const direction=section.origin.clone().sub(centre);if(direction.lengthSq()<1e-6)direction.set(1,.4,.3);direction.normalize().add(new THREE.Vector3(random()-.5,random()-.5,random()-.5).multiplyScalar(.3)).normalize();
-            const speed=length*(.018+random()*.028)*Math.min(1.7,Math.sqrt(length/Math.max(section.radius,1e-3))*.55),velocity=direction.multiplyScalar(speed);
-            const spinAxis=new THREE.Vector3(random()-.5,random()-.5,random()-.5).normalize(),spinRate=(.015+random()**2*.4)*Math.min(2,Math.sqrt(length/Math.max(section.radius,1e-3))*.5)*THREE.MathUtils.clamp(Math.sqrt(35/Math.max(worldLength,1)),.18,1.4);
+            // A violent break-up: sections leave at about half to one ship
+            // length per second, smaller ones faster and tumbling harder
+            // (equal blast energy). Purely visual; loot boxes drift on their own.
+            const smallness=Math.sqrt(length/Math.max(section.radius,1e-3));
+            const speed=length*(.45+random()*.55)*Math.min(2.6,smallness*.6),velocity=direction.multiplyScalar(speed);
+            const spinAxis=new THREE.Vector3(random()-.5,random()-.5,random()-.5).normalize(),spinRate=(.4+random()**2*2.2)*Math.min(3,smallness*.6)*THREE.MathUtils.clamp(Math.sqrt(35/Math.max(worldLength,1)),.18,1.4);
             const part={group,origin:section.origin,velocity,spinAxis,spinRate,mass:section.mass};parts.push(part);momentum.addScaledVector(velocity,part.mass);mass+=part.mass;
         }
         momentum.divideScalar(Math.max(1e-9,mass));for(const p of parts)p.velocity.sub(momentum);

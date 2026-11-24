@@ -1,3 +1,9 @@
+## 0.8.2pm — Violent break-ups, cargo icons, launchers keep their missiles
+
+- Destroyed ships come apart violently: hull sections fly off at about half to one ship length per second, smaller pieces faster and tumbling harder, and torn armour bursts out as many small fast flecks and a few slower plates. Explosions throw more sparks, faster, and more burning chunks. Loot still drifts where the ship died.
+- Every cargo icon is redrawn as pixel goods: a water tank, ration cans, an auto-injector, a processor, a cog, faceted ore, a stack of gold bars, scrap plates, a cut gem and an ammunition crate.
+- Arena: moving a missile launcher to another mount, or swapping it out for a reward, keeps its remaining missiles; stored racks go back in with them, the fullest first.
+
 ## 0.8.2pl — Hardware icons, menus clear of the notch
 
 - Every equipment icon is redrawn as crisp pixel hardware on the diagonal: twin-barrelled pulse lasers, a lens-tipped beam, split magrail rails with a glowing channel, a flared scatter cannon, coil-wound ion cannon, ribbed plasma cannon, the missile, swarm pod and torpedo themselves, rotary PDC and laser dome, and systems as real parts (exhaust nozzle, thruster cluster, reactor core, charged cells, domed shield emitters, riveted armour, radar dish, cargo container, targeting optic, tractor emitter, salvage cutter, drones). Housings take the tier paint (blue steel, titanium, black alloy with gold bands), barrels a darker gunmetal, and glowing parts the item's signature colour. Higher tiers add hardware without shrinking the icon.

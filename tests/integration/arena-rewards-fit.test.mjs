@@ -53,3 +53,19 @@ test('a better rack replaces the old rack, not a gun',()=>{
  const plan=runRewardPlan(save,'swarm-launcher');
  assert.ok(plan);assert.equal(plan.changes[0].index,rackIndex);assert.equal(plan.changes[0].key,'launchers');
 });
+
+test('moving a launcher between mounts keeps its missiles; the fullest stored rack goes back in first',async()=>{
+ const {fitRunItem}=await import('../../src/game/arenaRun.js');
+ const {HULL_HARDPOINTS}=await import('../../src/game/outfitting.js');
+ const {normalizeLauncherMagazines,launcherMagazineEntries}=await import('../../src/game/weapons.js');
+ const save=ready(11,'talon',6),p=save.player;save.arenaRun.rewardChosen=true;
+ normalizeLauncherMagazines(p,{fill:true});
+ const spec=HULL_HARDPOINTS.talon,fit=p.outfitting.loadouts.talon,from=fit.launchers.findIndex(Boolean),rack=fit.launchers[from];
+ const to=spec.weapons.findIndex((m,i)=>i!==from&&!fit.guns[i]&&!fit.launchers[i]);
+ assert.ok(from>=0&&to>=0,'fixture: a fitted rack and a free weapon mount');
+ p.launcherMagazines[spec.launchers[from].id].rounds=2;normalizeLauncherMagazines(p);
+ assert.ok(fitRunItem(save,'weapons',from,null),'take the rack off');
+ assert.ok(fitRunItem(save,'weapons',to,rack),'mount it elsewhere');
+ assert.equal(launcherMagazineEntries(p).find(e=>e.mount.id===spec.launchers[to].id)?.rounds,2);
+ assert.equal(save.arenaRun.storedRounds?.[rack],undefined,'the stored count was used up');
+});

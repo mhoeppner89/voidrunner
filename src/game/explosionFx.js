@@ -110,10 +110,10 @@ export function createShipExplosion(position, scale = 1, { velocity, variant, se
     // Hot sparks, then a few long-burning chunks trailing fire. Both live in
     // the root's scaled frame, so a frigate's sparks fly proportionally.
     const parts = [
-        createStreakBurst({ count: kind === 'breach' ? 34 : 26, speedMin: 12, speedMax: 34, drag: 1.7, lifeMin: .45 * pace.value, lifeMax: 1.05 * pace.value, width: .15, lag: .06,
+        createStreakBurst({ count: kind === 'breach' ? 48 : 40, speedMin: 18, speedMax: 58, drag: 1.4, lifeMin: .45 * pace.value, lifeMax: 1.1 * pace.value, width: .15, lag: .06,
             hot: 0xfffbe8, cool: kind === 'breach' ? 0x5aa8ff : 0xff6a1e, random, delay: (i) => centres[i % centres.length][3] }),
-        createStreakBurst({ count: kind === 'breakup' ? 9 : 5, direction: kind === 'breakup' ? (i, out, rnd) => out.copy(axis).multiplyScalar(i % 2 ? 1 : -1).add(new THREE.Vector3(rnd() - .5, rnd() - .5, rnd() - .5).multiplyScalar(.9)) : undefined,
-            speedMin: 5, speedMax: 11, drag: .55, lifeMin: 1.5 * pace.value, lifeMax: 2.4 * pace.value, width: .34, lag: .35, hot: 0xffd27a, cool: 0xc02a08, random }),
+        createStreakBurst({ count: kind === 'breakup' ? 12 : 8, direction: kind === 'breakup' ? (i, out, rnd) => out.copy(axis).multiplyScalar(i % 2 ? 1 : -1).add(new THREE.Vector3(rnd() - .5, rnd() - .5, rnd() - .5).multiplyScalar(.9)) : undefined,
+            speedMin: 8, speedMax: 20, drag: .5, lifeMin: 1.6 * pace.value, lifeMax: 2.6 * pace.value, width: .34, lag: .35, hot: 0xffd27a, cool: 0xc02a08, random }),
         createShockRing({ radius: kind === 'breach' ? 9 : 4.5, life: kind === 'breach' ? .55 : .32, hex: kind === 'breach' ? 0xbfe2ff : 0xffd9a0, opacity: kind === 'breach' ? .8 : .45, thickness: kind === 'breach' ? .12 : .22,
             normal: kind === 'breach' ? [axis.x, axis.y + .6, axis.z] : undefined }),
     ];
@@ -146,15 +146,20 @@ export function createHullDebris(position, scale = 1, velocity = [0,0,0]) {
     for(let i=0;i<rim.length;i++){const j=(i+1)%rim.length;indices.push(i,6+j,j,i,6+i,6+j);}
     const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geometry.setIndex(indices);geometry.computeVertexNormals();
     const material=new THREE.MeshStandardMaterial({color:0xb1a89c,roughness:.87,metalness:.5,flatShading:true});
-    const chunks=new THREE.InstancedMesh(geometry,material,20);
+    // Many small flecks, few big plates. Equal blast energy per fragment
+    // means speed falls with mass (v ∝ 1/√m ∝ size^-1.5, softened here):
+    // flecks fly and tumble several times faster than the big plates.
+    const COUNT=36;
+    const chunks=new THREE.InstancedMesh(geometry,material,COUNT);
     chunks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);chunks.frustumCulled=false;
     chunks.raycast=()=>undefined;root.add(chunks);
     const parts=[],matrix=new THREE.Object3D(),color=new THREE.Color();
-    for(let i=0;i<20;i++) {
-        const z=random()*2-1,a=random()*Math.PI*2,r=Math.sqrt(1-z*z),speed=(3+random()*8)*scale;
+    for(let i=0;i<COUNT;i++) {
+        const z=random()*2-1,a=random()*Math.PI*2,r=Math.sqrt(1-z*z),mass=.22+random()**2.4*.9;
+        const speed=(4+random()*5)*Math.min(5,(.7/mass)**1.25)*scale,tumble=Math.min(6,.8/mass)*(1+random()*1.5);
         parts.push({velocity:[Math.cos(a)*r*speed,Math.sin(a)*r*speed,z*speed],
-            size:[(.3+random()*.65)*scale,(.07+random()*.16)*scale,(.25+random()*.6)*scale],
-            spin:[random()*3-1.5,random()*3-1.5,random()*3-1.5]});
+            size:[(.4+random()*.5)*mass*1.6*scale,(.08+random()*.14)*Math.sqrt(mass)*scale,(.35+random()*.5)*mass*1.6*scale],
+            spin:[(random()*2-1)*tumble,(random()*2-1)*tumble,(random()*2-1)*tumble]});
         color.setHex(i%3===0?0x7c4a27:i%3===1?0x687580:0xc1b69d);chunks.setColorAt(i,color);
     }
     let age=0;

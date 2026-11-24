@@ -46,11 +46,16 @@ test('projected faction paint remains in the original mesh frame as fragments se
  mesh.material.onBeforeCompile(shader);assert.match(shader.vertexShader,/vrPaintFrame\*vec4\(wreckSourcePosition/);assert.match(shader.vertexShader,/mat3\(vrPaintFrame\)\*wreckSourceNormal/);
  const data=Array.from(mesh.geometry.attributes.wreckSourcePosition.array);e.update(12);assert.deepEqual(Array.from(mesh.geometry.attributes.wreckSourcePosition.array),data);assert.ok(mesh.geometry.attributes.wreckSourceNormal);e.dispose();factory.dispose();
 });
-test('debris plates are non-rectangular instanced meshes and keep drifting/spinning',()=>{
- const e=createHullDebris(actor.position,1,actor.velocity),m=e.object.children[0];assert.ok(m.isInstancedMesh);assert.equal(m.count,20);assert.ok(m.geometry.attributes.position.count>8);const first=Array.from(m.instanceMatrix.array);e.update(1);assert.notDeepEqual(Array.from(m.instanceMatrix.array),first);assert.deepEqual(e.object.position.toArray(),[45,68,-83]);dispose(e.object);
+test('debris plates are non-rectangular instanced meshes and keep drifting/spinning; small flecks fly faster',()=>{
+ const e=createHullDebris(actor.position,1,actor.velocity),m=e.object.children[0];assert.ok(m.isInstancedMesh);assert.equal(m.count,36);assert.ok(m.geometry.attributes.position.count>8);const first=Array.from(m.instanceMatrix.array);e.update(1);assert.notDeepEqual(Array.from(m.instanceMatrix.array),first);assert.deepEqual(e.object.position.toArray(),[45,68,-83]);dispose(e.object);
  const a=new T.Vector3(),b=new T.Vector3(),c=new T.Vector3(),p=m.geometry.attributes.position,index=m.geometry.index;let volume=0;
  for(let i=0;i<index.count;i+=3){a.fromBufferAttribute(p,index.getX(i));b.fromBufferAttribute(p,index.getX(i+1));c.fromBufferAttribute(p,index.getX(i+2));volume+=a.dot(b.cross(c))/6;}
  assert.ok(volume>0,'closed plate faces must point outwards');
+ // Equal blast energy: the smallest flecks outrun the biggest plates.
+ const matrix=new T.Matrix4(),pos=new T.Vector3(),q=new T.Quaternion(),scale=new T.Vector3(),pieces=[];
+ for(let i=0;i<m.count;i++){m.getMatrixAt(i,matrix);matrix.decompose(pos,q,scale);pieces.push({size:scale.x*scale.z,distance:pos.length()});}
+ pieces.sort((x,y)=>x.size-y.size);const small=pieces.slice(0,6),big=pieces.slice(-6),mean=list=>list.reduce((sum,x)=>sum+x.distance,0)/list.length;
+ assert.ok(mean(small)>mean(big)*2,`small ${mean(small).toFixed(1)} vs big ${mean(big).toFixed(1)}`);
 });
 test('separate scene-mounted turrets retain their world pose, receive valid colour attributes and expire without touching live assets',()=>{
  const root=source(),factory=new ShipWreckFactory(),turret=new T.Group(),mesh=new T.Mesh(new T.BoxGeometry(1,1,2),root.children[0].material);turret.add(mesh);turret.position.set(40,73,-85);turret.rotation.y=.7;

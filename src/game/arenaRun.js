@@ -328,6 +328,7 @@ export function chooseRunReward(save,id){
  else{
   // Commit the complete fit together so a pair cannot fail halfway through.
   const p=save.player,state=JSON.parse(JSON.stringify(p.outfitting)),fit=state.loadouts[p.shipId];
+  for(const {index,old,other} of plan.changes)for(const item of [old,other])if(OUTFIT_ITEMS[item]?.category==='launcher')stashRackRounds(r,item,rackRoundsAt(p,index));
   for(const {key,index,old,other,otherKey} of plan.changes){
    if(other){state.locker[other]=(state.locker[other]??0)+1;fit[otherKey][index]=null;state.factory[p.shipId][otherKey][index]=false;}
    if(old){state.locker[old]=(state.locker[old]??0)+1;if(state.factory[p.shipId][key][index])state.factoryLocker[old]=(state.factoryLocker[old]??0)+1;}
@@ -349,6 +350,18 @@ export function skipRunReward(save){
  if(r.wave===0)r.openingPicks=2;
  return true;
 }
+// A rack taken off keeps its rounds with the stored copy, and a stored copy
+// goes back in with them. Rounds are kept per copy (r.storedRounds[itemId]);
+// the fullest copy is installed first. Freshly won racks arrive full.
+function rackRoundsAt(p,index){return launcherMagazineEntries(p).find(e=>e.mount.id===HULL_HARDPOINTS[p.shipId].launchers[index]?.id)?.rounds;}
+function stashRackRounds(r,itemId,rounds){if(!itemId||OUTFIT_ITEMS[itemId]?.category!=='launcher'||!Number.isFinite(rounds))return;(r.storedRounds??={})[itemId]=[...(r.storedRounds[itemId]??[]),rounds];}
+function loadRackRounds(p,r,itemId,index){
+ const entry=launcherMagazineEntries(p).find(e=>e.mount.id===HULL_HARDPOINTS[p.shipId].launchers[index]?.id);if(!entry)return;
+ const pool=r.storedRounds?.[itemId];
+ if(pool?.length){pool.sort((a,b)=>a-b);p.launcherMagazines[entry.mount.id].rounds=Math.min(entry.capacity,pool.pop());if(!pool.length)delete r.storedRounds[itemId];}
+ else if((r.freshLaunchers?.[itemId]??0)>0){p.launcherMagazines[entry.mount.id].rounds=entry.capacity;r.freshLaunchers[itemId]--;}
+ normalizeLauncherMagazines(p);
+}
 export function fitRunItem(save,key,index,id){
  const r=save.arenaRun;if(!save.arena?.run||r.phase!=='prepare'||!r.rewardChosen)return false;
  const p=save.player,draft=loadoutFor(p);if(![...LOADOUT_KEYS,'weapons'].includes(key)||!Number.isInteger(index)||index<0||index>=(key==='weapons'?HULL_HARDPOINTS[p.shipId].weapons.length:draft[key].length))return false;
@@ -358,6 +371,7 @@ export function fitRunItem(save,key,index,id){
  if(['guns','launchers'].includes(key)){draft.guns[index]=null;draft.launchers[index]=null;}
  draft[key][index]=next;
  const validation=validateLoadout(p,p.shipId,draft);if(!validation.ok||!draft.guns.some(Boolean))return false;
+ const removedRounds=old&&OUTFIT_ITEMS[old]?.category==='launcher'?rackRoundsAt(p,index):undefined;
  // Arena equipment is earned into the locker. No purchase or simulated docking is involved.
  const state=JSON.parse(JSON.stringify(p.outfitting)),flags=state.factory[p.shipId][key];
  if(old){state.locker[old]=(state.locker[old]??0)+1;if(flags[index])state.factoryLocker[old]=(state.factoryLocker[old]??0)+1;}
@@ -367,10 +381,8 @@ export function fitRunItem(save,key,index,id){
  const equipped={...p,outfitting:state};
  p.equipment=projectLegacyEquipment(equipped,state);p.weaponId=projectLegacyWeaponId(equipped);p.outfitting=state;
  normalizeLauncherMagazines(p);
- if(next&&OUTFIT_ITEMS[next]?.category==='launcher'&&(r.freshLaunchers?.[next]??0)>0){
-  const entry=launcherMagazineEntries(p).find(e=>e.mount.id===HULL_HARDPOINTS[p.shipId][key][index].id);
-  if(entry){p.launcherMagazines[entry.mount.id].rounds=entry.capacity;r.freshLaunchers[next]--;normalizeLauncherMagazines(p);}
- }
+ stashRackRounds(r,old,removedRounds);
+ if(next&&OUTFIT_ITEMS[next]?.category==='launcher')loadRackRounds(p,r,next,index);
  return true;
 }
 // The hulls a stage offers: the stage's tier, filtered to the faction blocs the

@@ -5,6 +5,7 @@
 import {COMMODITY_SYMBOLS,ACCENTS,CARGO_PAINT,FALLBACK,TIER_PAINT,SINGLE_TIER} from './itemGlyphs.mjs';
 import {EQUIPMENT_PARTS,TIER_EQUIPMENT_PARTS,METAL_PAINT} from './itemEquipment.mjs';
 import {renderDiagonal} from './diagonalSprites.mjs';
+import {CARGO_PARTS} from './itemCargo.mjs';
 const N=32, INK=[5,8,15], WHITE=[255,255,255];
 // Pixel steel is lighter than the old vector paint: small sprites need value contrast.
 const STEEL=TIER_PAINT[1];
@@ -68,8 +69,14 @@ function encode(px,code){
 }
 // Diagonal weapons: banded materials, an ink outline, glow coded for recolour.
 function weaponSprite(id,tier){
-  const paint=TIER_PAINT[tier],body=hex(paint.body),face=hex(paint.face),edge=hex(paint.edge),line=hex(paint.line),accent=sat(hex(ACCENTS[id]??'#9ed5e8'),1.15);
-  const dark=mix(body,INK,.45),metal=METAL_PAINT[tier].map(hex);
+  const extra=(TIER_EQUIPMENT_PARTS[id]??[]).slice(0,tier-1).flat(),all=[...EQUIPMENT_PARTS[id],...(TIER_EQUIPMENT_PARTS[id]??[]).flat()];
+  return paintedSprite([...EQUIPMENT_PARTS[id],...extra],all,{...TIER_PAINT[tier],accent:ACCENTS[id]??'#9ed5e8'},METAL_PAINT[tier],tier);
+}
+// Cargo: the commodity's own paint, neutral gunmetal.
+const cargoSprite=id=>paintedSprite(CARGO_PARTS[id],CARGO_PARTS[id],CARGO_PAINT[id],METAL_PAINT[1],1);
+function paintedSprite(parts,all,paint,metalPaint,tier){
+  const body=hex(paint.body),face=hex(paint.face),edge=hex(paint.edge),line=hex(paint.line),accent=sat(hex(paint.accent),1.15);
+  const dark=mix(body,INK,.45),metal=metalPaint.map(hex);
   const ramps={
     // Tier III keeps its gold for trim bands; stair-step hull edges take a steel highlight.
     hull:{hi:tier===3?mix(face,WHITE,.3):edge,lit:face,mid:body,lo:dark},
@@ -77,8 +84,7 @@ function weaponSprite(id,tier){
     dark:{hi:mix(body,INK,.35),lit:mix(body,INK,.5),mid:mix(body,INK,.62),lo:mix(body,INK,.75)},
     trim:{hi:mix(line,WHITE,.35),lit:line,mid:mix(line,body,.35),lo:mix(line,INK,.45)},
   };
-  const extra=(TIER_EQUIPMENT_PARTS[id]??[]).slice(0,tier-1).flat(),all=[...EQUIPMENT_PARTS[id],...(TIER_EQUIPMENT_PARTS[id]??[]).flat()];
-  const cells=renderDiagonal([...EQUIPMENT_PARTS[id],...extra],{scaleFrom:all});
+  const cells=renderDiagonal(parts,{scaleFrom:all});
   const px=new Array(N*N).fill(null),code=new Array(N*N).fill('0');
   for(let y=0;y<N;y++)for(let x=0;x<N;x++){
     const i=y*N+x,c=cells[i];
@@ -92,7 +98,7 @@ const out={equipment:{},commodity:{}};
 for(const id of Object.keys(EQUIPMENT_PARTS))for(const tier of SINGLE_TIER.has(id)?[1]:[1,2,3])
   out.equipment[tier>1?`${id}@${tier}`:id]=weaponSprite(id,tier);
 out.equipment.fallback=sprite(FALLBACK,{...STEEL,accent:'#9ed5e8'});
-for(const [id,shape] of Object.entries(COMMODITY_SYMBOLS))out.commodity[id]=sprite(shape,CARGO_PAINT[id]);
+for(const [id,shape] of Object.entries(COMMODITY_SYMBOLS))out.commodity[id]=CARGO_PARTS[id]?cargoSprite(id):sprite(shape,CARGO_PAINT[id]);
 out.commodity.fallback=sprite(FALLBACK,{...STEEL,accent:'#9ed5e8'});
 window.sprites=out;
 </script>
