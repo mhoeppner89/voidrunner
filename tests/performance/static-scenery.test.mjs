@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import * as THREE from 'three';
 import {buildGlbScene} from '../../src/game/glbLoader.js';
-import {prepareGraveyardModel,arrangeGraveyardModel,batchGraveyardModel,batchGraveyardModelAsync,createGraveyardPlating} from '../../src/game/graveyardArt.js';
+import {prepareGraveyardModel,arrangeGraveyardModel,batchGraveyardModel,batchGraveyardModelAsync,createCollisionWreck,installWreckDrawRanges,clipWreckSections,createGraveyardPlating} from '../../src/game/graveyardArt.js';
 import {GRAVEYARD_MODEL_WRECKS} from '../../src/game/missionWorldData.js';
 import {freezeStaticTransforms} from '../../src/game/renderWork.js';
 import {addStationOccupants} from '../../src/game/stationOccupants.js';
@@ -53,6 +53,37 @@ test('batched wrecks preserve every vertex, normal, UV, damage coordinate and tr
  assert.ok(checked>100000);assert.ok(afterCalls<beforeCalls*.7,`${beforeCalls} → ${afterCalls} submissions`);
 });
 
+test('the Mourning Line phone view stays within the static hull submission budget',async t=>{
+ const old=globalThis.createImageBitmap;
+ t.after(()=>{if(old)globalThis.createImageBitmap=old;else delete globalThis.createImageBitmap;});
+ globalThis.createImageBitmap=async()=>({width:1,height:1});
+ const camera=new THREE.PerspectiveCamera(70,844/390,.1,500000);
+ const frustum=new THREE.Frustum().setFromProjectionMatrix(camera.projectionMatrix);
+ const sources=new Map(),plating=createGraveyardPlating();
+ let draws=0,triangles=0;
+ const renderer={info:{render:{frame:1}},renderBufferDirect(camera,scene,geometry,material,object,group){
+  draws++; triangles+=(group?.count ?? geometry.index.count)/3;
+ }};
+ installWreckDrawRanges(renderer,camera);
+ for(const config of GRAVEYARD_MODEL_WRECKS){
+  if(!sources.has(config.file)){
+   const file=await readFile(new URL('../../'+config.file,import.meta.url));
+   const model=await buildGlbScene(file.buffer.slice(file.byteOffset,file.byteOffset+file.byteLength));
+   sources.set(config.file,prepareGraveyardModel(model,plating));
+  }
+  const wreck=batchGraveyardModel(arrangeGraveyardModel(sources.get(config.file),config));
+  wreck.position.fromArray(config.local);
+  clipWreckSections(wreck,camera);
+  wreck.traverseVisible(mesh=>{
+   if(!mesh.isMesh||!frustum.intersectsObject(mesh))return;
+   renderer.renderBufferDirect(camera,null,mesh.geometry,mesh.material,mesh,null);
+   assert.deepEqual(mesh.geometry.drawRange,{start:0,count:Infinity});
+  });
+ }
+ assert.ok(draws>0&&draws<=30,`${draws} static wreck draws`);
+ assert.ok(triangles>200000&&triangles<263000,`${triangles} static wreck triangles`);
+});
+
 test('sliced wreck preparation can be cancelled before touching the model',async()=>{
  const root=new THREE.Group();assert.equal(await batchGraveyardModelAsync(root,{shouldCancel:()=>true}),null);assert.equal(root.userData.graveyardBatched,undefined);
 });
@@ -83,4 +114,30 @@ test('station service fixtures retain their dimensions, finishes and conservativ
    }
   }
  }
+});
+
+test('offline wreck vertices coincide with all collision sections in world space',async()=>{
+ const {GRAVEYARD_MODEL_COLLIDERS}=await import('../../src/game/worldData.js');
+ const {LOCATIONS}=await import('../../src/game/data.js');
+ const plating=createGraveyardPlating(), origin=LOCATIONS['mourning-line'].position;
+ for(const config of GRAVEYARD_MODEL_WRECKS){
+  const root=createCollisionWreck(config,origin,GRAVEYARD_MODEL_COLLIDERS,plating);
+  root.updateMatrixWorld(true);
+  const mesh=root.children[0], position=mesh.geometry.attributes.position, indices=mesh.geometry.index;
+  const expected=new THREE.Vector3(), actual=new THREE.Vector3();
+  let vertex=0,index=0;
+  for(const c of GRAVEYARD_MODEL_COLLIDERS.filter(c=>c.modelWreckId===config.id)){
+   for(const i of c.meshIndices)assert.equal(indices.getX(index++),vertex+i);
+   const q=new THREE.Quaternion().fromArray(c.quaternion), offset=new THREE.Vector3(...c.position);
+   for(let i=0;i<c.meshVerts.length;i+=3){
+    expected.fromArray(c.meshVerts,i).applyQuaternion(q).add(offset);
+    actual.fromBufferAttribute(position,vertex++).applyMatrix4(mesh.matrixWorld);
+    assert.ok(actual.distanceTo(expected)<0.001, c.id);
+   }
+  }
+  assert.equal(index,indices.count);
+  assert.equal(vertex,position.count);
+  mesh.geometry.dispose();mesh.material.dispose();
+ }
+ plating.dispose();
 });

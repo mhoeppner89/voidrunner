@@ -211,3 +211,102 @@ test('controller menus suppress flight commands and disconnect pauses before sim
     s.input.getActions=()=>({shipMenu:true});s.updateFrame(85);
     assert.equal(s.ui.isModalOpen,true);assert.equal(s.steps,steps);
 });
+
+test('auto promotes sustained headroom and falls back under load with a cooldown', () => {
+    const budget = new FrameBudget();
+    let now = 0;
+    const run = (seconds, hz, cost, touch = true) => {
+        const end = now + seconds * 1000;
+        while (now < end) {
+            now += 1000 / hz;
+            const draw = budget.take(now, budget.target('auto', touch)) !== null;
+            budget.observe(now, draw ? cost : 1, draw, touch);
+        }
+    };
+    run(14, 60, 13);
+    assert.equal(budget.target('auto', true), 30, 'busy submitted frames prevent promotion');
+    run(14, 60, 5);
+    assert.equal(budget.target('auto', true), 60);
+    assert.equal(budget.target('battery', true), 30);
+    run(2, 35, 5);
+    run(4, 60, 5);
+    assert.equal(budget.target('auto', true), 60, 'one slow window does not drop a healthy flight');
+    run(6, 42, 5);
+    assert.equal(budget.target('auto', true), 30, 'missed vsyncs reveal load outside JavaScript');
+    run(25, 60, 5);
+    assert.equal(budget.target('auto', true), 30, 'brief recovery cannot cause flapping');
+    assert.equal(budget.target('performance', true), 60);
+    budget.clear();
+    run(14, 120, 2, false);
+    assert.ok(budget.target('auto', false) >= 119, 'cheap desktop frames follow high refresh');
+    budget.clear();
+    assert.equal(budget.target('auto', false), 60);
+});
+
+test('auto cadence counts delivered frames, and menus cannot skip the cooldown', () => {
+    const budget = new FrameBudget();
+    let now = 0;
+    const promote = (seconds = 14) => {
+        for (const end = now + seconds * 1000; now < end;) {
+            now += 1000 / 60;
+            const draw = budget.take(now, budget.target('auto', true)) !== null;
+            budget.observe(now, draw ? 5 : 1, draw, true);
+        }
+        assert.equal(budget.target('auto', true), 60);
+    };
+    promote();
+    // A 120 Hz panel firing callbacks in a 1, 1, 4 tick rhythm: 60 callbacks
+    // but only 40 delivered frames per second.
+    const tick = 1000 / 120;
+    for (let i = 0; i < 300; i++) {
+        now += tick * [1, 1, 4][i % 3];
+        const draw = budget.take(now, budget.target('auto', true)) !== null;
+        budget.observe(now, draw ? 2 : 1, draw, true);
+    }
+    assert.equal(budget.target('auto', true), 30, 'missed submissions downshift although callbacks keep coming');
+    // Opening the map resets timing each frame; cheap frames afterwards must
+    // still wait out the 30 s cooldown.
+    budget.reset();
+    for (const end = now + 14000; now < end;) {
+        now += 1000 / 60;
+        const draw = budget.take(now, budget.target('auto', true)) !== null;
+        budget.observe(now, draw ? 5 : 1, draw, true);
+    }
+    assert.equal(budget.target('auto', true), 30, 'cooldown survives a menu reset');
+    promote(30);
+    budget.restart();
+    assert.equal(budget.target('auto', true), 30, 'a new launch starts at the safe rate');
+});
+
+test('slightly faster than nominal refresh does not accumulate phase error', () => {
+    for (const target of [30, 60]) {
+        const budget = new FrameBudget();
+        let previous;
+        for (let i = 0; i < 3600; i++) {
+            const now = Math.round(i * 10000 / 60.02) / 10;
+            if (budget.take(now, target) === null) continue;
+            if (previous !== undefined) assert.ok(Math.abs(now - previous - 1000 / target) < 0.2);
+            previous = now;
+        }
+    }
+});
+
+test('recorded WebKit callbacks keep every 30 fps draw two refreshes apart', () => {
+    // Millisecond callback intervals from the two 5.5 s WebKit review traces.
+    const traces = [
+        '0 18 15 17 16 17 16 18 16 17 16 19 15 19 13 18 16 18 16 17 18 15 17 15 17 18 16 17 17 15 18 17 16 17 19 14 16 19 15 17 19 14 17 17 16 16 18 16 17 16 18 16 17 16 17 17 16 17 17 16 17 17 16 16 19 15 17 17 18 14 18 16 17 17 16 19 13 18 19 15 15 18 18 15 19 15 16 17 15 18 18 16 16 17 16 18 16 18 15 19 15 16 16 16 18 19 15 16 18 15 18 16 15 18 18 16 16 17 18 15 17 17 16 17 15 19 16 17 16 17 17 17 16 17 16 18 16 15 18 17 16 16 19 15 16 19 16 14 18 19 15 16 17 17 17 17 15 18 16 17 17 16 17 19 14 16 19 15 17 17 16 17 17 16 17 16 17 17 16 17 15 19 16 18 16 16 17 17 18 15 17 16 17 16 16 18 19 14 17 18 15 15 19 16 18 15 18 16 15 18 16 16 18 18 16 15 18 15 19 16 19 14 17 17 16 17 18 15 15 19 17 16 16 19 13 19 17 15 18 15 18 18 14 18 17 15 19 16 16 17 18 16 16 18 15 17 17 16 18 16 15 19 16 15 17 19 15 17 17 16 17 18 14 18 17 16 15 18 16 19 16 16 18 16 17 16 17 16 17 17 16 17 16 18 16 17 16 17 17 16 19 15 16 16 18 15 18 17 16 18 16 16 16 18 17 16 17 15 17 16 18 19 15 16 19 18 12 19 16 15 18',
+        '0 17 16 17 17 16 19 15 18 15 16 16 18 16 18 15 18 17 16 19 14 17 17 19 14 17 17 16 17 15 18 19 15 15 18 15 19 16 17 18 15 15 18 19 14 17 17 17 15 19 16 16 19 13 18 17 16 17 15 19 15 19 16 16 18 14 18 17 15 17 18 17 16 17 17 15 18 18 14 18 18 15 19 14 17 16 16 18 17 16 17 16 17 17 17 15 18 19 14 17 17 16 17 17 16 17 17 15 17 19 16 17 14 18 19 14 19 15 17 17 16 17 16 19 15 17 16 17 16 17 17 16 17 18 15 19 15 16 17 17 16 17 17 16 19 15 18 15 17 17 16 17 17 16 17 17 16 17 16 17 16 16 18 17 16 19 15 17 15 17 17 17 17 16 17 17 17 16 16 19 15 17 16 17 17 16 17 17 17 17 14 18 16 19 16 15 19 14 18 19 15 16 17 16 17 19 15 16 17 17 17 15 18 16 17 16 16 18 17 16 18 15 16 18 15 18 17 16 17 16 17 17 17 16 17 16 19 16 14 19 16 18 16 16 17 16 16 18 17 16 17 17 16 17 15 18 18 16 16 16 19 15 17 16 17 16 18 16 17 18 15 17 16 18 16 17 16 16 18 15 18 17 15 19 15 16 18 15 17 18 17 16 17 17 16 17 17 16 17 16 17 17 15 18 17 15 19 14 17 18 17 15 18 17 19 14 17 16 16 18 16 18 15 17 19 15 16 19 15 16 17',
+    ];
+    for (const trace of traces) {
+        const budget = new FrameBudget(), intervals = [];
+        let now = 0, last;
+        for (const elapsed of trace.split(' ').map(Number)) {
+            now += elapsed;
+            if (budget.take(now, 30) === null) continue;
+            if (last !== undefined) intervals.push(now - last);
+            last = now;
+        }
+        assert.ok(intervals.every(ms => Math.round(ms * 60 / 1000) === 2));
+        assert.ok(Math.abs(intervals.reduce((a,b) => a+b, 0) / intervals.length - 1000/30) < 0.1);
+    }
+});

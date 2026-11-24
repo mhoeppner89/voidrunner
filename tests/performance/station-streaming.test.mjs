@@ -34,11 +34,11 @@ test('preparing a streamed scene does not wait for unrelated shader programs',as
  scene.children[0].geometry.dispose();material.dispose();
 });
 
-test('without parallel shader compilation, queued GPU linking finishes without blocking the animation thread',async()=>{
+test('shader readiness queries wait for queued linking even with parallel compilation',async()=>{
  const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera();let ready=false,uniforms=0,deleted=0;
  const gl={SYNC_GPU_COMMANDS_COMPLETE:1,ALREADY_SIGNALED:2,CONDITION_SATISFIED:3,TIMEOUT_EXPIRED:4,WAIT_FAILED:5,
   fenceSync:()=>({}),flush(){},clientWaitSync:()=>ready?3:4,deleteSync:()=>deleted++};
- const renderer={getContext:()=>gl,getRenderTarget:()=>null,setRenderTarget(){},compile(){},extensions:{has:()=>false},
+ const renderer={getContext:()=>gl,getRenderTarget:()=>null,setRenderTarget(){},compile(){},extensions:{has:()=>true},
   info:{programs:[{isReady:()=>true,getUniforms(){uniforms++;}}]}};
  const pending=prepareRenderScene(renderer,scene,camera,{}, {timeoutMs:1000});
  await Promise.resolve();assert.equal(uniforms,0,'do not synchronously query a still-pending linked shader');
@@ -54,7 +54,7 @@ test('flight waits for streamed station assemblies before compiling their shader
 test('flight warmup still finishes when a station request never resolves',async()=>{
  const r=Object.create(SpaceRenderer.prototype);let compiled=0;
  Object.assign(r,{stationModelLoads:new Map([['helix',new Promise(()=>{})]]),scene:new THREE.Scene(),camera:new THREE.PerspectiveCamera(),prepareCombatWarmup:()=>new THREE.Group(),isIOS:false,bloomEnabled:()=>true,bloomSceneTarget:{},renderer:{getRenderTarget:()=>null,setRenderTarget(){},compileAsync:async()=>{compiled++;}}});
- await r.prepareActiveScene({timeoutMs:1,assetTimeoutMs:1});assert.equal(compiled,4);
+ await r.prepareActiveScene({timeoutMs:1,assetTimeoutMs:1});assert.equal(compiled,2);
 });
 
 test('docking lane colours upload only when the visible light sequence advances',()=>{
@@ -180,12 +180,13 @@ test('Wayfarer traffic prepares its three existing authored independent finishes
  for(const mesh of own){mesh.removeFromParent();mesh.geometry.dispose();mesh.material.dispose();}r.disposeObject(root);template.children[0].geometry.dispose();material.dispose();map.dispose();
 });
 
-test('career preparation waits for nearby wreck geometry without requesting it in arena/default warmup',async()=>{
+test('preparation waits for a visible wreck field and never starts a distant field',async()=>{
  const r=Object.create(SpaceRenderer.prototype);let loads=0,release,compiled=0;
  Object.assign(r,{scene:new THREE.Scene(),camera:new THREE.PerspectiveCamera(),ensureGraveyardModels:()=>{loads++;return new Promise(resolve=>release=resolve);},prepareCombatWarmup:()=>new THREE.Group(),isIOS:false,bloomEnabled:()=>true,bloomSceneTarget:{},renderer:{getRenderTarget:()=>null,setRenderTarget(){},compileAsync:async()=>{compiled++;}}});
  await r.prepareActiveScene();assert.equal(loads,0);compiled=0;
- const ready=r.prepareActiveScene({prepareNearbyWrecks:true});await Promise.resolve();assert.equal(loads,1);assert.equal(compiled,0);
- release();await ready;assert.equal(compiled,4);
+ r.graveyardModelLoading=r.ensureGraveyardModels();
+ const ready=r.prepareActiveScene();await Promise.resolve();assert.equal(loads,1);assert.equal(compiled,0);
+ release();await ready;assert.equal(compiled,2);
 });
 
 test('completed departures avoid a hidden dock resize, but a refused launch can restore the dock',async t=>{
@@ -230,4 +231,27 @@ test('completed arrival waits for its last GPU frame before restoring the dock c
  while(!animated)await new Promise(resolve=>setTimeout(resolve,0));
  assert.equal(ended,false);assert.ok(v.transitPreparing,'skip remains available while finishing the last frame');
  ready=true;assert.equal(await pending,true);assert.equal(ended,true);v.transitWarmupTarget.dispose();
+});
+
+test('Apple parallel warmups wait for the most recent submission before querying either program',async()=>{
+ const calls=[];
+ const program=label=>({isReady:()=>true,getUniforms:()=>calls.push(label)});
+ const first=program('first'),second=program('second');
+ const renderer={getRenderTarget:()=>null,setRenderTarget(){},compile(){},info:{programs:[first]},
+  extensions:{has:()=>true},getContext:()=>({flush:()=>calls.push('flush'),fenceSync(){throw Error('synchronous fence');}})};
+ const scene=new THREE.Scene(),camera=new THREE.Camera(),options={appleDriver:true};
+ const prepare=()=>prepareRenderScene(renderer,scene,camera,null,options);
+ const one=prepare();
+ assert.deepEqual(calls,['flush']);
+ await new Promise(resolve=>setTimeout(resolve,35));
+ renderer.info.programs=[second];
+ const last=performance.now(),two=prepare();
+ await one;
+ assert.ok(performance.now()-last>=98,'the first query also waits for the second link');
+ assert.ok(await two);
+ assert.deepEqual(calls.slice(0,2),['flush','flush']);
+ assert.deepEqual(calls.slice(2).sort(),['first','second']);
+ renderer.info.programs=[first,second];
+ assert.ok(await prepare());
+ assert.equal(calls.length,4,'ready programs need no further driver queries');
 });

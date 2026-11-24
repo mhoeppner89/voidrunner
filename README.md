@@ -166,6 +166,8 @@ Shardbelt now resembles a fractured parent asteroid: ten large rock sections, co
 
 ## Verify changes
 
+The build and model-delivery tests use Python 3.10 or later and Pillow with WebP support. Install the pinned encoder with `python3 -m pip install -r tools/assets/requirements.txt` in your Python environment. The build packs the approved hulls and wrecks into `dist` and verifies their geometry, pixels and compressed contents.
+
 ```sh
 npm test
 npm run test:unit
@@ -174,7 +176,7 @@ npm run test:performance
 npm run build
 ```
 
-`npm test` runs every maintained Node test. Shared helpers do not register tests. The Node checks need no installed dependencies; browser checks use pinned Playwright:
+`npm test` runs every maintained Node test. Shared helpers do not register tests. Browser checks use pinned Playwright.
 
 ```sh
 npm ci

@@ -1503,9 +1503,7 @@ export class GameSession {
         this.renderer.syncProjectiles(this.projectiles, this.projStore);
         this.renderer.syncPickups(this.pickups, this.pickupStore);
         this.renderer.updateCamera(this.save.player.position, this.save.player.prevPosition, this.save.player.rotation, this.save.player.prevRotation, this.save.player.angularVelocity, 0, false, 0, 0);
-        await this.renderer.prepareActiveScene?.({
-            prepareNearbyWrecks: !this.arena && this.save.player.systemId === 'helios-verge',
-        });
+        await this.renderer.prepareActiveScene?.();
         this.renderer.render();
         this.flightPrepared = true;
     }
@@ -2811,6 +2809,13 @@ export class GameSession {
             this.input?.getActions?.(); // discard one-shot presses made while loading
             return;
         }
+        // Auto cadence samples only live flight. A stopped spectator battle
+        // (editor, paused or decided) is cheap and must not earn 60 fps for
+        // the fight that follows it.
+        const observerIdle = Boolean(this.arena?.observer)
+            && (!this.observerStarted || this.observerPaused || Boolean(this.observerResult));
+        const autoCadence = this.save.settings.powerMode === 'auto' && !this.save.player.dockedAt && !observerIdle;
+        const workStart = autoCadence ? performance.now() : 0;
         let dt = (now - this.lastFrame) / 1000;
         this.lastFrame = now;
         if (dt < 0 || !Number.isFinite(dt))
@@ -2909,6 +2914,7 @@ export class GameSession {
         // is already declared above — same frame-gating value.)
         const throttle = flying && Number.isFinite(this.save.player.throttle) ? this.save.player.throttle : 0;
         let nearbyEnemies = 0;
+        let hostileContact = false;
         if (!this.save.player.dockedAt && this.ships) {
             const px = this.save.player.position[0];
             const py = this.save.player.position[1];
@@ -2919,6 +2925,7 @@ export class GameSession {
                 const dy = py - ship.position[1];
                 const dz = pz - ship.position[2];
                 const distanceSq = dx * dx + dy * dy + dz * dz;
+                if (ship.hostile && ship.hull > 0 && distanceSq < 2500 * 2500) hostileContact = true;
                 if ((ship.hostile || ship.role === 'pirate' || ship.role === 'bounty') && ship.targetId === 'player' && distanceSq < 625 * 625)
                     nearbyEnemies += 1;
                 // Fly-by: a ship that was closing and is now opening, close and fast.
@@ -3000,6 +3007,15 @@ export class GameSession {
         // A renderer prepared behind the initial career gate must stay idle at
         // the dock. It exists solely to make Launch instant, not to burn GPU
         // time underneath opaque station screens.
+        // Docking and launch start a fresh cadence history independent of the
+        // departure film, which reduced motion skips.
+        this.renderer?.updateWreckCache?.(now, flying && !this.save.player.dockedAt && !this.launchPreparing &&
+            !this.ui.isModalOpen && !this.arena && this.hyperdriveFx === 'none' && !this.deathTimer &&
+            this.ui.planetTransitOverlay?.dataset.awaitingFlight !== 'true' && !nearbyEnemies && !hostileContact && !missileThreat && this.audio.currentContext !== 'combat');
+        if (flying !== this.cadenceFlying) {
+            this.cadenceFlying = flying;
+            this.renderBudget?.restart();
+        }
         if (this.renderer && flying) {
             this.renderBudget ??= new FrameBudget();
             const revision = this.renderer.renderRevision ?? 0;
@@ -3014,8 +3030,11 @@ export class GameSession {
                 this.renderBudget.reset();
                 if (this.lastRenderRevision !== revision) this.syncRender(0, now);
             } else {
-                const renderDt = this.renderBudget.take(now, flightFrameRate(this.save.settings.powerMode, this.renderer.touchDevice));
+                const touch = this.renderer.touchDevice;
+                const renderDt = this.renderBudget.take(now, this.renderBudget.target(this.save.settings.powerMode, touch));
                 if (renderDt !== null) this.syncRender(renderDt, now);
+                if (autoCadence) this.renderBudget.observe(now, performance.now() - workStart, renderDt !== null, touch);
+                else if (observerIdle) this.renderBudget.suspendSampling();
             }
             this.lastRenderRevision = revision;
         }
@@ -7249,6 +7268,7 @@ export class GameSession {
         const pitch=actions.pitch??0,yaw=actions.yaw??0,roll=actions.roll??0;
         this.hyperdriveEntrySteering=Math.max(Math.abs(pitch),Math.abs(yaw),Math.abs(roll))>0.35?{pitch,yaw,roll}:undefined;
         this.hyperdriveWaypoint=nav.kind==='waypoint'?nav:undefined;
+        this.renderer?.prepareDestination?.(nav.position);
         this.recallMiningDrones('hyperdrive');
         this.autopilot = true;
         this.hyperdriveFx = 'spooling';
@@ -14377,7 +14397,7 @@ export class GameSession {
         }
         else if (key === 'powerMode' && ['auto','battery','performance'].includes(value)) {
             this.save.settings.powerMode = value;
-            this.renderBudget?.reset();
+            this.renderBudget?.clear();
             this.resetQualitySample();
         }
         else if (key === 'language' && (value === 'de' || value === 'en')) {
@@ -14410,7 +14430,8 @@ export class GameSession {
         // Render animation dt is intentionally capped after a stall; using it
         // here hid the true frame rate and delayed recovery in dense scenes.
         const fps = this.fpsFrames / elapsed;
-        const targetFps = flightFrameRate(this.save.settings.powerMode, this.renderer.touchDevice);
+        const targetFps = this.renderBudget?.target(this.save.settings.powerMode, this.renderer.touchDevice)
+            ?? flightFrameRate(this.save.settings.powerMode, this.renderer.touchDevice);
         const scale = this.qualityScale ?? this.renderer.lastQualityScale ?? 1;
         if (fps < targetFps * 0.75)
             this.qualityScale = Math.max(0.5, scale - 0.15);
@@ -15142,14 +15163,14 @@ export class GameSession {
                 continue;
             // A staged dark return first appears as a hollow, pulsing contact;
             // sustained exposure resolves it into the normal solid blip.
-            const shipPos = this.tmpRadarPos.set(ship.position[0], ship.position[1], ship.position[2]);
-            const distance = player.distanceTo(shipPos);
-            const occluded = this.lineBlocked(player, shipPos);
             const selected = ship.id === this.save.player.currentTargetId;
             const awareness = ship.playerSensorAwareness ?? 0;
-            const seen = !occluded && awareness >= SENSOR_CONTACT_THRESHOLD;
-            const tracked = selected && distance <= this.lockTrackedRange(ship)
-                && this.save.world.time < (ship.playerLockOccludedUntil ?? Infinity);
+            const tracked = selected && this.save.world.time < (ship.playerLockOccludedUntil ?? Infinity)
+                && player.distanceTo(this.tmpRadarPos.fromArray(ship.position)) <= this.lockTrackedRange(ship);
+            // An unresolved return cannot be seen, and a tracked lock survives
+            // occlusion. Only a resolved, untracked contact needs a terrain ray.
+            const seen = awareness >= SENSOR_CONTACT_THRESHOLD && !tracked
+                && !this.lineBlocked(player, this.tmpRadarPos.fromArray(ship.position));
             const type = ship.hostile ? 'hostile' : ship.role === 'patrol' ? 'friendly' : 'neutral';
             if (seen || tracked) {
                 const last = ship.lastSeenPosition ?? (ship.lastSeenPosition = [0, 0, 0]);

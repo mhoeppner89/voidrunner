@@ -1,3 +1,4 @@
+import {fetchModelBytes} from './modelDelivery.js';
 import * as THREE from 'three';
 
 // Minimal GLB loader for the static ship hulls in assets/models/. It supports
@@ -31,11 +32,35 @@ const loadViaImage = (blob) => new Promise((resolve, reject) => {
     image.src = url;
 });
 
+// Dock, flight and parked ships can carry identical PNGs in distinct GLBs.
+// Only live pixels are shared. A digest avoids retaining the compressed GLB
+// or mistaking equally sized textures for one another.
+const liveImageSources = new Map();
+async function sharedImageSource(bytes, mime, decode) {
+    if (!globalThis.crypto?.subtle || typeof WeakRef !== 'function') return decode();
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+    const key = mime + ':' + Array.from(digest, n => n.toString(16).padStart(2,'0')).join('');
+    const entry = liveImageSources.get(key);
+    const source = entry?.pending ?? entry?.ref?.deref();
+    if (source) return source;
+    const pending = decode();
+    liveImageSources.set(key, {pending});
+    try {
+        const ready = await pending;
+        liveImageSources.set(key, {ref: new WeakRef(ready)});
+        return ready;
+    } catch (error) {
+        liveImageSources.delete(key);
+        throw error;
+    }
+}
+
 // The wreck variants carry identical embedded maps. Share their immutable
 // pixels, while keeping each material's texture settings and disposal separate.
 // The cache belongs to one batch of models and is released when it finishes.
-function decodeImageSource(bytes, mime, batch) {
-    const decode = () => decodeImage(bytes, mime).then(bitmap => new THREE.Source(bitmap));
+function decodeImageSource(bytes, mime, batch, reuseImages) {
+    const read = () => decodeImage(bytes, mime).then(bitmap => new THREE.Source(bitmap));
+    const decode = () => reuseImages ? sharedImageSource(bytes,mime,read) : read();
     if (!batch) return decode();
     const key = `${mime}:${bytes.length}`;
     const bucket = batch.get(key) ?? [];
@@ -75,30 +100,50 @@ const parseContainer = (arrayBuffer) => {
 
 // Build a THREE.Group from a GLB buffer. Textures are decoded asynchronously
 // first (createImageBitmap), then geometry/materials are built synchronously.
-export async function loadGlb(url, imageBatch) {
-    const response = await fetch(url);
-    if (!response.ok)
-        throw new Error(`GLB ${url}: HTTP ${response.status}`);
-    const arrayBuffer = await response.arrayBuffer();
-    return buildGlbScene(arrayBuffer, imageBatch);
+let activeLoads = 0;
+export const modelLoaderBusy = () => activeLoads > 0;
+
+export async function loadGlb(url, imageBatch, options) {
+    activeLoads++;
+    try {
+        // Previously cached full models can still serve an offline visit.
+        const arrayBuffer = options?.packed && typeof DecompressionStream === 'function'
+            ? await fetchModelBytes(url + '.gz').catch(() => fetchModelBytes(url))
+            : await fetchModelBytes(url);
+        return await buildGlbScene(arrayBuffer, imageBatch, {...options, reuseImages:true});
+    } finally { activeLoads--; }
 }
 
-export async function buildGlbScene(arrayBuffer, imageBatch) {
+export async function buildGlbScene(arrayBuffer, imageBatch, { omitDetailMaps = false, reuseImages = false } = {}) {
     const { json, bin } = parseContainer(arrayBuffer);
     const dataView = new DataView(bin.buffer, bin.byteOffset, bin.byteLength);
 
-    // Decode embedded textures first: every material slot is a separate image
-    // in these models (base color, metallic-roughness).
+    // Apple station materials discard normal and roughness/metalness maps.
+    // A packed image can also supply ambient occlusion or colour, so resolve
+    // retained slots to image indices before skipping any decoder work.
+    const imageIndex = (texture, index) => texture?.extensions?.EXT_texture_webp?.source ?? texture?.source ?? index;
+    let requiredImages;
+    if (omitDetailMaps) {
+        requiredImages = new Set();
+        for (const material of json.materials ?? []) {
+            for (const slot of [material.pbrMetallicRoughness?.baseColorTexture,
+                material.occlusionTexture, material.emissiveTexture]) {
+                if (slot) requiredImages.add(imageIndex(json.textures?.[slot.index], slot.index));
+            }
+        }
+    }
     const sources = [];
-    for (const image of json.images ?? []) {
+    for (const [index, image] of (json.images ?? []).entries()) {
+        if (requiredImages && !requiredImages.has(index)) continue;
         const bufferView = json.bufferViews[image.bufferView];
-        const bytes = bin.subarray(bufferView.byteOffset, bufferView.byteOffset + bufferView.byteLength);
-        sources.push(await decodeImageSource(bytes, image.mimeType ?? 'image/png', imageBatch));
+        const offset = bufferView.byteOffset ?? 0;
+        const bytes = bin.subarray(offset, offset + bufferView.byteLength);
+        sources[index] = await decodeImageSource(bytes, image.mimeType ?? 'image/png', imageBatch, reuseImages);
     }
     const wrapping = (value) => value === 33071 ? THREE.ClampToEdgeWrapping : value === 33648 ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping;
     const textureDefs = json.textures ?? sources.map((_, source) => ({ source }));
     const textures = textureDefs.map((definition, index) => {
-        const source = sources[definition.source ?? index];
+        const source = sources[imageIndex(definition, index)];
         if (!source)
             return undefined;
         const texture = new THREE.Texture();
@@ -142,7 +187,7 @@ export async function buildGlbScene(arrayBuffer, imageBatch) {
                 material.map = texture;
             }
         }
-        if (pbr.metallicRoughnessTexture !== undefined) {
+        if (!omitDetailMaps && pbr.metallicRoughnessTexture !== undefined) {
             const texture = textures[pbr.metallicRoughnessTexture.index];
             // GLTF packs R=occlusion, G=roughness, B=metalness; three.js reads
             // the same channels, and the texture is linear data, not sRGB.
@@ -180,7 +225,7 @@ export async function buildGlbScene(arrayBuffer, imageBatch) {
         // Conservatory glazing is one outward shell. Keep its depth test, but
         // let the opaque trees and paths behind it supply the depth buffer.
         if (definition.extras?.voidGlassCanopy) material.depthWrite = false;
-        if (definition.normalTexture) {
+        if (!omitDetailMaps && definition.normalTexture) {
             material.normalMap = textures[definition.normalTexture.index];
             material.normalMap.colorSpace = THREE.NoColorSpace;
             const scale = definition.normalTexture.scale ?? 1;

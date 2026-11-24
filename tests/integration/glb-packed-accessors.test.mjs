@@ -163,3 +163,42 @@ test('GLB contact shading decodes normalized byte colours without changing hull 
  assert.ok(mesh.material.polygonOffset);assert.equal(mesh.material.polygonOffsetUnits,-2);assert.equal(mesh.material.depthWrite,true);
  mesh.geometry.dispose();mesh.material.dispose();
 });
+
+test('Apple station loader decodes colour and packed AO, skipping detail-only bitmaps', async t => {
+    const previous = globalThis.createImageBitmap;
+    let decodes = 0;
+    globalThis.createImageBitmap = async () => ({ width: 2, height: 2, id: ++decodes });
+    t.after(() => { globalThis.createImageBitmap = previous; });
+    const { readFile } = await import('node:fs/promises');
+    for (const [hull, expected, keepsAO] of [['torsas', 1, false], ['lancer', 2, true]]) {
+        const file = await readFile(new URL(`../../assets/models/ships/${hull}.glb`, import.meta.url));
+        decodes = 0;
+        const scene = await buildGlbScene(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength),
+            undefined, { omitDetailMaps: true });
+        assert.equal(decodes, expected, hull);
+        const materials = new Set();
+        scene.traverse(node => { if (node.isMesh) materials.add(node.material); });
+        assert.ok([...materials].some(material => material.map?.image));
+        assert.equal([...materials].some(material => material.aoMap?.image), keepsAO);
+        for (const material of materials) {
+            assert.equal(material.normalMap, null);
+            assert.equal(material.roughnessMap, null);
+            assert.equal(material.metalnessMap, null);
+        }
+    }
+});
+
+test('concurrent models reuse live immutable pixels while owning independent texture settings',async t=>{
+    let decodes=0;
+    const original=globalThis.createImageBitmap;
+    t.after(()=>{if(original)globalThis.createImageBitmap=original;else delete globalThis.createImageBitmap;});
+    globalThis.createImageBitmap=async()=>{decodes++;return {width:2,height:2};};
+    const load=async()=>{const root=await buildGlbScene(fixture({texture:{}}).buffer,undefined,{reuseImages:true});return root.children[0].children[0].material.map;};
+    const [first,second]=await Promise.all([load(),load()]);
+    assert.equal(decodes,1);
+    assert.notEqual(first,second);
+    assert.equal(first.source,second.source);
+    first.anisotropy=1;
+    assert.equal(second.anisotropy,8);
+    first.dispose();assert.equal((await load()).source,second.source);
+});

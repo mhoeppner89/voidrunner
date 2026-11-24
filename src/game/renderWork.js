@@ -1,6 +1,33 @@
 // Render-only work reduction. Explicit world-space queries still use Three's
 // updateWorldMatrix(), including for hidden objects; gameplay is unaffected.
 const guardedRoots = new WeakSet();
+const preparedApplePrograms = new WeakSet();
+const appleCompileBatches = new WeakMap();
+
+// All streamed scenes use the same WebGL command queue. Other stations and
+// arriving ships can submit new links while an earlier scene is waiting.
+async function awaitAppleCompileBatch(renderer, deadline) {
+    const batch = appleCompileBatches.get(renderer) ?? {lastSubmission: 0};
+    appleCompileBatches.set(renderer, batch);
+    batch.lastSubmission = performance.now();
+    renderer.getContext?.()?.flush?.();
+    let remaining;
+    while ((remaining = Math.min(deadline, batch.lastSubmission + 100) - performance.now()) > 0)
+        await new Promise(resolve => setTimeout(resolve, remaining));
+    return batch.lastSubmission + 100 <= deadline;
+}
+
+// iPadOS can identify itself as macOS, so platform alone is not enough here.
+// Keep this as a small capability check instead of tying the render profile to
+// a browser user-agent string: it also catches desktop-mode iPads reliably.
+export const isAppleTouchDevice = (platform = typeof navigator !== 'undefined' ? navigator : undefined) => {
+    if (!platform)
+        return false;
+    const identity = `${platform.platform ?? ''} ${platform.userAgent ?? ''}`;
+    return /iPad|iPhone|iPod/i.test(identity)
+        || (platform.platform === 'MacIntel' && Number(platform.maxTouchPoints) > 1);
+};
+
 const yieldRenderSetup = () => globalThis.scheduler?.yield?.() ?? new Promise(resolve => setTimeout(resolve, 0));
 
 // Static local transforms need no recomposition. World matrices still update
@@ -56,7 +83,7 @@ export function configureShaderDiagnostics(renderer) {
 // Prepare the exact render-target/lighting variant before its animation clock
 // starts. Restore the target before awaiting the driver, so cancellation or a
 // concurrently visible view cannot inherit a temporary framebuffer.
-export async function prepareRenderScene(renderer, scene, camera, target, {timeoutMs = 2500, shouldCancel = () => false, lightingScene = scene} = {}) {
+export async function prepareRenderScene(renderer, scene, camera, target, {timeoutMs = 2500, shouldCancel = () => false, lightingScene = scene, appleDriver = isAppleTouchDevice()} = {}) {
     if (shouldCancel()) return false;
     const textures = new Set();
     scene.traverse(object => {
@@ -99,11 +126,15 @@ export async function prepareRenderScene(renderer, scene, camera, target, {timeo
         } else programs = [...(renderer.info?.programs ?? [])];
     } finally { renderer.setRenderTarget(previous); }
     const deadline = performance.now() + timeoutMs;
-    // Without KHR_parallel_shader_compile, Three reports programs as ready
-    // immediately even while the driver is still linking them. Querying their
-    // uniforms then blocks the main thread. A GPU fence lets that work finish
-    // asynchronously before the first query, while preserving cancellation.
-    if (renderer.extensions?.has?.('KHR_parallel_shader_compile') === false) {
+    const parallelApple = appleDriver && renderer.extensions?.has?.('KHR_parallel_shader_compile');
+    if (parallelApple) {
+        programs = programs.filter(program => !preparedApplePrograms.has(program));
+        if (!programs.length) return !shouldCancel();
+        // Even fenceSync can synchronously wait behind a cold WebKit link.
+        // Dispatch the queued work without a round trip. The measured cold
+        // link took 85 ms; allow that first link to run before polling KHR.
+        if (!await awaitAppleCompileBatch(renderer, deadline)) return false;
+    } else if (programs.length) {
         const ready = await waitForRenderWork(renderer, {timeoutMs: Math.max(0, deadline - performance.now()), shouldCancel});
         if (!ready || shouldCancel()) return false;
     }
@@ -115,6 +146,7 @@ export async function prepareRenderScene(renderer, scene, camera, target, {timeo
             for (const program of programs) {
                 if (shouldCancel()) return false;
                 program.getUniforms?.();
+                if (parallelApple) preparedApplePrograms.add(program);
                 if (performance.now() >= uniformDeadline) {
                     await yieldRenderSetup();
                     uniformDeadline = performance.now() + 3;

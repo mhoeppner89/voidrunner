@@ -18,13 +18,31 @@ for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heig
    const marker=r.tutorialFieldTarget();p.position.splice(0,3,...marker.position);p.velocity.fill(0);p.throttle=0;r.updateActiveInstance(true);await r.renderer.ensureGraveyardModels();r.handleTutorialEvent('patrol-arrived');
    const hiding=r.ensureTutorialHidePosition();if(!hiding)throw Error('Carrier cover missing');p.position.splice(0,3,...hiding);p.velocity.fill(0);p.throttle=0;p.transponder=false;r.playerEmissionHeat=0;r.utilityActive=false;r.resetPlayerInterpolation(true);
    const paul=r.ships.find(s=>s.storyPersonId==='paul'),goal=r.tutorialFormationGoal().clone().addScaledVector(r.tmpTutorialRight,-96);let collision;
-   for(const o of r.activeFieldObstacles().filter(o=>o.modelWreckId==='concord-carrier-wreck')){
-    // Place Paul's visible hull on a real carrier triangle, then use the
-    // ordinary collision resolver that cleared the user's travel destination.
-    const v=o.meshVerts,ix=o.meshIndices;if(!v||!ix?.length)continue;const center=new T.Vector3();for(let i=0;i<3;i++)center.add(new T.Vector3(v[ix[i]*3],v[ix[i]*3+1],v[ix[i]*3+2]));center.multiplyScalar(1/3).applyQuaternion(new T.Quaternion(o.box.qx,o.box.qy,o.box.qz,o.box.qw)).add(new T.Vector3(o.x,o.y,o.z));
-    paul.position.splice(0,3,...center.toArray());paul.velocity.splice(0,3,25,0,0);paul.destination=goal.toArray();r.resolveNpcCollisions(paul);if(!paul.destination){collision=o.id;break;}
+   const {shipVsObstacle}=await import('/src/game/shipCollision.js');
+   const {npcShipScaleForVariant}=await import('/src/game/render.js');
+   const rotation=new T.Quaternion(...paul.rotation),scale=npcShipScaleForVariant(paul.variant);
+   const center=new T.Vector3(),vertex=new T.Vector3(),normal={};
+   const sections=r.activeFieldObstacles().filter(o=>o.modelWreckId==='concord-carrier-wreck');
+   let contacts=0;
+   for(const o of sections){
+    // Find a real surface contact and fly into its normal. An arbitrary
+    // world-X velocity can graze the plate too gently to clear a route.
+    const v=o.meshVerts,ix=o.meshIndices;if(!v||!ix?.length)continue;
+    const orientation=new T.Quaternion(o.box.qx,o.box.qy,o.box.qz,o.box.qw);
+    const step=3*Math.max(1,Math.floor(ix.length/96));
+    for(let face=0;face<ix.length;face+=step){
+     center.set(0,0,0);
+     for(let k=0;k<3;k++)center.add(vertex.fromArray(v,ix[face+k]*3));
+     center.multiplyScalar(1/3).applyQuaternion(orientation).add(vertex.set(o.x,o.y,o.z));
+     if(!shipVsObstacle(center,rotation,paul.variant,scale,o,normal))continue;
+     contacts++;paul.position.splice(0,3,...center.toArray());
+     paul.velocity.splice(0,3,-40*normal.x,-40*normal.y,-40*normal.z);
+     paul.destination=goal.toArray();r.resolveNpcCollisions(paul);
+     if(!paul.destination){collision=o.id;break;}
+    }
+    if(collision)break;
    }
-   if(!collision)throw Error('No real carrier contact cleared the route');if(paul.poweredDown)throw Error('Fixture disabled Paul before formation recovery');
+   if(!collision)throw Error('No real carrier contact cleared the route '+JSON.stringify({instance:r.activeInstanceId,sections:sections.length,contacts,variant:paul.variant}));if(paul.poweredDown)throw Error('Fixture disabled Paul before formation recovery');
    paul.position.splice(0,3,goal.x+80,goal.y,goal.z);paul.velocity.fill(0);if(paul.destination!==undefined)throw Error('Regression precondition lost');
    window.carrierProbe={start:r.save.world.time,samples:[],resets:0};const sim=r.updateSimulation;r.updateSimulation=function(...args){const t=performance.now();try{return sim.apply(this,args);}finally{carrierProbe.samples.push(performance.now()-t);}};
    r.lastFrame=performance.now()-100;r.frame(performance.now());cancelAnimationFrame(r.frameId);carrierProbe.buffer=paul.tutorialFormationDestination;return{collision,recovered:carrierProbe.buffer?.length===3,error:r.frameErrorAt??null};

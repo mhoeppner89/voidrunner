@@ -386,6 +386,6 @@ test('only the player’s close drone is hidden from the cockpit camera',()=>{
 test('environment shader preparation restores hidden regions and shadow settings',async()=>{
  const r=renderer(),region=new THREE.Group(),scene=new THREE.Scene(),originalTarget={};region.visible=false;scene.add(region);const calls=[];let target=originalTarget;
  Object.assign(r,{scene,camera:new THREE.PerspectiveCamera(),instanceRoots:new Map([['shardbelt',region]]),sunLight:{castShadow:false},isIOS:false,bloomSceneTarget:{},bloomEnabled:()=>true,prepareCombatWarmup:()=>new THREE.Group(),renderer:{shadowMap:{enabled:false,type:THREE.PCFShadowMap},getRenderTarget:()=>target,setRenderTarget:t=>{target=t;},compileAsync:async()=>{calls.push({region:region.visible,shadow:r.renderer.shadowMap.enabled,type:r.renderer.shadowMap.type});}}});
- await r.prepareActiveScene();assert.equal(calls.length,4);assert.ok(calls.every(c=>c.region));assert.ok(calls.some(c=>c.shadow&&c.type===THREE.PCFSoftShadowMap));
+ await r.prepareActiveScene();assert.equal(calls.length,2);assert.ok(calls.every(c=>c.region));assert.ok(calls.some(c=>c.shadow&&c.type===THREE.PCFSoftShadowMap));
  assert.equal(region.visible,false);assert.equal(r.renderer.shadowMap.enabled,false);assert.equal(r.renderer.shadowMap.type,THREE.PCFShadowMap);assert.equal(r.sunLight.castShadow,false);assert.equal(target,originalTarget);
 });

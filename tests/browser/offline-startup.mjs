@@ -2,7 +2,7 @@ import {chromium,webkit,devices} from 'playwright';
 import {existsSync} from 'node:fs';
 import {mkdir,writeFile,readFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
-import {createServer} from 'node:http';
+import {createOfflineTestOrigin} from '../helpers/offline-origin.mjs';
 import {paintedCockpitAssets} from '../../src/game/cockpitDefinitions.js';
 import {isolateBrowserProfiles,isolateBrowserHulls} from '../helpers/browser-profiles.mjs';
 await isolateBrowserProfiles(import.meta.url,['desktop','android','iphone']);
@@ -19,23 +19,8 @@ const currentCache=(await readFile(new URL('../../sw.js',import.meta.url),'utf8'
 await writeFile(`${out}/report-fixture.html`,'<!doctype html><title>Cached QA report</title><h1>Cached QA report</h1>');
 const profiles=[['desktop',chromium,{viewport:{width:1440,height:900}}],['android',chromium,devices['Pixel 7 landscape']],['iphone',webkit,devices['iPhone 13 landscape']]].filter(([name])=>!process.env.VR_PROFILES||process.env.VR_PROFILES.split(',').includes(name));
 const report=[];
-// Disconnect a test-only origin instead of toggling the browser-wide offline
-// flag: WebKit's automation backend can fail navigation internally with that
-// flag before its service worker gets to handle the request.
-async function testOrigin(){
- let stallGameModule=false;const stalled=new Set();
- const server=createServer(async(req,res)=>{
-  if(stallGameModule&&new URL(req.url,'http://test').pathname==='/src/game/game.js'){stalled.add(res);res.once('close',()=>stalled.delete(res));return;}
-  try{const response=await fetch(base+req.url);res.writeHead(response.status,{'content-type':response.headers.get('content-type')??'application/octet-stream'});res.end(Buffer.from(await response.arrayBuffer()));}
-  catch{if(!res.destroyed){res.writeHead(502);res.end('Preview upstream unavailable');}}
- });
- const listen=port=>new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',()=>{server.removeListener('error',reject);resolve();});});
- await listen(0);const port=server.address().port;
- const disconnect=async()=>{if(!server.listening)return;const stopped=new Promise(resolve=>server.close(resolve));server.closeAllConnections();await stopped;};
- return {url:`http://127.0.0.1:${port}`,disconnect,reconnect:()=>listen(port),stallGameModule(value){stallGameModule=value;if(!value)for(const res of stalled)res.destroy();}};
-}
 for(const [name,engine,device] of profiles){
- const origin=await testOrigin();
+ const origin=await createOfflineTestOrigin(base);
  const browser=await engine.launch({headless:true,...(engine===chromium?{...(existsSync('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')?{executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'}:{}),args:['--no-sandbox','--disable-gpu-sandbox','--mute-audio','--use-gl=angle','--use-angle=swiftshader']}:{})});
  try{
   // Intentionally allow service workers and omit startup-probe. The other

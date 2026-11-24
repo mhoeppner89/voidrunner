@@ -20,6 +20,7 @@ const CORE_ASSETS = [
   './src/style.css',
   './src/station-ui.css',
   './src/main.js',
+  './src/game/modelDelivery.js',
   './src/game/gamepad.js',
   './src/game/controllerBindings.js',
   './src/game/haptics.js',
@@ -266,7 +267,7 @@ self.addEventListener('activate', (event) => {
 // authoritative for this release: the cache name changes on deploy, and a
 // background revalidation here would duplicate the GLB/image warmup requests
 // issued by the title shell.
-const IMMUTABLE_ART = /\.(?:png|jpe?g|webp|gif|svg|avif|ico|woff2?|ttf|otf|glb)$/i;
+const IMMUTABLE_ART = /\.(?:png|jpe?g|webp|gif|svg|avif|ico|woff2?|ttf|otf|glb(?:\.gz)?)$/i;
 const isSameOrigin = (request) => new URL(request.url).origin === self.location.origin;
 const isArtAsset = (request) => IMMUTABLE_ART.test(new URL(request.url).pathname);
 // Some static hosts return their HTML entry page with status 200 for missing
@@ -296,7 +297,11 @@ const cacheResponse = (request, response) => {
 
 // One network request produces both promises. Callers use `response` for the
 // fetch result and register `persistence` with the active FetchEvent.
+let foregroundTransfers = 0;
+let wreckTransfer;
 const fetchAndCache = (request) => {
+  foregroundTransfers++;
+  wreckTransfer?.abort();
   let persistence = Promise.resolve();
   const response = fetch(request, { cache: 'no-cache' })
     .then((networkResponse) => {
@@ -305,7 +310,7 @@ const fetchAndCache = (request) => {
       return cached.response;
     })
     .catch(() => undefined);
-  const lifetime = response.then(() => persistence, () => persistence);
+  const lifetime = response.then(() => persistence, () => persistence).finally(() => { foregroundTransfers--; });
   return { response, lifetime };
 };
 
@@ -359,11 +364,13 @@ const cacheFirst = (request) => {
   return { response, lifetime };
 };
 
+let saveDataRequested = false;
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET' || !isSameOrigin(request))
     return;
 
+  saveDataRequested = request.headers?.get('Save-Data') === 'on';
   if (isArtAsset(request)) {
     const cache = cacheFirst(request);
     event.waitUntil(cache.lifetime);
@@ -392,5 +399,32 @@ self.addEventListener('fetch', (event) => {
       } catch { /* Keep waiting for the network when the cache is unavailable. */ }
     }
     return (await network.response) ?? (await offlineFallback(request));
+  })());
+});
+
+// The flight loop grants one transfer at a time and withdraws it on combat or
+// docking. Cache the response body directly, without inflating or decoding it.
+self.addEventListener('message', event => {
+  const {type, file} = event.data ?? {};
+  const port = event.ports[0];
+  if (type !== 'cache-wreck' || !port || !/^assets\/models\/wrecks\/[\w-]+\.glb(?:\.gz)?$/.test(file)) return;
+  const connection = self.navigator?.connection;
+  if (foregroundTransfers || wreckTransfer || saveDataRequested || connection?.saveData ||
+      ['slow-2g', '2g'].includes(connection?.effectiveType)) { port.postMessage(false); port.close(); return; }
+  const controller = new AbortController();
+  wreckTransfer = controller;
+  port.onmessage = () => controller.abort();
+  event.waitUntil((async () => {
+    let saved = false;
+    try {
+      const cache = await caches.open(CACHE);
+      if (!await cache.match(file)) {
+        const response = await fetch(file, {priority:'low', signal:controller.signal});
+        if (!response.ok || isHtmlResponse(response)) return;
+        await cache.put(file, response);
+      }
+      saved = true;
+    } catch { /* Offline, interrupted or out of quota: retry on a later idle flight. */ }
+    finally { wreckTransfer = undefined; port.postMessage(saved); port.close(); }
   })());
 });

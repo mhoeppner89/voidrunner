@@ -19,8 +19,11 @@ for(const [name,type,device] of profiles){
    if(!r.save.player.position.every(Number.isFinite)||r.ships.some(s=>!s.position.every(Number.isFinite)))throw Error('Invalid flight position');
    return {steps:times.length,p50Ms:times[Math.floor(times.length*.5)],p95Ms:times[Math.floor(times.length*.95)],rounds,damage,ships:r.ships.length,alive:r.ships.filter(s=>s.hull>0).length,playerHull:r.save.player.hull};
   },seconds);
+  const wreckDownloads=[];
+  page.on('request',request=>{if(request.url().includes('/assets/models/wrecks/'))wreckDownloads.push(request.url());});
   await page.evaluate(()=>__VOID_PRIVATEER__.newGame());await stop();
   await page.evaluate(async()=>{const r=__VOID_PRIVATEER__.getRuntime();r.skipTutorial();await r.launch();});await stop();
+  assert.deepEqual(wreckDownloads,[],'Helix dock and launch do not fetch the distant wreck fleet');
   const career=await simulate(3);console.log(name,'career passed');await page.screenshot({path:`${out}/${name}-career-flight.png`});
   // Use the loaded, real Helix surfaces and a validated berth for launch/landing.
   const docking=await page.evaluate(async()=>{

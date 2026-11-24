@@ -2085,3 +2085,10 @@ Follow-up: restore beam body without pitch variation; deepen scattergun (0.8.2pa
 Follow-up: approved weapon sounds in live game.
 - Confirmed career/Arena player guns, NPC guns and turrets all route through the shared approved sound events; no review-only override exists. The production package includes byte-identical events, manifest and affected recordings/forged assets. Existing 0.8.2pa/SWv680 already invalidates older cached audio; no further runtime change or version bump needed.
 - Muted real-career combat checks pass desktop Chrome and iPhone/WebKit: all108 sound-bank entries decode, finite voice/mixer state, menu/dock transitions and disposal pass with no page errors. Desktop master peak0.872 stays below full scale. Opened game.html?revision=0.8.2pa for user review. Local changes remain uncommitted; no commit/push requested.
+
+Follow-up: phone and desktop performance pass (three rounds, reviewed).
+- Auto power mode adapts 30/60 fps on phones (and follows high refresh on desktop) with a delivered-frame overload check and a 30 s cooldown; the 30 fps gate tolerates WebKit timestamp jitter (removed the 50 ms gaps measured on Shardbelt/simulator).
+- Radar skips terrain rays that cannot change a contact; Shardbelt tiles reject distant collision queries; shader warmup targets the real render target (577 -> 293 programs).
+- Download through launch: iPhone 99.7 -> 58.0 MB, Android 89.1 -> 47.4 MB. Helix defers the wreck fleet, wrecks stream two at a time nearest first, the build generates and verifies .glb.gz wrecks and packed Lancer/Torsas hulls at full resolution.
+- Graveyard wreck draws 84 -> 44 (batched by finish, draw-scoped index clipping). Offline first visits show a collision-derived derelict stand-in until the model arrives; the service worker fills wrecks during quiet flight.
+- iPhone first-combat shader stall ~85 -> 4 ms. 1,423 Node and 70 render tests pass, plus the browser, wreck, graveyard, racing, salvage, carrier-hiding, station-performance and preparation suites. Measurements in output/perf-pass/. Physical-device heat/battery/memory still unmeasured.

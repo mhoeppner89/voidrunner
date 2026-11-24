@@ -115,3 +115,22 @@ test('grid rebuild cadence and instance switches rebuild the sparse index togeth
     const found = []; s.forEachObstacleInBox(60, -1, -1, 70, 1, 1, o => found.push(o.id)); assert.deepEqual(found, ['a']);
     const changed = s.obstacleBoxIndex; s.activeInstanceId = 'other'; s.ensureObstacleGrid(); assert.notEqual(s.obstacleBoxIndex, changed);
 });
+
+test('radar traces terrain only when occlusion could change a contact', async () => {
+    const { tutorialFixture } = await import('../helpers/tutorial.mjs');
+    const { session, save } = tutorialFixture('earn-standing');
+    save.world.time = 100;
+    save.player.currentTargetId = 'locked';
+    const position = [...save.player.position];
+    position[2] -= 25;
+    session.ships = ['unresolved', 'locked', 'resolved'].map(id => ({
+        id, position, hull: 1, playerSensorAwareness: id === 'unresolved' ? 0 : 1,
+    }));
+    session.lockTrackedRange = () => 100;
+    let rays = 0;
+    session.lineBlocked = () => { rays++; return true; };
+    const contacts = session.radarContacts();
+    assert.equal(rays, 1);
+    assert.ok(contacts.some(contact => contact.type === 'neutral' && contact.selected));
+    assert.deepEqual(session.ships.map(ship => ship.lastSeenAt), [undefined, 100, undefined]);
+});

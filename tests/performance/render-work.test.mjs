@@ -5,7 +5,7 @@ registerHooks({ resolve(specifier, context, next) {
     return next(specifier === 'three' ? new URL('../../vendor/three.module.min.js', import.meta.url).href : specifier, context);
 } });
 const THREE = await import('three');
-const { skipHiddenWorldMatrices, markAttributeSpan } = await import('../../src/game/renderWork.js');
+const { skipHiddenWorldMatrices, markAttributeSpan, prepareRenderScene } = await import('../../src/game/renderWork.js');
 const { CanvasSizeCache } = await import('../../src/game/canvasSizeCache.js');
 const { SpaceRenderer } = await import('../../src/game/render.js');
 
@@ -168,7 +168,7 @@ test('race boost markers and peripheral streaks reuse bounded pools and clear af
  r.raceSpeedIntensity=1;r.reducedHyperdriveMotion=true;r.updateRaceSpeedLines(1/60);assert.equal(r.raceSpeedLines.visible,false);
 });
 
-test('flight warmup retains canvas and HDR effect programs and restores the current target',async()=>{
+test('flight warmup compiles world materials only for their linear scene target and restores the current target',async()=>{
     const hdr={},previous={},compiled=[],warmup=new THREE.Group();let target=previous,initialized=0;
     const s=Object.create(SpaceRenderer.prototype);
     Object.assign(s,{scene:new THREE.Scene(),camera:new THREE.PerspectiveCamera(),isIOS:false,
@@ -176,12 +176,12 @@ test('flight warmup retains canvas and HDR effect programs and restores the curr
         renderer:{info:{programs:[{getUniforms:()=>initialized++}]},getRenderTarget:()=>target,setRenderTarget:value=>target=value,
             compileAsync:async()=>{compiled.push(target);}}});
     await s.prepareActiveScene();
-    assert.deepEqual(compiled,[null,hdr,null,hdr]);assert.equal(target,previous);assert.equal(initialized,1);
+    assert.deepEqual(compiled,[hdr,hdr]);assert.equal(target,previous);assert.equal(initialized,1);
     assert.equal(warmup.parent,null);assert.equal(s.pendingShaderCompiles.size,0);
     compiled.length=0;s.isIOS=true;
     s.renderer.domElement={width:640,height:360};
     await s.prepareActiveScene();
-    assert.deepEqual(compiled,[null,s.pixelSceneTarget,null,s.pixelSceneTarget,null],'iOS prepares shadow/no-shadow HDR scenes and its bounded resolve');
+    assert.deepEqual(compiled,[s.pixelSceneTarget,s.pixelSceneTarget,null],'iOS prepares shadow/no-shadow HDR scenes and its bounded resolve');
     assert.equal(s.pixelQuad.material,s.pixelResolveMaterial);
     s.pixelSceneTarget.dispose();s.pixelResolveMaterial.dispose();s.pixelQuad.geometry.dispose();
 });
@@ -198,8 +198,18 @@ test('off-scene postprocess and planetary ring passes are prepared before flight
         renderer:{getRenderTarget:()=>target,setRenderTarget:value=>target=value,
             compileAsync:async object=>{calls.push({object,material:object.material,target});}}});
     await s.prepareActiveScene();
-    assert.deepEqual(calls.map(call=>call.target),[null,hdr,null,hdr,blurA,blurB,null,hdr,hdr]);
-    assert.deepEqual(calls.slice(4,7).map(call=>call.material),[bright,blur,composite]);
-    assert.equal(calls[7].object,volume);assert.equal(calls[8].object,particles);
+    assert.deepEqual(calls.map(call=>call.target),[hdr,hdr,blurA,blurB,null,hdr,hdr]);
+    assert.deepEqual(calls.slice(2,5).map(call=>call.material),[bright,blur,composite]);
+    assert.equal(calls[5].object,volume);assert.equal(calls[6].object,particles);
     assert.equal(quad.material,material);assert.equal(target,null);
+});
+
+test('a later Apple submission pushes the quiet period past the first deadline',async()=>{
+const flush=[],queries=[];let current;
+const renderer={getRenderTarget(){},setRenderTarget(){},getContext:()=>({flush(){flush.push(performance.now());}}),compile(){},extensions:{has:()=>true},get info(){return {programs:[current]};}};
+const scene={traverse(){}},run=(label,timeoutMs)=>{current={isReady:()=>{queries.push([label,performance.now()-flush.at(-1)]);return true;}};return prepareRenderScene(renderer,scene,{},{},{appleDriver:true,timeoutMs});};
+const first=run('first',110);
+await new Promise(r=>setTimeout(r,70));const next=run('second',1000);
+assert.deepEqual(await Promise.all([first,next]),[false,true]);
+assert.deepEqual(queries.map(([label])=>label),['second']);
 });

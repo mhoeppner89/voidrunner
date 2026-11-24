@@ -281,7 +281,7 @@ async function prepareScene(scene) {
     for (const [name, model] of runtime.renderer.glbShipModels) {
         if (!model) throw new Error(`Ship model ${name} did not load. Reload before benchmarking.`);
     }
-    if (scene.environment === 'debris-field' && runtime.renderer.graveyardModelMeshes.length !== readyModules[4].GRAVEYARD_MODEL_WRECKS.length)
+    if (scene.environment === 'debris-field' && runtime.renderer.graveyardModelMeshes.filter(w => !w.userData.collisionWreck).length !== readyModules[4].GRAVEYARD_MODEL_WRECKS.length)
         throw new Error('Wreck models did not load. Reload before benchmarking.');
     await abortable(runtime.prepareFlightScene());
     if (controller.signal.aborted) throw new Error(String(controller.signal.reason));

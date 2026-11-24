@@ -103,7 +103,7 @@ export function prepareGraveyardModel(root,plating) {
                     paint=mix(paint,heatStain,soot*.96);
                     paint=mix(paint,vec3(.105,.14,.16),gyInterior);
                     float backFace=gl_FrontFacing?1.:mix(.42,.8,gyInterior);
-                    diffuseColor.rgb=paint*(.35+plating*.90)*fineWear*backFace;
+                    diffuseColor.rgb=diffuse*paint*(.35+plating*.90)*fineWear*backFace;
                 `);
             };
             material.customProgramCacheKey=()=> 'graveyard-plating-3';
@@ -112,6 +112,44 @@ export function prepareGraveyardModel(root,plating) {
         mesh.material=Array.isArray(mesh.material)?mesh.material.map(prepare):prepare(mesh.material);
         for(const material of Array.isArray(mesh.material)?mesh.material:[mesh.material])stabilizeMaterialNormals(material);
     });
+    return root;
+}
+
+// Assemble the exact collision triangles in wreck-local space. This preserves the
+// open flight deck, torn plates and gaps used by salvage and navigation queries.
+export function createCollisionWreck(config, center, colliders, plating) {
+    const root = new THREE.Group();
+    const origin = new THREE.Vector3(...center).add(new THREE.Vector3(...config.local));
+    const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(...config.rotation));
+    const inverse = rotation.clone().invert(), section = new THREE.Quaternion();
+    const point = new THREE.Vector3(), offset = new THREE.Vector3();
+    const positions = [], indices = [];
+    for (const collider of colliders) {
+        if (collider.modelWreckId !== config.id) continue;
+        section.fromArray(collider.quaternion);
+        offset.fromArray(collider.position).sub(origin);
+        const start = positions.length / 3;
+        for (let i = 0; i < collider.meshVerts.length; i += 3) {
+            point.fromArray(collider.meshVerts, i).applyQuaternion(section).add(offset)
+                .applyQuaternion(inverse).multiplyScalar(1 / config.scale);
+            positions.push(point.x, point.y, point.z);
+        }
+        for (const index of collider.meshIndices) indices.push(start + index);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    const blank = new THREE.MeshStandardMaterial({flatShading:true});
+    root.add(new THREE.Mesh(geometry, blank));
+    prepareGraveyardModel(root, plating);
+    blank.dispose();
+    root.children[0].material.color.setScalar(0.68);
+    root.name = config.id;
+    root.position.copy(origin);
+    root.quaternion.copy(rotation);
+    root.scale.setScalar(config.scale);
+    root.userData.collisionWreck = true;
     return root;
 }
 
@@ -131,7 +169,7 @@ export function arrangeGraveyardModel(source,config) {
 // Keep every triangle, UV and authored damage sample, but submit nearby static
 // sections with the same finish together. Damage coordinates are baked before
 // applying the broken section's transform, so paint and torn edges do not move.
-// Four longitudinal clusters retain useful close-up frustum culling.
+// Merge each finish within a single hull. Culling still separates casualties.
 function* graveyardBatchBuild(wreck) {
     if(wreck.userData.graveyardBatched)return wreck;
     wreck.updateMatrixWorld(true);
@@ -143,18 +181,22 @@ function* graveyardBatchBuild(wreck) {
         if(!visible)return;
         mesh.geometry.computeBoundingBox();
         matrix.multiplyMatrices(inverse,mesh.matrixWorld);
-        bounds.union(mesh.geometry.boundingBox.clone().applyMatrix4(matrix));meshes.push(mesh);
+        const box=mesh.geometry.boundingBox.clone().applyMatrix4(matrix);
+        bounds.union(box);
+        meshes.push({mesh,center:box.getCenter(new THREE.Vector3())});
     });
-    const size=bounds.getSize(new THREE.Vector3()),axis=size.x>=size.y&&size.x>=size.z?'x':size.y>=size.z?'y':'z';
+    const size=bounds.getSize(point);
+    const axis=size.x>=size.y&&size.x>=size.z?'x':size.y>=size.z?'y':'z';
+    // Neighbouring sections occupy consecutive indices. Offscreen ends can
+    // be dropped without splitting a material into several draw calls.
+    meshes.sort((a,b)=>a.center[axis]-b.center[axis]);
     const groups=new Map();
-    for(const mesh of meshes){
+    for(const {mesh} of meshes){
         const material=mesh.material,data=material.userData.graveyardBatch;
         matrix.multiplyMatrices(inverse,mesh.matrixWorld);
-        const centre=mesh.geometry.boundingBox.getCenter(point).applyMatrix4(matrix);
-        const cluster=Math.min(3,Math.max(0,Math.floor((centre[axis]-bounds.min[axis])/Math.max(.001,size[axis])*4)));
         // Unmodified dark glazing and structural alloy can share only their
         // original material object; the painted variants retain source IDs.
-        const key=(data?.source??material.userData.graveyardSource??material.uuid)+'|'+cluster;
+        const key=data?.source??material.userData.graveyardSource??material.uuid;
         const group=groups.get(key)??{material,parts:[],meshes:[]};groups.set(key,group);
         const geometry=mesh.geometry.clone();
         if(data){
@@ -186,7 +228,19 @@ function* graveyardBatchBuild(wreck) {
             geometry.setAttribute(name,new THREE.BufferAttribute(array,first.itemSize,first.normalized));
         }
         const indices=[],sections=[];let offset=0;
-        for(let n=0;n<parts.length;n++){const part=parts[n];sections.push({name:originals[n].name,source:originals[n].uuid,start:offset,count:part.attributes.position.count});if(part.index)for(const index of part.index.array)indices.push(index+offset);else for(let i=0;i<part.attributes.position.count;i++)indices.push(i+offset);offset+=part.attributes.position.count;part.dispose();yield;}
+        for(let n=0;n<parts.length;n++){
+            const part=parts[n],startIndex=indices.length;
+            if(part.index)for(const index of part.index.array)indices.push(index+offset);
+            else for(let i=0;i<part.attributes.position.count;i++)indices.push(i+offset);
+            // Keep the original box and transform: re-boxing after each
+            // rotation inflates the bounds of long, oblique hull sections.
+            const box=originals[n].geometry.boundingBox;
+            matrix.multiplyMatrices(inverse,originals[n].matrixWorld);
+            sections.push({name:originals[n].name,source:originals[n].uuid,start:offset,
+                count:part.attributes.position.count,startIndex,endIndex:indices.length,
+                min:box.min.toArray(),max:box.max.toArray(),matrix:matrix.toArray()});
+            offset+=part.attributes.position.count;part.dispose();yield;
+        }
         geometry.setIndex(indices);geometry.computeBoundingBox();geometry.computeBoundingSphere();
         let finish=material;
         if(material.userData.graveyardBatch){
@@ -214,4 +268,58 @@ export async function batchGraveyardModelAsync(wreck,{shouldCancel=()=>false,bud
         if(performance.now()>=deadline){await(globalThis.scheduler?.yield?.()??new Promise(resolve=>setTimeout(resolve,0)));deadline=performance.now()+budgetMs;}
     }
     build.return();return null;
+}
+
+// Install after final world placement. Cloned casualties share index/vertex
+// buffers, but each placement has its own immutable world-space bounds.
+export function clipWreckSections(wreck, flightCamera) {
+    const frustum=new THREE.Frustum(),projection=new THREE.Matrix4();
+    let lastFrame=-1;
+    wreck.updateWorldMatrix(true,true);
+    wreck.traverse(mesh => {
+        const sections=mesh.userData.graveyardSections;
+        if(!sections)return;
+        const transform=new THREE.Matrix4();
+        const boxes=sections.map(({min,max,matrix})=>new THREE.Box3(
+            new THREE.Vector3(...min),new THREE.Vector3(...max)).applyMatrix4(
+                transform.fromArray(matrix).premultiply(mesh.matrixWorld)));
+        mesh.userData.graveyardDrawRange=(renderer,camera,range)=>{
+            if(camera!==flightCamera)return;
+            // Direct scene renders (warmup and inspection) can change the
+            // camera between game frames. Use the matrices of this draw.
+            const frame=renderer.info.render.frame;
+            if(frame!==lastFrame){
+                projection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse);
+                frustum.setFromProjectionMatrix(projection);
+                lastFrame=frame;
+            }
+            let first=0,last=boxes.length-1;
+            while(first<=last&&!frustum.intersectsBox(boxes[first]))first++;
+            while(last>first&&!frustum.intersectsBox(boxes[last]))last--;
+            const start=sections[first]?.startIndex??0;
+            range.start=start;
+            range.count=first<=last?sections[last].endIndex-start:0;
+        };
+    });
+}
+
+// Keep the canonical geometry available to every camera and every raycaster.
+// Three intersects a draw group with geometry.drawRange in renderBufferDirect.
+// Scope our private group to that draw, including throws and re-entrant draws.
+export function installWreckDrawRanges(renderer, flightCamera) {
+    const draw = renderer.renderBufferDirect;
+    const range = {start:0, count:Infinity};
+    renderer.renderBufferDirect = function(camera, scene, geometry, material, mesh, group) {
+        const clip = mesh.userData.graveyardDrawRange;
+        if (!clip || camera !== flightCamera || group)
+            return draw.call(this, camera, scene, geometry, material, mesh, group);
+        const {start, count} = range;
+        try {
+            clip(this, camera, range);
+            return draw.call(this, camera, scene, geometry, material, mesh, range);
+        } finally {
+            range.start = start;
+            range.count = count;
+        }
+    };
 }

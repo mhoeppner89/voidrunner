@@ -28,6 +28,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 -m pip install -r tools/assets/requirements.txt
+      - uses: actions/cache@v4
+        with:
+          path: .workbench/hull-delivery
+          key: hulls-${{ runner.os }}-${{ hashFiles('assets/models/ships/lancer.glb', 'assets/models/ships/torsas.glb', 'tools/assets/pack-hull-textures.py', 'tools/assets/requirements.txt', '.github/workflows/pages.yml') }}
       - name: Package game runtime
         run: npm run build
       - name: Upload game runtime

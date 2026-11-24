@@ -197,7 +197,7 @@ function* buildAsteroidTerrain() {
         prepareMeshQueryIndex(verts,indices);
         prepareSurfaceMeshIndex(verts,indices);
         obstacles.push({id:`shardbelt-terrain:${key}`,x:origin[0]+center[0],y:origin[1]+center[1],z:origin[2]+center[2],
-            radius,losRadius:radius,collisionRadius:radius,shape:'asteroid',terrain:true,surfaceOnly:true,minReach:0,
+            radius,maxReach:radius,losRadius:radius,collisionRadius:radius,shape:'asteroid',terrain:true,surfaceOnly:true,minReach:0,
             meshVerts:verts,meshIndices:indices,box:{hx:half[0],hy:half[1],hz:half[2],qx:0,qy:0,qz:0,qw:1}});
         if((++tileCount&15)===0)yield;
     }

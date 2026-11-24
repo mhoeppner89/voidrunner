@@ -1,3 +1,4 @@
+import {fetchModelBytes} from './game/modelDelivery.js';
 import {paintedCockpitAssets} from './game/cockpitDefinitions.js';
 import { normalizeControllerBindings } from './game/controllerBindings.js';
 import {newArenaRun,readArenaRun,arenaRecord} from './game/arenaRun.js';
@@ -114,11 +115,9 @@ const warmedBinaries = new Map();
 const warmBinary = (url, priority = 'low') => {
     let pending = warmedBinaries.get(url);
     if (!pending) {
-        pending = fetch(url, { cache: 'force-cache', priority })
-            .then(async (response) => {
-                if (response.ok)
-                    await response.arrayBuffer();
-            });
+        // Drop the response body when the predictive read has finished.
+        pending = fetchModelBytes(url, priority).then(() => undefined);
+        pending.catch(() => warmedBinaries.delete(url));
         warmedBinaries.set(url, pending);
     }
     return pending;

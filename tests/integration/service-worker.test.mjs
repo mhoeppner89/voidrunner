@@ -14,12 +14,12 @@ function workerFixture(scope='https://example.test/voidrunner/') {
   return {match:async request=>store.get(key(request))?.clone(),put:async(request,response)=>store.set(key(request),response.clone())};
  };
  const self={location:new URL('sw.js',scope),clients:{claim:async()=>{}},skipWaiting:async()=>{},addEventListener:(name,fn)=>handlers.set(name,fn)};
- vm.runInNewContext(source,{self,URL,Response,Promise,setTimeout,clearTimeout,caches:{open:async name=>cacheFor(name),keys:async()=>[...stores.keys()],delete:async name=>stores.delete(name)},fetch:async request=>{
+ vm.runInNewContext(source,{self,URL,Response,Promise,AbortController,setTimeout,clearTimeout,caches:{open:async name=>cacheFor(name),keys:async()=>[...stores.keys()],delete:async name=>stores.delete(name)},fetch:async request=>{
   requests.push(key(request));if(hang)return new Promise(()=>{});if(!online)throw Error('offline');
   return new Response('network asset',{headers:{'content-type':contentType}});
  }});
  const cacheName=source.match(/const CACHE = '([^']+)'/)[1];
- return {requests,cache:cacheFor(cacheName),online:value=>{online=value;},hang:value=>{hang=value;},contentType:value=>{contentType=value;},async event(name){let task;handlers.get(name)({waitUntil:p=>{task=p;}});await task;},async fetch(path,mode='navigate',responseOnly=false){
+ return {handlers,requests,cache:cacheFor(cacheName),online:value=>{online=value;},hang:value=>{hang=value;},contentType:value=>{contentType=value;},async event(name){let task;handlers.get(name)({waitUntil:p=>{task=p;}});await task;},async fetch(path,mode='navigate',responseOnly=false){
   let response;const tasks=[];handlers.get('fetch')({request:{url:key(path),method:'GET',mode},respondWith:p=>{response=p;},waitUntil:p=>tasks.push(p)});
   const result=await response;if(!responseOnly)await Promise.all(tasks);return result;
  }};
@@ -60,4 +60,19 @@ test('an HTML fallback cannot poison precached opening artwork during install',a
  const w=workerFixture();w.online(true);w.contentType('text/html');await w.event('install');
  assert.equal(await w.cache.match('./art/portraits/simplified/rin-vek-hd-v1.webp'),undefined);
  w.contentType('image/webp');assert.equal(await(await w.fetch('./art/portraits/simplified/rin-vek-hd-v1.webp','no-cors')).text(),'network asset');
+});
+
+test('the worker grants one background wreck transfer and reuses the cached response', async()=>{
+ const w=workerFixture(),file='assets/models/wrecks/concord-carrier-wreck-v4.glb.gz';
+ w.online(true);
+ const fill=()=>{
+  let result,work;
+  const port={postMessage(value){result=value;},close(){}};
+  w.handlers.get('message')({data:{type:'cache-wreck',file},ports:[port],waitUntil(task){work=task;}});
+  return Promise.resolve(work).then(()=>result);
+ };
+ assert.deepEqual(await Promise.all([fill(),fill()]),[true,false]);
+ assert.equal(await fill(),true);
+ assert.equal(w.requests.length,1);
+ assert.ok(await w.cache.match(file));
 });
