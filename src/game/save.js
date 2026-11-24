@@ -13,7 +13,7 @@ import { refreshMissionOffers } from './missions.js';
 import { normalizeRaceRecord } from './racing.js';
 import { clamp } from './random.js';
 import { getEffectiveShipStats } from './shipStats.js';
-import { AMMO_CAPACITY, LEGACY_GUN_AMMO, WEAPON_ORDER, WEAPONS, normalizeLauncherMagazines } from './weapons.js';
+import { AMMO_CAPACITY, LEGACY_GUN_AMMO, WEAPON_ORDER, WEAPONS, LAUNCHERS, mountedLauncherEntries, normalizeLauncherMagazines } from './weapons.js';
 import { HULL_HARDPOINTS, canonicalOutfitId,collapseOutfittingToSingleShip, createOutfittingState, normalizeOutfitting, projectLegacyEquipment, projectLegacyWeaponId } from './outfitting.js';
 import { combinedHullIntegrity, normalizeEnergy } from './combatResources.js';
 import { normalizeQuestStates } from './quests.js';
@@ -528,6 +528,59 @@ const normalizeLocalContractProgress = (candidate) => {
         .filter(([chainId, stageIndex]) => chainId && Number.isFinite(Number(stageIndex)))
         .map(([chainId, stageIndex]) => [chainId, Math.min(99, Math.max(0, Math.floor(Number(stageIndex))))]));
 };
+// A fitted magazine is authoritative. Inventory and Arena records can mirror
+// it, including an older count captured before the last sortie.
+function refundSwarmCanisters(save,legacyPool){
+    const p=save.player,items=p.inventory?.items??{},rewards=save.arenaRun?.rewardRecords??{};
+    const swarm=id=>id==='swarm'||id==='shield-swarm';
+    const seen=new Set();
+    let excess=0;
+    const retain=(rounds,capacity)=>{
+        const count=Number.isFinite(Number(rounds))?Math.max(0,Math.floor(Number(rounds))):0;
+        excess+=Math.max(0,count-capacity);
+        return Math.min(count,capacity);
+    };
+    for(const shipId of p.ownedShips){
+        const state=shipId===p.shipId?p:p.storedShips?.[shipId]?.resources;
+        if(!state)continue;
+        const mounts=mountedLauncherEntries(p,shipId);
+        if(!mounts.some(e=>swarm(e.launcherId)))continue;
+        // Before typed magazines the old pool filled racks in mount order.
+        if(shipId===p.shipId && Number.isFinite(legacyPool)
+            && !mounts.some(e=>state.launcherMagazines?.[e.mount.id]?.launcherId===e.launcherId)){
+            state.launcherMagazines={};
+            let remaining=Math.max(0,Math.floor(legacyPool));
+            for(const e of mounts){
+                const rounds=Math.min(remaining,swarm(e.launcherId)?12:e.launcher.capacity);
+                state.launcherMagazines[e.mount.id]={launcherId:e.launcherId,rounds};
+                remaining-=rounds;
+            }
+        }
+        for(const e of mounts){
+            if(!swarm(e.launcherId))continue;
+            const mags=state.launcherMagazines??={},oldKey=`${shipId}-launcher-${e.index-HULL_HARDPOINTS[shipId].stockGunCount}`;
+            if(!mags[e.mount.id] && mags[oldKey]){mags[e.mount.id]=mags[oldKey];delete mags[oldKey];}
+            const mag=mags[e.mount.id],item=items[e.itemId]??rewards[e.itemId];
+            if(mag?.launcherId!==e.launcherId && item?.rounds==null)continue;
+            const rounds=retain(mag?.launcherId===e.launcherId?mag.rounds:item.rounds,e.launcher.capacity);
+            mags[e.mount.id]={launcherId:e.launcherId,ordnanceId:e.launcher.ordnanceId,rounds};
+            for(const copy of [items[e.itemId],rewards[e.itemId]])if(copy)copy.rounds=rounds;
+            seen.add(e.itemId);
+        }
+        if(state.launcherMagazines && Object.keys(state.launcherMagazines).length)
+            state.missiles=Object.values(state.launcherMagazines).reduce((n,m)=>n+(Number(m?.rounds)||0),0);
+    }
+    for(const record of [...Object.values(items),...Object.values(rewards)]){
+        if(!record || record.rounds==null || !['swarm-launcher','shield-swarm-launcher'].includes(record.baseId) || seen.has(record.id))continue;
+        const rounds=retain(record.rounds,LAUNCHERS.swarm.capacity);
+        for(const copy of [items[record.id],rewards[record.id]])if(copy)copy.rounds=rounds;
+        seen.add(record.id);
+    }
+    if(excess){
+        p.credits+=excess*240;
+        p.swarmRefund=(p.swarmRefund??0)+excess;
+    }
+}
 export const hydrateSave = (candidate) => {
     candidate = candidate && typeof candidate === 'object' && !Array.isArray(candidate) ? candidate : {};
     const parsedVersion = Number(candidate.version ?? 1);
@@ -782,6 +835,13 @@ export const hydrateSave = (candidate) => {
      save.arenaRun.offers=[...new Set((save.arenaRun.offers??[]).map(canonicalOutfitId))];
      if(save.arenaRun.selectedReward)save.arenaRun.selectedReward=canonicalOutfitId(save.arenaRun.selectedReward);
     }
+    const checkpoint=save.arenaRun?.checkpoint;
+    if(checkpoint?.outfitting && Array.isArray(checkpoint.ownedShips)){
+        // Retry restores its own player and balance. Credit that timeline once.
+        const rewardRecords=JSON.parse(JSON.stringify(save.arenaRun.rewardRecords??{}));
+        refundSwarmCanisters({player:checkpoint,arenaRun:{rewardRecords}});
+    }
+    refundSwarmCanisters(save,sourceVersion<10?candidate.player?.missiles:undefined);
     normalizeEquipmentInventory(save.player,{disabled:Boolean(save.arena)});
     normalizeCareerLoot(save.world,save.player);
     normalizeExploration(save.world);

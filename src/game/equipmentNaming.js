@@ -91,6 +91,7 @@ export const EQUIPMENT_NAMING = {
       "en": "Cargo Expansion",
       "de": "Frachterweiterung"
     },
+    "fire-control": {"en":"Fire Control","de":"Feuerleitung"},
     "loot-collector": {"en": "Tractor Beam", "de": "Traktorstrahl"},
     "salvage-mk2": {
       "en": "Salvage Targeting",
@@ -206,6 +207,7 @@ export const EQUIPMENT_NAMING = {
     }
   },
   "affixes": {
+    "quickLock": {"en": "Quick-lock", "de": "Schnellerfassung"},
     "efficient": {
       "en": "Efficient",
       "de": "Effizient"

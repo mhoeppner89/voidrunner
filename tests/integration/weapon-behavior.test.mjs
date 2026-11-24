@@ -122,7 +122,7 @@ test('enemy fittings obey mounts and finite missiles need a continuous lock and 
  }
  const s=session(),ship=s.spawnShip('pirate',[0,0,180],undefined,undefined,{tier:'ace',temperament:'steady'});
  ship.rotation=[0,0,0,1];ship.targetId='player';ship.combatFit=createEnemyLoadout(ship,0);ship.combatFit.missiles=1;ship.combatFit.racks?.forEach(r=>r.missiles=1);
- for(let i=0;i<90;i++){s.save.world.time=i/60;s.updateNpcOrdnance(ship,new THREE.Vector3(),1/60);}
+ for(let i=0;i<30;i++){s.save.world.time=i/60;s.updateNpcOrdnance(ship,new THREE.Vector3(),1/60);}
  assert.equal(s.projectiles.length,0);assert.equal(ship.combatFit.warned,true);
  s.obstacles=[{x:0,y:0,z:90,radius:20,losRadius:20}];s.updateNpcOrdnance(ship,new THREE.Vector3(),1/60);assert.equal(ship.combatFit.lock,0);assert.equal(ship.combatFit.warned,false);s.obstacles=[];
  for(let i=0;i<1000;i++){s.save.world.time=2+i/60;s.updateNpcOrdnance(ship,new THREE.Vector3(),1/60);}
@@ -138,11 +138,11 @@ test('novices lock slowly and every subsequent missile requires a fresh warned l
    s.updateNpcOrdnance(ship,new THREE.Vector3(),1/60);
    if(s.projectiles.length>before)launches.push(s.save.world.time);
   }
-  assert.equal(launches.length,2);assert.equal(warnings.length,2);assert.deepEqual(sounds.map(([id])=>id),['missileAlert','missileAlert'],'locking stays visual; only launched missiles raise the incoming warning');
-  const lock=tier==='novice'?4:2.5,gap=tier==='novice'?10:6;
+  assert.equal(launches.length,2);assert.equal(warnings.length,2);assert.deepEqual(sounds.map(([id])=>id),['missileLaunch','missileLaunch'],'locking stays visual; only launched missiles raise the incoming warning');
+  const lock=tier==='novice'?2:tier==='veteran'?1.5:1,gap=tier==='novice'?10:6;
   assert.ok(launches[0]>=lock-.02);assert.ok(launches[0]<lock+.1);
   assert.ok(launches[1]-launches[0]>=gap+lock-.02);
-  launches.forEach((time,i)=>assert.ok(time-warnings[i]>=(tier==='novice'?2.6:1.1)));
+  launches.forEach((time,i)=>assert.ok(time-warnings[i]>=lock-.02));
   assert.equal(ship.combatFit.missiles,0);
  }
 });
@@ -159,7 +159,7 @@ test('a wingmate holds guns and a locked missile while the pilot or a friendly h
   s.save.world.time=tick/60;s.updateNpcOrdnance(wing,target,1/60);
   if(tick===180)s.fireNpcGun(wing,forward);
  }
- assert.ok(fit.lock>=2.5);assert.equal(fit.racks[0].missiles,1);
+ assert.equal(fit.lock,1);assert.equal(fit.racks[0].missiles,1);
  assert.equal(beams,0,'guns also withhold fire through the pilot');
  s.save.player.position[0]=80;ally.position[0]=0;
  s.updateNpcOrdnance(wing,target,1/60);s.fireNpcGun(wing,forward);

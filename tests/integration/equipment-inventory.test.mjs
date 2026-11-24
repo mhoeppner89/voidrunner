@@ -133,6 +133,7 @@ test('multiple launchers spend one energy charge per canister and cannot overdra
  const s=Object.create(GameSession.prototype);s.save=make();s.projectiles=[];s.projStore=new EntityStore(64);s.projectileCounter=0;s.renderer={spawnMuzzleFlash(){}};s.audio={play(){},playCockpit(){}};s.setMonitorStatus=()=>{};s.addPlayerEmission=()=>{};s.tmpPlayerOrientation=new THREE.Quaternion();for(let i=0;i<7;i++)s['tmpP'+i]=new THREE.Vector3();const p=s.save.player;p.position=[0,0,0];p.rotation=[0,0,0,1];p.mode='combat';
  const fit=normalizeLoadout('wayfarer',{mountSchema:4,launchers:['swarm-launcher','swarm-launcher','swarm-launcher']});p.outfitting.loadouts.wayfarer=fit;
  const target={id:'energy-target',hull:1000,position:[0,0,-200]};s.ships=[target];s.getTargetRef=()=>({kind:'ship',id:target.id});fillLauncherMagazines(p);p.launcherFireMode='together';p.energy=30;
+ p.currentTargetId=target.id;target.rotation=[0,0,0,1];p.dockedAt=undefined;s.tmpQ2=new THREE.Quaternion();s.updatePlayerRackLocks(2);
  const before=p.missiles;s.fireMissile();assert.equal(s.projectiles.length,8);assert.equal(p.energy,2);assert.equal(p.missiles,before-2);
  s.fireMissile();assert.equal(s.projectiles.length,8);assert.equal(p.energy,2);
  p.energy=60;s.save.world.time=100;s.fireMissile();assert.equal(s.projectiles.length,20);assert.equal(p.energy,18);

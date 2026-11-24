@@ -29,7 +29,7 @@ const COVER_MAX_DISTANCE = 1150;
 // Rocks and hull sections big enough to hide a fighter behind.
 const COVER_MIN_RADIUS = 40;
 // Carrier hangar starts: [distance off the opening, lift, lateral], best first.
-const BAY_STARTS = Object.freeze([[420, 100, 0], [420, 150, 0], [330, 60, 0], [520, 100, 0], [420, 0, -140], [250, 60, 0], [420, 0, 0]]);
+const BAY_STARTS = Object.freeze([[260, 95, 0], [330, 85, 0], [420, 100, 0], [420, 150, 0], [330, 60, 0], [520, 100, 0], [420, 0, -140], [250, 60, 0], [420, 0, 0]]);
 
 export const ENTRY_WARNINGS = Object.freeze({
     ahead: 'Reinforcement ahead in {seconds} seconds.',
@@ -147,7 +147,7 @@ export const ArenaStagingMethods = {
             if (start) { position.copy(start); forward.copy(bay.center).sub(start).normalize(); }
             else forward.fromArray(this.setDebrisCollisionTestPosition(position));
             if (bay) {
-                const far = bay.center.clone().addScaledVector(bay.axis, bay.halfLength + 180);
+                const far = bay.center.clone().addScaledVector(bay.axis, bay.halfLength + 12);
                 const side = new THREE.Vector3().crossVectors(bay.axis, UP).normalize();
                 add(firstClear([far, far.clone().addScaledVector(bay.axis, 80)]), 'ahead', 'Contact coming down the hangar deck.');
                 add(firstClear([far.clone().addScaledVector(side, 70), far.clone().addScaledVector(side, -70), far.clone().addScaledVector(bay.axis, 160)]), 'ahead', 'Contact coming down the hangar deck.');

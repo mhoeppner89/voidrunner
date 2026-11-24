@@ -1,3 +1,4 @@
+import {weaponDamage} from './weaponDamage.js';
 import {displaySpeed} from './data.js';
 // Shared concrete labels/conversions for comparisons. Values come from the
 // actual staged ship stats, including losses caused by replaced equipment.
@@ -13,6 +14,7 @@ export const EQUIPMENT_STAT_FIELDS=[
  {key:'cargo',label:'Cargo capacity',effects:['cargoCapacity']},
  {key:'radarRange',label:'Radar range',unit:'km',effects:['radarMultiplier']},
  {key:'scanRange',label:'Scan range',unit:'km',effects:['scanMultiplier']},
+ {key:'assistMultiplier',label:'Aim cone',unit:'%',scale:100,effects:['assistMultiplier']},
  {key:'lootRange',label:'Loot collection range',unit:'km',effects:['lootRange']},
  {key:'salvageRange',label:'Drone recovery range',unit:'km',effects:['salvageRange']},
  {key:'salvageRate',label:'Salvage impact',unit:'×',effects:['salvageRate']},
@@ -36,4 +38,11 @@ export function equipmentEffectStats(item){
   const value=ratio?(item.effects[effect]-1)*100:item.effects[effect];
   return [{key:field.key,label:field.label,value,unit:ratio?'%':['salvageRange','lootRange'].includes(effect)?' km':'',...(field.lowerBetter?{lowerBetter:true}:{})}];
  });
+}
+
+export function magazineLabel(rack,surface){
+ if(!rack)return '—';
+ const volley=rack.volley>1?` × ${rack.volley}`:'';
+ const damage=weaponDamage(surface==='shield'?Infinity:0,rack.damage,rack)[surface];
+ return `${Number(damage.toFixed(1))}${volley} × ${rack.capacity}`;
 }

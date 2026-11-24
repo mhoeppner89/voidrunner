@@ -11,7 +11,7 @@ test('the first pirate carries a real green tier I missile launcher that always 
  for(let seed=1;seed<=12;seed++){
   const {session,enemy,save,quest}=pirate(seed),record=enemy.equipmentRecords.find(e=>e.item.id===enemy.guaranteedLootId);
   assert.ok(record);assert.equal(record.key,'launchers');assert.equal(record.item.baseId,'seeker-launcher');assert.equal(enemy.combatFit.launchers[record.index],record.item.id);
-  assert.equal(record.item.tier,1);assert.equal(record.item.rarity,'uncommon');assert.equal(record.item.affixes.length,1);
+  assert.equal(record.item.tier,1);assert.equal(record.item.rarity,'uncommon');assert.deepEqual(record.item.affixes,['quickLock']);
   assert.equal(OUTFIT_ITEMS[record.item.id].rarity,'uncommon');
   const wreck=makeCareerWreck(session,enemy),entry=wreck.contents.find(e=>e.id===record.item.id);assert.ok(entry);assert.equal(entry.item.factory,false);assert.equal(wreck.contents.length,1,'only the launcher survives this tutorial encounter');
   assert.equal(makeCareerWreck(session,enemy),null,'destruction resolves only once');enemy.hull=0;

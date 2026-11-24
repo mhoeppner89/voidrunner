@@ -27,7 +27,14 @@ test('Arena rewards show capacity/output, every replacement trade-off and distin
  Object.assign(s.arenaRun,{wave:13,phase:'prepare',hullChosen:true,decisions:{13:true},rewardChosen:false,offers:['shield-swarm-launcher','capacitor-bank','swarm-launcher']});
  const node={innerHTML:'',classList:{remove(){}}},ui=Object.create(GameUI.prototype);ui.root={querySelector:()=>node};ui.updateOrientationNotice=()=>{};ui.showArenaRun(s);
  const markup=node.innerHTML;for(const key of ['energyCapacity','maxSpeed','acceleration'])assert.match(markup,new RegExp(`data-stat="${key}"`));
- assert.match(markup,/>Energy capacity</);assert.doesNotMatch(markup,/>Capacitor<|<img/);assert.match(markup,/>4×20</);assert.match(markup,/>4×10</);assert.match(markup,/Shield damage/);assert.match(markup,/Hull damage/);
+ assert.match(markup,/>Energy capacity</);assert.doesNotMatch(markup,/>Capacitor<|<img/);
+ for(const [id,shield,hull] of [['swarm-launcher',15,30],['shield-swarm-launcher',30,15]]){
+  const card=markup.split(`data-run-value="${id}"`)[1].split('</button>')[0];
+  assert.equal(card.match(/class="run-stat"/g).length,4);
+  assert.ok(card.includes(`<small>Shield damage</small><b>${shield} × 4 × 4</b>`));
+  assert.ok(card.includes(`<small>Hull damage</small><b>${hull} × 4 × 4</b>`));
+  assert.match(card,/run-unit"> s</);assert.match(card,/run-unit"> km</);
+ }
 });
 test('station warmup no longer fetches retired equipment/commodity bitmaps',async()=>{
  const {GameUI}=await import('../../src/game/ui.js'),ui=Object.create(GameUI.prototype);ui.save=createNewSave(98,{tutorial:false});const urls=ui.locationAssetUrls('helix');assert(urls.length>0);assert(!urls.some(url=>url.includes('/commodities/')||url.includes('/outfitting/simplified/')));
@@ -68,7 +75,7 @@ test('German Arena reward names use complete weapon types and tiers',async()=>{
 
 test('unmounted utility bonuses use concrete stat labels and actual rolled effects',()=>{
  const base=BASE_OUTFIT_ITEMS['capacitor-bank'];const item=resolveEquipmentDefinition(base,{id:'tier2',baseId:base.id,tier:2,rarity:'common',affixes:[]});
- const rows=equipmentEffectStats(item);assert.deepEqual(rows.map(r=>r.label),['Energy capacity']);assert.equal(rows[0].unit,'%');assert(Math.abs(rows[0].value-56)<.001,'tier II scales the +40% bonus by 1.4');
+ const rows=equipmentEffectStats(item);assert.deepEqual(rows.map(r=>r.label),['Energy capacity']);assert.equal(rows[0].unit,'%');assert(Math.abs(rows[0].value-70)<.001,'tier II scales the +50% bonus by 1.4');
  for(const base of Object.values(BASE_OUTFIT_ITEMS).filter(d=>!['gun','launcher','turret','drone'].includes(d.category)))assert(equipmentEffectStats(base).length,base.id);
 });
 

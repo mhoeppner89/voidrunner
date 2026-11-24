@@ -60,8 +60,8 @@ check('mining rate stat retired', base.miningRate, undefined);
 
 // Each piece of equipment applies its documented modifier on top of the hull.
 const engineFit = getEffectiveShipStats(playerWith(['engine-mk2']));
-check('engine-mk2 max speed', engineFit.maxSpeed, 50 * 1.18);
-check('engine-mk2 afterburn', engineFit.afterburnSpeed, 75 * 1.18);
+check('engine-mk2 max speed', engineFit.maxSpeed, 50 * 1.2);
+check('engine-mk2 afterburn', engineFit.afterburnSpeed, 75 * 1.2);
 check('engine-mk2 acceleration', engineFit.acceleration, 21 * 1.1);
 check('engine-mk2 reactor output', engineFit.reactorOutput, 10);
 const thrusterFit = getEffectiveShipStats(playerWith(['thrusters-mk2']));
@@ -83,7 +83,7 @@ const canonicalSeekerFit = createOutfittingState(['wayfarer']);
 check('factory seeker rack supplies four missiles', getEffectiveShipStats(playerWith([], { outfitting: canonicalSeekerFit })).missileCapacity, 4);
 const mixedLauncherFit = createOutfittingState(['lancer']);
 mixedLauncherFit.loadouts.lancer.launchers = ['swarm-launcher', 'torpedo-launcher'];
-check('installed launcher capacities add together', getEffectiveShipStats(playerWith([], { shipId: 'lancer', outfitting: mixedLauncherFit })).missileCapacity, 14);
+check('installed launcher capacities add together', getEffectiveShipStats(playerWith([], { shipId: 'lancer', outfitting: mixedLauncherFit })).missileCapacity, 6);
 mixedLauncherFit.loadouts.lancer.launchers = [null, null];
 check('empty launcher bays provide no missile capacity', getEffectiveShipStats(playerWith([], { shipId: 'lancer', outfitting: mixedLauncherFit })).missileCapacity, 0);
 
@@ -95,16 +95,16 @@ magazineFit.loadouts.lancer.launchers = ['swarm-launcher', 'torpedo-launcher'];
 const magazinePilot = playerWith([], {
     shipId: 'lancer',
     outfitting: magazineFit,
-    missiles: 7,
+    missiles: 3,
     launcherMagazines: undefined,
     activeLauncherMountId: null,
 });
-normalizeLauncherMagazines(magazinePilot, { legacyMissiles: 7 });
+normalizeLauncherMagazines(magazinePilot, { legacyMissiles: 3 });
 let magazines = launcherMagazineEntries(magazinePilot);
-check('legacy rounds enter the first launcher magazine', magazines[0].rounds, 7);
+check('legacy rounds enter the first launcher magazine', magazines[0].rounds, 3);
 check('legacy migration does not invent torpedoes', magazines[1].rounds, 0);
 check('first fitted launcher becomes selected', magazines[0].selected, true);
-check('aggregate missile projection follows magazines', magazinePilot.missiles, 7);
+check('aggregate missile projection follows magazines', magazinePilot.missiles, 3);
 magazinePilot.launcherMagazines[magazines[0].mount.id].rounds = 3;
 magazinePilot.launcherMagazines[magazines[1].mount.id].rounds = 1;
 magazinePilot.activeLauncherMountId = magazines[1].mount.id;
@@ -120,10 +120,10 @@ check('replacement launcher starts empty', magazines[1].rounds, 0);
 check('replacement magazine has the installed ordnance type', magazines[1].ordnanceId, 'swarm-canister');
 fillLauncherMagazines(magazinePilot);
 const filledRefillCost = refillCost(magazinePilot);
-check('refill fills both launcher magazines', magazinePilot.missiles, 24);
+check('refill fills both launcher magazines', magazinePilot.missiles, 8);
 clearLauncherMagazines(magazinePilot);
 check('clearing ordnance empties every magazine', magazinePilot.missiles, 0);
-check('typed ordnance refill charges for every missing round', refillCost(magazinePilot) - filledRefillCost, 24 * 240);
+check('typed ordnance refill charges for every missing round', refillCost(magazinePilot) - filledRefillCost, 8 * 240);
 const cargoFit = getEffectiveShipStats(playerWith(['cargo-pods']));
 check('cargo-pods capacity', cargoFit.cargo, 50);
 const radarFit = getEffectiveShipStats(playerWith(['radar-mk2']));
@@ -136,7 +136,7 @@ check('salvage-mk2 rate', salvageFit.salvageRate, 1.7);
 check('salvage-mk2 range', salvageFit.salvageRange, 170);
 // Modifiers compose when several pieces are fitted at once.
 const comboFit = getEffectiveShipStats(playerWith(['engine-mk2', 'shield-mk2', 'cargo-pods', 'radar-mk2']));
-check('combo keeps engine boost', comboFit.maxSpeed, 50 * 1.18);
+check('combo keeps engine boost', comboFit.maxSpeed, 50 * 1.2);
 check('combo keeps shield boost', comboFit.shield, 260);
 check('combo keeps cargo boost', comboFit.cargo, 50);
 check('combo keeps radar boost', comboFit.radarRange, 3000);
@@ -193,8 +193,8 @@ for (const id of ['shield-mk2','pulse-cannon','cargo-pods','engine-mk2'])
     checkTrue('migration preserves ' + id, migratedRack.includes(id));
 check('migrated shield resolves', getEffectiveShipStats(migrated.player).shield, 260);
 check('migrated pulse-mk2 does not globally buff hull damage', getEffectiveShipStats(migrated.player).gunDamage, 10);
-check('migrated cargo resolves', getEffectiveShipStats(migrated.player).cargo, 50);
-check('migrated equipment preserves the full speed booster', getEffectiveShipStats(migrated.player).maxSpeed, 50 * 1.18);
+check('migrated cargo resolves', getEffectiveShipStats(migrated.player).cargo, 52);
+check('migrated equipment preserves the full speed booster', getEffectiveShipStats(migrated.player).maxSpeed, 50 * 1.2);
 check('legacy armor and hull combine', migrated.player.hull, 185);
 check('legacy armor field is removed', Object.hasOwn(migrated.player, 'armor'), false);
 check('legacy save receives the current full capacitor', migrated.player.energy, 60);

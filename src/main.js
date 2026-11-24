@@ -1,7 +1,7 @@
 import {fetchModelBytes} from './game/modelDelivery.js';
 import {paintedCockpitAssets} from './game/cockpitDefinitions.js';
 import { normalizeControllerBindings } from './game/controllerBindings.js';
-import {newArenaRun,readArenaRun,arenaRecord} from './game/arenaRun.js';
+import {newArenaRun,readArenaRun,writeArenaRun,arenaRecord} from './game/arenaRun.js';
 import { AudioManager } from './game/audio.js';
 import { TURRET_TEST_MODE, DRONE_TEST_MODE, LANDING_PREVIEW_ID, createNewSave, defaultSettings, loadGame, loadSettingsPreferences, saveGame, saveSettingsPreferences } from './game/save.js';
 import { DOCK_LOCATION_IDS, LOCATIONS, SHIPS } from './game/data.js';
@@ -306,6 +306,13 @@ const beginSession = (mode, arena, tutorial = true) => {
             await nextSession.prepareFlightScene();
         if (!arena && save.player.dockedAt) await ui.prepareDockView();
         if (mode === 'new' && tutorialCampaignSummary(save)?.active) ui.showStory();
+        if(save.player.swarmRefund>0){
+            const count=save.player.swarmRefund;
+            ui.pushEvent(t('Swarm racks re-rated: {count} canisters refunded, {credits} cr',{count,credits:count*240}),'success');
+            delete save.player.swarmRefund;
+            if(save.arenaRun?.checkpoint)delete save.arenaRun.checkpoint.swarmRefund;
+            if(arena?.run)writeArenaRun(save);else saveGame(save);
+        }
         return nextSession;
     })().catch((error) => {
         console.error('Session startup failed.', error);

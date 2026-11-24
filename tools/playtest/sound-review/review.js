@@ -9,7 +9,7 @@ const flight = { speed: 0, turn: 0, yaw: 0, shield: 1, hyper: false, missileThre
 const PLACES = [['open', 'Deep space'], ['planet', 'Near a planet'], ['field', 'Asteroid belt'], ['graveyard', 'Ship graveyard'], ['stealth', 'Running dark'], ['dock:station', 'Docked · station'], ['dock:planet', 'Docked · planet']];
 const GROUPS = [
     ['Weapons', ['laser', 'beam', 'gauss', 'pdc', 'ripper', 'ion', 'mortar', 'missile', 'capacitorEmpty']],
-    ['Taking damage', ['shield', 'hit', 'shieldBreak', 'shieldRestore', 'targetShieldBreak', 'hullAlarm', 'spark', 'creak']],
+    ['Taking damage', ['shield', 'hit', 'shieldBreak', 'shieldRestore', 'targetShieldBreak', 'confirmShield', 'confirmHull', 'hullAlarm', 'spark', 'creak']],
     ['World', ['impact', 'rock', 'explosion', 'capitalExplosion', 'flyby', 'whizz']],
     ['Ship systems', ['afterburnerOn', 'afterburnerOff', 'scan', 'dock', 'pickup', 'salvage', 'mining', 'repair', 'hyperSpool', 'hyperActive', 'hyperDrop', 'slipstream']],
     ['Targeting & alerts', ['targetCycle', 'targetLock', 'missileAlert', 'alert', 'threat', 'kill', 'countdown', 'raceGo', 'commsOpen', 'commsClose', 'chatter']],

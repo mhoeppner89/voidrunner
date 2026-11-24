@@ -11,8 +11,8 @@ import {SpaceRenderer} from '../../src/game/render.js';
 import {LaserFx} from '../../src/game/laserFx.js';
 import * as THREE from '../../vendor/three.module.min.js';
 
-const profiles={seeker:[100,50],'shield-seeker':[50,100],swarm:[20,10],'shield-swarm':[10,20]};
-test('rocket damage matches requested hull/shield values and seeker beats a full cluster salvo',()=>{
+const profiles={seeker:[120,60],'shield-seeker':[60,120],swarm:[30,15],'shield-swarm':[15,30]};
+test('rocket damage matches requested hull/shield values and one seeker matches a full cluster salvo',()=>{
  for(const [id,[hull,shield]] of Object.entries(profiles)){
   const l=LAUNCHERS[id];assert.deepEqual(weaponDamage(0,l.damage,l),{shield:0,hull});
   assert.deepEqual(weaponDamage(1000,l.damage,l),{shield,hull:0});
@@ -20,7 +20,7 @@ test('rocket damage matches requested hull/shield values and seeker beats a full
  assert.equal(LAUNCHERS.swarm.volley,4);assert.equal(LAUNCHERS['shield-swarm'].volley,4);
  for(const prefix of ['', 'shield-'])for(const layer of ['hull','shield']){
   const single=LAUNCHERS[prefix+'seeker'],cluster=LAUNCHERS[prefix+'swarm'];
-  assert.ok(weaponDamage(layer==='shield'?1000:0,single.damage,single)[layer]>weaponDamage(layer==='shield'?1000:0,cluster.damage,cluster)[layer]*4);
+  assert.ok(weaponDamage(layer==='shield'?1000:0,single.damage,single)[layer]===weaponDamage(layer==='shield'?1000:0,cluster.damage,cluster)[layer]*4);
  }
 });
 test('partial shields consume only the matching damage budget, with correct hull overflow',()=>{
@@ -44,6 +44,7 @@ test('anti-shield racks fire their typed volleys and persist separate one-canist
   const fit=loadoutFor(p);fit.launchers=[id+'-launcher',null];p.outfitting.loadouts.lancer=fit;
   fillLauncherMagazines(p);const before=launcherMagazineEntries(p)[0].rounds;
   const enemy=s.spawnShip('pirate',[0,0,-100]);s.getTargetRef=()=>({kind:'ship',id:enemy.id});
+  p.currentTargetId=enemy.id;s.updatePlayerRackLocks(3);
   s.fireMissile();assert.equal(s.projectiles.length,LAUNCHERS[id].volley);
   assert.equal(launcherMagazineEntries(p)[0].rounds,before-1);
   assert.ok(s.projectiles.every(m=>m.launcherId===id&&m.damage===LAUNCHERS[id].damage));
@@ -59,7 +60,7 @@ test('automatic ship locks enter combat mode and stale tool modes still fire at 
   p.mode=mode;s.applyTarget({kind:'ship',id:enemy.id,position:enemy.position});
   assert.equal(p.mode,'combat',`automatic lock from ${mode}`);
   p.mode=mode;let dronesToggled=false;s.toggleMiningDrones=()=>{dronesToggled=true;};
-  s.handleActions({missile:true});
+  s.updatePlayerRackLocks(3);s.handleActions({missile:true});
   assert.equal(dronesToggled,false);assert.equal(p.mode,'combat');
   assert.equal(s.projectiles.length,1);assert.equal(s.projectiles[0].targetId,enemy.id);
   assert.equal(launcherMagazineEntries(p)[0].rounds,before-1);

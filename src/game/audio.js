@@ -6,6 +6,41 @@ import { ShipEngineAudio } from './audioEngine.js';
 import { AmbienceAudio } from './audioAmbience.js';
 import { MusicDirector } from './audioMusic.js';
 
+// Missile warning pacing: approaches counted within this window before the
+// warning settles, and the shortest gap between two break cues.
+export const MISSILE_FATIGUE_WINDOW = 20;
+export const MISSILE_CUE_SPACING = 0.6;
+// One warning voice covers every inbound round: pips that quicken with the
+// nearest threat, then a single "break now" cue at the moment a hard turn
+// works best (weaponFlight.breakCueTime). After the cue the pips stop, so it
+// stands alone. Under a sustained barrage the warning settles like the hull
+// alarm: past three approaches within the window it plays softer and slower.
+// Returns the pip and cue levels to play this step (0 for none).
+export const MISSILE_PIP_FLOOR = 0.45;
+export function stepMissileWarning(state, dt, threat, cueNow, committed, paused) {
+    state.clock = (state.clock ?? 0) + dt;
+    if (threat > 0 && !(state.threat > 0)) (state.episodes ??= []).push(state.clock);
+    state.episodes = state.episodes?.filter((at) => state.clock - at < MISSILE_FATIGUE_WINDOW);
+    state.threat = threat;
+    const weary = (state.episodes?.length ?? 0) > 3;
+    let alert = 0, cue = 0;
+    if (paused || !(threat > 0)) return { alert, cue };
+    if (cueNow && state.clock - (state.cueAt ?? -Infinity) >= MISSILE_CUE_SPACING) {
+        cue = weary ? 0.7 : 1;
+        state.cueAt = state.clock;
+    }
+    else if (!committed) {
+        // Pace from the last pip itself, so a dropped frame of tracking
+        // cannot fire the next pip early.
+        const interval = Math.max(MISSILE_PIP_FLOOR, (0.95 - 0.5 * clamp(threat, 0, 1)) * (weary ? 1.5 : 1));
+        if (state.clock - (state.pipAt ?? -Infinity) >= interval) {
+            alert = (0.55 + 0.35 * clamp(threat, 0, 1)) * (weary ? 0.6 : 1);
+            state.pipAt = state.clock;
+        }
+    }
+    return { alert, cue };
+}
+
 // One-shot voices alive at once. Low-priority events are dropped beyond this
 // so a furball cannot starve the audio thread on phones.
 const MAX_VOICES = 36;
@@ -221,6 +256,7 @@ export class AudioManager {
         // or replacing a session). Silence continuous flight layers here too.
         this.setPaused(false);
         if (station) {
+            this.missileWarning = undefined;
             this.stopWork();
             this.engine?.silence();
             void this.bank?.load('dock');
@@ -318,15 +354,11 @@ export class AudioManager {
             this.lastShield = shield;
         }
 
-        const threat = flight?.missileThreat ?? 0;
-        if (threat > 0) {
-            this.missileTimer = (this.missileTimer ?? 0) - dt;
-            if (this.missileTimer <= 0) {
-                this.play('missileAlert', 0.55 + 0.35 * threat);
-                this.missileTimer = 0.95 - 0.6 * clamp(threat, 0, 1);
-            }
-        }
-        else this.missileTimer = 0;
+        // Docked: a fresh warning history for the next flight.
+        if (this.stationMode) this.missileWarning = undefined;
+        const warning = stepMissileWarning(this.missileWarning ??= {}, dt, this.stationMode ? 0 : flight?.missileThreat ?? 0, Boolean(flight?.missileBreak), Boolean(flight?.missileCommitted), this.paused);
+        if (warning.cue > 0) this.playCockpit('missileBreak', warning.cue);
+        if (warning.alert > 0) this.play('missileAlert', warning.alert);
 
         // Structure groans under afterburner, hard turns and damage.
         const stress = (afterburner ? 0.35 : 0) + clamp(flight?.turn ?? 0, 0, 1) * 0.45 + damage * 0.45;
@@ -352,6 +384,13 @@ export class AudioManager {
         this.pauseDip.gain.setTargetAtTime(paused ? 0.45 : 1, now, 0.1);
     }
 
+    // Seconds from scheduling a sound to hearing it (phones can add 0.1 s or
+    // more). Time-critical cues are fired early by this much; capped so a bad
+    // report cannot move them far.
+    outputLatency() {
+        const context = this.context, value = (context?.outputLatency || 0) + (context?.baseLatency || 0);
+        return Number.isFinite(value) ? clamp(value, 0, 0.2) : 0;
+    }
     setMusicContext(context) {
         this.musicContext = context;
     }
@@ -408,7 +447,10 @@ export class AudioManager {
             this.playWork(effect, intensity, pan, distance);
             return;
         }
-        this.trigger(effect, clamp(intensity * (cockpit ? 1.25 : 1), 0.001, 2), pan, distance, 1, 0, 0, cockpit ? `cockpit:${effect}` : effect);
+        // Events naming a shared channel space against each other (launch and
+        // approach warnings use one pip sample and must never stack).
+        const channel = SOUND_EVENTS[effect]?.channel ?? (cockpit ? `cockpit:${effect}` : effect);
+        this.trigger(effect, clamp(intensity * (cockpit ? 1.25 : 1), 0.001, 2), pan, distance, 1, 0, 0, channel);
         // Story beats also land in the score.
         if (effect === 'threat' || effect === 'kill') this.music?.stinger(effect);
     }

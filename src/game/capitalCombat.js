@@ -7,7 +7,7 @@ import {FRIGATE_MOUNTS,FRIGATE_CLEARANCE,FRIGATE_ENGINE_MOUNTS,FRIGATE_TORPEDO_M
 import {FRIGATE_COLLISION_TRIANGLES} from './frigateCollisionData.js';
 import {clearTurretArc,shipBlocksRay,updateAutomaticTurrets} from './turrets.js';
 import {disruptionFactor} from './weaponDamage.js';
-import {relativeIntercept} from './weaponFlight.js';
+import {relativeIntercept,rackLockProgress} from './weaponFlight.js';
 import {SHIPS} from './data.js';
 // Live capital hulls render at twice their authored scale. PDCs use the same
 // extents through npcHullExtents; main batteries and assembly hits must agree.
@@ -24,7 +24,7 @@ export function equipFrigate(ship,boss=false){
  ship.capitalBoss=boss;
  ship.combatFit={hullId:'concord-frigate',turrets:[null,null,null,null,'pdc','pdc','pdc','pdc'],stats:{energyCapacity:240},weapons:[],guns:[],attackOrder:[],fireAt:[],missiles:0};
  ship.energy=240;ship.capitalMountHull=FRIGATE_MOUNTS.map((m,i)=>m.hull??(i<4?100:65));
- {ship.maxShield=FRIGATE_SHIELD_CAPACITY;ship.shield=ship.maxShield;ship.maxHull=1400;ship.hull=1400;ship.shieldRegen=FRIGATE_GENERATOR_REGEN*2;ship.turnRate=.12;ship.capitalBaseSpeed??=ship.speed;ship.speed=ship.capitalBaseSpeed;ship.capitalTorpedoes=40;}
+ {ship.maxShield=FRIGATE_SHIELD_CAPACITY;ship.shield=ship.maxShield;ship.maxHull=1400;ship.hull=1400;ship.shieldRegen=FRIGATE_GENERATOR_REGEN*2;ship.turnRate=.12;ship.capitalBaseSpeed??=ship.speed;ship.speed=ship.capitalBaseSpeed;ship.capitalTorpedoes=LAUNCHERS.torpedo.capacity;}
 }
 function stateFor(ship){
  return ship.capitalRuntime??={position:new THREE.Vector3(),normal:new THREE.Vector3(),direction:new THREE.Vector3(),scratch:new THREE.Vector3(),local:new THREE.Vector3(),inverse:new THREE.Quaternion(),q:new THREE.Quaternion(),goal:new THREE.Quaternion(),target:new THREE.Vector3(),velocity:new THREE.Vector3(),lead:new THREE.Vector3(),torpedoStarts:[new THREE.Vector3(),new THREE.Vector3()],turn:new THREE.Quaternion(),mounts:FRIGATE_MOUNTS.map(()=>({direction:new THREE.Vector3(),fireAt:0,chargeAt:0,rounds:0}))};
@@ -84,8 +84,7 @@ export function frigateSubsystemExplosionScale(index){
   :mount.radius??(index<4?6.2:4);
  return Math.max(.35,Math.min(2.5,radius*1.18/6.5));
 }
-// A finite magazine and a separate, interruptible warning give the stern a
-// threat without tracking a fighter through a turn or firing through cover.
+// The frigate announces its lock before opening the two-cell launcher.
 function updateFrigateTorpedoes(session,ship,dt,targetPosition){
  const s=stateFor(ship),now=session.save.world.time;
  ship.capitalTorpedoWarning=false;
@@ -96,11 +95,17 @@ function updateFrigateTorpedoes(session,ship,dt,targetPosition){
  if(!targetPosition||!ship.targetId||!torpedoTarget||ship.holdFire||ship.pursuitHoldFire||ship.fleeing||ship.patrolMemoryActive||ship.capitalTorpedoes<1||!FRIGATE_TORPEDO_MOUNTS.some(i=>ship.capitalMountHull[i]>0)||now<(s.torpedoReadyAt??12)){s.torpedoLock=0;return;}
  s.position.fromArray(ship.position);s.direction.copy(targetPosition).sub(s.position);
  const distance=s.direction.length();
- if(distance<120||distance>600||session.lineBlocked(s.position,targetPosition,ship.id)){s.torpedoLock=0;return;}
- if(!(s.torpedoLock>0)&&ship.targetId==='player')session.setOwnMonitorStatus?.(t('TORPEDO LOCK · EVADE'),4000);
- s.torpedoLock=(s.torpedoLock??0)+dt;ship.capitalTorpedoWarning=true;
- if(s.torpedoLock<3||(!ship.capitalDisarmed&&ship.capitalAttack!=='SALVO'))return;
+ const launcher=LAUNCHERS.torpedo;
+ if(distance<120 || distance>launcher.lockRange || session.lineBlocked(s.position,targetPosition,ship.id)){s.torpedoLock=0;return;}
  s.direction.normalize();
+ const facing=s.scratch.set(0,0,-1).applyQuaternion(s.q.fromArray(ship.rotation)).dot(s.direction);
+ const aspect=targetActor.rotation?s.scratch.set(0,0,-1).applyQuaternion(s.q.fromArray(targetActor.rotation)).dot(s.direction):0;
+ const previous=s.torpedoLock??0;
+ s.torpedoLock=rackLockProgress(previous,launcher,ship.pilot?.tier,distance,facing,aspect,dt);
+ if(!s.torpedoLock)return;
+ if(ship.targetId==='player')session.warnPlayerLock?.(t('TORPEDO LOCK · EVADE'),!previous);
+ ship.capitalTorpedoWarning=true;
+ if(s.torpedoLock<1||(!ship.capitalDisarmed&&ship.capitalAttack!=='SALVO'))return;
  // The single launcher fires two separated cells together, alternating rows.
  s.q.fromArray(ship.rotation);
 
@@ -111,14 +116,15 @@ function updateFrigateTorpedoes(session,ship,dt,targetPosition){
 
   if(session.lineBlocked(s.torpedoStarts[i],targetPosition,ship.id)){s.torpedoLock=0;return;}
  }
- const launcher=LAUNCHERS.torpedo;
+ const salvo=session.projectileCounter+1;
  for(let i=0;i<2;i++){
   if(ship.capitalTorpedoes<=0)continue;
   const slot=session.projStore.alloc();session.projStore.setPosV(slot,s.torpedoStarts[i]);
-  s.velocity.copy(s.direction).multiplyScalar(launcher.speed).add(s.scratch.fromArray(ship.velocity));session.projStore.setVelV(slot,s.velocity);
-  session.projectiles.push({id:`p-${++session.projectileCounter}`,slot,kind:'missile',ownerId:ship.id,targetId:ship.targetId,faction:ship.faction,launcherId:'torpedo',damage:launcher.damage,life:launcher.life,homingSpeed:launcher.homingSpeed,homingTurn:launcher.homingTurn,acceleration:launcher.acceleration,shield:launcher.projectileShield});
+  s.velocity.copy(forward).applyQuaternion(s.q).multiplyScalar(launcher.speed).add(s.scratch.fromArray(ship.velocity));session.projStore.setVelV(slot,s.velocity);
+  session.projectiles.push({id:`p-${++session.projectileCounter}`,slot,salvo,kind:'missile',ownerId:ship.id,targetId:ship.targetId,faction:ship.faction,launcherId:'torpedo',hitWeapon:launcher,damage:launcher.damage,life:launcher.life,homingSpeed:launcher.homingSpeed,homingTurn:launcher.homingTurn,acceleration:launcher.acceleration,shield:launcher.projectileShield});
   ship.capitalTorpedoes--;
  }
+ if(ship.targetId==='player')session.audio?.playCockpit?.('missileAlert',.9);
  s.torpedoCell=((s.torpedoCell??0)+1)%2;
  s.torpedoLock=0;s.torpedoReadyAt=now+16;ship.capitalTorpedoWarning=false;
 }

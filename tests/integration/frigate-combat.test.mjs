@@ -307,10 +307,10 @@ test('frigate PDC salvo pressure materially cuts a stationary player shield duri
  assert.ok(s.save.player.shield<65,`frigate PDCs should apply meaningful shield pressure, remaining ${s.save.player.shield}`);
 });
 test('frigate torpedoes have a finite magazine, warning, cooldown, and cover interruption',()=>{
- const {s,ship}=stage(),point=new THREE.Vector3(380,0,0);s.spawnGunProjectile=()=>{};
- assert.equal(ship.capitalTorpedoes,40);
+ const {s,ship}=stage(),point=new THREE.Vector3(0,0,-380);s.spawnGunProjectile=()=>{};
+ assert.equal(ship.capitalTorpedoes,2);
  let warnings=0,launches=[];for(let i=0;i<430*60;i++){s.save.world.time=i/60;const before=s.projectiles.length;updateFrigateBatteries(s,ship,1/60,point,new THREE.Vector3());if(ship.capitalTorpedoWarning)warnings++;if(s.projectiles.length>before)launches.push(s.projectiles.length-before);}
- assert.ok(warnings>180);assert.deepEqual(launches,Array(20).fill(2));assert.equal(ship.capitalTorpedoes,0);assert.equal(s.projectiles.length,40);
+ assert.ok(warnings>0);assert.deepEqual(launches,[2]);assert.equal(ship.capitalTorpedoes,0);assert.equal(s.projectiles.length,2);
  const mount=frigateMountPosition(ship,11,new THREE.Vector3()),l=FRIGATE_TORPEDO_LAYOUT;
  for(let i=0;i<s.projectiles.length;i+=2){const a=s.projStore.getPos(s.projectiles[i].slot,new THREE.Vector3()),b=s.projStore.getPos(s.projectiles[i+1].slot,new THREE.Vector3());assert.ok(Math.abs(a.y-(mount.y+l.muzzleHeight))<1e-6,'salvo starts above the modeled launch cells');assert.equal(a.y,b.y);assert.ok(Math.abs(a.x+l.cellX)<1e-6&&Math.abs(b.x-l.cellX)<1e-6,'paired rounds leave opposite cells of one launcher');assert.ok(Math.abs(a.z-(mount.z+(i/2%2===0?-l.cellZ:l.cellZ)))<2e-6,'salvos alternate cell rows');}
  const other=stage();other.s.lineBlocked=()=>true;
@@ -318,13 +318,13 @@ test('frigate torpedoes have a finite magazine, warning, cooldown, and cover int
  assert.equal(other.s.projectiles.length,0);assert.equal(other.ship.capitalTorpedoWarning,false);
 });
 test('frigate torpedoes reserve salvos for capital ships and slower hulls',()=>{
- const {s,ship}=stage(),point=new THREE.Vector3(380,0,0);s.spawnGunProjectile=()=>{};s.save.player.shipId='talon';
+ const {s,ship}=stage(),point=new THREE.Vector3(0,0,-380);s.spawnGunProjectile=()=>{};s.save.player.shipId='talon';
  for(let i=0;i<45*60;i++){s.save.world.time=i/60;updateFrigateBatteries(s,ship,1/60,point,new THREE.Vector3());}
  assert.equal(s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length,0);assert.equal(ship.capitalTorpedoWarning,false);
  s.save.player.shipId='atlas';ship.capitalTorpedoes=2;ship.capitalRuntime.torpedoReadyAt=0;ship.capitalRuntime.torpedoLock=0;
  for(let i=0;i<35*60&&s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length<2;i++){s.save.world.time=45+i/60;updateFrigateBatteries(s,ship,1/60,point,new THREE.Vector3());}
  assert.equal(s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length,2,'a slow industrial hull should draw a paired salvo');
- const capital=s.spawnCapitalShip('concord-frigate',[380,0,0],'rook','Capital target');ship.targetId=capital.id;ship.capitalTorpedoes=2;ship.capitalRuntime.torpedoReadyAt=0;ship.capitalRuntime.torpedoLock=0;
+ const capital=s.spawnCapitalShip('concord-frigate',[0,0,-380],'rook','Capital target');ship.targetId=capital.id;ship.capitalTorpedoes=2;ship.capitalRuntime.torpedoReadyAt=0;ship.capitalRuntime.torpedoLock=0;
  for(let i=0;i<35*60&&s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length<4;i++){s.save.world.time=80+i/60;updateFrigateBatteries(s,ship,1/60,new THREE.Vector3(...capital.position),new THREE.Vector3());}
  assert.equal(s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length,4,'capital hulls should draw paired salvos regardless of speed');
 });
@@ -399,7 +399,7 @@ test('destroying the single torpedo launcher disables paired salvos without spen
   damageFrigateMount(ship,frigateMountPosition(ship,11,new THREE.Vector3()).toArray(),90);
   for(let i=0;i<120*60;i++){s.save.world.time=i/60;updateFrigateBatteries(s,ship,1/60,new THREE.Vector3(380,0,0),new THREE.Vector3());}
   const shots=s.projectiles.filter(p=>p.launcherId==='torpedo');
-  assert.equal(shots.length,0);assert.equal(ship.capitalTorpedoes,40);assert.equal(ship.capitalTorpedoWarning,false);
+  assert.equal(shots.length,0);assert.equal(ship.capitalTorpedoes,2);assert.equal(ship.capitalTorpedoWarning,false);
 });
 
 test('one launcher preserves its paired cell positions through rotation, blocks obstructed salvos and handles one remaining round',()=>{
@@ -409,9 +409,9 @@ test('one launcher preserves its paired cell positions through rotation, blocks 
   const q=new THREE.Quaternion().fromArray(ship.rotation),inverse=q.clone().invert(),l=FRIGATE_TORPEDO_LAYOUT;
   if(mode==='last-round')ship.capitalTorpedoes=1;
   if(mode==='blocked')s.lineBlocked=origin=>origin.clone().applyQuaternion(inverse).x>1;
-  s.save.world.time=20;updateFrigateBatteries(s,ship,3.1,new THREE.Vector3(380,0,0),new THREE.Vector3());
+  s.save.world.time=20;updateFrigateBatteries(s,ship,6,new THREE.Vector3(0,0,-380).applyQuaternion(q),new THREE.Vector3());
   const shots=s.projectiles.filter(p=>p.launcherId==='torpedo'),expected=mode==='blocked'?0:mode==='last-round'?1:2;
-  assert.equal(shots.length,expected);assert.equal(ship.capitalTorpedoes,mode==='last-round'?0:40-expected);
+  assert.equal(shots.length,expected);assert.equal(ship.capitalTorpedoes,mode==='last-round'?0:2-expected);
   const center=new THREE.Vector3().fromArray(FRIGATE_MOUNTS[11].position).multiply(new THREE.Vector3(...FRIGATE_EXTENTS));
   for(let i=0;i<shots.length;i++){
    const point=s.projStore.getPos(shots[i].slot,new THREE.Vector3()).applyQuaternion(inverse),target=center.clone().add(new THREE.Vector3(i===0?-l.cellX:l.cellX,l.muzzleHeight,-l.cellZ));

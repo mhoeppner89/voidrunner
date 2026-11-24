@@ -9,7 +9,7 @@ import {COMMODITIES,LOCATIONS,SHIPS} from './data.js';
 import {t} from './i18n.js';
 import {DRONE_TYPES} from './droneData.js';
 import {equipmentIcon,commodityIcon} from './itemIcons.js';
-import {equipmentStatChanges,equipmentEffectStats} from './equipmentStatPresentation.js';
+import {magazineLabel,equipmentStatChanges,equipmentEffectStats} from './equipmentStatPresentation.js';
 import {uiIcon} from './uiIcons.js';
 
 const html=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -93,6 +93,11 @@ export function renderEquipmentInventory(ui,{embedded=false}={}){
    if(item.droneType==='mining')values+=stat('Yield per trip',undefined,d.payloadUnits)+stat('Mining time',undefined,d.cutSecondsPerUnit);
    if(item.droneType==='repair')values+=stat('Repair per second',undefined,d.repairRate);
    if(selectedMount&&fit.droneBays[selectedMount.index]?.pendingInventoryDrone)values+=`<p role="status">${t('Drones are returning automatically.')}</p>`;
+  }else if(item.category==='launcher'&&w){
+   values=['shield','hull'].map(surface=>`<div class="inventory-stat"><span>${t(surface==='shield'?'Shield damage':'Hull damage')}</span><b>${magazineLabel(w,surface)}</b></div>`).join('')
+    +stat('Lock time (s)',before?.lockTime,w.lockTime,2,true)
+    +stat('Seeker cone (°)',before?.seekerCone,w.seekerCone)
+    +stat('Range (km)',before?.lockRange,w.lockRange);
   }else if(w){const dps=sustainedDps(w);values=(dps!=null?stat('Damage per second',before?sustainedDps(before):undefined,dps):'')+stat('Damage',before?(before.damageFlat??before.damage):undefined,(w.damageFlat??w.damage))+stat('Energy per shot',before?.energyCost,w.energyCost,1,true)+stat('Shot interval',before?.cooldown??before?.shotInterval,w.cooldown??w.shotInterval,3,true)+stat('Range',before?.range??before?.lockRange,w.range??w.lockRange);if((w.gunneryAccuracy??1)!==1||(before?.gunneryAccuracy??1)!==1)values+=stat('Aim correction',before?(before.gunneryAccuracy??1)*100:undefined,(w.gunneryAccuracy??1)*100);}
   else if(cmpMount?.key==='utility'){
    const preview=JSON.parse(JSON.stringify(player.outfitting)),afterFit=preview.loadouts[player.shipId];

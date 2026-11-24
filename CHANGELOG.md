@@ -1,3 +1,19 @@
+## 0.8.2pk — Smoother phones, a readable dogfight, dodgeable missiles
+
+- Phones can now run at 60 fps in Auto: the game starts at 30, steps up after 12 seconds with headroom and falls back under load (with a 30 s cooldown). Battery saving and Smoother motion still force 30 and 60. Desktop follows high-refresh displays when there is room.
+- Lighter on phones: the first trip to the station downloads about 58 MB instead of 99 MB on iPhone (47 instead of 89 on Android). Distant wrecks stream in nearest first, and a dark stand-in built from their collision shape shows until a model arrives, also offline. The graveyard draws its wrecks in half the calls, and the first iPhone dogfight no longer stalls on shader compiles.
+- A lead diamond shows where to aim at your target and turns gold when the shot will hit. Shield and hull hits tick on the reticle with their own soft sounds. Kills and captures read in gold on the target monitor, heavy hits and nearby kills shake the view (not the cockpit), and Reduced damage effects turns the shake off.
+- New utility equipment, Fire Control (I–III), widens and strengthens aim help even with Aim assistance off. Dealers sell it; good pilots occasionally carry one.
+- Shooting a fighter's tail once its shields are down cripples its drive: no boost, half speed, smoke. In career a crippled pilot surrenders far more readily; in Arena they fight on.
+- Missiles can be dodged. They track inside a seeker cone and home on the drive glow, so a hard break at the right moment makes them overshoot for good, while flying straight or circling still gets you hit. A short "break now" cue sounds at the best moment (allowing for your reaction and the device's audio delay); the approach beeps stop after it, and a salvo gives one cue.
+- Missile lock: keep a target near your nose and the bracket closes and turns gold; locks are twice as fast from behind. Firing early shows LOCKING. Enemies lock the same way and warn you throughout.
+- Every rack now carries 240 damage per magazine (seekers 4 × 60, swarm 4 canisters × 4 × 15, torpedoes 2 × 120); old swarm magazines above four canisters are refunded at 240 cr each. Swarm racks cost 4,000 cr (anti-shield 4,500). Racks roll Quick-lock instead of Efficient; Precise widens the seeker cone.
+- Enemy pilots miss far more often, and close: bursts that miss stream past just off your hull. Against a dodging pilot veterans now land about 1 in 6 shots and aces about 1 in 4.
+- Equipment balance: affix ranges use round numbers; Siphoning returns 15–30% (it beats Efficient for accurate pilots), Rapid adds up to 18% fire rate. Energy Storage +50%, Speed Booster +20%, Cargo Expansion +20. The laser turret hits harder for less energy. Needle Array crits for double damage, Hailstorm fires nine pellets, Quiet Sun returns half its energy, and Static Bloom and Dawnbreaker gain +10% damage.
+- Mission enemies no longer start hidden behind rock or wreckage.
+- Arena rewards fit your ship: upgrades over what they replace and empty bays come first, with a nudge toward what the build lacks (power, shields, a missile rack). A better rack replaces your old rack, not a gun. Hulls with drone bays are offered PDC and repair drones; runs start without the mining drone.
+- Shipping assets (packed wrecks and hulls) are generated and verified by the build; `npm run build` needs Python with Pillow (`tools/assets/requirements.txt`).
+
 ## 0.8.2pj — Arena range control, quieter entry marker
 
 - Hiding in the Arena buys a breather, not a stalemate. Opponents still lose you behind rock exactly as in career, but once none of them has had you for 8 seconds, range control sweeps the field: the cockpit warns three seconds ahead, then every opponent gets your position at that moment and repeats every 6 seconds while you stay hidden. The sweep is a snapshot, so moving after the ping still makes them search.

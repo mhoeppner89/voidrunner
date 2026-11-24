@@ -41,22 +41,45 @@ export function createDerelictVents(root,sections){
         anchors.push({position:point.clone().addScaledVector(normal,.6),normal:normal.clone()});
         if(anchors.length===3)break;
     }
-    const count=anchors.length*6,geometry=new THREE.InstancedBufferGeometry();
+    return createVentPlume(root,anchors,'Kestrel Nine leaking fuel and smoke');
+}
+
+export function createDriveLeak(root){
+    const port=root.userData.engineFlares?.[0];
+    const position=port?root.worldToLocal(port.getWorldPosition(new THREE.Vector3())):new THREE.Vector3(0,0,5);
+    return createVentPlume(root,[{position,normal:new THREE.Vector3(.15,.05,1.6)}],'Damaged drive exhaust',true);
+}
+
+function createVentPlume(root,anchors,name,sparks=false){
+    const perVent=sparks?9:6;
+    const count=anchors.length*perVent,geometry=new THREE.InstancedBufferGeometry();
     geometry.setIndex([0,1,2,0,2,3]);geometry.setAttribute('position',new THREE.Float32BufferAttribute([-1,-1,0,1,-1,0,1,1,0,-1,1,0],3));
     const origins=new Float32Array(count*3),directions=new Float32Array(count*3),phases=new Float32Array(count),flames=new Float32Array(count);
-    for(let i=0;i<count;i++){anchors[Math.floor(i/6)].position.toArray(origins,i*3);anchors[Math.floor(i/6)].normal.toArray(directions,i*3);phases[i]=(i%6)/2+(Math.floor(i/6)*.37);flames[i]=i%6===0?1:0;}
+    for(let i=0;i<count;i++){
+        const vent=Math.floor(i/perVent),particle=i%perVent;
+        anchors[vent].position.toArray(origins,i*3);
+        anchors[vent].normal.toArray(directions,i*3);
+        phases[i]=particle*.5+vent*.37;
+        flames[i]=particle>=6?2:particle===0?1:0;
+    }
     geometry.setAttribute('origin',new THREE.InstancedBufferAttribute(origins,3));geometry.setAttribute('direction',new THREE.InstancedBufferAttribute(directions,3));geometry.setAttribute('phase',new THREE.InstancedBufferAttribute(phases,1));geometry.setAttribute('flame',new THREE.InstancedBufferAttribute(flames,1));geometry.instanceCount=count;
     const time={value:0},material=new THREE.ShaderMaterial({uniforms:{time},transparent:true,depthWrite:false,
         vertexShader:`attribute vec3 origin;attribute vec3 direction;attribute float phase;attribute float flame;uniform float time;varying vec2 puffUv;varying float age;varying float seed;
         void main(){age=mix(mod(time+phase,3.),.12+.035*sin(time*11.+phase*7.),flame);seed=phase;puffUv=position.xy;
             vec3 centre=origin+direction*age*(3.+phase*.4);centre+=vec3(sin(phase*4.+age),cos(phase*3.+age*.7),sin(age*.9))*age*.65;
-            vec4 view=modelViewMatrix*vec4(centre,1.);view.xy+=position.xy*(.8+age*2.+flame*1.1)*length(modelMatrix[0].xyz);gl_Position=projectionMatrix*view;}`,
+            float size=.8+age*2.+flame*1.1;
+            if(flame>1.5){
+                float travel=fract(time*1.7+phase*.71);
+                centre=origin+(direction*10.+vec3(sin(phase*9.)*3.,cos(phase*5.)*3.,0.))*travel;
+                size=.16*(1.-travel);age=.16;
+            }
+            vec4 view=modelViewMatrix*vec4(centre,1.);view.xy+=position.xy*size*length(modelMatrix[0].xyz);gl_Position=projectionMatrix*view;}`,
         fragmentShader:`precision highp float;varying vec2 puffUv;varying float age;varying float seed;
         float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);vec4 h=fract(sin(vec4(dot(i,vec2(127.1,311.7)),dot(i+vec2(1,0),vec2(127.1,311.7)),dot(i+vec2(0,1),vec2(127.1,311.7)),dot(i+vec2(1,1),vec2(127.1,311.7))))*43758.5453);return mix(mix(h.x,h.y,f.x),mix(h.z,h.w,f.x),f.y);}
         void main(){float r=length(puffUv);if(r>1.)discard;float n=noise(puffUv*3.+seed+age*.5);
             float shape=1.-smoothstep(.1,1.,r+(n-.5)*.35),hot=(1.-smoothstep(.18,.9,age))*(.7+n*.3);
             vec3 smoke=mix(vec3(.055,.065,.075),vec3(.3,.31,.32),n),fire=mix(vec3(.9,.14,.015),vec3(1.,.65,.13),n);
             float fade=smoothstep(0.,.08,age)*(1.-smoothstep(1.5,3.,age));gl_FragColor=vec4(mix(smoke,fire,hot),shape*fade*(.48+hot*.4));}`});
-    const object=new THREE.Mesh(geometry,material);object.name='Kestrel Nine leaking fuel and smoke';object.frustumCulled=false;object.raycast=()=>undefined;root.add(object);
+    const object=new THREE.Mesh(geometry,material);object.name=name;object.frustumCulled=sparks;if(sparks)geometry.boundingSphere=new THREE.Sphere(anchors[0].position.clone(),26);object.raycast=()=>undefined;root.add(object);
     return {object,anchors,update(dt){time.value=(time.value+dt)%300;},dispose(){object.removeFromParent();geometry.dispose();material.dispose();}};
 }

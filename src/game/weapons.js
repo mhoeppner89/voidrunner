@@ -56,11 +56,11 @@ for(const weapon of Object.values(WEAPONS)){
 }
 // Read-only compatibility for old weapon-ID callers; no separate roster entry.
 WEAPONS['pulse-mk2']={...WEAPONS.pulse,id:'pulse',nameKey:'Pulse Laser II',hudNameKey:'PULSE II',damageFlat:WEAPONS.pulse.damageFlat*27/23,energyCost:WEAPONS.pulse.energyCost*1.125,legacyOnly:true};
-export const TRACKING_LASER=Object.freeze({id:'tracking-turret',kind:'beam',range:300,speed:100000,damageFlat:6*WEAPON_DAMAGE_SCALE,energyCost:4,cooldown:.7});
+export const TRACKING_LASER=Object.freeze({id:'tracking-turret',kind:'beam',range:300,speed:100000,damageFlat:8*WEAPON_DAMAGE_SCALE,energyCost:3,cooldown:.7});
 export const weaponRange=weapon=>weapon?.range??(weapon?.speed??0)*(weapon?.life??0);
 export const weaponShotDamage=weapon=>weapon?.damageFlat??0;
 // Launcher records are kept beside guns because they share target and
-// projectile plumbing, but they use ship-local magazines and their own
+// projectile plumbing, but they use per-mount magazines and their own
 // selection cycle. A swarm canister is one magazine round that opens into
 // four micro-warheads simultaneously at launch.
 export const LAUNCHERS = {
@@ -70,9 +70,9 @@ export const LAUNCHERS = {
         category: 'launcher',
         speed: 260,
         homingSpeed: 260,
-        homingTurn: 1.8,
-        acceleration: 520, lockRange: 800,
-        damage: 62.5,
+        trackRate: 60, homingTurn: 60*Math.PI/180,
+        acceleration: 520, lockTime: 2, seekerCone: 45, lockRange: 800,
+        damage: 60,
         hullMul: 2,
         life: 8,
         cooldown: 1.1,
@@ -91,36 +91,36 @@ export const LAUNCHERS = {
         category: 'launcher',
         speed: 300,
         homingSpeed: 300,
-        homingTurn: 2.4,
-        acceleration: 650, lockRange: 700,
-        damage: 12.5,
+        trackRate: 60, homingTurn: 60*Math.PI/180,
+        acceleration: 650, lockTime: 1, seekerCone: 30, lockRange: 600,
+        damage: 15,
         hullMul: 2,
-        life: 6.4,
+        life: 3,
         cooldown: 1.3,
-        capacity: 12,
+        capacity: 4,
         ordnanceId: 'swarm-canister',
         ordnanceNameKey: 'SWARM CANISTER',
         shortCode: 'SWM',
         unitCost: 240,
         volley: 4,
-        spreadRad: 0.07,
+        spreadRad: 3*Math.PI/180,
         audioKey: 'missile',
     },
     'shield-seeker': {
         id: 'shield-seeker', nameKey: 'ANTI-SHIELD MISSILE RACK', category: 'launcher',
-        speed: 260, homingSpeed: 260, homingTurn: 1.8,
-        acceleration: 520, lockRange: 800, damage: 62.5, shieldMul: 2,
+        speed: 260, homingSpeed: 260, trackRate: 60, homingTurn: 60*Math.PI/180,
+        acceleration: 520, lockTime: 2, seekerCone: 45, lockRange: 800, damage: 60, shieldMul: 2,
         life: 8, cooldown: 1.1, capacity: 4,
         ordnanceId: 'shield-seeker-missile', ordnanceNameKey: 'ANTI-SHIELD MISSILE',
         shortCode: 'ASM', unitCost: 240, volley: 1, spreadRad: 0, audioKey: 'missile',
     },
     'shield-swarm': {
         id: 'shield-swarm', nameKey: 'ANTI-SHIELD SWARM RACK', category: 'launcher',
-        speed: 300, homingSpeed: 300, homingTurn: 2.4,
-        acceleration: 650, lockRange: 700, damage: 12.5, shieldMul: 2,
-        life: 6.4, cooldown: 1.3, capacity: 12,
+        speed: 300, homingSpeed: 300, trackRate: 60, homingTurn: 60*Math.PI/180,
+        acceleration: 650, lockTime: 1, seekerCone: 30, lockRange: 600, damage: 15, shieldMul: 2,
+        life: 3, cooldown: 1.3, capacity: 4,
         ordnanceId: 'shield-swarm-canister', ordnanceNameKey: 'ANTI-SHIELD SWARM CANISTER',
-        shortCode: 'ASW', unitCost: 240, volley: 4, spreadRad: .07, audioKey: 'missile',
+        shortCode: 'ASW', unitCost: 240, volley: 4, spreadRad: 3*Math.PI/180, audioKey: 'missile',
     },
     torpedo: {
         id: 'torpedo',
@@ -128,18 +128,18 @@ export const LAUNCHERS = {
         category: 'launcher',
         speed: 115,
         homingSpeed: 115,
-        homingTurn: .28,
+        homingTurn: 10*Math.PI/180,
         shieldBypass: 1,
         projectileShield: 12,
-        acceleration: 140, lockRange: 600,
-        damage: 118,
+        acceleration: 140, lockTime: 3, seekerCone: 30, lockRange: 600,
+        damage: 120,
         life: 10,
         cooldown: 2.6,
         capacity: 2,
         ordnanceId: 'heavy-torpedo',
         ordnanceNameKey: 'HEAVY TORPEDO',
         shortCode: 'TOR',
-        unitCost: 240,
+        unitCost: 480,
         volley: 1,
         spreadRad: 0,
         splashRadius: 20,
@@ -148,7 +148,10 @@ export const LAUNCHERS = {
     },
 };
 for (const launcher of Object.values(LAUNCHERS)) {
-    launcher.damage *= WEAPON_DAMAGE_SCALE;
+    if(launcher.trackRate){
+        launcher.terminalRange=launcher.volley===1?600:400;
+        launcher.plumeFraction=.025;
+    }
     if (launcher.splashMin != null) launcher.splashMin *= WEAPON_DAMAGE_SCALE;
 }
 export const WEAPON_ORDER = ['pulse', 'gauss', 'pdc', 'ripper', 'ion', 'mortar', 'beam'];

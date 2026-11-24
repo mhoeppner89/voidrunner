@@ -25,7 +25,7 @@ const origin = new THREE.Vector3(...LOCATIONS.shardbelt.position);
 const rng = (seed) => () => ((seed = Math.imul(seed ^ seed >>> 15, 2246822507) + 0x6d2b79f5 | 0) >>> 0) / 4294967296;
 
 function world() {
-    const s = session();
+    const s = session();s.pickups=[];
     s.tmpCollide = new THREE.Vector3(); s.tmpEuler = new THREE.Euler(); s.fireNpcGun = () => {}; s.damageShip = () => {};
     if (OPEN) return s;
     s.activeInstanceId = 'shardbelt'; s.asteroids = generateAsteroidField(718, []); s.graveyard = generateGraveyardPieces(718); s.wreckNodes = [];
@@ -45,6 +45,7 @@ function spot(random, s) {
     }
 }
 
+const armed=process.env.ARMED==='1'; // Keep the original terrain-only control by default.
 const totals = {};
 for (let c = 0; c < CASES; c++) for (const tier of TIERS) {
     const s = world(), random = rng(1000 + c), a = spot(random, s);
@@ -55,7 +56,8 @@ for (let c = 0; c < CASES; c++) for (const tier of TIERS) {
         s.spawnShip('patrol', b.toArray(), undefined, undefined, { tier, temperament: 'steady' })];
     for (const [ship, other] of [[ships[0], ships[1]], [ships[1], ships[0]]]) {
         ship.rotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), new THREE.Vector3(...other.position).sub(new THREE.Vector3(...ship.position)).normalize()).toArray();
-        ship.velocity = [0, 0, 0]; ship.targetId = other.id; ship.combatFit.turrets = []; ship.combatFit.missiles = 0; ship.hull = ship.maxHull = 1e9;
+        ship.velocity = [0, 0, 0]; ship.targetId = other.id; ship.combatFit.turrets = []; ship.hull = ship.maxHull = 1e9;
+        if(!armed){ship.combatFit.missiles=0;for(const rack of ship.combatFit.racks??[])rack.missiles=0;}
         ship.metrics = { speed: 0, limited: 0, brakes: 0, stops: 0, bumps: 0, history: [], recentLimit: [], stopped: false, lastBump: -99, lastBrake: -999 };
     }
     const steps = SECONDS * 60, started = performance.now();
@@ -77,13 +79,18 @@ for (let c = 0; c < CASES; c++) for (const tier of TIERS) {
             if (i > 120 && fraction < .4 && Math.max(...m.history) > max * .8 && i - m.lastBrake > 90) { m.lastBrake = i; if (terrain) m.brakes++; }
             if (ship.combatBumpAt === s.save.world.time) { if (i - m.lastBump > 30) m.bumps++; m.lastBump = i; }
         }
+        if(armed){
+            s.updateProjectiles(1/60);
+            s.cleanupEntities();
+        }
     }
     const cost = (performance.now() - started) / steps / 2, minutes = SECONDS / 60;
     for (const ship of ships) {
         const m = ship.metrics, t = totals[tier] ??= { ships: 0, meanSpeed: 0, terrainBrakesPerMin: 0, terrainStopsPerMin: 0, bumpsPerMin: 0, terrainLimited: 0, msPerShipStep: 0 };
+        if(armed)t.launches=(t.launches??0)+s.projectileCounter/2;
         t.ships++; t.meanSpeed += m.speed / steps; t.terrainBrakesPerMin += m.brakes / minutes; t.terrainStopsPerMin += m.stops / minutes;
         t.bumpsPerMin += m.bumps / minutes; t.terrainLimited += m.limited / steps; t.msPerShipStep += cost;
     }
 }
-for (const t of Object.values(totals)) for (const key of Object.keys(t)) if (key !== 'ships') t[key] = +(t[key] / t.ships).toFixed(3);
+for (const t of Object.values(totals)) for (const key of Object.keys(t)) if (key !== 'ships' && key !== 'launches') t[key] = +(t[key] / t.ships).toFixed(3);
 console.log(JSON.stringify(totals, null, 1));

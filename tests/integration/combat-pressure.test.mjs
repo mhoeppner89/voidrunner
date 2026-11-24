@@ -66,10 +66,10 @@ test('a supporting pilot holds gun energy and missile ammunition until its attac
  fit.guns=['pulse-cannon'];fit.gunIndices=[0];fit.weapons=['pulse'];fit.weaponDefinitions=[WEAPONS.pulse];fit.fireAt=[0];fit.attackOrder=[0];
  const direction=new THREE.Vector3(...ship.position).negate().normalize();
  s.fireNpcGun(ship,direction);assert.equal(s.projectiles.length,0);assert.equal(ship.energy,100);assert.equal(fit.fireAt[0],0);
- fit.racks=undefined;fit.launcher='swarm';fit.missiles=2;fit.lockTarget='player';fit.lock=5;fit.warned=true;fit.warnedAt=-5;fit.launchAt=-1;
+ fit.racks=undefined;fit.launcher='swarm';fit.missiles=2;fit.lockTarget='player';fit.lockRack='swarm';fit.lock=1;fit.warned=true;fit.warnedAt=-5;fit.launchAt=-1;
  s.updateNpcOrdnance(ship,new THREE.Vector3(),1/60);assert.equal(fit.missiles,2);assert.equal(ship.energy,100);
  // At one second this support pilot's window opens; the acquired lock remains valid.
- s.save.world.time=1.05;s.updateNpcOrdnance(ship,new THREE.Vector3(),1/60);
+ for(let i=1;i<=63;i++){s.save.world.time=i/60;s.updateNpcOrdnance(ship,new THREE.Vector3(),1/60);}
  assert.equal(fit.missiles,1);assert.ok(s.projectiles.some(p=>p.kind==='missile'));
 });
 

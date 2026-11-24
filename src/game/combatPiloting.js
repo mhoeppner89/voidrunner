@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import {registerHitReaction} from './flightDynamics.js';
+import {hashString,mulberrySample} from './random.js';
+import {breakCueStart,breakCueEnd} from './weaponFlight.js';
 import {weaponDamage} from './weaponDamage.js';
 import {WEAPONS,weaponRange} from './weapons.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -13,21 +15,43 @@ export function observeIncomingFire(session,ship) {
  const scan=ship.threatScan??={start:new THREE.Vector3(),end:new THREE.Vector3(),seen:new Map()};
  for(const [id,until] of scan.seen)if(now>=until)scan.seen.delete(id);
  const radius=Math.max(...session.npcHullExtents(ship))+2;
- let best,soonest=1.2;
+ let best,soonest=Infinity;
  for(const p of session.projectiles) {
-  if(p.life<=0||p.ownerId===ship.id||scan.seen.has(p.id)||!session.projectileCanHitShip(p,ship))continue;
+  const missile=p.kind==='missile'||p.kind==='torpedo';
+  if(missile && (p.lostTrack || p.targetId!==ship.id))continue;
+  if(p.life<=0||p.ownerId===ship.id||scan.seen.has(p.salvo??p.id??p)||!session.projectileCanHitShip(p,ship))continue;
   const i=p.slot*3,pos=session.projStore.pos,vel=session.projStore.vel;
   const x=pos[i]-ship.position[0],y=pos[i+1]-ship.position[1],z=pos[i+2]-ship.position[2];
-  if(x*x+y*y+z*z>400*400)continue;
+  const viewRange=missile?800:400;
+  if(x*x+y*y+z*z>viewRange*viewRange)continue;
   const vx=vel[i]-ship.velocity[0],vy=vel[i+1]-ship.velocity[1],vz=vel[i+2]-ship.velocity[2],v2=vx*vx+vy*vy+vz*vz;
   const time=-(x*vx+y*vy+z*vz)/Math.max(1,v2);
-  if(time<0||time>soonest||time>p.life||(x+vx*time)**2+(y+vy*time)**2+(z+vz*time)**2>radius*radius)continue;
+  if(time<=0||time>soonest||time>p.life||(x+vx*time)**2+(y+vy*time)**2+(z+vz*time)**2>radius*radius)continue;
+  let reaction=1.2;
+  if(missile && !ship.capitalClass){
+   // Each pilot judges a salvo once. Sampling by pilot and salvo keeps all
+   // four swarm lanes on the same decision across repeated threat scans.
+   scan.seed??=hashString(ship.id);
+   const roll=mulberrySample(scan.seed+(typeof p.salvo==='number'?p.salvo:p.slot));
+   const center=(breakCueEnd(p.hitWeapon)+breakCueStart(p.hitWeapon))/2+.1; // 5 Hz scan
+   reaction=ship.pilot?.tier==='ace'?center+(roll-.5)*.2:
+    ship.pilot?.tier==='veteran'?center+(roll-.5)*1.2:roll<.7?.2+roll*.4:2+roll*.5;
+  }
+  if(time>reaction)continue;
   scan.start.set(pos[i],pos[i+1],pos[i+2]);scan.end.fromArray(ship.position);
   if(session.lineBlocked(scan.start,scan.end,ship.id))continue;
   best=p;soonest=time;
  }
  if(best){
-  scan.seen.set(best.id,now+2);
+  const missile=best.kind==='missile'||best.kind==='torpedo';
+  scan.seen.set(best.salvo??best.id??best,now+(missile?best.life+.2:2));
+  if(missile && !ship.capitalClass){
+   ship.missileBreak??=new THREE.Vector3();
+   scan.rotation??=new THREE.Quaternion();
+   ship.missileBreak.set(1,0,0).applyQuaternion(scan.rotation.fromArray(ship.rotation));
+   ship.missileBreakUntil=now+1;
+   ship.evasiveUntil=Math.max(ship.evasiveUntil??0,ship.missileBreakUntil);
+  }
   ship.combatThreatId=best.ownerId;ship.combatThreatUntil=now+2;
   if(WEAPONS[best.weaponId])ship.observedWeaponRange=Math.max(ship.observedWeaponRange??0,weaponRange(WEAPONS[best.weaponId]));
   const damage=weaponDamage(ship.shield,best.damage,WEAPONS[best.weaponId]);

@@ -20,7 +20,7 @@ test('Needle Array crits every fourth bolt per mount, and only that bolt',()=>{
  const s=session(),weapon=weaponForOutfit(createEquipmentRecord('pulse-cannon',{rarity:'named'}).id);
  const shots=Array.from({length:8},()=>fire(s,weapon));
  assert.deepEqual(shots.map(p=>p.crit),[false,false,false,true,false,false,false,true]);
- assert.ok(Math.abs(shots[3].damage-shots[0].damage*2.5)<1e-9);
+ assert.ok(Math.abs(shots[3].damage-shots[0].damage*2)<1e-9);
  const other=fire(s,weapon,'player','m1');assert.equal(other.crit,false,'each mount keeps its own cadence');
 });
 
@@ -62,7 +62,7 @@ test('player-fired Scatter Cannon retains legendary pellets, siphon, multipliers
  s.tmpPlayerOrientation=new THREE.Quaternion();
  s.renderer={spawnRailPlume(){},spawnMuzzleFlash(_x,_y,_z,color){flashes.push(color);}};
  s.fireMountedPlayerGuns();
- assert.equal(s.projectiles.length,10,'Hailstorm fires ten pellets through the player mount path');
+ assert.equal(s.projectiles.length,9,'Hailstorm fires nine pellets through the player mount path');
  assert.deepEqual(flashes,[0xa8e6ff]);
  const directions=new Set();
  for(const p of s.projectiles){
@@ -74,5 +74,5 @@ test('player-fired Scatter Cannon retains legendary pellets, siphon, multipliers
   assert.deepEqual([...s.projStore.prevPos.slice(i,i+3)],[...s.projStore.pos.slice(i,i+3)],'interpolation prevPos is snapshotted');
   directions.add(s.projStore.vel.slice(i,i+3).map(v=>v.toFixed(3)).join(','));
  }
- assert.equal(directions.size,10,'spread directions stay distinct across all pellets');
+ assert.equal(directions.size,9,'spread directions stay distinct across all pellets');
 });

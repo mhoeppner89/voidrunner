@@ -280,6 +280,7 @@ test('wing orders are range-gated against the pilot: aggressive, defensive, brea
  assert.equal(wing.targetId,enemy.id,'the wing stays committed to its locked target');
  assert.ok(distance(wing.position,enemy.position)<opening,'a committed wing closes on its target');
  // Break off: the flee doctrine plus a long leg outward from the nearest threat.
+ const priorShots=s.projectiles.filter(shot=>shot.ownerId===wing.id).length;
  assert.equal(s.setWingOrder('breakoff'),true);
  assert.equal(wing.fleeing,true);assert.equal(wing.holdFire,true);assert.equal(wing.task.kind,'flee');assert.equal(wing.wingmanTargetId,undefined);
  assert.equal(s.resolveShipTarget(wing),undefined,'a wing breaking off takes no target either');
@@ -289,7 +290,7 @@ test('wing orders are range-gated against the pilot: aggressive, defensive, brea
  assert.ok(distance(wing.destination,enemy.position)>before+2000,'the break-off leg runs away from the fight');
  step(4);
  assert.ok(distance(wing.position,enemy.position)>before+100,'the wing opens the range instead of closing it');
- assert.equal(s.projectiles.filter(shot=>shot.ownerId===wing.id).length,0,'a wing breaking off holds fire too');
+ assert.equal(s.projectiles.filter(shot=>shot.ownerId===wing.id).length,priorShots,'a wing breaking off holds fire too');
  // Cycling walks the three orders and returns to aggressive.
  assert.equal(s.cycleWingOrder(),true,'break off cycles back to aggressive');
  assert.equal(r.wingOrder,'aggressive');assert.equal(wing.fleeing,false);assert.equal(wing.holdFire,false);assert.equal(wing.pursuitHoldFire,false);assert.equal(wing.task.kind,'hunt');

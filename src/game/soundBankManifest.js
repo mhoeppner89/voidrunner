@@ -421,6 +421,44 @@ export const FORGED_SOUNDS = {
   ],
   "group": "ui"
  },
+ "break-cue": {
+  "files": [
+   "fx/break-cue-0.mp3"
+  ],
+  "group": "flight"
+ },
+ "rack-search": {
+  "files": [
+   "fx/rack-search-0.mp3"
+  ],
+  "group": "flight"
+ },
+ "rack-ready": {
+  "files": [
+   "fx/rack-ready-0.mp3"
+  ],
+  "group": "flight"
+ },
+ "rack-denied": {
+  "files": [
+   "fx/rack-denied-0.mp3"
+  ],
+  "group": "flight"
+ },
+ "confirm-hull": {
+  "files": [
+   "fx/confirm-hull-0.mp3",
+   "fx/confirm-hull-1.mp3"
+  ],
+  "group": "flight"
+ },
+ "confirm-shield": {
+  "files": [
+   "fx/confirm-shield-0.mp3",
+   "fx/confirm-shield-1.mp3"
+  ],
+  "group": "flight"
+ },
  "kill-confirm": {
   "files": [
    "fx/kill-confirm-0.mp3"

@@ -8,7 +8,7 @@ import {isolateBrowserProfiles} from '../helpers/browser-profiles.mjs';
 await isolateBrowserProfiles(import.meta.url,['desktop','android']);
 const out='output/music-review',base=process.env.VR_BASE_URL??'http://127.0.0.1:4192';await mkdir(out,{recursive:true});
 for(const [name,device]of [['desktop',{viewport:{width:1440,height:1000}}],['android',devices['Pixel 7']]].filter(([n])=>(process.env.VR_PROFILES??'desktop,android').split(',').includes(n))){
- const browser=await chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',args:['--no-sandbox','--disable-gpu-sandbox','--mute-audio','--autoplay-policy=no-user-gesture-required']});
+ const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-gpu-sandbox','--mute-audio','--autoplay-policy=no-user-gesture-required']});
  try{
   const page=await browser.newPage({...device,serviceWorkers:'block'}),errors=[];page.setDefaultTimeout(45000);
   page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!/404/.test(m.text()))errors.push(m.text());});

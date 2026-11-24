@@ -117,8 +117,11 @@ export function planCombatFlight(session,ship,targetPosition,targetVelocity,lead
  // indefinitely from the railgun's maximum standoff distance.
  const baseRange=novice&&ship.combatFit.weapons?.at(-1)==='gauss'?300:ship.combatFit.profile.range;
  const mainWeapon=WEAPONS[ship.combatFit.weapons?.at(-1)];
+ // In open water a novice with ordinary guns follows through on a pass.
+ // Field pilots keep their extra turning room near rock and wreckage.
+ const passRange=novice&&!session.activeInstanceId&&(mainWeapon?.kind==='laser'||mainWeapon?.kind==='beam')?baseRange*.8:baseRange;
  const effectiveRange=mainWeapon?Math.min(weaponRange(mainWeapon),(ship.fireRange??weaponRange(mainWeapon))*(ship.pilot?.fireRangeMul??1)):Infinity;
- const preferred=style.range===1?baseRange:Math.min(baseRange*style.range,effectiveRange*.82);
+ const preferred=style.range===1?passRange:Math.min(passRange*style.range,effectiveRange*.82);
  s.engagementRange=preferred;
  s.position.fromArray(ship.position);s.travel.fromArray(ship.velocity);s.nose.copy(FORWARD).applyQuaternion(s.q.fromArray(ship.rotation));
  s.relative.copy(targetPosition).sub(s.position);s.direct.copy(s.relative).normalize();

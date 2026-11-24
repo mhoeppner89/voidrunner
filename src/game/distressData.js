@@ -629,6 +629,8 @@ export function normalizeDistressActors(candidate) {
                 ? raw.rotation.map(entry => Number(entry))
                 : undefined,
             velocity: tuple(raw.velocity),
+            driveWear: Math.max(0, finite(raw.driveWear, 0)),
+            crippled: raw.crippled === true,
             destroyed: raw.destroyed === true,
             surrendered: raw.surrendered === true,
         });

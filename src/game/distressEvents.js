@@ -1,3 +1,4 @@
+import {restoreFighterDrive} from './weaponFlight.js';
 // Recurring distress encounters: scheduling, actors, assistance and the
 // exactly-once settlement of each event.
 //
@@ -475,6 +476,8 @@ export const DistressMethods = {
     snapshotDistressActor(active, ship) {
         const snapshot = {
             key: ship.distressActor,
+            driveWear: ship.driveWear,
+            crippled: ship.crippled,
             role: ship.distressRole ?? ship.role,
             hullId: ship.hullId ?? ship.variant,
             name: ship.name,
@@ -508,7 +511,10 @@ export const DistressMethods = {
             const legacyAlias = active.legacy === 'lantern' && entry.role === 'pirate' ? `raider-${entry.key.split('-').at(-1)}` : entry.key;
             const snapshot = active.actors.find(actor => actor.key === entry.key || actor.key === legacyAlias);
             if (snapshot?.destroyed) continue;
-            const point = snapshot?.position ?? offset(active.position, entry.offset, yaw);
+            // Fresh raiders start in the pilot's sight, not behind the
+            // derelict or a rock; reloads keep their saved positions.
+            let point = snapshot?.position ?? offset(active.position, entry.offset, yaw);
+            if (!snapshot && entry.role === 'pirate' && this.visibleSpawnPosition) point = this.visibleSpawnPosition(new THREE.Vector3(...point), {maxAngle: 30}).toArray();
             const ship = this.spawnShip(entry.role, [...point], `distress-${active.id}`, snapshot?.name ?? entry.name, {tier: 'regular', temperament: 'steady'}, {hullId: entry.hullId, faction: entry.faction});
             ship.distressActor = entry.key;
             ship.distressEventId = active.id;
@@ -541,6 +547,7 @@ export const DistressMethods = {
                 if (hullFraction < 1) ship.hull = Math.max(1, Math.round(ship.maxHull * hullFraction));
             }
             if (snapshot && !snapshot.destroyed) {
+                restoreFighterDrive(ship, snapshot);
                 ship.hull = Math.min(ship.maxHull, Math.max(1, snapshot.hull));
                 ship.shield = Math.min(ship.maxShield, Math.max(0, snapshot.shield ?? 0));
                 if (snapshot.rotation?.length === 4) ship.rotation = [...snapshot.rotation];

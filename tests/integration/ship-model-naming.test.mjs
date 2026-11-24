@@ -81,6 +81,7 @@ test('traffic has distinct deterministic vessel names while authored names and p
 
 test('a reusable vessel name cannot be mistaken for a remembered hostile pilot', () => {
     const first = fixture();
+    first.arena=undefined;
     first.save.player.reputation.alliance = -50;
     first.resolveHyperdriveIntercept = () => {};
     first.ejectCargo = () => {};

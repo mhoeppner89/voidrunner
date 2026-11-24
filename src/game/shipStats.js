@@ -85,6 +85,7 @@ export const getEffectiveShipStats = (player) => {
         miningRange: 100,
         salvageRate,
         salvageRange,
+        assistMultiplier: selectedEffects.reduce((best,e)=>Math.max(best,e.assistMultiplier??1),1),
         lootRange: selectedEffects.reduce((range,e)=>Math.max(range,e.lootRange??0),0),
     };
 };

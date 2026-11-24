@@ -139,7 +139,7 @@ test('rarity grades roll more and stronger affixes, and rating orders tier and r
 });
 test('legendary traits change the hardware and better parts survive destruction more often',()=>{
  const named=id=>weaponForOutfit(createEquipmentRecord(id,{tier:1,rarity:'named'}).id);
- assert.equal(named('ripper').pellets,10);assert.equal(named('gauss-cannon').pierce,1);assert.equal(named('ion-blaster').jamSeconds,2);
+ assert.equal(named('ripper').pellets,9);assert.equal(named('gauss-cannon').pierce,1);assert.equal(named('ion-blaster').jamSeconds,2);
  assert.equal(named('pulse-cannon').critEvery,4);assert.ok(named('beam-emitter').siphon>=.35);
  const plain=weaponForOutfit('mortar'),dawn=named('mortar');assert.ok(dawn.splashRadius>plain.splashRadius*1.5);
  const order=['common','uncommon','rare','epic','named'].map(r=>EQUIPMENT_RARITIES[r].survival);
@@ -158,4 +158,26 @@ test('special dealer offers are expensive, fixed within a rotation, bought once 
  assert.equal(equipmentAction(p,'buy',{baseId:offer.baseId,tier:offer.tier,offerId:offer.offerId,world:save.world}).ok,false);
  const restored=hydrateSave(JSON.parse(JSON.stringify(save)));assert.equal(specialEquipmentOffers(restored.player,'helix',restored.world).some(o=>o.offerId===offer.offerId),false);
  assert.equal(equipmentAction(restored.player,'buy',{baseId:offer.baseId,tier:offer.tier,offerId:offer.offerId,world:{...restored.world,time:restored.world.time+1800}}).ok,false);
+});
+
+test('base racks deliver equal magazine damage and refill cost',async()=>{
+ const {LAUNCHERS}=await import('../../src/game/weapons.js');
+ for(const rack of Object.values(LAUNCHERS)){
+  assert.equal(rack.damage*rack.volley*rack.capacity,240,rack.id);
+  assert.equal(rack.unitCost*rack.capacity,960,rack.id);
+ }
+});
+test('launcher affixes resolve on the rack and legacy Efficient retains its roll',async()=>{
+ const {launcherForOutfit,LAUNCHERS}=await import('../../src/game/weapons.js');
+ const {EQUIPMENT_AFFIXES}=await import('../../src/game/equipmentCatalog.js');
+ assert.deepEqual(EQUIPMENT_AFFIXES.efficient.categories,['gun','turret']);
+ assert.deepEqual(EQUIPMENT_AFFIXES.quickLock.categories,['launcher']);
+ const save=createNewSave(51,{tutorial:false});
+ const record=createEquipmentRecord('seeker-launcher',{rarity:'rare',affixes:['quickLock','precise'],rolls:[.7,.2]});
+ record.affixes[0]='efficient';save.player.inventory.items[record.id]=record;
+ const restored=hydrateSave(JSON.parse(JSON.stringify(save))).player.inventory.items[record.id];
+ assert.deepEqual(restored.affixes,['quickLock','precise']);assert.deepEqual(restored.rolls,[.7,.2]);
+ const rack=launcherForOutfit(record.id),base=LAUNCHERS.seeker;
+ assert.ok(rack.lockTime<base.lockTime&&rack.seekerCone>base.seekerCone&&rack.homingTurn>base.homingTurn);
+ assert.equal(rack.energyCost,base.energyCost);
 });

@@ -69,6 +69,10 @@ export function createEnemyLoadout(ship, index, arenaFit) {
         utility:spec.utility.map((mount)=>observerFit?.utility && itemFitsMount(OUTFIT_ITEMS[observerFit.utility],mount)?observerFit.utility:null),
         fireGroups:{activeGroup:'ALL',assignments:Object.fromEntries(spec.guns.map((mount)=>[mount.id,'A']))}};
     const utilities=observerFit?.utilities??(Array.isArray(observerFit?.utility)?observerFit.utility:[observerFit?.utility,observerFit?.power,observerFit?.drive,observerFit?.defense].filter(Boolean));
+    // Only a few high-skill stock fighters carry the recoverable computer.
+    // NPC fire control continues to use the pilot's gunnery profile.
+    if(!arenaFit && (hullId==='demon'||hullId==='talon') &&
+        (ship.pilot?.tier==='ace'||ship.pilot?.tier==='veteran') && index%4===0)utilities.push('fire-control');
     equipmentLoadout.utility=spec.utility.map((mount,i)=>utilities?.[i]&&itemFitsMount(utilities[i],mount)?utilities[i]:null);
     const stats=observerFit
         ? getEffectiveShipStats({shipId:hullId,outfitting:{schema:4,locker:{},loadouts:{[hullId]:equipmentLoadout}}})
@@ -76,7 +80,7 @@ export function createEnemyLoadout(ship, index, arenaFit) {
     const launcher = explicit && arenaFit.launcher && LAUNCHERS[arenaFit.launcher] ? arenaFit.launcher : launcherIdForOutfit(launchers.find(Boolean));
     return {hullId,guns,weapons,gunIndices,weaponDefinitions:gunIndices.map(i=>weaponForOutfit(guns[i])),turrets,launchers,power:equipmentLoadout.power,drive:equipmentLoadout.drive,defense:equipmentLoadout.defense,utility:equipmentLoadout.utility,fitId:explicit ? 'scenario' : OBSERVER_FITS[arenaFit]?arenaFit:`${hullId}-standard`,profile,stats,attackOrder:[...weapons.keys()].filter(i=>weapons[i]).reverse(),resources:{...stats,shield:stats.shield},fireAt:weapons.map(()=>0),
         launcher,
-        racks: launchers.some(Boolean) ? launchers.filter(Boolean).map(id=>{const launcher=launcherIdForOutfit(id);return {launcher,missiles:LAUNCHERS[launcher].capacity};}) : undefined,
+        racks: launchers.some(Boolean) ? launchers.filter(Boolean).map(id=>{const launcher=launcherIdForOutfit(id);return {launcher,itemId:id,missiles:LAUNCHERS[launcher].capacity};}) : undefined,
         missiles:explicit ? (arenaFit.missiles??(LAUNCHERS[launcher]?.capacity??0)) : (LAUNCHERS[launcher]?.capacity??0),
         droneTypes:NPC_DRONE_DEFAULTS[hullId]};
 }

@@ -27,16 +27,19 @@ const SCENARIOS = {
     cruise: { seconds: 40, context: 'open', state: `(t) => ({ throttle: t < 6 ? 0.2 : t < 20 ? 0.85 : t < 30 ? 0.45 : 1, burn: t > 30 && t < 36, speed: Math.min(1, t / 12), turn: (t > 14 && t < 16) ? 0.8 : 0 })`, actions: `[]` },
     dogfight: {
         seconds: 45, context: 'open',
-        state: `(t) => ({ throttle: 0.8, burn: t > 20 && t < 24, enemies: t < 4 ? 0 : t < 14 ? 1 : t < 34 ? 3 : 0, damage: t > 26 ? 0.75 : 0.1, speed: 0.8, turn: 0.4 + 0.4 * Math.sin(t), shield: t > 18 && t < 30 ? 0 : 1 })`,
+        state: `(t) => ({ throttle: 0.8, burn: t > 20 && t < 24, enemies: t < 4 ? 0 : t < 14 ? 1 : t < 34 ? 3 : 0, damage: t > 26 ? 0.75 : 0.1, speed: 0.8, turn: 0.4 + 0.4 * Math.sin(t), missileThreat: t >= 17.5 && t < 18.5 ? .75 : 0, missileBreak: t >= 17.5 && t < 18.5, shield: t > 18 && t < 30 ? 0 : 1 })`,
         actions: `(() => { const list = [];
             for (let t = 5; t < 34; t += 0.17) if (Math.sin(t * 0.9) > -0.2) list.push([t, (a) => a.play('laser', 0.72)]);
             for (let t = 8; t < 34; t += 1.1) list.push([t, (a) => a.play('gauss', 0.85)]);
             for (let t = 6; t < 34; t += 0.23) list.push([t, (a) => a.playAtDirection('laser', 0.5, 120 + 80 * Math.sin(t), 90 * Math.cos(t * 1.3), 60 * Math.sin(t))]);
             for (let t = 7; t < 34; t += 0.9) list.push([t, (a) => a.playAtDirection('impact', 0.45, 150, 60 * Math.sin(t * 2), -80)]);
             for (let t = 9; t < 30; t += 1.7) list.push([t, (a) => a.playCockpit(t > 18 ? 'hit' : 'shield', 1)]);
+            for(let t=6;t<34;t+=.24)if(Math.sin(t*.9)>-.2)list.push([t,a=>a.playCockpit(t%3<2?'confirmShield':'confirmHull')]);
             list.push([18, (a) => a.playCockpit('shieldBreak', 1)]);
-            for (const t of [12, 21, 27, 33]) list.push([t, (a) => { a.playAtDirection('explosion', 1.1, 140, 80, -60); a.play('kill', 0.8); a.stinger?.('kill'); }]);
+            for (const t of [12, 21, 27, 33]) list.push([t, (a) => { a.playAtDirection('explosion', 1.1, 140, 80, -60); a.play('kill', 0.8); }]);
             for (let t = 10; t < 32; t += 3.3) list.push([t, (a) => a.playAtDirection('flyby', 0.9, 40, t % 2 ? 30 : -30, 0)]);
+            for (const t of [13, 13.65, 14.3]) list.push([t, (a) => a.playCockpit('rackSearch')]);
+            list.push([13.4, (a) => a.playCockpit('rackDenied')], [14.95, (a) => a.playCockpit('rackReady')]);
             list.push([15, (a) => a.play('missile')], [25.5, (a) => a.playCockpit('targetShieldBreak', 0.7)]);
             return list; })()`,
     },
@@ -118,7 +121,7 @@ try {
             for (let frame = 0; frame < scenario.seconds * 60; frame += 1) {
                 clock = frame / 60;
                 const s = state(clock);
-                Object.assign(flight, { speed: s.speed ?? 0, turn: s.turn ?? 0, yaw: s.turn ?? 0, shield: s.shield ?? 1, hyper: Boolean(s.hyper), missileThreat: 0, dockKind: scenario.dockKind, dockId: scenario.dockId, systemId: 'helios-verge' });
+                Object.assign(flight, { speed: s.speed ?? 0, turn: s.turn ?? 0, yaw: s.turn ?? 0, shield: s.shield ?? 1, hyper: Boolean(s.hyper), missileThreat: s.missileThreat ?? 0, missileBreak: Boolean(s.missileBreak), dockKind: scenario.dockKind, dockId: scenario.dockId, systemId: 'helios-verge' });
                 while (next < actions.length && actions[next][0] <= clock) { actions[next][1](audio); next += 1; }
                 if (!scenario.effectsOnly) audio.update(1 / 60, s.throttle ?? 0, Boolean(s.burn), s.damage ?? 0, s.enemies ?? 0, scenario.context, 0, flight);
             }

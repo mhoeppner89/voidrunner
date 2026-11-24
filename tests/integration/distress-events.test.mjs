@@ -868,6 +868,7 @@ test('reload restores damaged actors and never returns destroyed ones', () => {
     s.debugStartDistress('convoy', 0, {phase: 'involved'});
     atEvent(s);
     s.ships[0].hull = 55;
+    s.ships[3].driveWear=.1;
     s.ships[0].name = 'Lantern 1'; // An in-progress save from before the roster rename.
     s.ships[2].hull = 0;
     tick(s);
@@ -877,6 +878,7 @@ test('reload restores damaged actors and never returns destroyed ones', () => {
     s.distressTickAt = 0;
     s.updateDistress();
     assert.deepEqual(s.ships.map(ship => [ship.distressActor, ship.hull]), [['lantern-1', 55], ['lantern-2', 186], ['cutlass-2', 240]]);
+    assert.equal(s.ships.find(ship => ship.distressActor === 'cutlass-2').driveWear,.1);
     assert.equal(s.ships.find(ship => ship.distressActor === 'lantern-1').name, 'Lantern 1');
     assert.equal(s.ships.some(ship => ship.distressActor === 'cutlass-1'), false);
 });

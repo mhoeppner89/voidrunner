@@ -1,10 +1,11 @@
 import {arenaSite} from './arenaSites.js';
-import {equipmentBaseId,RARITY_ORDER,NAMED_EQUIPMENT} from './equipmentCatalog.js';
+import {equipmentBaseId,equipmentRating,RARITY_ORDER,NAMED_EQUIPMENT} from './equipmentCatalog.js';
+import {DRONE_TYPES,createDroneUnit} from './droneData.js';
 import {createEquipmentRecord,rollAffixes,registerInventoryDefinitions,normalizeEquipmentInventory} from './equipmentInventory.js';
 import {createNewSave,hydrateSave} from './save.js';
 import {HULL_HARDPOINTS,OUTFIT_ITEMS,canonicalOutfitId,LOADOUT_KEYS,loadoutFor,createOutfittingState,itemFitsMount,validateLoadout,projectLegacyEquipment,projectLegacyWeaponId} from './outfitting.js';
 import {getEffectiveShipStats} from './shipStats.js';
-import {launcherMagazineEntries,normalizeLauncherMagazines,fillLauncherMagazines} from './weapons.js';
+import {launcherMagazineEntries,normalizeLauncherMagazines,fillLauncherMagazines,weaponForOutfit} from './weapons.js';
 import {proceduralCallsign,seededRandom} from './random.js';
 import {HULL_NPC_FITS} from './enemyLoadouts.js';
 import {ARENA_HULL_OFFER_COUNT,MAX_RUN_WINGMEN,PLAYER_FLYABLE_HULLS,WINGMAN_OFFER_COUNT,HULL_FACTIONS,isFlyableHull,hullTier,wingmanFitFor} from './shipPool.js';
@@ -118,18 +119,28 @@ export function newArenaRun(hard=false,seed=Date.now()) {
  const save=createNewSave(seed,{tutorial:false});save.arena={run:true};normalizeEquipmentInventory(save.player,{disabled:true});save.player.credits=0;save.player.cargo={};save.player.throttle=.35;
  for(const key of LOADOUT_KEYS){save.player.outfitting.loadouts[save.player.shipId][key].fill(null);save.player.outfitting.factory[save.player.shipId][key].fill(false);}
  save.player.equipment=[];save.player.weaponId=null;save.player.launcherMagazines={};save.player.missiles=0;
+ clearRunMiningDrones(save.player);
  save.arenaRun={openingPicks:0,version:3,totalWaves:RUN_WAVES.length,seed,hard,wave:0,phase:'prepare',rewardChosen:false,hullChosen:false,decisions:{},offers:[],hullOffers:[],wingmanOffers:[],wingmen:[],wingOrder:'aggressive',cleared:0,elapsed:0,damage:0,missiles:0};save.arenaRun.hullOffers=runHullOffers(save);return save;
+}
+// Mining drones have no work in the Arena: their bays start empty so a combat
+// drone reward can fill them.
+function clearRunMiningDrones(p){
+ const fleet=p.droneFleet;if(!fleet)return;
+ for(const fit of Object.values(p.outfitting?.loadouts??{}))for(const bay of fit.droneBays??[])bay.unitIds=bay.unitIds.map(id=>fleet.unitsById[id]?.type==='mining'?null:id);
+ for(const [id,unit] of Object.entries(fleet.unitsById))if(unit.type==='mining'){delete fleet.unitsById[id];fleet.lockerIds=fleet.lockerIds.filter(value=>value!==id);}
 }
 const OLD_WAVE_TOTALS={1:8,2:10};
 // Map an old checkpoint's wave index onto the same fractional position in the
 // current run, so a saved sortie resumes roughly where it was instead of jumping.
 const migrateWave=(wave,version)=>Math.max(0,Math.min(RUN_WAVES.length-1,Math.floor((wave+0.5)/OLD_WAVE_TOTALS[version]*RUN_WAVES.length)));
 export function readArenaRun(){try{
- const raw=JSON.parse(window.localStorage.getItem(ARENA_RUN_KEY)),r=raw?.arenaRun;
+ const raw=JSON.parse(window.localStorage.getItem(ARENA_RUN_KEY));
+ let r=raw?.arenaRun;
  const totals={...OLD_WAVE_TOTALS,3:RUN_WAVES.length};
  if(![1,2,3].includes(r?.version)||!['prepare','combat','won','lost'].includes(r.phase)||!Number.isInteger(r.wave)||r.wave<0||r.wave>=totals[r.version])return null;
  registerInventoryDefinitions({items:r.rewardRecords});
- const save=hydrateSave(raw);save.arenaRun=r;r.offers=[...new Set((r.offers??[]).map(canonicalOutfitId))];if(r.selectedReward)r.selectedReward=canonicalOutfitId(r.selectedReward);save.arena={run:true};normalizeEquipmentInventory(save.player,{disabled:true});
+ const save=hydrateSave(raw);
+ r=save.arenaRun;save.arena={run:true};normalizeEquipmentInventory(save.player,{disabled:true});
  // Finished short runs stay finished with their old totals; an active one moves
  // into the current five-act run at the same fraction of the way through.
  if(r.version<3){
@@ -163,13 +174,13 @@ export const RUN_EQUIPMENT_RARITY=Object.freeze({
 });
 const rewardPools={
  offense:['pulse-cannon','ripper','gauss-cannon','ion-blaster','mortar','pulse-cannon-t2','pulse-cannon-t3','shield-seeker-launcher','swarm-launcher','shield-swarm-launcher','torpedo-launcher'],
- survival:['pdc','tracking-turret','shield-mk2','recovery-shield'],
+ survival:['pdc','tracking-turret','shield-mk2','recovery-shield','pdc-drone','repair-drone'],
  handling:['engine-mk2','thrusters-mk2','capacitor-bank','sustained-reactor'],
 };
 const rewardWave={'pulse-cannon-t2':3,'pulse-cannon-t3':8,'swarm-launcher':3,'torpedo-launcher':5,'mortar':2,'gauss-cannon':2};
 const REWARD_GRADES=RARITY_ORDER;
 function runRewardItem(save,id){
- const item=OUTFIT_ITEMS[id];if(!item)return id;
+ const item=OUTFIT_ITEMS[id];if(!item||item.category==='drone')return id;
  const r=save.arenaRun,hull=Math.max(1,hullTier(save.player.shipId)??1);
  const bonus=r.rarityBonusWave===r.wave;
  const tier=Math.max(item.tier??1,hull===2&&seededRandom(`${r.seed}:reward-tier:${r.wave}:${id}`)()<.2?3:hull);
@@ -197,6 +208,35 @@ function enoughRunEquipment(save,id,owned){
  for(const [other,n] of Object.entries(p.outfitting.locker))if(asGood(other))count+=n;
  return count>=(item.category==='gun'?HULL_HARDPOINTS[p.shipId].guns.filter(m=>itemFitsMount(item,m)).length:1);
 }
+// How much a reward does for this ship and fit. Above 1 it improves the
+// build: a better grade than what it replaces, an empty bay filled, or
+// relief for what the fit lacks. Below 1 it is a downgrade.
+const FILLS_EMPTY_BAY=1.5;
+export function rewardFitScore(save,id,plan=runRewardPlan(save,id)){
+ if(!plan)return 0;
+ if(['repair','rearm','resupply'].includes(id))return 1;
+ const p=save.player,item=OUTFIT_ITEMS[id];if(!item)return 0;
+ if(item.category==='drone')return plan.replaced.length?1.2:FILLS_EMPTY_BAY;
+ const rating=equipmentRating(item),same=plan.replaced.filter(old=>OUTFIT_ITEMS[old]?.category===item.category).map(old=>equipmentRating(OUTFIT_ITEMS[old]));
+ let score=!plan.replaced.length?FILLS_EMPTY_BAY:same.length?rating/Math.max(...same):1.05;
+ const stats=getEffectiveShipStats(p),fit=loadoutFor(p);
+ let draw=0;for(const gun of fit.guns){const w=gun&&weaponForOutfit(gun);if(w?.cooldown>0)draw+=(w.energyCost??0)/w.cooldown;}
+ if(item.category==='power'&&draw>stats.reactorOutput*1.5)score*=1.3;
+ if(item.category==='defense'&&stats.shield<120)score*=1.2;
+ // A fit without missiles lacks a whole capability; offer one.
+ if(item.category==='launcher'&&!fit.launchers.some(Boolean))score*=1.3;
+ return score;
+}
+// The best few rewards of a pool, then a weighted draw among them so runs
+// still vary. Downgrades only appear when nothing better fits.
+function pickForFit(save,ids,rng){
+ const scored=ids.map(id=>({id,score:rewardFitScore(save,id)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
+ const useful=scored.filter(x=>x.score>=1),pool=(useful.length?useful:scored).slice(0,3);
+ if(!pool.length)return;
+ let roll=rng()*pool.reduce((sum,x)=>sum+x.score,0);
+ for(const x of pool)if((roll-=x.score)<=0)return x.id;
+ return pool.at(-1).id;
+}
 export function runOffers(save){
  const r=save.arenaRun,p=save.player,fit=loadoutFor(p),owned=LOADOUT_KEYS.flatMap(k=>fit[k]).filter(Boolean);
  if(r.wave===0&&r.openingPicks===0)return ['pulse-cannon','beam-emitter','ripper'].filter(id=>runRewardPlan(save,id));
@@ -211,8 +251,8 @@ export function runOffers(save){
   const counters=heavy?['torpedo-launcher','mortar']:['ripper'];
   if(!owned.some(id=>counters.includes(equipmentBaseId(id)))){const counter=counters.map(id=>runRewardItem(save,id)).find(id=>runRewardPlan(save,id));if(counter)offers.push(counter);}
  }
- for(const key of ['offense','survival','handling']){if(key==='offense'&&offers.length)continue;const id=candidates[key].find(id=>!offers.includes(id));if(id)offers.push(id);}
- for(const id of Object.values(candidates).flat())if(offers.length<3&&!offers.includes(id))offers.push(id);
+ for(const key of ['offense','survival','handling']){if(key==='offense'&&offers.length)continue;const id=pickForFit(save,candidates[key].filter(id=>!offers.includes(id)),rng);if(id)offers.push(id);}
+ while(offers.length<3){const id=pickForFit(save,Object.values(candidates).flat().filter(id=>!offers.includes(id)),rng);if(!id)break;offers.push(id);}
  if(p.hull<=getEffectiveShipStats(p).hull*.8)offers.splice(2,1,'repair');
  // A long run can own every upgrade a hull can take, leaving nothing eligible.
  // The stage must never be empty: startRunWave needs a chosen reward, so offer a
@@ -240,6 +280,14 @@ export function recoverRun(save,extra=false){const p=save.player,stats=getEffect
 export function runRewardPlan(save,id){
  if(['repair','rearm','resupply'].includes(id))return {id,count:1,changes:[],replaced:[]};
  const p=save.player,item=OUTFIT_ITEMS[id],spec=HULL_HARDPOINTS[p.shipId];if(!item||equipmentBaseId(id)==='ion-blaster'&&spec.guns.length<2)return null;
+ if(item.category==='drone'){
+  // A combat drone takes an empty bay first, else one flying another role.
+  const bays=loadoutFor(p).droneBays??[],typeOf=bay=>p.droneFleet?.unitsById?.[bay.unitIds?.[0]]?.type;
+  const index=[bays.findIndex(bay=>!typeOf(bay)),bays.findIndex(bay=>typeOf(bay)&&typeOf(bay)!==item.droneType)].find(i=>i>=0);
+  if(index===undefined||!DRONE_TYPES[item.droneType])return null;
+  const old=typeOf(bays[index]);
+  return {id,count:1,changes:[{key:'droneBays',index,old:old?`${old}-drone`:null}],replaced:old?[`${old}-drone`]:[]};
+ }
  const fit=loadoutFor(p),key=item.category==='gun'?'guns':item.category==='launcher'?'launchers':item.category==='turret'?'turrets':'utility';if(!key)return null;
  let indices=spec[key].map((m,i)=>itemFitsMount(item,m)?i:-1).filter(i=>i>=0);
  if(!indices.length)return null;
@@ -256,7 +304,7 @@ export function runRewardPlan(save,id){
    const paired=indices.slice(0,Math.min(2,spec.weapons.length));
    const replace=paired.filter(i=>fit.guns[i]!==id);
    indices=replace.length?replace:spec[key].map((m,i)=>itemFitsMount(item,m)&&fit.guns[i]!==id?i:-1).filter(i=>i>=0).slice(0,2);
-  }else indices=[indices.find(i=>fit[key][i]!==id)??indices[0]];
+  }else indices=[indices.find(i=>fit[key][i]&&fit[key][i]!==id)??indices.find(i=>fit[key][i]!==id)??indices[0]];
  }else indices=[indices.find(i=>!fit[key][i])??indices.find(i=>fit[key][i]!==id)??indices[0]];
  if(indices.every(i=>fit[key][i]===id))return null;
  const changes=indices.map(index=>({key,index,old:fit[key][index],otherKey:key==='guns'?'launchers':key==='launchers'?'guns':null,other:(key==='guns'?fit.launchers:key==='launchers'?fit.guns:[])?.[index]}));
@@ -270,6 +318,13 @@ export function chooseRunReward(save,id){
  if(id==='repair')recoverRun(save,true);
  else if(id==='rearm')fillLauncherMagazines(save.player);
  else if(id==='resupply'){const stats=getEffectiveShipStats(save.player);save.player.fuel=stats.fuel;save.player.energy=stats.energyCapacity;}
+ else if(OUTFIT_ITEMS[id]?.category==='drone'){
+  // loadoutFor returns a copy: write the live loadout.
+  const p=save.player,fleet=p.droneFleet,live=p.outfitting.loadouts[p.shipId];live.droneBays=loadoutFor(p).droneBays;
+  const bay=live.droneBays[plan.changes[0].index],unit=`drone-unit-${fleet.nextUnitId++}`;
+  for(const old of bay.unitIds)if(old){delete fleet.unitsById[old];fleet.lockerIds=fleet.lockerIds.filter(value=>value!==old);}
+  fleet.unitsById[unit]=createDroneUnit(unit,OUTFIT_ITEMS[id].droneType);bay.mode=OUTFIT_ITEMS[id].droneType;bay.unitIds=[unit];
+ }
  else{
   // Commit the complete fit together so a pair cannot fail halfway through.
   const p=save.player,state=JSON.parse(JSON.stringify(p.outfitting)),fit=state.loadouts[p.shipId];

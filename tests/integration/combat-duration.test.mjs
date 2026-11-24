@@ -39,7 +39,7 @@ test('beam and ordnance keep their impact and economy; physical guns reward land
  const beam=WEAPONS.beam;
  assert.deepEqual({damage:beam.damageFlat,cooldown:beam.cooldown,energy:beam.energyCost,speed:beam.speed,range:beam.range,assist:beam.assist},
   {damage:10.4,cooldown:.4,energy:3.5,speed:100000,range:350,assist:1.4});
- for(const [w,damage] of [[LAUNCHERS.seeker,50],[TRACKING_LASER,4.8],[CRUISER_GUN,160]])assert.ok(Math.abs((w.damageFlat??w.damage)-damage)<1e-9,w.id);
+ for(const [w,damage] of [[LAUNCHERS.seeker,60],[TRACKING_LASER,6.4],[CRUISER_GUN,160]])assert.ok(Math.abs((w.damageFlat??w.damage)-damage)<1e-9,w.id);
  for(const [id,previous] of Object.entries({pulse:9.2,gauss:27.2,ripper:4,ion:4,mortar:56,pdc:.64})){
   const w=WEAPONS[id],old={...w,damageFlat:previous};
   assert.ok(lethalVolleys('npc',w)<lethalVolleys('npc',old),`${id}: fewer landed volleys`);

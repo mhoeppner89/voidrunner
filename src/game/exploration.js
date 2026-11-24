@@ -1,3 +1,4 @@
+import {restoreFighterDrive} from './weaponFlight.js';
 import * as THREE from '../../vendor/three.module.min.js';
 import {combatWreckNode} from './careerLoot.js';
 import {createEquipmentRecord} from './equipmentInventory.js';
@@ -10,7 +11,7 @@ const state=s=>s.save.world.exploration??normalizeExploration(s.save.world);
 const cargo=(id,commodity,quantity)=>({id:'exploration-cargo-'+id,kind:'cargo',commodity,quantity});
 const clearBattle=s=>!s.ships.some(a=>a.hull>0&&a.hostile&&near(a.position,s.save.player.position,7000)&&!a.explorationActor);
 const eligible=s=>!s.arena&&!s.activeRace&&!s.save.player.raceReturn&&!isTutorialGuided(s.save);
-const serialise=ship=>({key:ship.explorationActor,hull:ship.hull,shield:ship.shield,position:[...ship.position],rotation:[...ship.rotation],velocity:[...ship.velocity],surrendered:Boolean(ship.surrendered)});
+const serialise=ship=>({key:ship.explorationActor,hull:ship.hull,shield:ship.shield,driveWear:ship.driveWear,crippled:ship.crippled,position:[...ship.position],rotation:[...ship.rotation],velocity:[...ship.velocity],surrendered:Boolean(ship.surrendered)});
 // The recurring Lantern convoy now lives in distressEvents.js. Only the
 // authored Kestrel Nine salvage claim remains an exploration discovery.
 const groups={
@@ -58,7 +59,7 @@ function actors(s,group){
   const ship=s.spawnShip(role,old?.position??offset(center,...delta),'exploration-'+group,name,{tier:'regular',temperament:'steady'},{hullId:hull,faction:hostile?'pirates':'independents'});
   ship.explorationActor=key;ship.explorationGroup=group;ship.dark=false;ship.mugCapable=false;ship.playerIdentified=true;ship.playerAwareness=1;ship.playerSensorAwareness=1;
   ship.authorizedTarget=hostile;ship.hostile=hostile;ship.cargo={};ship.nextLineAt=Infinity;
-  if(old){ship.hull=Math.min(ship.maxHull,old.hull);ship.shield=Math.min(ship.maxShield,old.shield??0);if(old.rotation?.length===4)ship.rotation=[...old.rotation];if(old.velocity?.length===3)ship.velocity=[...old.velocity];}
+  if(old){restoreFighterDrive(ship,old);ship.hull=Math.min(ship.maxHull,old.hull);ship.shield=Math.min(ship.maxShield,old.shield??0);if(old.rotation?.length===4)ship.rotation=[...old.rotation];if(old.velocity?.length===3)ship.velocity=[...old.velocity];}
   if(group==='salvagers'&&!hostile){ship.poweredDown=true;ship.standingDown=true;ship.velocity.fill(0);}
  }
  retarget(s,group);

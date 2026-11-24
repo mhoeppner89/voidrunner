@@ -11,14 +11,15 @@ import {TRACKING_LASER,weaponForOutfit,launcherForOutfit} from './weapons.js';
 import {PDC_TURRET} from './turrets.js';
 import {equipmentIcon} from './itemIcons.js';
 import {uiIcon} from './uiIcons.js';
-import {equipmentStatChanges} from './equipmentStatPresentation.js';
+import {DRONE_TYPES} from './droneData.js';
+import {magazineLabel,equipmentStatChanges} from './equipmentStatPresentation.js';
 import {shipTopDownProfile,shipProfilePath} from './shipTopDownProfile.js';
 import {HARDPOINT_SPECS,LOADOUT_KEYS,OUTFIT_ITEMS,itemFitsMount,loadoutFor} from './outfitting.js';
 import {getLanguage,t} from './i18n.js';
 
 const esc=value=>String(value??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'})[c]);
 const ROMAN=['','I','II','III'];
-const CATEGORY={gun:'Gun',launcher:'Launcher',turret:'Turret'};
+const CATEGORY={gun:'Gun',launcher:'Launcher',turret:'Turret',drone:'Drone'};
 const SERVICES=['repair','rearm','resupply'];
 const shipRole=role=>({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role]??role);
 // Hull bars compare against the strongest hull in the whole roster, so a
@@ -103,10 +104,14 @@ export function renderArenaRun(ui,save){
   const d=item(id),w=flight(id);
   if(w){
    const old=replaced&&item(replaced)?.category===d.category?flight(replaced):undefined,diff=(a,b)=>old&&a!=null&&b!=null?a-b:undefined;
-   const shots=w.volley??w.pellets??1,per=v=>shots>1?`${shots}×${num(v)}`:num(v);
-   if(d.category==='launcher'){const damage=w.damage??0;return `<span class="run-stats">${tile('Shield damage',per(damage*(1-(w.shieldBypass??0))*(w.shieldMul??1)))}${tile('Hull damage',per(damage*(w.hullMul??1)))}${tile('Range',w.lockRange??w.range??0,' km',diff(w.lockRange??w.range,old?.lockRange??old?.range))}</span>`;}
+   if(d.category==='launcher')return `<span class="run-stats run-launcher-stats">${tile('Shield damage',magazineLabel(w,'shield'))}${tile('Hull damage',magazineLabel(w,'hull'))}${tile('Lock time',w.lockTime,' s',diff(w.lockTime,old?.lockTime),true)}${tile('Range',w.lockRange,' km',diff(w.lockRange,old?.lockRange))}</span>`;
    const dps=sustainedDps(w);
    return `<span class="run-stats">${tile('Damage per second',dps,'',diff(dps,sustainedDps(old)))}${tile('Energy per shot',w.energyCost??0,'',diff(w.energyCost,old?.energyCost),true)}${tile('Range',w.range??0,' km',diff(w.range,old?.range))}</span>`;
+  }
+  // Drones: what the unit is, not a stat projection of the ship.
+  if(d?.category==='drone'){
+   const type=DRONE_TYPES[d.droneType];
+   return `<span class="run-stats">${tile('Hull',type?.maxHull??0)}${tile('Range',d.droneType==='repair'?200:300,' km')}${d.droneType==='repair'?tile('Repair per second',type?.repairRate??0):tile('Intercepts',t('Missiles'))}</span>`;
   }
   // Systems preview the actual fitted outcome, including trade-offs.
   const plan=runRewardPlan(save,id),outfitting=JSON.parse(JSON.stringify(p.outfitting)),afterFit=outfitting.loadouts[p.shipId];

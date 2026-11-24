@@ -27,7 +27,7 @@ import { AMMO_CAPACITY, WEAPON_ORDER, WEAPONS, TRACKING_LASER, LAUNCHERS, weapon
 import { TIER_LABELS, TEMPERAMENT_LABELS } from './pilots.js';
 import {equipmentIcon, commodityIcon} from './itemIcons.js';
 import {uiIcon} from './uiIcons.js';
-import {equipmentStatChanges} from './equipmentStatPresentation.js';
+import {magazineLabel,equipmentStatChanges} from './equipmentStatPresentation.js';
 import { shipTopDownProfile, shipProfilePath } from './shipTopDownProfile.js';
 import { defaultSettings, saveGame } from './save.js';
 import { getLanguage, t } from './i18n.js';
@@ -478,7 +478,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2pj';
+const GAME_VERSION = '0.8.2pk';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -1061,8 +1061,41 @@ export class GameUI {
     updateCockpitKit(dt, actions) {
         this.cockpitArtwork?.update(dt, actions);
     }
+    updateShakenBracket(projection,edge,active) {
+        const bracket=this.el('#target-bracket'),pointer=this.el('#target-edge-pointer');
+        bracket.classList.toggle('shake-tracking',active);
+        pointer.classList.toggle('shake-tracking',active);
+        bracket.classList.toggle('is-hidden',!projection?.visible || projection.behind || Boolean(edge));
+        if(projection)bracket.style.transform=`translate(${projection.x}px, ${projection.y}px)`;
+        pointer.classList.toggle('is-hidden',!edge);
+        if(edge){
+            pointer.style.transform=`translate(${edge.x}px, ${edge.y}px)`;
+            this.el('#target-edge-pointer i').style.transform=`rotate(${edge.angleDeg}deg)`;
+        }
+    }
+    updateSight(lead,hit) {
+        const marker=this.el('.lead-marker'),reticle=this.el('.reticle');
+        if(!marker || !reticle)return;
+        if(reticle.dataset.hit!==(hit??''))reticle.dataset.hit=hit??'';
+        if(marker.hidden===Boolean(lead))marker.hidden=!lead;
+        if(!lead)return;
+        const x=Math.round(lead.x),y=Math.round(lead.y);
+        if(this.leadX!==x || this.leadY!==y){
+            marker.style.transform=`translate(${x}px,${y}px)`;
+            this.leadX=x;this.leadY=y;
+        }
+        // Lined up for a hit, the diamond takes the gold "fire now" accent.
+        const tone=lead.solution?'solution':lead.relation;
+        if(this.leadTone!==tone){
+            marker.style.color=lead.solution?'var(--void-gold)':relationColor(lead.relation);
+            this.leadTone=tone;
+        }
+        marker.classList.toggle('in-range',lead.inRange);
+        marker.classList.toggle('on-solution',lead.solution);
+        marker.classList.toggle('close-lead',lead.close);
+    }
     cockpitPointVisible(x,y,shipId=this.save?.player?.shipId) {
-        this.setCockpitShip(shipId);
+        if(shipId!==this.cockpitShipId)this.setCockpitShip(shipId);
         if(this.cockpitArtwork?.active)return this.cockpitArtwork.pointVisible(x,y);
         const art=this.el('.cockpit-art');
         if(!art)return true;
@@ -1291,6 +1324,7 @@ export class GameUI {
           <div id="target-bracket" class="target-bracket is-hidden" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
           <div id="speaker-bracket" class="target-bracket speaker-bracket is-hidden" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
           <div id="target-edge-pointer" class="target-edge-pointer is-hidden" aria-hidden="true"><i></i><span></span></div>
+          <i class="lead-marker" hidden aria-hidden="true"></i>
           <div class="reticle" aria-hidden="true"><span></span><span></span><span></span><span></span><b></b></div>
           <div class="comms-channel"><button type="button" id="comms-bar" class="comms-bar" data-ui-command="open-chat" role="button" tabindex="0" aria-label="${t('Open comms log')}"></button>
           <button type="button" id="patrol-reply-chip" class="patrol-reply-chip is-hidden" data-ui-command="patrol-reply" role="button" tabindex="0" aria-label="${t('Reply to the patrol greeting')}">${t('REPLY')} <em id="patrol-reply-timer"></em></button></div>
@@ -4232,8 +4266,8 @@ export class GameUI {
                     body+=`<details><summary>${t('DETAILS')}</summary>${metric('ENERGY PER SHOT',before?.energyCost,w.energyCost)}${metric('SHOT INTERVAL',before?.cooldown,w.cooldown)}<p>${t('FIRE GROUP')} ${draft.fireGroups?.assignments?.[selected.mount.id] ?? 'A'}</p><button data-outfit-group="A">${t('GROUP')} A</button><button data-outfit-group="B">${t('GROUP')} B</button></details>`;
                 } else {body+=`<p>${escapeHtml(t(item.stat))}</p>`;}
             } else if(item.category==='launcher'){
-                const launcher=LAUNCHERS[item.weaponId],previous=LAUNCHERS[old?.weaponId];
-                body+=metric('LOCK RANGE (km)',previous?.lockRange,launcher.lockRange)+metric('PROJECTILE SPEED (km/s)',previous?.speed,launcher.speed)+metric('SHIELD DAMAGE',previous?previous.damage*(1-(previous.shieldBypass??0))*(previous.shieldMul??1):undefined,launcher.damage*(1-(launcher.shieldBypass??0))*(launcher.shieldMul??1))+metric('HULL DAMAGE',previous?previous.damage*(previous.hullMul??1):undefined,launcher.damage*(launcher.hullMul??1));
+                const launcher=launcherForOutfit(item),previous=launcherForOutfit(old);
+                body+=metric('Shield damage',magazineLabel(previous,'shield'),magazineLabel(launcher,'shield'))+metric('Hull damage',magazineLabel(previous,'hull'),magazineLabel(launcher,'hull'))+metric('Lock time (s)',previous?.lockTime,launcher.lockTime)+metric('Seeker cone (°)',previous?.seekerCone,launcher.seekerCone)+metric('Range (km)',previous?.lockRange,launcher.lockRange);
             } else {
                 for(const row of equipmentStatChanges(stats,after,item))
                     body+=metric(row.label,row.before+(row.unit?' '+row.unit:''),row.after+(row.unit?' '+row.unit:''));
@@ -4758,7 +4792,9 @@ export class GameUI {
         const readout = this.el('#screen-target-readout');
         readout.classList.toggle('is-capital-warning',capital&&(target.capitalTorpedoWarning||!target.capitalDisarmed&&['CHARGING','SALVO'].includes(target.capitalAttack)));
         const driveNotice = !model?.monitorStatus && model?.hyperdriveStatus;
-        readout.classList.toggle('is-alert', Boolean(model?.monitorStatus));
+        const reward = Boolean(model?.monitorStatus) && model.monitorTone === 'reward';
+        readout.classList.toggle('is-alert', Boolean(model?.monitorStatus) && !reward);
+        readout.classList.toggle('is-reward', reward);
         readout.classList.toggle('is-hyperdrive-status', Boolean(driveNotice));
         readout.classList.toggle('is-dock-prompt', Boolean(model?.dockPrompt && !model.monitorStatus && !driveNotice));
         // Choose the visible readout before publishing it. An alert or race
@@ -4797,6 +4833,9 @@ export class GameUI {
             setHudAttribute(subtarget, 'aria-label', `${subtarget.title}: ${label}${selected?' '+health+'%':''}`);
         }
         const bracket = this.el('#target-bracket');
+        const progress=target?.kind==='ship'?(model?.rackProgress??0):0;
+        bracket?.style.setProperty('--rack-inset',Math.round(progress*16)+'%');
+        bracket?.classList.toggle('rack-locked',progress===1);
         const edgePointer = this.el('#target-edge-pointer');
         // The target monitor carries the lock (name, bars, distance) — the old
         // top-right target panel was redundant with it and is gone.
@@ -5495,6 +5534,11 @@ export class GameUI {
             const [wx, wy] = warpPoint(contact.x, contact.y);
             const x = wx * radius;
             const y = wy * radius;
+            if(contact.type==='missile'){
+                ctx.fillStyle='#ff9b55';
+                ctx.fillRect(x-2*ratio,y-2*ratio,4*ratio,4*ratio);
+                continue;
+            }
             const size = (contact.selected ? 5.5 : 3.2) * ratio;
             const color = contact.lootRarity ? (EQUIPMENT_RARITIES[contact.lootRarity]?.color ?? EQUIPMENT_RARITIES.common.color) : contact.type === 'hostile' ? '#ff5a43' : contact.type === 'friendly' ? '#6cc8e4' : contact.type === 'location' ? '#e6b95f' : contact.type === 'resource' ? '#b8c97b' : contact.type === 'wreck' ? '#87b5aa' : contact.type === 'pickup' ? '#f2df91' : contact.type === 'distress' ? '#ff9442' : '#c9cbc6';
             // A distress beacon from beyond the horizon (see radarContacts): a

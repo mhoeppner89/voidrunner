@@ -106,7 +106,8 @@ export default {
     'missile-alert': {
         variants: 1, peak: -6, group: 'flight',
         make: () => {
-            const pip = d.bandpass(d.sum(d.osc(0.045, 1480, 'saw'), d.osc(0.045, 1480, 'square')), 1700, 1.2);
+            // G6 keeps the classic bright pip on the panel's pentatonic set.
+            const pip = d.bandpass(d.sum(d.osc(0.045, NOTE.G6, 'saw'), d.osc(0.045, NOTE.G6, 'square')), 1800, 1.2);
             const shaped = d.mul(pip, d.curve(0.045, (t) => Math.min(1, t / 0.002) * Math.min(1, (0.045 - t) / 0.005)));
             return d.drive(sequence(0.34, [0, 0.08, 0.16, 0.24].map((time) => [shaped, time, 1]))[0], 1.5);
         },
@@ -160,10 +161,51 @@ export default {
                 [key(NOTE.G5, 0.5, { tau: 0.14 }), 0.18, 0.8, 0.2], [key(NOTE.C6, 0.9, { tau: 0.3 }), 0.27, 1, 0.4], [key(NOTE.D6, 0.7, { tau: 0.2, index: 1.2 }), 0.42, 0.35, -0.3]]), { time: 1.8, mix: 0.3, seed: 217 });
         },
     },
-    // Hostile destroyed: a short, rewarding confirmation under the blast.
+    // ------------------------------------------- missile lock and dodge
+    // These repeat through every dogfight, so they stay short, soft-edged
+    // and on the panel's glass key in A minor pentatonic. The key's FM
+    // partials carry them through phone speakers that drop the fundamental.
+    //
+    // Break now: fired once, at the moment a hard turn works best. A reedy
+    // rising fifth (A4 to E5), a voice no other cue uses, so it reads as a
+    // command, with a soft 5 ms attack and a short tail.
+    'break-cue': {
+        variants: 1, peak: -10, group: 'flight', mono: true,
+        make: () => {
+            const reed = (freq, seconds) => d.mul(d.sum(d.lowpass(d.osc(seconds, freq, 'square', { width: 0.3 }), 1800, 0.9), d.scale(d.osc(seconds, freq / 2), 0.3)),
+                d.curve(seconds, (t) => Math.min(1, t / 0.005) * Math.exp(-Math.max(0, t - 0.03) / (seconds * 0.45))));
+            return sequence(0.4, [[reed(NOTE.A4, 0.1), 0, 0.85], [reed(NOTE.E5, 0.26), 0.11, 1]])[0];
+        },
+    },
+    // Lock building: one pip per third, rising A-C-D by playback rate in
+    // the events. Lock resolves to the fifth and octave above.
+    'rack-search': {
+        variants: 1, peak: -16, group: 'flight', mono: true,
+        make: () => key(NOTE.A4, 0.11, { tau: 0.035, index: 2.4, attack: 0.006, air: 0.15 }),
+    },
+    'rack-ready': {
+        variants: 1, peak: -13, group: 'flight', mono: true,
+        make: () => sequence(0.42, [[key(NOTE.E5, 0.32, { tau: 0.1, index: 1.6, attack: 0.005 }), 0, 0.85], [key(NOTE.A5, 0.34, { tau: 0.11, index: 1.4, attack: 0.005 }), 0.05, 1]])[0],
+    },
+    // Trigger before lock: a muted low "not yet".
+    'rack-denied': {
+        variants: 1, peak: -17, group: 'flight', mono: true,
+        make: () => d.lowpass(sequence(0.2, [[key(NOTE.D4, 0.08, { tau: 0.025, index: 2.2, attack: 0.004, air: 0.1 }), 0, 1], [key(NOTE.D4, 0.08, { tau: 0.025, index: 2.2, attack: 0.004, air: 0.1 }), 0.085, 0.8]])[0], 2200),
+    },
+    // Hit confirms fire many times a second: hull is a dull knock, shield a
+    // lighter glass tap. Two takes each so rapid fire never machine-guns.
+    'confirm-hull': {
+        variants: 2, peak: -18, group: 'flight', mono: true,
+        make: (v) => blend([thud(0.09, [150, 138][v], 90, { tau: 0.03, attack: 0.003, push: 1.2 }), 0.3], [key(NOTE.A4, 0.09, { tau: [0.024, 0.028][v], index: 2.2, attack: 0.004, air: 0.1 }), 1]),
+    },
+    'confirm-shield': {
+        variants: 2, peak: -19, group: 'flight', mono: true,
+        make: (v) => key(NOTE.E5, 0.08, { tau: [0.02, 0.024][v], index: 1.4, attack: 0.004, air: 0.2 }),
+    },
+    // Hostile destroyed: a low thump under a warm A-E resolution.
     'kill-confirm': {
         variants: 1, peak: -8, group: 'flight', mono: true,
-        make: (v, R) => room(sequence(0.5, [[thud(0.22, 104, 50, { tau: 0.05 }), 0, 0.7], [key(NOTE.A5, 0.3, { tau: 0.08 }), 0, 0.8, -0.3], [key(NOTE.E6, 0.4, { tau: 0.11 }), 0.02, 1, 0.3]]), 219, 0.2, 0.7),
+        make: () => room(sequence(0.5, [[thud(0.22, 104, 50, { tau: 0.05 }), 0, 0.7], [key(NOTE.A4, 0.3, { tau: 0.08, index: 1.6, attack: 0.005 }), 0, 0.75], [key(NOTE.E5, 0.4, { tau: 0.11, index: 1.6, attack: 0.005 }), 0.03, 0.9]]), 219, 0.18, 0.6),
     },
 
     // ------------------------------------------------ cockpit atmosphere

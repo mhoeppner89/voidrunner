@@ -116,6 +116,7 @@ const legacyOrdnance = hydrateSave({
         shipId: 'lancer',
         ownedShips: ['lancer'],
         outfitting: legacyLauncherFit,
+        credits: 2000,
         missiles: 9,
         dockedAt: undefined,
     }),
@@ -123,10 +124,12 @@ const legacyOrdnance = hydrateSave({
 });
 const migratedMagazines = launcherMagazineEntries(legacyOrdnance.player);
 assert.equal(migratedMagazines[0].launcherId, 'swarm');
-assert.equal(migratedMagazines[0].rounds, 9);
+assert.equal(migratedMagazines[0].rounds, 4);
 assert.equal(migratedMagazines[1].launcherId, 'torpedo');
 assert.equal(migratedMagazines[1].rounds, 0);
-assert.equal(legacyOrdnance.player.missiles, 9);
+assert.equal(legacyOrdnance.player.missiles, 4);
+assert.equal(legacyOrdnance.player.swarmRefund, 5);
+assert.equal(legacyOrdnance.player.credits, 2000 + 5*240);
 
 // Corrupted manifests are repaired at the save boundary and remain harmless
 // if an unsanitized runtime object reaches the economy helpers directly.

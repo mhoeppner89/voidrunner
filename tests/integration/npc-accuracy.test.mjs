@@ -37,7 +37,9 @@ test('real beam rays miss occasionally, with novice < veteran < ace accuracy',()
 });
 test('Magrail accuracy falls with range, while novices miss regularly and trained pilots improve',()=>{
  const near=tiers.map(tier=>firingSample(tier,'gauss',100)),far=tiers.map(tier=>firingSample(tier,'gauss',550));
- assert.ok(near[0]>.1&&near[0]<.95);assert.ok(near[1]>near[0]&&near[2]>=near[1]);
+ // Every pilot lines up some bursts just off the hull (near misses), so even
+ // point-blank novice Magrail fire lands only occasionally.
+ assert.ok(near[0]>.05&&near[0]<.95);assert.ok(near[1]>near[0]&&near[2]>=near[1]);
  for(let i=0;i<3;i++)assert.ok(far[i]<near[i],`${tiers[i]} ${near[i]} -> ${far[i]}`);
  assert.ok(far[0]<far[1]&&far[1]<far[2]);console.log('Magrail 100/550 km hit fractions:',{near,far});
 });

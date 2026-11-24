@@ -17,7 +17,7 @@ import {bindCarrierArmament} from './carrierModels.js';
 import {CRUISER_MOUNTS,CRUISER_ARMAMENT_COUNT} from './cruiserModelData.js';
 import {createCruiserTurret,createCruiserPdc,createCruiserEngineDamage,updateCruiserEngineDamage} from './cruiserModels.js';
 import { createShipExplosion, createHullDebris } from './explosionFx.js';
-import {derelictSurfaceObstacles,createDerelictVents} from './derelictFx.js';
+import {derelictSurfaceObstacles,createDerelictVents,createDriveLeak} from './derelictFx.js';
 import {ShipWreckFactory} from './shipWreckFx.js';
 import { isAppleTouchDevice, skipHiddenWorldMatrices, markAttributeSpan, configureShaderDiagnostics, prepareRenderScene, freezeStaticTransforms, waitForRenderWork } from './renderWork.js';
 import { DRONE_PORTS } from './droneFlight.js';
@@ -3704,6 +3704,7 @@ export class SpaceRenderer {
     // alive until renderer shutdown.
     disposeGlbShip(mesh) {
         if (this.deferShaderDisposal(() => this.disposeGlbShip(mesh))) return;
+        mesh.userData.driveLeak?.dispose();
         const ports = mesh.getObjectByName('drone-docking-ports');
         if (ports) { mesh.remove(ports); this.disposeObject(ports); }
         const flareTextures = new Set((mesh.userData.engineFlares ?? []).map(flare => flare.material.map));
@@ -3803,6 +3804,10 @@ export class SpaceRenderer {
             if (rimMaterial?.uniforms) {
                 rimMaterial.uniforms.uIntensity.value = entity.hostile ? 0.7 + damage * 0.2 : 0.62;
             }
+            if(entity.crippled){
+                const leak=mesh.userData.driveLeak??=createDriveLeak(mesh);
+                leak.object.material.uniforms.time.value=exhaustTime%300;
+            }
             const flares = mesh.userData.engineFlares;
             if (flares) {
                 const variant = mesh.userData.variant;
@@ -3813,7 +3818,7 @@ export class SpaceRenderer {
                 for (let flareIndex=0;flareIndex<flares.length;flareIndex++) {
                     const flare=flares[flareIndex];
                     const output=entity.capitalClass==='frigate'?frigateEngineFraction(entity,flareIndex):entity.capitalClass==='cruiser'?(entity.capitalMountHull?.[CRUISER_ARMAMENT_COUNT+flareIndex]??300)/300:1;
-                    flare.material.opacity = entity.stationDock?.phase === "docked" ? 0 : baseOpacity * boost * output;
+                    flare.material.opacity = entity.stationDock?.phase === "docked" ? 0 : baseOpacity * boost * output * (entity.crippled ? .24+.22*Math.sin(exhaustTime*31+flareIndex) : 1);
                     flare.scale.setScalar(baseSize * (boost > 1 ? 1.08 : 1));
                 }
             }
@@ -5371,12 +5376,12 @@ export class SpaceRenderer {
             this.flightCueAccel+=(accel-(this.flightCueAccel??0))*(1-Math.exp(-4*dt));
         }
         this.camera.position.set(...position);
-        if (prevPosition && alpha > 0) {
+        if (prevPosition && (alpha > 0 || dt > 0)) {
             this.tmpPrevPos.set(prevPosition[0], prevPosition[1], prevPosition[2]);
             this.camera.position.lerpVectors(this.tmpPrevPos, this.camera.position, alpha);
         }
         this.camera.quaternion.set(...rotation);
-        if (prevRotation && alpha > 0) {
+        if (prevRotation && (alpha > 0 || dt > 0)) {
             this.tmpPrevQuat.set(...prevRotation);
             this.tmpCurQuat.copy(this.camera.quaternion);
             this.camera.quaternion.copy(this.tmpPrevQuat).slerp(this.tmpCurQuat, alpha);
@@ -6170,6 +6175,7 @@ export class SpaceRenderer {
         // Visible to compileAsync, outside every gameplay camera's frustum.
         // Retain the small representatives so their programs stay resident.
         root.position.set(1e9, 1e9, 1e9);
+        createDriveLeak(root);
         this.prepareTrafficWarmup(root);
         for (const kind of ['laser', 'gauss', 'pdc', 'ripper', 'ion', 'mortar', 'missile']) {
             const launchers = kind === 'missile' ? ['seeker', 'swarm', 'torpedo'] : [undefined];
@@ -6599,7 +6605,7 @@ export class SpaceRenderer {
         this.renderer.setRenderTarget(null);
         this.renderer.render(this.bloomQuad, this.bloomCamera);
     }
-    projectToScreen(position) {
+    projectToScreen(position, out = {}) {
         // Runtime entities store transforms as tuples, while rendered meshes
         // expose THREE.Vector3 positions. Accept both: treating a Vector3 like
         // an array returns undefined coordinates and makes every live ship
@@ -6608,12 +6614,11 @@ export class SpaceRenderer {
             ? this.tmpPosition.copy(position).project(this.camera)
             : tupleToVector(position, this.tmpPosition).project(this.camera);
         const behind = vector.z > 1;
-        return {
-            x: (vector.x * 0.5 + 0.5) * this.viewportWidth,
-            y: (-vector.y * 0.5 + 0.5) * this.viewportHeight,
-            visible: vector.z >= -1 && vector.z <= 1 && vector.x >= -1.2 && vector.x <= 1.2 && vector.y >= -1.2 && vector.y <= 1.2,
-            behind,
-        };
+        out.x = (vector.x * .5 + .5) * this.viewportWidth;
+        out.y = (.5 - vector.y * .5) * this.viewportHeight;
+        out.visible = vector.z >= -1 && vector.z <= 1 && Math.abs(vector.x) <= 1.2 && Math.abs(vector.y) <= 1.2;
+        out.behind = behind;
+        return out;
     }
     projectTargetToScreen(kind, id, fallbackPosition, mount) {
         let renderedPosition;

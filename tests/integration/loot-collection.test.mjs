@@ -14,7 +14,7 @@ import {setLanguage} from '../../src/game/i18n.js';
 const fixture=()=>{const f=tutorialFixture('earn-standing');f.save.player.dockedAt=undefined;f.save.player.position.splice(0,3,0,0,0);f.save.player.prevPosition=new Float64Array(3);f.session.activeInstanceId=undefined;f.session.wreckNodes=[];f.save.world.combatWrecks={};return f;};
 function drop(f,position,contents){
  const id=`wreck-collection-${Object.keys(f.save.world.combatWrecks).length}`;
- const item=createEquipmentRecord('seeker-launcher',{tier:1,rarity:'uncommon',affixes:['efficient']});
+ const item=createEquipmentRecord('seeker-launcher',{tier:1,rarity:'uncommon',affixes:['quickLock']});
  const wreck={id,systemId:f.save.player.systemId,position:[...position],contents:contents??[{id:item.id,kind:'equipment',item}],radius:35,scanned:false};
  f.save.world.combatWrecks[id]=wreck;f.session.wreckNodes.push(combatWreckNode(wreck));return wreck;
 }
@@ -35,7 +35,7 @@ test('existing and newly purchased collectors use the tractor-beam name in both 
 });
 test('fast fly-over collects an unselected, unscanned crate with exact item identity once',()=>{
  const f=fixture(),w=drop(f,[0,0,0]),entry=w.contents[0];f.save.player.prevPosition.set([-20,0,0]);f.save.player.position.splice(0,3,20,0,0);f.save.player.mode='combat';
- tick(f);const item=f.save.player.inventory.items[entry.id];assert.equal(item.rarity,'uncommon');assert.equal(item.baseId,'seeker-launcher');assert.deepEqual(item.affixes,['efficient']);assert.equal(item.location.kind,'cargo');assert.equal(f.save.world.combatWrecks[w.id],undefined);
+ tick(f);const item=f.save.player.inventory.items[entry.id];assert.equal(item.rarity,'uncommon');assert.equal(item.baseId,'seeker-launcher');assert.deepEqual(item.affixes,['quickLock']);assert.equal(item.location.kind,'cargo');assert.equal(f.save.world.combatWrecks[w.id],undefined);
  const count=Object.keys(f.save.player.inventory.items).length;tick(f);assert.equal(Object.keys(f.save.player.inventory.items).length,count);
  const restored=hydrateSave(JSON.parse(JSON.stringify(f.save)));assert.equal(restored.world.combatWrecks[w.id],undefined);assert.deepEqual(restored.player.inventory.items[entry.id],item);
 });

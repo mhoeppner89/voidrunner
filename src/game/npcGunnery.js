@@ -2,11 +2,19 @@ import * as THREE from 'three';
 import {weaponAssistCone} from './weapons.js';
 const DEG=Math.PI/180,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const profiles={
- novice:{settle:.08,shots:7,pause:.55,spread:2.6*DEG,lead:.90,wander:.5*DEG,curve:.12,beam:.4*DEG,beamSlip:.22,beamWide:1.4*DEG,turretError:1.25,turretAcquire:.45,turretTurn:.85},
- veteran:{settle:.12,shots:5,pause:.35,spread:.6*DEG,lead:.99,wander:.25*DEG,curve:.55,beam:.18*DEG,beamSlip:.09,beamWide:1*DEG,turretError:.65,turretAcquire:.3,turretTurn:1},
- ace:{settle:0,shots:8,pause:.15,spread:.28*DEG,lead:.998,wander:.16*DEG,curve:.85,beam:.055*DEG,beamSlip:.015,beamWide:.55*DEG,turretError:.35,turretAcquire:.18,turretTurn:1.15},
+ novice:{onTarget:.6,settle:.08,shots:7,pause:.55,spread:2.6*DEG,lead:.90,wander:.5*DEG,curve:.12,beam:.4*DEG,beamSlip:.22,beamWide:1.4*DEG,turretError:1.25,turretAcquire:.45,turretTurn:.85},
+ veteran:{onTarget:.6,settle:.12,shots:5,pause:.35,spread:.6*DEG,lead:.99,wander:.25*DEG,curve:.55,beam:.18*DEG,beamSlip:.09,beamWide:1*DEG,turretError:.65,turretAcquire:.3,turretTurn:1},
+ ace:{onTarget:.6,settle:0,shots:8,pause:.15,spread:.28*DEG,lead:.998,wander:.16*DEG,curve:.85,beam:.055*DEG,beamSlip:.015,beamWide:.55*DEG,turretError:.35,turretAcquire:.18,turretTurn:1.15},
 };
 export const npcGunneryProfile=ship=>profiles[ship.pilot?.tier]??profiles.veteran;
+// Near misses. Each burst is either on target (profile.onTarget, the same for
+// every tier, so skill shows only in precision and tracking) or lined up
+// just off the hull: NEAR_MISS_RING target radii from its centre, walking
+// slowly around it while the burst lasts. Most misses then pass close enough
+// to see and hear instead of scattering wide. The offset scales with the
+// target's size and distance, so it reads the same at any range.
+export const NEAR_MISS_RING=Object.freeze([1.5,2.5]);
+const NEAR_MISS_WALK=1.2;
 export const DEFAULT_NPC_AIM_ERROR=1.5;
 // Give every non-frigate NPC a modest, trajectory-independent fairness buffer.
 // The observer may override it for controlled NPC-vs-NPC studies. Concord
@@ -49,7 +57,7 @@ export function npcTriggerReady(ship,weapon,facing,now){
 export function recordNpcShot(ship,now){ship.lastCombatShotAt=now;const p=npcGunneryProfile(ship);ship.gunBurstCount=(ship.gunBurstCount??0)+1;if(ship.gunBurstCount>=p.shots){ship.gunBurstCount=0;ship.gunBurstPauseUntil=now+p.pause;}}
 function aimState(ship){
  if(!ship.gunAim){let hash=0;for(const c of ship.id??'pilot')hash=(hash*31+c.charCodeAt(0))>>>0;
-  ship.gunAim={rotation:new THREE.Quaternion(),error:new THREE.Vector3(),velocity:new THREE.Vector3(),trackedVelocity:new THREE.Vector3(),acceleration:new THREE.Vector3(),delta:new THREE.Vector3(),phase:hash%628/100,observedAt:-Infinity};}
+  ship.gunAim={missRadii:0,missAngle:0,missAt:0,missBurst:undefined,rotation:new THREE.Quaternion(),error:new THREE.Vector3(),velocity:new THREE.Vector3(),trackedVelocity:new THREE.Vector3(),acceleration:new THREE.Vector3(),delta:new THREE.Vector3(),phase:hash%628/100,observedAt:-Infinity};}
  return ship.gunAim;
 }
 // Called by the visible-target planner at 5 Hz (3.3 Hz for novices). Never
@@ -70,7 +78,17 @@ export function applyNpcTurnLead(ship,predicted,leadTime,now){
 }
 // Speculative rounds still follow the barrel; their wider trigger window does
 // not grant wider aim correction. Pointing errors move the actual beam/ray.
-export function npcShotDirection(ship,weapon,targetDirection,out,now=0,distance=0){
+// A new burst starts when the burst counter is back at zero; roll its intent once.
+function nearMissOffset(ship,s,p,now,rng){
+ const burst=(ship.gunBurstCount??0)===0?(ship.gunBurstPauseUntil??0):s.missBurst;
+ if(burst!==s.missBurst){
+  s.missBurst=burst;
+  s.missRadii=rng()<p.onTarget?0:NEAR_MISS_RING[0]+(NEAR_MISS_RING[1]-NEAR_MISS_RING[0])*rng();
+  s.missAngle=rng()*Math.PI*2;s.missAt=now;
+ }
+ return s.missRadii;
+}
+export function npcShotDirection(ship,weapon,targetDirection,out,now=0,distance=0,targetRadius=0){
  const s=aimState(ship),rotation=s.rotation.fromArray(ship.rotation);
  out.set(0,0,-1).applyQuaternion(rotation);
  if(out.dot(targetDirection)<Math.cos(npcTriggerCone(ship,weapon,now)))return false;
@@ -86,9 +104,15 @@ export function npcShotDirection(ship,weapon,targetDirection,out,now=0,distance=
   if(gauss)spread*=.45+.6*clamp(distance/weapon.range,0,1);
   if(out.dot(targetDirection)>=Math.cos(npcForwardCone(weapon)))out.lerp(targetDirection,tier==='ace'?(hard?.96:.94):tier==='veteran'?(hard?.55:.97):gauss?.85:hard?.25:.65).normalize();
  }
+ // Beams keep their own slip model; projectile bursts may line up just off the hull.
+ let missX=0,missY=0;
+ if(!beam&&targetRadius>0&&distance>targetRadius){
+  const radii=nearMissOffset(ship,s,p,now,rng);
+  if(radii>0){const angle=s.missAngle+NEAR_MISS_WALK*(now-s.missAt),offset=radii*targetRadius/distance;missX=Math.cos(angle)*offset;missY=Math.sin(angle)*offset;}
+ }
  const radius=Math.sqrt(rng())*Math.tan(spread),angle=rng()*Math.PI*2;
  const wander=p.wander*(beam?.2:gauss?.5:1)*aimError,phase=now*1.7+s.phase;
- s.error.set(Math.cos(angle)*radius+Math.sin(phase)*wander,Math.sin(angle)*radius+Math.sin(phase*1.31+1.2)*wander,0).applyQuaternion(rotation);
+ s.error.set(Math.cos(angle)*radius+Math.sin(phase)*wander+missX,Math.sin(angle)*radius+Math.sin(phase*1.31+1.2)*wander+missY,0).applyQuaternion(rotation);
  out.add(s.error).normalize();
  return true;
 }

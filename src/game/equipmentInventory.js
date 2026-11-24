@@ -26,6 +26,7 @@ export function registerInventoryDefinitions(inventory){
   if(!EQUIPMENT_RARITIES[record.rarity])record.rarity='common';
   if(record.rarity==='named'&&!NAMED_EQUIPMENT[record.baseId]&&!id.startsWith('eq-arena-'))record.rarity='epic';
   const raw=Array.isArray(record.affixes)?record.affixes:[],rolls=Array.isArray(record.rolls)?record.rolls:[],kept=[],keptRolls=[];
+  if(base.category==='launcher'){const index=raw.indexOf('efficient');if(index>=0)raw[index]='quickLock';}
   for(const [i,a] of raw.entries())if(EQUIPMENT_AFFIXES[a]?.categories.includes(base.category)&&!kept.includes(a)&&kept.length<EQUIPMENT_RARITIES[record.rarity].affixes){kept.push(a);keptRolls.push(Number.isFinite(Number(rolls[i]))?Math.max(0,Math.min(1,Number(rolls[i]))):.5);}
   record.affixes=kept;if(kept.length)record.rolls=keptRolls;else delete record.rolls;
   registerEquipmentDefinition(id,resolveEquipmentDefinition(base,record));

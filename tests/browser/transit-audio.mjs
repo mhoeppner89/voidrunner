@@ -3,6 +3,8 @@
 import {chromium,webkit,devices} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import {isolateBrowserProfiles} from '../helpers/browser-profiles.mjs';
+await isolateBrowserProfiles(import.meta.url);
 const out='output/transit-audio',base=process.env.VR_BASE_URL??'http://127.0.0.1:4192';await mkdir(out,{recursive:true});
 await writeFile(`${out}/offline.html`,'<link rel="icon" href="data:,"><script type="importmap">{"imports":{"three":"/vendor/three.module.min.js"}}</script>');
 for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1280,height:800}}],['iphone',webkit,devices['iPhone 13 landscape']]]){

@@ -37,7 +37,7 @@ import {observeIncomingFire, updateCombatIntent, combatThrottle, combatTrackingR
 import {planCombatFlight, combatPursuitDirection, friendlyFiringLaneBlocked} from './combatPlanning.js';
 import { combatTargetEligible } from './combatTargeting.js';
 import {getPdcDefenseChannel} from './pdcFireControl.js';
-import {guideMissile,relativeIntercept,closestHullPoint} from './weaponFlight.js';
+import {MISSILE_PADDING,updateMissileWarning,guideMissile,rackLockProgress,wearFighterDrive,relativeIntercept,closestHullPoint} from './weaponFlight.js';
 import {fieldCombatSteering} from './fieldCombatNav.js';
 import {DEFAULT_NPC_AIM_ERROR,npcTrackedVelocity,npcGunneryProfile,npcTriggerCone,npcTriggerReady,npcShotDirection,recordNpcShot,applyNpcTurnLead} from './npcGunnery.js';
 import {ArenaRunMethods} from './arenaRunSession.js';
@@ -66,7 +66,7 @@ import { buyCommodity, cargoCapacity, cargoFree, cargoMass, denPrice, recordMark
 import { InputManager } from './input.js';
 import { acceptMission, awardCareerProgress, completeBountyMission, completeMissionsAtDock, discardMission as discardActiveMission, failExpiredMissions, failMission, joinGuild, missionTitle, refreshMissionOffers, VALUABLE_CARGO_LABELS, } from './missions.js';
 import { RACE_QUEST_ID, createRaceRacers, crossedRaceGate, generateRaceCourse, normalizeRaceRecord, raceCourseUnlocked, racePayout, raceRankLabel, raceRacerTarget, recordRaceResult, stageRaceRacers, updateRaceRacer, advanceRaceRacerGates } from './racing.js';
-import { clamp, damp, formatCredits, pick, proceduralCallsign, proceduralVesselName, randomBetween, randomInt, seededRandom } from './random.js';
+import { hashString, hashUnsignedDecimal, mulberrySample, clamp, damp, formatCredits, pick, proceduralCallsign, proceduralVesselName, randomBetween, randomInt, seededRandom } from './random.js';
 import { EntityStore } from './entityStore.js';
 import { NPC_FIGHTER_SCALE, SpaceRenderer, npcShipScaleForVariant } from './render.js';
 import { saveGame } from './save.js';
@@ -100,6 +100,7 @@ import { paletteForFaction, playerShipVariant, shipVariantForRole } from './voxe
 import { SENSOR_CLOSE_VISUAL_RANGE, SENSOR_CONTACT_THRESHOLD, SENSOR_HORIZON, SENSOR_IDENTIFY_THRESHOLD, SENSOR_TRACK_THRESHOLD, addEmissionHeat, awarenessState, npcPhysicalSignatureRangeValues, physicalSignatureRangeValues, signatureBand, stepDriveHeat, stepEmissionHeat, stepSensorAwareness } from './sensors.js';
 // Location kinds that carry their own music when you fly near them.
 const MUSIC_REGION_CONTEXT = Object.freeze({ planet: 'planet', field: 'field', rings: 'field', graveyard: 'graveyard' });
+const DEFAULT_GUN_ANCHOR = [0, -.6, -2.8];
 const FORWARD = new THREE.Vector3(0, 0, -1);
 const UP = new THREE.Vector3(0, 1, 0);
 const RIGHT = new THREE.Vector3(1, 0, 0);
@@ -2401,7 +2402,7 @@ export class GameSession {
                 const attackerPos = center.clone().addScaledVector(wingDir, 1100);
                 wingman = this.spawnShip('patrol', tuple(wingmanPos));
                 const wingAttacker = this.spawnShip('escort', tuple(attackerPos), undefined, undefined, hostilePilot,{faction:'pirates'});
-                wingAttacker.targetId = wingman.id;wingAttacker.noSurrender=true;
+                wingAttacker.targetId = wingman.id;
                 const faceToward = (ship, toward) => {
                     const dir = toward.clone().sub(vec(ship.position)).normalize();
                     ship.rotation = quatTuple(new THREE.Quaternion().setFromUnitVectors(FORWARD, dir));
@@ -2414,7 +2415,7 @@ export class GameSession {
                 const flanks = [new THREE.Vector3(1, 0, 0.25), new THREE.Vector3(-0.9, 0, -0.3)];
                 flanks.forEach((dir, index) => {
                     const hostile = this.spawnShip(index === 0 ? 'pirate' : 'bounty', tuple(center.clone().addScaledVector(dir.normalize(), 1100 + index * 40)), undefined, undefined, hostilePilot,{faction:'pirates',hullId:index===1?'lancer':'demon'});
-                    hostile.targetId = 'player';hostile.noSurrender=true;
+                    hostile.targetId = 'player';
                 });
             }
             else {
@@ -2422,7 +2423,7 @@ export class GameSession {
                     const angle = (index / Math.max(1, hostileCount)) * Math.PI * 2 + 0.6;
                     const offset = new THREE.Vector3(Math.cos(angle), index % 2 ? 0.5 : -0.35, Math.sin(angle)).normalize().multiplyScalar(1100 + index * 40);
                     const hostile = this.spawnShip(index === 0 ? 'pirate' : index === 2 ? 'bounty' : 'escort', tuple(center.clone().add(offset)), undefined, undefined, hostilePilot,{faction:'pirates',hullId:index===2?'lancer':index===1?'demon':'scrapper'});
-                    hostile.targetId = 'player';hostile.noSurrender=true;
+                    hostile.targetId = 'player';
                 }
             }
         }
@@ -2784,7 +2785,10 @@ export class GameSession {
         this.fpsFrames = 0;
     }
     onPageVisibilityChange = () => {
-        if (globalThis.document?.hidden) this.haptics?.stop();
+        if (globalThis.document?.hidden) {
+            this.haptics?.stop();
+            this.audio?.setMissileBreakTone?.(false);
+        }
         this.lastFrame = performance.now();
         this.simAccumulator = 0;
         this.renderBudget?.reset();
@@ -2985,16 +2989,10 @@ export class GameSession {
         flight.dockId = this.save.player.dockedAt || undefined;
         flight.systemId = this.save.player.systemId;
         flight.regionId = musicRegion;
-        let missileThreat = 0;
-        if (flying && this.projectiles) {
-            for (const projectile of this.projectiles) {
-                if (projectile.targetId !== 'player' || projectile.life <= 0 || (projectile.kind !== 'missile' && projectile.kind !== 'torpedo')) continue;
-                const i = projectile.slot * 3, source = this.projStore.pos, position = this.save.player.position;
-                const range = Math.hypot(source[i] - position[0], source[i + 1] - position[1], source[i + 2] - position[2]);
-                missileThreat = Math.max(missileThreat, clamp(1 - range / 700, 0.05, 1));
-            }
-        }
-        flight.missileThreat = missileThreat;
+        updateMissileWarning(flight, flying ? this.projectiles : null, this.projStore, this.save.player, this.audio?.outputLatency?.() ?? 0);
+        // A destroyed ship hears no warning: the explosion owns the moment.
+        if (this.save.player.hull <= 0 || this.deathTimer > 0) { flight.missileThreat = 0; flight.missileBreak = false; }
+        const missileThreat=flight.missileThreat;
         // Opening the pause menu, map or ship console in flight steps out of the cockpit.
         const modalOpen = flying && Boolean(this.ui.isModalOpen);
         if (modalOpen !== Boolean(this.audioModalOpen)) {
@@ -3015,6 +3013,10 @@ export class GameSession {
         if (flying !== this.cadenceFlying) {
             this.cadenceFlying = flying;
             this.renderBudget?.restart();
+        }
+        if(!flying || this.ui.isModalOpen){
+            this.hitTickUntil=0;
+            this.ui.updateSight?.(undefined,undefined);
         }
         if (this.renderer && flying) {
             this.renderBudget ??= new FrameBudget();
@@ -3154,6 +3156,7 @@ export class GameSession {
         // the ship reaches the station hull, not one step after the collision.
         this.updateStationLandingGuidance();
         this.updatePlayer(dt, actions);
+        this.updatePlayerRackLocks(dt);
         this.updateTutorialSurveyProgress();
         this.updateTutorialFlightChecks(dt, actions);
         this.updatePlayerSignature(dt);
@@ -4705,6 +4708,17 @@ export class GameSession {
     // spreads evenly around the compass with density falling toward the cone
     // edge, seeded for headless reproducibility. Allocation-free: `out` and
     // `right`/`up` are caller-owned scratches.
+    mountedScatterRandom(counter,mountId) {
+        if(this.scatterSeed!==this.save.world.seed || !this.scatterRandom){
+            this.scatterSeed=this.save.world.seed;
+            this.scatterPrefix=hashString(`${this.scatterSeed}:wpn:`);
+            this.scatterRandom=()=>mulberrySample(this.scatterState+=0x6d2b79f5);
+        }
+        let hash=hashUnsignedDecimal(Math.floor(this.save.world.time*1000),this.scatterPrefix);
+        hash=hashUnsignedDecimal(counter,hashString(':',hash));
+        this.scatterState=hashString(mountId,hashString(':',hash));
+        return this.scatterRandom;
+    }
     spreadDirection(direction, right, up, spread, rng, out) {
         const angle = rng() * Math.PI * 2;
         const radius = ((rng() + rng() + rng()) / 1.5 - 1) * spread;
@@ -4716,11 +4730,12 @@ export class GameSession {
     firePlayerGuns() {
         return this.fireMountedPlayerGuns();
     }
-    weaponAimDirection(position, velocity, weapon, target, baseDirection, out, muzzle = position) {
+    weaponAimDirection(position, velocity, weapon, target, baseDirection, out, muzzle = position, lockedShip) {
         out.copy(baseDirection);
-        if (!this.save.settings.aimAssist || target?.kind !== 'ship')
+        const assist = this.playerStats().assistMultiplier ?? 1;
+        if ((!this.save.settings.aimAssist && assist <= 1) || target?.kind !== 'ship')
             return out;
-        const ship = this.ships.find((entry) => entry.id === target.id);
+        const ship = lockedShip ?? this.ships.find((entry) => entry.id === target.id);
         if (!ship)
             return out;
         const aimPoint=Number.isInteger(target.mount)?target.position:ship.position;
@@ -4728,7 +4743,7 @@ export class GameSession {
         const distance = r.length();
         // Instant beams aim at the current hull position, without projectile lead.
         if (weapon.kind === 'beam') {
-            if (ship.hull > 0 && distance <= weapon.range && distance > 0 && out.angleTo(r) < weaponAssistCone(weapon))
+            if (ship.hull > 0 && distance <= weapon.range && distance > 0 && out.angleTo(r) < weaponAssistCone(weapon)*assist)
                 out.set(aimPoint[0]-muzzle.x,aimPoint[1]-muzzle.y,aimPoint[2]-muzzle.z).normalize();
             return out;
         }
@@ -4736,7 +4751,7 @@ export class GameSession {
         const time=relativeIntercept(position,aimPoint,velocity,ship.velocity,weapon.speed,predicted);
         if(!Number.isFinite(time)||time>weapon.life)return out;
         const length=predicted.length();predicted.normalize();
-        if(out.angleTo(predicted)<weaponAssistCone(weapon))out.lerp(predicted,.34).normalize();
+        if(out.angleTo(predicted)<weaponAssistCone(weapon)*assist)out.lerp(predicted,Math.min(.9,.34*assist)).normalize();
         // Converge all muzzles on the same assisted line, avoiding parallax.
         out.multiplyScalar(length).add(position).sub(muzzle).normalize();
         return out;
@@ -4813,6 +4828,22 @@ export class GameSession {
             weaponId:weapon.id,visualScale:weapon.visualScale,mountId,pierce:weapon.pierce??0,splashRadius:weapon.splashRadius,splashMin:weapon.splashMin,splashDamage:weapon.splashDamage};
         this.projectiles.push(projectile);return projectile;
     }
+    mountedGunAnchor(player, spec, index, orientation, position, out) {
+        const anchors=SHIP_MOUNT_ANCHORS[player.shipId];
+        const local=anchors?.guns?.[index] ?? anchors?.launchers?.[index-spec.stockGunCount] ?? DEFAULT_GUN_ANCHOR;
+        return out.fromArray(local).applyQuaternion(orientation).add(position);
+    }
+    readyMountedGun(fit, mount, index, group, firedA, firedB) {
+        const assigned=fit.fireGroups?.assignments?.[mount.id] ?? 'A';
+        if(group!=='ALL' && assigned!==group)return;
+        const now=this.save.world.time;
+        if(now<(this.mountFireAt?.[mount.id]??0))return;
+        if(fit.fireGroups?.firingModes?.[assigned]==='alternating' &&
+            ((assigned==='A'?firedA:firedB) || this.save.player.energy<=0 ||
+             this.groupFireHull===this.save.player.shipId && now<(this.groupFireAt?.[assigned]??0)))return;
+        const weapon=weaponForOutfit(fit.guns?.[index]);
+        if(weapon && (!weapon.ammoId || this.save.player.ammo?.[weapon.ammoId]>0))return weapon;
+    }
     fireMountedPlayerGuns() {
         const disruption = disruptionFactor(this.save.player, this.save.world.time);
         const stats = this.playerStats();
@@ -4883,30 +4914,19 @@ export class GameSession {
         let firstWeapon;
         for (let offset=0;offset<spec.guns.length;offset++) {
             const index=((this.gunFairStart??0)+offset)%spec.guns.length, mount=spec.guns[index];
-            if (activeGroup !== 'ALL' && (loadout.fireGroups?.assignments?.[mount.id] ?? 'A') !== activeGroup)
-                continue;
+            const weapon=this.readyMountedGun(loadout,mount,index,activeGroup,firedA,firedB);
+            if(!weapon)continue;
             const group=loadout.fireGroups?.assignments?.[mount.id]==='B'?'B':'A';
             const alternating=group==='A'?alternatingA:alternatingB;
-            const groupKey=group;
-            if(alternating&&((group==='A'?firedA:firedB)||player.energy<=0||this.save.world.time<(this.groupFireAt[groupKey]??0)))continue;
-            const weaponId = weaponIdForOutfit(loadout.guns?.[index]);
-            const weapon = weaponId ? weaponForOutfit(loadout.guns?.[index]) : undefined;
-            if (!weapon)
-                continue;
-            if (this.save.world.time < (this.mountFireAt[mount.id] ?? 0)) continue;
-
-            const ammoId = weapon.ammoId;
-            if (ammoId && (player.ammo[ammoId] ?? 0) <= 0)
-                continue;
+            const groupKey=group, ammoId=weapon.ammoId;
             if (!spendEnergy(player, (weapon.energyCost ?? 0) * disruption)) {this.gunFairNext=index;break;}
-            const localAnchor = (SHIP_MOUNT_ANCHORS[player.shipId]?.guns?.[index]??SHIP_MOUNT_ANCHORS[player.shipId]?.launchers?.[index-spec.stockGunCount]) ?? [0, -0.6, -2.8];
-            const anchorWorld = (this.tmpPlayerGunMuzzle ??= new THREE.Vector3()).set(...localAnchor).applyQuaternion(orientation).add(position);
+            const anchorWorld=this.mountedGunAnchor(player,spec,index,orientation,position,this.tmpPlayerGunMuzzle??=new THREE.Vector3());
             const direction = this.weaponAimDirection(position, velocity, weapon, target, baseDirection, this.tmpP6, anchorWorld);
             const anchorX = anchorWorld.x;
             const anchorY = anchorWorld.y;
             const anchorZ = anchorWorld.z;
             if (weapon.kind === 'pdc') {
-                const rng = seededRandom(`${this.save.world.seed}:wpn:${Math.floor(this.save.world.time * 1000)}:${this.projectileCounter}:${mount.id}`);
+                const rng=this.mountedScatterRandom(this.projectileCounter,mount.id);
                 const up = this.tmpP3.copy(UP).applyQuaternion(orientation);
                 const bolt = this.spreadDirection(direction, right, up, weapon.spreadRad ?? 0, rng, this.tmpP0);
                 const muzzleX = anchorX + bolt.x * 0.35;
@@ -4916,7 +4936,7 @@ export class GameSession {
                 this.spawnPlayerGunProjectile(weapon, bolt, muzzleX, muzzleY, muzzleZ, velocity, targetId, mount.id);
             }
             else if (weapon.kind === 'ripper') {
-                const rng = seededRandom(`${this.save.world.seed}:wpn:${Math.floor(this.save.world.time * 1000)}:${this.projectileCounter}:${mount.id}`);
+                const rng=this.mountedScatterRandom(this.projectileCounter,mount.id);
                 const up = this.tmpP4.copy(UP).applyQuaternion(orientation);
                 const pelletCount = weapon.pellets ?? 7;
                 this.haptics?.pulse(35, .04, .22);
@@ -4968,9 +4988,11 @@ export class GameSession {
     }
     // Transient target-monitor status: missile and target-cycle errors land on
     // the TARGET monitor's readout line instead of the toast stack.
-    setMonitorStatus(message, duration = 2800) {
+    // A 'reward' tone (kills, captures) reads gold instead of the alert red.
+    setMonitorStatus(message, duration = 2800, tone = 'alert') {
         // Duration is in milliseconds; save.world.time runs in seconds.
         this.monitorStatus = message;
+        this.monitorStatusTone = tone;
         this.monitorStatusUntil = this.save.world.time + duration / 1000;
     }
     // Keep full notices in the ship log; the cockpit uses compact labels.
@@ -4999,12 +5021,56 @@ export class GameSession {
         this.ownMonitorStatus = message;
         this.ownMonitorStatusUntil = this.save.world.time + duration / 1000;
     }
+    warnPlayerLock(message,first){
+        if(first)this.setOwnMonitorStatus(message,500);
+        else{
+            this.ownMonitorStatus=message;
+            this.ownMonitorStatusUntil=this.save.world.time+.5;
+        }
+    }
     // Drive notices stay in the flight log; the control label stays fixed.
     setHyperdriveStatus(message, duration = 3000) {
         if (message !== this.hyperdriveStatus || this.save.world.time >= (this.hyperdriveStatusUntil ?? 0))
             this.ui.pushEvent(message, 'info', duration);
         this.hyperdriveStatus = message;
         this.hyperdriveStatusUntil = this.save.world.time + duration / 1000;
+    }
+    updatePlayerRackLocks(dt) {
+        const p=this.save.player, id=p.currentTargetId;
+        let target;
+        if(id)for(const ship of this.ships)if(ship.id===id && ship.hull>0 && !ship.claimed && !ship.captured){target=ship;break;}
+        const locks=this.rackLocks??=new Map(),previous=this.rackProgress??0;
+        this.rackProgress=0;
+        if(!target || target.jumpPursuit || p.dockedAt || p.hull<=0 || this.hyperdriveFx==='spooling' || this.hyperdriveFx==='active' || this.hyperdriveFx==='gate'){locks.clear();return;}
+        const mounts=HULL_HARDPOINTS[p.shipId]?.launchers,items=p.outfitting?.loadouts?.[p.shipId]?.launchers;
+        if(!items || !mounts){locks.clear();return;}
+        if(this.lineBlocked(this.tmpP1.fromArray(p.position),this.tmpP0.fromArray(target.position),target.id)){locks.clear();return;}
+        const direction=this.tmpP0.fromArray(target.position).sub(this.tmpP1.fromArray(p.position));
+        const distance=direction.length();
+        direction.normalize();
+        const alignment=this.tmpP1.copy(FORWARD).applyQuaternion(this.tmpQ2.fromArray(p.rotation)).dot(direction);
+        const aspect=this.tmpP1.copy(FORWARD).applyQuaternion(this.tmpQ2.fromArray(target.rotation)).dot(direction);
+        let together=Infinity;
+        for(let index=0;index<mounts.length;index++){
+            const key=mounts[index].id,item=items[index],selected=key===p.activeLauncherMountId;
+            if(!item || !(p.launcherMagazines?.[key]?.rounds>0) || (!selected && p.launcherFireMode==='single')){locks.delete(key);continue;}
+            let lock=locks.get(key);
+            if(!lock || lock.item!==item || lock.target!==target){
+                const launcher=launcherForOutfit(item);
+                if(!launcher)continue;
+                lock={item,target,launcher,progress:0};
+                locks.set(key,lock);
+            }
+            const before=lock.progress;
+            lock.progress=rackLockProgress(before,lock.launcher,null,distance,alignment,aspect,dt);
+            if(p.launcherFireMode==='together'){
+                if(distance<=lock.launcher.lockRange && !(this.launcherReadyAt?.[`${p.shipId}:${key}`]>this.save.world.time))
+                    together=Math.min(together,lock.progress);
+            }else if(selected)this.rackProgress=lock.progress;
+        }
+        if(Number.isFinite(together))this.rackProgress=together;
+        if(previous<1 && this.rackProgress===1)this.audio?.playCockpit?.('rackReady');
+        else if(Math.ceil(previous*3)<Math.ceil(this.rackProgress*3))this.audio?.playCockpit?.(['rackSearch','rackSearch2','rackSearch3'][Math.min(2,Math.ceil(this.rackProgress*3)-1)]);
     }
     fireMissile() {
         return this.fireMountedMissiles();
@@ -5040,13 +5106,21 @@ export class GameSession {
         const candidates = mode === 'single' ? [ordered[0]] : ordered;
         const ready = candidates.filter(entry => entry.rounds > 0 && distance <= entry.launcher.lockRange
             && !(this.launcherReadyAt[`${player.shipId}:${entry.mount.id}`] > now));
-        const firing = mode === 'together' ? ready : ready.slice(0,1);
+        this.updatePlayerRackLocks(0);
+        const locked=ready.filter(entry=>this.rackLocks.get(entry.mount.id)?.progress===1);
+        if(ready.length && (!locked.length || mode==='together' && locked.length!==ready.length)){
+            this.setMonitorStatus(t('LOCKING'),1000);
+            this.audio?.playCockpit?.('rackDenied');
+            return;
+        }
+        const firing = mode === 'together' ? locked : locked.slice(0,1);
         if (!firing.length) {
             const loaded = candidates.filter(entry => entry.rounds > 0);
             this.setMonitorStatus(t(!loaded.length ? 'LAUNCHERS EMPTY' : loaded.every(entry=>distance>entry.launcher.lockRange) ? 'MISSILE TARGET OUT OF RANGE' : 'LAUNCHERS RELOADING'));
             return;
         }
         const spec=HULL_HARDPOINTS[player.shipId];
+        const salvo=this.projectileCounter+1;
         let actualFired=0;
         for (const selected of firing) {
             if(!spendEnergy(player,(selected.launcher.energyCost??0)*disruptionFactor(player,now)))continue;
@@ -5101,7 +5175,7 @@ export class GameSession {
                     homingSpeed: launcher.homingSpeed,
                     homingTurn: launcher.homingTurn,
                     acceleration: launcher.acceleration,
-                    volleyIndex: micro,
+                    salvo,volleyIndex: micro,
                     splashRadius: launcher.splashRadius,
                     splashMin: launcher.splashMin,
                 });
@@ -6068,7 +6142,7 @@ export class GameSession {
         // Spawn the rival just outside the rock's collision envelope so they
         // arrive beside the seam instead of materializing inside it.
         const direction = new THREE.Vector3(rng() - 0.5, (rng() - 0.5) * 0.4, rng() - 0.5).normalize();
-        return tuple(vec(node.position).addScaledVector(direction, asteroidCollisionRadius(node) + 90));
+        return tuple(this.visibleSpawnPosition(vec(node.position).addScaledVector(direction, asteroidCollisionRadius(node) + 90)));
     }
     recoverWreckEquipment(node, drop) {
         const rng = seededRandom(`${this.save.world.seed}:wreck-equipment:${node.id}`);
@@ -6116,7 +6190,7 @@ export class GameSession {
             return;
         this.salvageAmbushTriggered.add(node.id);
         const player = vec(this.save.player.position);
-        const lead = this.spawnCareerRaider('pirate', tuple(player.clone().add(new THREE.Vector3(90, 20, -75))), region, rng);
+        const lead = this.spawnCareerRaider('pirate', tuple(this.visibleSpawnPosition(player.clone().add(new THREE.Vector3(90, 20, -75)))), region, rng);
         const escorts = [];
         // The richest holds rate a two-ship team: the second pirate's odds
         // ramp across the escort worth band instead of cutting in at a hard
@@ -6125,7 +6199,7 @@ export class GameSession {
         const escortChance = clamp((worth - SALVAGE_AMBUSH_ESCORT_MIN_WORTH) / escortSpan, 0, 1);
         const teamSize = careerGroupSize(region, rng);
         for (let i=1;i<teamSize;i++) if (rng() < escortChance) {
-            const escort = this.spawnCareerRaider('escort', tuple(player.clone().add(new THREE.Vector3(-75-i*18, -15, -95-i*24))), region, rng);
+            const escort = this.spawnCareerRaider('escort', tuple(this.visibleSpawnPosition(player.clone().add(new THREE.Vector3(-75-i*18, -15, -95-i*24)))), region, rng);
             escorts.push(escort);
         }
         this.stageHunterGroup(lead, escorts, { forceTrack: true });
@@ -6362,8 +6436,12 @@ export class GameSession {
     }
     // A prize can be boarded: it surrendered, powered down (a pilot still
     // running must be disabled first), is worth a claim and is still in one piece.
+    hasCaptureClaim(ship) {
+        return Boolean(!this.arena && ship?.surrendered && !ship.claimed && !ship.captured && ship.hull > 0
+            && (ship.bountyValue > 0 || ship.missionId));
+    }
     boardable(ship) {
-        return Boolean(ship?.surrendered && !ship.fleeing && !ship.claimed && !ship.captured && ship.hull > 0 && (ship.bountyValue > 0 || ship.missionId));
+        return this.hasCaptureClaim(ship) && !ship.fleeing;
     }
     // Boarding without a button, like docking: staying within scan range of a
     // prize for BOARDING_SECONDS captures it. The locked target boards first,
@@ -7038,6 +7116,11 @@ export class GameSession {
         return this.beginGalaxyGateTransition(jumpPoint);
     }
     clearTransientSpace() {
+        this.rackLocks?.clear();
+        this.rackProgress=0;
+        this.shakeStrength=0;
+        this.hitTickUntil=0;
+        this.nextHitTick=0;
         this.playerDocking = undefined;
         this.localPursuitPrepared=false;
         this.renderer?.clearDrones?.();
@@ -8896,7 +8979,7 @@ export class GameSession {
     integrateNpcFlight(ship, position, velocity, orientation, desiredOrientation, targetSpeed, burnWanted, assisted, dt, trackTarget=false) {
         const stats=this.npcFlightStats(ship);
         const angular=ship.flightAngularVelocity ??= new THREE.Vector3();
-        ship.burning=Boolean(burnWanted && ship.fuel>0.5);
+        ship.burning=Boolean(!ship.crippled && burnWanted && ship.fuel>0.5);
         const ceiling=ship.burning && velocity.length()>=stats.maxSpeed*0.9 ? stats.afterburnSpeed : stats.maxSpeed;
         const tracking=trackTarget?combatTrackingRate(ship,orientation,desiredOrientation,dt):undefined;
         if(!trackTarget&&ship.flightTracking){ship.flightTracking.previous.copy(desiredOrientation);ship.flightTracking.world.set(0,0,0);}
@@ -9241,8 +9324,10 @@ export class GameSession {
         // (pounce waypoints); evasion and extend keep pure steering so dodges
         // stay snappy.
         const navOut = this.tmpNavDesired ?? (this.tmpNavDesired = new THREE.Vector3());
+        const missileBreak=ship.missileBreakUntil>this.save.world.time && !ship.fleeing && !ship.combatPlan?.recovery?.active;
+        if(missileBreak){desired.copy(ship.missileBreak);spiraling=false;}
         let navGoal = targetPosition;
-        if (ship.fleeing || ship.combatPlan?.recovery?.active || ship.combatPlan?.crossfire?.active)
+        if (missileBreak || ship.fleeing || ship.combatPlan?.recovery?.active || ship.combatPlan?.crossfire?.active)
             navGoal = (this.tmpNavGoal ?? (this.tmpNavGoal = new THREE.Vector3())).set(position.x + desired.x * 400, position.y + desired.y * 400, position.z + desired.z * 400);
         else if (ship.covering && ship.coverPoint)
             navGoal = (this.tmpNavGoal ?? (this.tmpNavGoal = new THREE.Vector3())).set(ship.coverPoint[0], ship.coverPoint[1], ship.coverPoint[2]);
@@ -9278,7 +9363,7 @@ export class GameSession {
             desired.add(shipAvoidance);
         desired.normalize();
         let aceMove;
-        if (!judgment && !terrainMove && !routed && flightStats && (ship.pilot?.tier==='ace'||ship.pilot?.tier==='veteran'||ship.pilot?.tier==='novice')) {
+        if (!missileBreak && !judgment && !terrainMove && !routed && flightStats && (ship.pilot?.tier==='ace'||ship.pilot?.tier==='veteran'||ship.pilot?.tier==='novice')) {
             const nose=(this.tmpAceNose ??= new THREE.Vector3()).copy(FORWARD).applyQuaternion(orientation);
             const travel=(this.tmpAceTravel ??= new THREE.Vector3()).copy(velocity).normalize();
             const ahead=(this.tmpAceAhead ??= new THREE.Vector3()).copy(position).addScaledVector(velocity,Math.max(1.8,currentSpeed/flightStats.acceleration+1.6));
@@ -9382,13 +9467,14 @@ export class GameSession {
             desiredSpeed=maneuverThrottle;
             desiredSpeed=judgmentSpeed(judgment,this.save.world.time,desiredSpeed,ship.speed);
             if(judgment?.kind==='late-brake'||judgment?.kind==='hesitate')ship.burning=false;
+            if(missileBreak && fieldNav.canBoost){ship.burning=true;desiredSpeed=ship.afterburnSpeed;}
             if(terrainMove){desiredSpeed=Math.min(desiredSpeed,ship.speed*terrainMove.speedFactor);ship.burning=ship.burning&&terrainMove.canBoost;}
         }
         if (flightStats) {
             desiredSpeed=Math.min(desiredSpeed,fieldNav.speedLimit);
             const moveAge=aceMove?(this.save.world.time-aceMove.started)/(aceMove.durationScale??1):0;
-            const drifting=!judgment&&!terrainMove&&(committedShot&&ship.combatPlan?.aimingRun&&!ship.combatPlan.overshoot&&distance>ship.combatPlan.preferredRange*.55&&Math.abs(velocity.dot(direct))<currentSpeed*.85&&fieldNav.safeForManeuver&&!shipAvoidance||aceMove?.kind==='drift-pass'||aceMove?.kind==='boost-reversal'&&moveAge>=.65&&moveAge<2.4);
-            const poweredDrift=!judgment&&!terrainMove&&offensiveHeading&&ship.pilot?.tier==='ace'&&ship.combatPlan?.crossfire?.outnumbered&&distance<600&&distance>60&&!ship.combatPlan?.finishing&&currentSpeed>ship.speed*.5&&fieldNav.safeForManeuver&&!shipAvoidance;
+            const drifting=!missileBreak&&!judgment&&!terrainMove&&(committedShot&&ship.combatPlan?.aimingRun&&!ship.combatPlan.overshoot&&distance>ship.combatPlan.preferredRange*.55&&Math.abs(velocity.dot(direct))<currentSpeed*.85&&fieldNav.safeForManeuver&&!shipAvoidance||aceMove?.kind==='drift-pass'||aceMove?.kind==='boost-reversal'&&moveAge>=.65&&moveAge<2.4);
+            const poweredDrift=!missileBreak&&!judgment&&!terrainMove&&offensiveHeading&&ship.pilot?.tier==='ace'&&ship.combatPlan?.crossfire?.outnumbered&&distance<600&&distance>60&&!ship.combatPlan?.finishing&&currentSpeed>ship.speed*.5&&fieldNav.safeForManeuver&&!shipAvoidance;
             this.integrateNpcFlight(ship,position,velocity,orientation,this.tmpQ2,poweredDrift?(velocity.dot(direct)<-currentSpeed*.25&&distance<350?0:desiredSpeed):drifting?0:desiredSpeed,ship.burning && (poweredDrift||!drifting),!drifting&&!poweredDrift,dt,!fieldNav.active&&(drifting||poweredDrift||!fieldNav.roundField&&ship.combatIntent==='hunt'));
             forward.copy(FORWARD).applyQuaternion(orientation).normalize();
         } else {
@@ -9787,36 +9873,60 @@ export class GameSession {
             const rack=fit.racks.find(r=>r.missiles>0&&r.launcher===wanted)??fit.racks.find(r=>r.missiles>0);
             fit.activeRack=rack;fit.launcher=rack?.launcher;fit.missiles=rack?.missiles??0;
         }
-        const novice=ship.pilot?.tier==='novice',lockTime=novice?4:2.5,gap=novice?10:6;
-        if(fit.lockTarget!==ship.targetId){fit.lock=0;fit.warned=false;fit.lockTarget=ship.targetId;}
+        const gap=ship.pilot?.tier==='novice'?10:6;
+        if(fit.lockTarget!==ship.targetId || fit.lockRack!==fit.launcher || time-(fit.lockCheckedAt??time)>dt+.001){fit.lock=0;fit.warned=false;}
+        fit.lockTarget=ship.targetId;fit.lockRack=fit.launcher;fit.lockCheckedAt=time;
         if(time<(fit.launchAt??0)){fit.lock=0;fit.warned=false;return;}
         if(!fit.launcher || fit.missiles<=0 || ship.holdFire || ship.pursuitHoldFire || ship.fleeing || ship.patrolMemoryActive || ship.combatPlan?.recovery?.active || ship.recoveryTargetHidden) {fit.lock=0;fit.warned=false;return;}
-        const aim=ship.ordnanceAim??={start:new THREE.Vector3(),direction:new THREE.Vector3(),forward:new THREE.Vector3(),rotation:new THREE.Quaternion()};
+        const aim=ship.ordnanceAim??={
+            start:new THREE.Vector3(),direction:new THREE.Vector3(),forward:new THREE.Vector3(),rotation:new THREE.Quaternion(),
+            muzzle:new THREE.Vector3(),shot:new THREE.Vector3(),right:new THREE.Vector3(),up:new THREE.Vector3(),scratch:new THREE.Vector3(),
+        };
         const start=aim.start.fromArray(ship.position),dir=aim.direction.copy(targetPosition).sub(start),distance=dir.length();dir.normalize();
         const forward=aim.forward.copy(FORWARD).applyQuaternion(aim.rotation.fromArray(ship.rotation));
         const launcher=launcherForOutfit(fit.activeRack?.itemId)??LAUNCHERS[fit.launcher];
-        if(distance<80 || distance>launcher.lockRange || forward.dot(dir)<0.93 || this.lineBlocked(start,targetPosition,ship.id)){fit.lock=0;fit.warned=false;return;}
-        fit.lock=(fit.lock ?? 0)+dt;
-        if(fit.lock<1.4)return;
-        if(ship.targetId==='player' && !fit.warned){this.setOwnMonitorStatus(t('MISSILE LOCK — BREAK AWAY'),novice?3000:1800);fit.warned=true;fit.warnedAt=time;return;}
-        if(fit.lock<lockTime || (ship.targetId==='player' && time-fit.warnedAt<(novice?2.6:1.1)))return;
+        const alignment=forward.dot(dir);
+        const victim=ship.targetId==='player'?this.save.player:this.ships.find(s=>s.id===ship.targetId);
+        const aspect=victim?.rotation?aim.scratch.copy(FORWARD).applyQuaternion(aim.rotation.fromArray(victim.rotation)).dot(dir):0;
+        fit.lock=rackLockProgress(Math.min(1,fit.lock??0),launcher,ship.pilot?.tier,distance,alignment,aspect,dt);
+        if(distance<80 || !fit.lock || this.lineBlocked(start,targetPosition,ship.id)){fit.lock=0;fit.warned=false;return;}
+        if(ship.targetId==='player'){
+            this.warnPlayerLock(t('MISSILE LOCK — BREAK AWAY'),!fit.warned);
+            if(!fit.warned){
+                fit.warned=true;fit.warnedAt=time;
+                return;
+            }
+        }
+        if(fit.lock<1)return;
         if(!npcPlayerAttackWindow(this,ship))return;
         // A wingmate crossing the nose delays release, without losing the lock.
-        if(friendlyFiringLaneBlocked(this,ship,start,dir,distance))return;
+        if(friendlyFiringLaneBlocked(this,ship,start,forward,distance) || friendlyFiringLaneBlocked(this,ship,start,dir,distance))return;
         if(!spendEnergy(ship,(launcher.energyCost??0)*disruptionFactor(ship,time)))return;
-        const count=launcher.volley??1;
+        const count=launcher.volley??1,salvo=this.projectileCounter+1;
+        const muzzle=aim.muzzle.copy(start).addScaledVector(forward,this.npcHullExtents(ship)[2]);
+        const right=aim.right.copy(RIGHT).applyQuaternion(aim.rotation.fromArray(ship.rotation));
+        const up=aim.up.copy(UP).applyQuaternion(aim.rotation);
         for(let i=0;i<count;i++){
-            const slot=this.projStore.alloc(),muzzle=start.clone().addScaledVector(dir,this.npcHullExtents(ship)[2]);
-            const shot=dir.clone();
-            if(launcher.spreadRad){shot.x+=(ship.aiRng()-.5)*launcher.spreadRad;shot.y+=(ship.aiRng()-.5)*launcher.spreadRad;shot.normalize();}
-            this.projStore.setPosV(slot,muzzle);shot.multiplyScalar(launcher.speed).add(vec(ship.velocity));this.projStore.setVelV(slot,shot);
-            this.projectiles.push({id:`p-${++this.projectileCounter}`,kind:'missile',ownerId:ship.id,slot,damage:launcher.damage,life:launcher.life,
+            const slot=this.projStore.alloc(),shot=aim.shot.copy(forward);
+            if(launcher.spreadRad){
+                const angle=(i+.5)*2*Math.PI/count;
+                shot.addScaledVector(right,Math.cos(angle)*launcher.spreadRad).addScaledVector(up,Math.sin(angle)*launcher.spreadRad).normalize();
+            }
+            this.projStore.setPosV(slot,muzzle);
+            this.projStore.snapshot(slot);
+            shot.multiplyScalar(launcher.speed).add(aim.scratch.fromArray(ship.velocity));
+            this.projStore.setVelV(slot,shot);
+            this.projectiles.push({id:`p-${++this.projectileCounter}`,kind:'missile',ownerId:ship.id,slot,salvo,damage:launcher.damage,life:launcher.life,
                 targetId:ship.targetId,faction:ship.faction,launcherId:launcher.id,hitWeapon:launcher,homingSpeed:launcher.homingSpeed,homingTurn:launcher.homingTurn,
                 shield:launcher.projectileShield,acceleration:launcher.acceleration,splashRadius:launcher.splashRadius,splashMin:launcher.splashMin});
         }
         this.playWorldSound('missile',.8,start.x,start.y,start.z);
-        if(ship.targetId==='player')this.audio?.playCockpit?.('missileAlert',.9);
-        fit.missiles--;if(fit.activeRack)fit.activeRack.missiles=fit.missiles;fit.lock=0;fit.warned=false;fit.launchAt=time+Math.max(gap,launcher.cooldown)*disruptionFactor(ship,time);
+        if(ship.targetId==='player')this.audio?.playCockpit?.('missileLaunch',.9);
+        const baseCooldown=LAUNCHERS[fit.launcher].cooldown;
+        const cadence=launcher.cooldown/baseCooldown;
+        fit.missiles--;if(fit.activeRack)fit.activeRack.missiles=fit.missiles;
+        fit.lock=0;fit.warned=false;
+        fit.launchAt=time+Math.max(gap,baseCooldown)*cadence*disruptionFactor(ship,time);
     }
     fireNpcGun(ship, direction, opportunity) {
         if(!npcPlayerAttackWindow(this,ship,opportunity?.targetId??ship.targetId))return;
@@ -9831,7 +9941,8 @@ export class GameSession {
             const aiming=weapon.kind==='beam'&&target?new THREE.Vector3().fromArray(target.position).sub(start).normalize():direction;
             const dir=new THREE.Vector3();
             const distance=target?Math.hypot(target.position[0]-start.x,target.position[1]-start.y,target.position[2]-start.z):weapon.range;
-            if(!npcShotDirection(ship,weapon,aiming,dir,this.save.world.time,distance)||friendlyFiringLaneBlocked(this,ship,start,dir,distance)||!spendEnergy(ship,weapon.energyCost*disruption))return;
+            const targetRadius=!target?0:target===this.save.player?Math.max(...this.playerHullExtents()):this.ships.includes(target)?Math.max(...this.npcHullExtents(target)):0;
+            if(!npcShotDirection(ship,weapon,aiming,dir,this.save.world.time,distance,targetRadius)||friendlyFiringLaneBlocked(this,ship,start,dir,distance)||!spendEnergy(ship,weapon.energyCost*disruption))return;
             // Converge separated mounts on the pilot's chosen aim point.
             // Keeping parallel rays made wide hulls shoot around narrow targets.
             if(weapon.kind!=='beam')dir.multiplyScalar(distance).add(vec(ship.position)).sub(start).normalize();
@@ -9912,25 +10023,32 @@ export class GameSession {
             const start = this.projStore.getPos(projectile.slot, this.tmpP0);
             const velocity = this.projStore.getVel(projectile.slot, this.tmpP1);
             const isMissile = projectile.kind === 'missile' || projectile.kind === 'torpedo';
-            if (isMissile && projectile.targetId) {
-                let targetPosition;
+            if (isMissile && projectile.targetId && !projectile.lostTrack) {
+                let targetPosition,targetVelocity,targetRotation;
                 if (projectile.targetId === 'player') {
                     targetPosition = this.tmpP4.copy(playerPos);
+                    targetRotation=player.rotation;
+                    targetVelocity=player.velocity;
                 }
                 else {
                     const targetShip = this.ships.find((entry) => entry.id === projectile.targetId && entry.hull > 0);
                     if (targetShip){
+                        targetRotation=targetShip.capitalClass?undefined:targetShip.rotation;
+                        targetVelocity=targetShip.velocity;
                         targetPosition = Number.isInteger(projectile.targetMount)&&targetShip.capitalMountHull?.[projectile.targetMount]>0
                             ?(targetShip.capitalClass==='cruiser'?cruiserMountPosition:frigateMountPosition)(targetShip,projectile.targetMount,this.tmpP4):vec(targetShip.position,this.tmpP4);
                     }
                     else {
                         const drone = units[projectile.targetId];
-                        if (drone?.hull > 0 && drone.position && drone.state !== 'stowed' && drone.state !== 'destroyed')
+                        if (drone?.hull > 0 && drone.position && drone.state !== 'stowed' && drone.state !== 'destroyed'){
                             targetPosition = this.tmpP4.fromArray(drone.position);
+                            targetVelocity=drone.velocity;
+                        }
                     }
                 }
-                if (targetPosition) {
-                    guideMissile(velocity,targetPosition.sub(start),projectile,stepDt);
+                if (!targetPosition)projectile.lostTrack=true;
+                else {
+                    projectile.lostTrack=!guideMissile(velocity,targetPosition.sub(start),projectile,stepDt,targetVelocity&&this.tmpP5.fromArray(targetVelocity),targetRotation);
                     this.projStore.setVelV(projectile.slot, velocity);
                 }
             }
@@ -9958,7 +10076,7 @@ export class GameSession {
                     hitObstacle = obstacleResult.obstacle;
                 }
                 if (projectile.ownerId !== 'player') {
-                    const playerT = segmentShipColliderHit(sweepFrom, end, player.position, player.rotation, playerShipVariant(player.shipId), 1, isMissile ? 0.8 : 0.12);
+                    const playerT = segmentShipColliderHit(sweepFrom, end, player.position, player.rotation, playerShipVariant(player.shipId), 1, isMissile ? MISSILE_PADDING : 0.12);
                     if (playerT !== undefined && playerT < bestT) {
                         bestT = playerT;
                         hitKind = 'player';
@@ -9972,7 +10090,7 @@ export class GameSession {
                         if (!DRONE_TYPES[unit.type] || !(unit.hull > 0) || !unit.position
                             || unit.state === 'stowed' || unit.state === 'destroyed') continue;
                         const hit = segmentSphereHit(sweepFrom, end, this.tmpP4.fromArray(unit.position),
-                            DRONE_TYPES.pdc.collisionRadius + (isMissile ? 0.8 : 0.12));
+                            DRONE_TYPES.pdc.collisionRadius + (isMissile ? MISSILE_PADDING : 0.12));
                         if (hit !== undefined && hit < bestT) {
                             bestT = hit; hitKind = 'drone'; hitDrone = unit;
                         }
@@ -9985,7 +10103,7 @@ export class GameSession {
                         continue;
                     if (projectile.ownerId !== 'player' && !this.projectileCanHitShip(projectile, ship))
                         continue;
-                    const hit = segmentShipHullHit(sweepFrom, end, ship, this.npcHullExtents(ship), projectile.kind === 'missile' ? 0.8 : 0.12);
+                    const hit = segmentShipHullHit(sweepFrom, end, ship, this.npcHullExtents(ship), isMissile ? MISSILE_PADDING : 0.12);
                     if (hit !== undefined && hit < bestT) {
                         bestT = hit;
                         hitKind = 'ship';
@@ -10151,6 +10269,15 @@ export class GameSession {
             this.renderer.flashShield?.(ship, this.npcHullExtents(ship), .25, false, position, origin);
 
         const remaining = applied.hull*(ship.capitalClass==='frigate'?frigateHullDamageScale(weapon):1);
+        if ((combatWeapon || weapon.kind) && position && origin && ship.hull>0) {
+            if(shieldBeforeHit<=0)wearFighterDrive(ship,remaining,position,origin);
+            if(attackerId==='player' && applied.shield+remaining>0 && this.save.world.time >= (this.nextHitTick??-Infinity)){
+                this.hitTick=remaining>0?'hull':'shield';
+                this.hitTickUntil=this.save.world.time+.12;
+                this.nextHitTick=this.save.world.time+.24;
+                this.audio?.playCockpit?.(remaining>0?'confirmHull':'confirmShield');
+            }
+        }
         ship.hull -= remaining;
         const tutorialQuest = ship.tutorialEncounter === 'mining' ? getTutorialQuest(this.save) : undefined;
         const firstSurrender = tutorialQuest && ['raider-standoff','defeat-raider'].includes(tutorialQuest.stepId)
@@ -10285,9 +10412,9 @@ export class GameSession {
                 // escaped before gives up even sooner.
                 const hullRatio = ship.maxHull > 0 ? ship.hull / ship.maxHull : 1;
                 const stubborn = pilotMod(ship, 1, 'fleeMul');
-                const chance = (0.04 + (1 - hullRatio) * 0.32) * stubborn * (ship.waryOfPlayer ? WARY_FLEE_MULTIPLIER : 1);
-                if (hullDamaged && !ship.noSurrender && !ship.fleeing && !ship.surrendered && ship.aiRng() < chance) {
-                    this.surrenderShip(ship);
+                const chance = (ship.crippled ? .6 : 0) + (0.04 + (1 - hullRatio) * 0.32) * stubborn * (ship.waryOfPlayer ? WARY_FLEE_MULTIPLIER : 1);
+                if (hullDamaged && !this.arena && !ship.noSurrender && !ship.fleeing && !ship.surrendered && ship.aiRng() < chance) {
+                    this.surrenderShip(ship,ship.crippled ? {action:'down'} : undefined);
                     // The attacker gave up: the mark it was shooting at was just
                     // saved — thank the pilot if the victim actually took hits.
                     this.tryRescueGratitude(ship);
@@ -10362,6 +10489,7 @@ export class GameSession {
     // and turns orange on the HUD, with a fitting line per action. The action
     // follows the temperament weights, and cargo/credit dumps spawn pickups.
     surrenderShip(ship, options = {}) {
+        if(this.arena)return;
         ship.surrendered = true;
         ship.hostile = false;
         ship.fleeing = false;
@@ -10768,12 +10896,11 @@ export class GameSession {
     // the capture — the surrender already ended the fight, so no explosion and
     // no civilian-loss penalty. The hull stays alive and drifts as a quiet scene
     // object after the transfer.
-    // Only ships worth a bounty are claimable; a civilian the player beat down
-    // has no payoff and stays unclaimed.
+    // Bounties and mission targets are claimable in career flight.
     claimSurrendered(ship) {
-        if (!ship.surrendered || ship.claimed || ship.hull <= 0 || !(ship.bountyValue > 0 || ship.missionId))
+        if (!this.hasCaptureClaim(ship))
             return false;
-        this.audio?.play?.('reward', 0.7);
+        this.audio?.play?.('kill', .8);
         const lootWreck=this.addCareerWreck(ship,true);
         ship.cargo={};
         ship.claimed = true;
@@ -10807,6 +10934,7 @@ export class GameSession {
         surrenderedTo[ship.recognitionName ?? ship.name] = 'captured';
         if (this.save.player.currentTargetId === ship.id)
             this.clearTarget();
+        this.setMonitorStatus(t('CAPTURED'),2200,'reward');
         if (ship.tutorialEncounter === 'mining')
             this.handleTutorialEvent('ship-defeated', {shipId:ship.id,tutorialEnemy:true,tutorialEncounter:'mining',tutorialIndex:ship.tutorialIndex,attackerId:'player',wreckId:lootWreck?.id});
         return true;
@@ -10852,22 +10980,26 @@ export class GameSession {
         const blastDirection = (this.audioDirection ??= new THREE.Vector3()).fromArray(ship.position);
         blastDirection.x -= this.save.player.position[0];blastDirection.y -= this.save.player.position[1];blastDirection.z -= this.save.player.position[2];
         const blastDistance = blastDirection.length();
+        this.kickCamera(Math.max(0,1-blastDistance/(240*explosionScale))*.8);
         blastDirection.applyQuaternion((this.audioDirectionQ ??= new THREE.Quaternion()).fromArray(this.save.player.rotation).invert());
         this.audio.playAtDirection(ship.capitalClass ? 'capitalExplosion' : 'explosion', 1.1, blastDistance, blastDirection.x, blastDirection.z);
         if (ship.hostile && attackerId === 'player') {
-            this.audio?.play?.('kill', 0.8);
             // Just fought off a threat: calm the lanes for a while.
             this.lastCombatAt = this.save.world.time;
             // The mark that hostile was hitting is safe now — acknowledge the save.
             this.tryRescueGratitude(ship);
         }
         if (attackerId === 'player') {
-            if (!ship.captured)
+            if (!ship.captured) {
                 this.save.player.stats.kills += 1;
+                this.audio?.play?.('kill',.8);
+                this.setMonitorStatus(t('TARGET DESTROYED'),2200,'reward');
+            }
             // The capture already paid the bounty (see claimSurrendered); a
             // hull destroyed after the fact is scrap, not a second paycheck.
             if (!ship.captured && (ship.authorizedTarget || (ship.faction === 'pirates' && !ship.crimeVictim))) {
                 const payment = ship.bountyValue;
+                if(payment>0)this.setMonitorStatus(t('KILL · {credits}',{credits:formatCredits(payment)}),2200,'reward');
                 this.save.player.credits += payment;
                 recordSortieCredit(this.save, payment, 'bounties');
                 this.save.player.reputation.concord = clamp(this.save.player.reputation.concord + 1, -100, 100);
@@ -10903,6 +11035,12 @@ export class GameSession {
         if (this.save.player.currentTargetId === ship.id)
             this.save.player.currentTargetId = undefined;
     }
+    kickCamera(strength) {
+        if (!(strength>0) || this.save.settings.reducedDamageEffects) return;
+        const now=this.save.world.time, old=Math.max(0,1-(now-(this.shakeAt??-1))/.24);
+        this.shakeStrength=Math.min(1,Math.max(strength,(this.shakeStrength??0)*old*old));
+        this.shakeAt=now;
+    }
     damagePlayer(amount, source, feedback = true, weapon = {}, position, origin) {
         if (this.deathTimer > 0 || amount <= 0)
             return;
@@ -10910,6 +11048,7 @@ export class GameSession {
         const combatWeapon = source==='weapons fire'||source==='beam fire'||source==='missile strike'||source==='blast damage';
         const incomingAmount = amount * (this.save.settings.easyMode ? .5 : 1);
         const applied = weaponDamage(this.save.player.shield, incomingAmount, weapon);
+        this.kickCamera((applied.shield+applied.hull-6)/34);
         if (combatWeapon) registerCombatShieldHit(this.save.player);
         this.save.player.shield -= applied.shield;
         if (applied.shield > 0 && this.save.player.shield > 0)
@@ -11074,7 +11213,7 @@ export class GameSession {
                 continue;
             const rng = seededRandom(`${this.save.world.seed}:bounty:${mission.id}:${Math.floor(this.save.world.time / 60)}`);
             const offset = new THREE.Vector3(rng() - 0.5, (rng() - 0.5) * 0.45, rng() - 0.5).normalize().multiplyScalar(randomBetween(rng, 700, 950));
-            const spawnPosition = player.clone().add(offset);
+            const spawnPosition = this.visibleSpawnPosition(player.clone().add(offset));
             this.clearSpawnPosition(spawnPosition, zone);
             // Warrants pin a pilot profile at offer time, so a named ace keeps
             // the same skill and temperament across every spawn of that warrant
@@ -11517,6 +11656,35 @@ export class GameSession {
                 reserveStationDock(this,ship,id,true);
         }
     }
+    // Mission hostiles start where the pilot can see them. Keep the chosen
+    // point when it is clear of rock and wreckage and in line of sight from
+    // the player; otherwise search around the player at the same distance,
+    // nearest bearing first, then a little closer. Falls back to the original
+    // point. maxAngle keeps formations near their anchor. Mutates and returns
+    // `position` (a Vector3). Spawn time only.
+    visibleSpawnPosition(position, {clearance = 22, maxAngle = 180} = {}) {
+        const obstacles = this.activeFieldObstacles?.();
+        if (!obstacles?.length || !Number.isFinite(position?.x)) return position;
+        const eye = new THREE.Vector3().fromArray(this.save.player.position);
+        const visible = (point) => this.entryPositionClear(point, obstacles, clearance) && !this.lineBlocked(eye, point);
+        if (visible(position)) return position;
+        const offset = position.clone().sub(eye), distance = offset.length();
+        if (!(distance > 1)) return position;
+        const direction = offset.divideScalar(distance), side = new THREE.Vector3().crossVectors(direction, UP);
+        if (side.lengthSq() < 1e-6) side.set(1, 0, 0);
+        side.normalize();
+        const yaw = new THREE.Quaternion(), pitch = new THREE.Quaternion(), candidate = new THREE.Vector3();
+        for (const scale of [1, 0.8, 0.6])
+            for (const degrees of [15, -15, 30, -30, 45, -45, 60, -60, 90, -90, 135, -135, 180])
+                for (const lift of [0, 15, -15]) {
+                    if (Math.abs(degrees) > maxAngle) continue;
+                    yaw.setFromAxisAngle(UP, degrees * Math.PI / 180);
+                    pitch.setFromAxisAngle(side, lift * Math.PI / 180);
+                    candidate.copy(direction).applyQuaternion(pitch).applyQuaternion(yaw).multiplyScalar(distance * scale).add(eye);
+                    if (visible(candidate)) return position.copy(candidate);
+                }
+        return position;
+    }
     encounterPosition(rng, distance) {
         const player = vec(this.save.player.position);
         const orientation = quat(this.save.player.rotation);
@@ -11526,7 +11694,7 @@ export class GameSession {
         offset.y += randomBetween(rng, -35, 35);
         if (offset.length() < distance)
             offset.normalize().multiplyScalar(distance);
-        const position = player.clone().add(offset);
+        const position = this.visibleSpawnPosition(player.clone().add(offset));
         // Keep spawns clear of the huge planetary bodies and their landing zones.
         for (const id of this.currentDockLocationIds())
             this.clearSpawnPosition(position, LOCATIONS[id]);
@@ -13295,6 +13463,8 @@ export class GameSession {
         return distance <= (stationApproach(locationId) ? Math.max(LOCATIONS[locationId].dockRadius ?? 55, hyperdriveArrivalRadius(LOCATIONS[locationId])+20) : LOCATIONS[locationId].dockRadius ?? 55) ? locationId : undefined;
     }
     dockAt(locationId, landed = false) {
+        this.rackLocks?.clear();
+        this.rackProgress=0;
         if (this.playerDocking) return;
         if (!landed) this.dockingUnderThreat=this.hostilesNear(vec(this.save.player.position),1200)||this.ships.some(s=>s.jumpPursuit&&s.hull>0);
         this.recallAllDrones('docking');
@@ -14441,6 +14611,104 @@ export class GameSession {
         this.fpsSampleAt = now;
         this.fpsFrames = 0;
     }
+    leadRotation = new THREE.Quaternion();
+    leadPoint = new THREE.Vector3();
+    leadForward = new THREE.Vector3();
+    leadTuple = new Float64Array(3);
+    leadScreen = {};
+    leadTargetScreen = {};
+    visibleLeadPoint(screen) {
+        return screen.visible && screen.x >= 0 && screen.x < this.renderer.viewportWidth &&
+            screen.y >= 0 && screen.y < this.renderer.viewportHeight && this.ui.cockpitPointVisible(screen.x,screen.y);
+    }
+    combatSightBlocked() {
+        const p=this.save.player;
+        return p.hull<=0 || this.deathTimer>0 || p.dockedAt || this.ui.isModalOpen ||
+            this.autopilot || (this.hyperdriveFx && this.hyperdriveFx!=='none');
+    }
+    volleyHitsTarget(ship, aimTarget, speed, fit, spec, group) {
+        if(this.gunCooldown>0)return false;
+        const p=this.save.player, now=this.save.world.time;
+        const position=this.tmpP1.fromArray(p.position), orientation=this.tmpPlayerOrientation.fromArray(p.rotation);
+        const nose=this.tmpP2.copy(FORWARD).applyQuaternion(orientation);
+        let energy=p.energy??this.playerStats().energyCapacity, firedA=false, firedB=false, counter=this.projectileCounter;
+        for(let offset=0;offset<spec.guns.length;offset++){
+            const i=((this.gunFairStart??0)+offset)%spec.guns.length, mount=spec.guns[i];
+            const gun=this.readyMountedGun(fit,mount,i,group,firedA,firedB);
+            if(!gun)continue;
+            energy-=(gun.energyCost??0)*disruptionFactor(p,now);
+            if(energy < -1e-9)break;
+            if(fit.fireGroups?.assignments?.[mount.id]==='B')firedB=true;else firedA=true;
+            const pellets=gun.pellets??1, firstShot=counter;
+            if(gun.kind!=='beam')counter+=pellets;
+            if(gun.kind==='beam'||gun.speed!==speed)continue;
+            const muzzle=this.mountedGunAnchor(p,spec,i,orientation,position,this.tmpP5);
+            const aim=this.weaponAimDirection(position,p.velocity,gun,aimTarget,nose,this.tmpP6,muzzle,ship);
+            const scatter=gun.kind==='ripper'||gun.kind==='pdc';
+            const rng=scatter?this.mountedScatterRandom(firstShot,mount.id):null;
+            // In the target's translating frame, the hull is stationary and
+            // the shot inherits the firing ship's velocity minus the target's.
+            for(let pellet=0;pellet<pellets;pellet++){
+                const dir=scatter?this.spreadDirection(aim,this.tmpD.copy(RIGHT).applyQuaternion(orientation),
+                    this.tmpE.copy(UP).applyQuaternion(orientation),gun.spreadRad??0,rng,this.tmpP0):aim;
+                const start=this.tmpF.copy(muzzle);
+                if(scatter)start.addScaledVector(dir,.35);
+                const end=this.tmpG.copy(dir).multiplyScalar(gun.speed).add(this.tmpH.fromArray(p.velocity))
+                    .sub(this.tmpH.fromArray(ship.velocity)).multiplyScalar(gun.life).add(start);
+                if(segmentShipHullHit(start,end,ship,this.npcHullExtents(ship),.12)!==undefined)return true;
+            }
+        }
+        return false;
+    }
+    leadSolution() {
+        const p = this.save.player;
+        const mesh = this.renderer.shipMeshes?.get(p.currentTargetId);
+        if (!mesh?.visible || this.combatSightBlocked() || p.mode !== 'combat') return;
+        let ship;
+        for (let i = 0; i < this.ships.length; i++) {
+            if (this.ships[i].id === p.currentTargetId) {
+                ship = this.ships[i];
+                break;
+            }
+        }
+        if (!ship || ship.hull <= 0 || ship.surrendered || ship.captured) return;
+        const fit = p.outfitting?.loadouts?.[p.shipId];
+        const mounts = HULL_HARDPOINTS[p.shipId]?.guns;
+        const group = this.activeFireGroup();
+        if (!fit || !mounts) return;
+        let gun;
+        for (let i = 0; i < mounts.length; i++) {
+            if (group !== 'ALL' && (fit.fireGroups?.assignments?.[mounts[i].id] ?? 'A') !== group) continue;
+            const weapon = weaponForOutfit(fit.guns[i]);
+            if (weapon && weapon.kind !== 'beam' && (!gun || weapon.speed < gun.speed ||
+                weapon.speed===gun.speed && weapon.life>gun.life)) gun = weapon;
+        }
+        if (!gun) return;
+        const origin = this.renderer.camera.position;
+        const point = this.leadPoint.copy(mesh.position);
+        const aimTarget=this.leadAimTarget??={kind:'ship'};
+        aimTarget.id=ship.id;aimTarget.mount=undefined;
+        if (this.capitalSubtarget?.id === ship.id && Number.isInteger(this.capitalSubtarget.index)) {
+            const mountPosition = ship.capitalClass === 'cruiser' ? cruiserMountPosition : frigateMountPosition;
+            mountPosition(ship, this.capitalSubtarget.index, point);
+            aimTarget.mount=this.capitalSubtarget.index;
+            aimTarget.position=point.toArray(this.leadMountTuple??=new Float64Array(3));
+            point.sub(this.leadForward.fromArray(ship.position))
+                .applyQuaternion(this.leadRotation.fromArray(ship.rotation).invert())
+                .applyQuaternion(mesh.quaternion).add(mesh.position);
+        }
+        const range = weaponRange(gun), distance = point.distanceTo(origin);
+        if (distance > 1.5 * range || !this.visibleLeadPoint(this.renderer.projectToScreen(point, this.leadTargetScreen))) return;
+        const time = relativeIntercept(origin, point.toArray(this.leadTuple), p.velocity, ship.velocity, gun.speed, point);
+        if (!Number.isFinite(time)) return;
+        const screen = this.renderer.projectToScreen(point.add(origin), this.leadScreen);
+        if (!this.visibleLeadPoint(screen)) return;
+        screen.inRange = time <= gun.life;
+        screen.solution = screen.inRange && this.volleyHitsTarget(ship,aimTarget,gun.speed,fit,HULL_HARDPOINTS[p.shipId],group);
+        screen.close = Math.hypot(screen.x - this.leadTargetScreen.x, screen.y - this.leadTargetScreen.y) < 8;
+        screen.relation = this.shipRelation(ship);
+        return screen;
+    }
     syncRender(dt, now) {
         if (this.arena?.observer) {
             const focus = this.updateObserverFocus();
@@ -14468,6 +14736,14 @@ export class GameSession {
         this.renderer.setHyperdriveFx(fxState.fx, fxState.progress);
         this.renderer.raceSpeedIntensity=this.activeRace?.state==='running'?clamp((speed/Math.max(1,stats.maxSpeed)-.8)/.9,0,1):0;
         this.renderer.updateCamera(this.save.player.position, this.save.player.prevPosition, this.save.player.rotation, this.save.player.prevRotation, this.save.player.angularVelocity, clamp(speed / Math.max(1, stats.afterburnSpeed), 0, 2), this.afterburning || (this.autopilot && speed > stats.afterburnSpeed), dt, alpha);
+        if(!this.save.settings.reducedDamageEffects && this.shakeStrength>0){
+            const age=this.save.world.time-this.shakeAt, fade=Math.max(0,1-age/.24);
+            if(fade>0 && age>=0){
+                const amp=.014*this.shakeStrength*fade*fade;
+                this.renderer.camera?.rotateX(Math.sin(age*76+.7)*amp);
+                this.renderer.camera?.rotateY(Math.sin(age*57)*amp*.6);
+            }else this.shakeStrength=0;
+        }
         this.renderer.setLandingGuide?.(null);
         this.renderer.setDamageWarning(1 - this.save.player.hull / stats.hull, this.save.settings.reducedDamageEffects);
         // The sun swells only while an escort is racing its storm clock. The
@@ -14486,10 +14762,19 @@ export class GameSession {
         this.renderer.syncDrones?.(this.renderDroneFleet, this.miningDroneContext, alpha, this.save.player);
         this.renderer.render();
         this.renderFrameCount = (this.renderFrameCount ?? 0) + 1;
+        if(this.combatSightBlocked())this.hitTickUntil=0;
+        this.ui.updateSight?.(this.leadSolution(),this.save.world.time < this.hitTickUntil ? this.hitTick : undefined);
         if (!this.save.player.dockedAt && now - this.lastHudUpdate > 42) {
             this.lastHudUpdate = now;
             this.ui.updateHud(this.buildHudModel());
         }
+        const shakeActive=!this.save.settings.reducedDamageEffects && this.shakeStrength>0;
+        if(shakeActive || this.bracketWasShaking){
+            const target=this.getTargetRef(false);
+            const projection=target && this.renderer.projectTargetToScreen?.(target.kind,target.id,target.position,target.mount);
+            this.ui.updateShakenBracket?.(projection,projection && this.targetEdge(projection),shakeActive);
+        }
+        this.bracketWasShaking=shakeActive;
         if(!this.save.player.dockedAt&&this.ui.planetTransitOverlay?.dataset.awaitingFlight==='true')this.ui.completeDepartureTransit();
         this.sampleFlightQuality(now);
     }
@@ -14551,7 +14836,7 @@ export class GameSession {
                 const playerInv = quat(this.save.player.rotation, this.tmpRadarInv).invert();
                 const targetLocal = targetForward.applyQuaternion(playerInv);
                 const heading = Math.atan2(targetLocal.x, -targetLocal.z);
-                const claimable = ship.surrendered && !ship.claimed && !ship.captured && ship.hull > 0 && (ship.bountyValue > 0 || ship.missionId);
+                const claimable = this.hasCaptureClaim(ship);
                 const captureAvailable = claimable && this.boardable(ship) && distance <= stats.scanRange;
                 const surrenderReadout = ship.captured
                     ? t('CAPTURED · HULL DRIFTING')
@@ -14596,7 +14881,7 @@ export class GameSession {
                     // stays off the HUD: it reads through behavior and comms.
                     readout: ship.capitalMountHull && identified ? t(ship.capitalClass==='cruiser'?'BATTERIES {guns}/4 · PDC {pdc}/6':'BATTERIES {guns}/4 · PDC {pdc}/4',{guns:ship.capitalMountHull.slice(0,4).filter(n=>n>0).length,pdc:ship.capitalMountHull.slice(4,ship.capitalClass==='cruiser'?10:8).filter(n=>n>0).length}) : ship.captured || ship.surrendered
                         ? surrenderReadout
-                        : !identified
+                        : ship.crippled ? t('DRIVE DAMAGED') : !identified
                             ? distance > stats.scanRange
                                 ? t('TRACK STABLE · CLOSE TO IDENTIFY')
                                 : t('IDENTIFYING…')
@@ -14817,7 +15102,9 @@ export class GameSession {
             target: hudTarget,
             speaker: this.commsSpeakerHud(),
             dockPrompt,
+            rackProgress: this.rackProgress??0,
             monitorStatus: this.save.world.time < this.monitorStatusUntil ? this.monitorStatus : undefined,
+            monitorTone: this.monitorStatusTone,
             ownMonitorStatus: this.save.world.time < this.ownMonitorStatusUntil ? this.ownMonitorStatus : undefined,
             standoff,
             patrolReply: this.patrolReplyActive(),
@@ -15122,8 +15409,8 @@ export class GameSession {
         // outer ring is exactly the radarRange ring and the inner rings can be
         // calibrated against it (see radarRings in buildHudModel).
         const range = this.playerStats().radarRange;
-        const add = (position, type, selected, surfaceOffset = 0, ghost = false, lostAlpha = 0, race = false, faint = false) => {
-            const relative = this.tmpRadarRel.set(position[0], position[1], position[2]).sub(player).applyQuaternion(inverse);
+        const add = (position, type, selected, surfaceOffset = 0, ghost = false, lostAlpha = 0, race = false, faint = false, offset = 0) => {
+            const relative = this.tmpRadarRel.fromArray(position, offset).sub(player).applyQuaternion(inverse);
             const distance = Math.hypot(relative.x, relative.z) - surfaceOffset;
             const navigation=(type==='location'||type==='wreck')&&selected;
             if (!ghost && distance > range * 1.45&&!navigation)
@@ -15309,6 +15596,11 @@ export class GameSession {
                     });
                 }
             }
+        }
+        // Paint incoming rounds last so the firing ship cannot cover the blip.
+        for (const shot of this.projectiles) {
+            if (shot.targetId === 'player' && shot.life > 0 && !shot.lostTrack && (shot.kind === 'missile' || shot.kind === 'torpedo'))
+                add(this.projStore.pos, 'missile', false, 0, false, 0, false, false, shot.slot * 3);
         }
         return contacts;
     }

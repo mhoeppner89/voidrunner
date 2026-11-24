@@ -34,20 +34,21 @@ const WEAPON = ['gun', 'launcher', 'turret'], GUN = ['gun', 'turret'], SYSTEM = 
 // effect it adds, scaled by tier like the item's own effect. range: the value
 // at roll quality 0 and 1.
 export const EQUIPMENT_AFFIXES = Object.freeze({
- overcharged: {name: 'Overcharged', categories: WEAPON, mod: 'damage', range: [1.06, 1.15], signature: 0xff5ad6},
- efficient: {name: 'Efficient', categories: WEAPON, mod: 'energy', range: [.9, .8]},
- rapid: {name: 'Rapid', categories: WEAPON, mod: 'cooldown', range: [.95, .88]},
+ overcharged: {name: 'Overcharged', categories: WEAPON, mod: 'damage', range: [1.05, 1.15], signature: 0xff5ad6},
+ efficient: {name: 'Efficient', categories: GUN, mod: 'energy', range: [.9, .8]},
+ quickLock: {name: 'Quick-lock', categories: ['launcher'], mod: 'lockTime', range: [.9, .75]},
+ rapid: {name: 'Rapid', categories: WEAPON, mod: 'cooldown', range: [.95, .85]},
  precise: {name: 'Precise', categories: WEAPON, mod: 'accuracy', range: [1.1, 1.25]},
- longRange: {name: 'Long-range', categories: WEAPON, mod: 'range', range: [1.08, 1.18]},
+ longRange: {name: 'Long-range', categories: WEAPON, mod: 'range', range: [1.1, 1.2]},
  disruptive: {name: 'Disruptive', categories: GUN, mod: 'shield', range: [1.15, 1.35], signature: 0x8f6bff},
  piercing: {name: 'Armor-piercing', categories: GUN, mod: 'hull', range: [1.15, 1.35], signature: 0xeef4ff},
- siphoning: {name: 'Siphoning', categories: ['gun'], mod: 'siphon', range: [.1, .22], signature: 0x5dff8f},
- light: {name: 'Lightweight', categories: [...WEAPON, ...SYSTEM], mod: 'mass', range: [.8, .65]},
- tuned: {name: 'Tuned', categories: SYSTEM, mod: 'effect', range: [1.06, 1.14]},
- compact: {name: 'Compact', categories: SYSTEM, mod: 'mass', range: [.88, .78], also: {effect: [1.03, 1.06]}},
- reinforced: {name: 'Reinforced', categories: SYSTEM, bonus: 'hullCapacity', range: [8, 20], signature: 0xffb35c},
- warded: {name: 'Warded', categories: SYSTEM, bonus: 'shieldCapacity', range: [8, 20], signature: 0x6fc4ff},
- overclocked: {name: 'Overclocked', categories: SYSTEM, bonus: 'outputMultiplier', range: [1.04, 1.1], signature: 0xfff06a},
+ siphoning: {name: 'Siphoning', categories: ['gun'], mod: 'siphon', range: [.15, .3], signature: 0x5dff8f},
+ light: {name: 'Lightweight', categories: [...WEAPON, ...SYSTEM], mod: 'mass', range: [.8, .6]},
+ tuned: {name: 'Tuned', categories: SYSTEM, mod: 'effect', range: [1.05, 1.15]},
+ compact: {name: 'Compact', categories: SYSTEM, mod: 'mass', range: [.9, .8], also: {effect: [1.03, 1.06]}},
+ reinforced: {name: 'Reinforced', categories: SYSTEM, bonus: 'hullCapacity', range: [10, 20], signature: 0xffb35c},
+ warded: {name: 'Warded', categories: SYSTEM, bonus: 'shieldCapacity', range: [10, 20], signature: 0x6fc4ff},
+ overclocked: {name: 'Overclocked', categories: SYSTEM, bonus: 'outputMultiplier', range: [1.05, 1.1], signature: 0xfff06a},
 });
 // Signature colour: the specialisation an item is built around tints its
 // shots, impacts and icon accent (equipmentSignature). Legendaries have their
@@ -58,12 +59,12 @@ export const EQUIPMENT_AFFIXES = Object.freeze({
 //   scale  — flight fields multiplied
 //   effects — ship effects added to the item's own
 export const NAMED_EQUIPMENT = Object.freeze({
- 'pulse-cannon': {signature: 0xffe14d, name: 'Needle Array', trait: 'Every fourth bolt strikes for 2.5× damage.', mods: {accuracy: 1.15}, weapon: {critEvery: 4, critMultiplier: 2.5}},
- 'beam-emitter': {signature: 0xfff0c0, name: 'Quiet Sun', trait: 'Each hit returns 35% of its energy.', mods: {damage: 1.08, siphon: .35}},
+ 'pulse-cannon': {signature: 0xffe14d, name: 'Needle Array', trait: 'Every fourth bolt strikes for double damage.', mods: {accuracy: 1.15}, weapon: {critEvery: 4, critMultiplier: 2}},
+ 'beam-emitter': {signature: 0xfff0c0, name: 'Quiet Sun', trait: 'Each hit returns half of its energy.', mods: {damage: 1.1, siphon: .5}},
  'gauss-cannon': {signature: 0x38ffe0, name: 'Dead Reckoning', trait: 'Slugs pass through the first ship they hit.', mods: {damage: 1.1, range: 1.15}, weapon: {pierce: 1}},
- 'ripper': {signature: 0xa8e6ff, name: 'Hailstorm', trait: 'Fires ten pellets instead of seven.', weapon: {pellets: 10}},
- 'ion-blaster': {signature: 0xc06bff, name: 'Static Bloom', trait: 'Weapon jamming lasts twice as long.', weapon: {jamSeconds: 2}},
- 'mortar': {signature: 0xff5a8a, name: 'Dawnbreaker', trait: 'A 60% wider blast that hits 30% harder.', scale: {splashRadius: 1.6, splashDamage: 1.3}},
+ 'ripper': {signature: 0xa8e6ff, name: 'Hailstorm', trait: 'Fires nine pellets instead of seven.', weapon: {pellets: 9}},
+ 'ion-blaster': {signature: 0xc06bff, name: 'Static Bloom', trait: 'Weapon jamming lasts twice as long.', mods: {damage: 1.1}, weapon: {jamSeconds: 2}},
+ 'mortar': {signature: 0xff5a8a, name: 'Dawnbreaker', trait: 'A 60% wider blast that hits 30% harder.', mods: {damage: 1.1}, scale: {splashRadius: 1.6, splashDamage: 1.3}},
  'seeker-launcher': {signature: 0xffd27a, name: 'Longbow', trait: '30% longer lock range and sharper tracking.', mods: {range: 1.3, accuracy: 1.3}},
  'torpedo-launcher': {signature: 0xff8a4d, name: 'Siegebreaker', trait: 'A 50% wider warhead blast.', mods: {damage: 1.12}, scale: {splashRadius: 1.5}},
  'shield-mk2': {signature: 0x6fc4ff, name: 'Bastion', trait: 'Also regenerates shields 25% faster.', mods: {effect: 1.18}, effects: {rechargeMultiplier: 1.25}},
@@ -108,7 +109,7 @@ const addEffect=(effects,key,value)=>{
 export function resolveEquipmentDefinition(base, record) {
  const minTier=base.tier??1,tier=Math.max(minTier,Math.min(3,record.tier??1)),extra=Math.max(0,Math.min(2,tier-minTier));
  const rarityId=Object.hasOwn(EQUIPMENT_RARITIES,record.rarity)?record.rarity:'common',rarity=EQUIPMENT_RARITIES[rarityId];
- const modifiers={damage:TIER_CURVE.damage[extra]*rarity.gain,energy:TIER_CURVE.energy[extra],cooldown:1,range:1,accuracy:1,mass:1,effect:TIER_CURVE.effect[extra]*rarity.gain,shield:1,hull:1,siphon:0};
+ const modifiers={damage:TIER_CURVE.damage[extra]*rarity.gain,energy:TIER_CURVE.energy[extra],cooldown:1,lockTime:1,range:1,accuracy:1,mass:1,effect:TIER_CURVE.effect[extra]*rarity.gain,shield:1,hull:1,siphon:0};
  const affixRolls=[],bonuses=[];
  for(const [index,id] of (record.affixes??[]).entries()){
   const a=EQUIPMENT_AFFIXES[id];if(!a?.categories.includes(base.category))continue;
@@ -152,7 +153,7 @@ export function equipmentRating(item){
  const m=item?.modifiers;if(!m)return 100;
  const named=item.rarity==='named'&&item.trait?1.12:1;
  let score;
- if(WEAPON.includes(item.category))score=m.damage/m.cooldown*m.energy**-.35*m.range**.35*m.accuracy**.25*((m.shield??1)*(m.hull??1))**.35*(1+(m.siphon??0)*.6)*m.mass**-.05;
+ if(WEAPON.includes(item.category))score=m.damage/m.cooldown*(m.lockTime??1)**-.35*m.energy**-.35*m.range**.35*m.accuracy**.25*((m.shield??1)*(m.hull??1))**.35*(1+(m.siphon??0)*.6)*m.mass**-.05;
  else score=m.effect*m.mass**-.05*(1+(item.affixRolls??[]).filter(a=>EQUIPMENT_AFFIXES[a.id]?.bonus).length*.06);
  return Math.round(100*score*named);
 }
@@ -168,6 +169,8 @@ export function equipmentAffixLines(item){
   else if(key==='damage')text=t('+{value}% damage',{value:percent(value-1)});
   else if(key==='energy')text=t('−{value}% energy per shot',{value:percent(1-value)});
   else if(key==='cooldown')text=t('+{value}% fire rate',{value:percent(1/value-1)});
+  else if(key==='lockTime')text=t('−{value}% lock time',{value:percent(1-value)});
+  else if(key==='accuracy'&&item.category==='launcher')text=t('+{value}% seeker cone and turn rate',{value:percent(value-1)});
   else if(key==='accuracy')text=t('+{value}% aim correction',{value:percent(value-1)});
   else if(key==='range')text=t('+{value}% range',{value:percent(value-1)});
   else if(key==='shield')text=t('+{value}% shield damage',{value:percent(value-1)});
@@ -187,7 +190,9 @@ export function modifiedWeapon(base,item) {
  const value={...base,damageFlat:base.damageFlat==null?undefined:base.damageFlat*m.damage,damage:base.damage==null?undefined:base.damage*m.damage,
   splashDamage:base.splashDamage==null?undefined:base.splashDamage*m.damage,energyCost:(base.energyCost??0)*m.energy,cooldown:base.cooldown*m.cooldown,
   range:base.range==null?undefined:base.range*m.range,lockRange:base.lockRange==null?undefined:base.lockRange*m.range,
-  life:base.life*m.range,shotInterval:base.shotInterval==null?undefined:base.shotInterval*m.cooldown,burstPause:base.burstPause==null?undefined:base.burstPause*m.cooldown,interceptEnergy:base.interceptEnergy==null?undefined:base.interceptEnergy*m.energy,gunneryAccuracy:m.accuracy,homingTurn:base.homingTurn==null?undefined:base.homingTurn*m.accuracy,assist:(base.assist??1)*m.accuracy,spreadRad:(base.spreadRad??0)/m.accuracy,
+  plumeFraction:base.plumeFraction==null?undefined:base.plumeFraction/m.accuracy,
+  lockTime:base.lockTime==null?undefined:base.lockTime*m.lockTime,trackRate:base.trackRate==null?undefined:base.trackRate*m.accuracy,seekerCone:base.seekerCone==null?undefined:base.seekerCone*m.accuracy,
+  life:base.category==='launcher'?base.life:base.life*m.range,shotInterval:base.shotInterval==null?undefined:base.shotInterval*m.cooldown,burstPause:base.burstPause==null?undefined:base.burstPause*m.cooldown,interceptEnergy:base.interceptEnergy==null?undefined:base.interceptEnergy*m.energy,gunneryAccuracy:m.accuracy,homingTurn:base.homingTurn==null?undefined:base.homingTurn*m.accuracy,assist:(base.assist??1)*m.accuracy,spreadRad:(base.spreadRad??0)/m.accuracy,
   shieldMul:base.shieldMul==null&&shield===1?base.shieldMul:(base.shieldMul??1)*shield,hullMul:base.hullMul==null&&hull===1?base.hullMul:(base.hullMul??1)*hull,
   siphon:m.siphon>0?m.siphon:undefined,tint:item.signature?.color};
  const traits=item.weaponTraits;

@@ -39,6 +39,15 @@ export const SOUND_EVENTS = {
     hit: { bus: 'cockpit', room: 0.2, spacing: 0.065, muffle: 0.5, duck: [0.72, 0.08, 0.45], priority: 3, layers: [['hit', 0.75, { vary: 0.05 }], ['hull-thud', 0.75, { vary: 0.06 }], ['metal-clang', 0.28, { vary: 0.1 }], ['rattle', 0.5, { delay: 0.03 }], ['spark', 0.35, { delay: 0.07, chance: 0.4 }]] },
     shieldBreak: { bus: 'cockpit', room: 0.18, space: 0.2, spacing: 2, muffle: 0.7, duck: [0.5, 0.25, 0.9], priority: 3, layers: [['shield-collapse', 1], ['spark', 0.4, { delay: 0.3 }], ['thump', 0.5, { rate: 0.7 }]] },
     shieldRestore: { bus: 'cockpit', room: 0.14, spacing: 3, priority: 1, layers: [['shield-restore', 0.8]] },
+    // Lock steps climb A-C-D on the panel scale (equal-tempered rates), then
+    // rackReady resolves to E+A.
+    rackSearch: {bus:'cockpit', spacing:.12, layers:[['rack-search',.7]]},
+    rackSearch2: {bus:'cockpit', spacing:.12, layers:[['rack-search',.7,{rate:1.1892}]]},
+    rackSearch3: {bus:'cockpit', spacing:.12, layers:[['rack-search',.7,{rate:1.3348}]]},
+    rackReady: {bus:'cockpit', spacing:.25, layers:[['rack-ready',.8]]},
+    rackDenied: {bus:'cockpit', spacing:.25, layers:[['rack-denied',.55]]},
+    confirmShield: {bus:'cockpit', spacing:.24, layers:[['confirm-shield',.48]]},
+    confirmHull: {bus:'cockpit', spacing:.24, layers:[['confirm-hull',.58]]},
     targetShieldBreak: { bus: 'ui', spacing: 1.5, priority: 2, layers: [['target-shield-down', 1]] },
     hullAlarm: { bus: 'ui', room: 0.12, spacing: 1, priority: 3, layers: [['alarm-hull', 1]] },
     spark: { bus: 'cockpit', room: 0.12, spacing: 0.2, layers: [['spark', 1, { vary: 0.1 }]] },
@@ -84,7 +93,12 @@ export const SOUND_EVENTS = {
     weaponSwitch: { bus: 'ui', spacing: 0.08, layers: [['mech-clack', 0.5, { rate: 0.8, vary: 0.04 }], ['ui-tab', 0.8]] },
     targetCycle: { bus: 'ui', spacing: 0.05, layers: [['target-cycle', 1]] },
     targetLock: { bus: 'ui', spacing: 0.4, priority: 2, layers: [['target-lock', 1]] },
-    missileAlert: { bus: 'ui', spacing: 0.3, priority: 3, layers: [['missile-alert', 1]] },
+    missileBreak: { bus: 'cockpit', spacing: 0.6, priority: 3, layers: [['break-cue', .8]] },
+    // Launch and approach warnings share one pip sample and one channel, so
+    // they space against each other and never stack. A salvo or wingmen
+    // firing together read as one launch alert.
+    missileAlert: { bus: 'ui', channel: 'missile-pips', spacing: 0.45, priority: 3, layers: [['missile-alert', 1]] },
+    missileLaunch: { bus: 'ui', channel: 'missile-pips', spacing: 1.5, priority: 3, layers: [['missile-alert', 1]] },
     alert: { bus: 'ui', spacing: 0.65, priority: 2, layers: [['alert', 1]] },
     // The generic caution keeps its name: dozens of gameplay systems raise it.
     warning: { bus: 'ui', spacing: 0.65, priority: 2, layers: [['alert', 1]] },

@@ -113,5 +113,6 @@ test('launcher energy refusal uses the same own-monitor cue and preserves ammuni
  const s=session(),p=s.save.player,calls=[];s.audio.playCockpit=(...a)=>calls.push(a);p.shipId='lancer';p.ownedShips=['lancer'];p.mode='combat';
  const fit=loadoutFor(p);fit.launchers=['shield-seeker-launcher',null];p.outfitting.loadouts.lancer=fit;fillLauncherMagazines(p);p.energy=0;
  const before=launcherMagazineEntries(p)[0].rounds;const target=s.spawnShip('pirate',[0,0,-100]);s.getTargetRef=()=>({kind:'ship',id:target.id});
+ p.currentTargetId=target.id;s.updatePlayerRackLocks(3);calls.length=0;
  s.fireMissile();s.fireMissile();assert.deepEqual(calls.map(c=>c[0]),['capacitorEmpty']);assert.ok(s.ownMonitorStatus);assert.equal(s.projectiles.length,0);assert.equal(launcherMagazineEntries(p)[0].rounds,before);
 });

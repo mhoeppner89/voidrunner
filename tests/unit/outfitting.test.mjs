@@ -38,15 +38,15 @@ const capablePlayer = (overrides = {}) => ({
     ...overrides,
 });
 
-assert.equal(OUTFIT_ITEM_IDS.length, 30, 'registry includes the shop roster and three capital salvage modules');
-assert.equal(new Set(OUTFIT_ITEM_IDS).size, 30, 'registry ids are unique');
+assert.equal(OUTFIT_ITEM_IDS.length, 31, 'registry includes the shop roster and three capital salvage modules');
+assert.equal(new Set(OUTFIT_ITEM_IDS).size, 31, 'registry ids are unique');
 assert.deepEqual(OUTFIT_ITEM_IDS, [
     'mining-drone','pdc-drone','repair-drone',
     'tracking-turret','capacitor-bank','sustained-reactor','recovery-shield','beam-emitter',
     'pulse-cannon', 'gauss-cannon', 'pdc', 'ripper', 'ion-blaster', 'mortar',
     'seeker-launcher', 'swarm-launcher', 'shield-seeker-launcher', 'shield-swarm-launcher', 'torpedo-launcher',
     'engine-mk2', 'thrusters-mk2', 'shield-mk2', 'armor-mk2',
-    'radar-mk2', 'cargo-pods', 'loot-collector', 'salvage-mk2',
+    'radar-mk2', 'cargo-pods', 'fire-control', 'loot-collector', 'salvage-mk2',
     'frigate-battery', 'cruiser-battery', 'capital-shield-generator',
 ]);
 all(OUTFIT_ITEM_IDS, (id) => {
@@ -190,7 +190,7 @@ const cargoInvalid = validateLoadout(player, { shipId: 'wayfarer' }, empty);
 assert.equal(cargoInvalid.code, 'unknown-ship');
 assert.equal(validateLoadout(player, 'wayfarer', empty, { cargoMass: 33 }).code, 'cargo-over-capacity');
 assert.equal(validateLoadout(player, 'wayfarer', { ...empty, utility: ['cargo-pods', null] }, { cargoMass: 49 }).ok, true);
-assert.equal(validateLoadout(player, 'wayfarer', { ...empty, utility: ['cargo-pods', null] }, { cargoMass: 51 }).code, 'cargo-over-capacity');
+assert.equal(validateLoadout(player, 'wayfarer', { ...empty, utility: ['cargo-pods', null] }, { cargoMass: 53 }).code, 'cargo-over-capacity');
 
 // Quotes are pure: they do not spend credits or mutate the player, and the
 // same input produces the same deterministic transaction object.

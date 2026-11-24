@@ -11,8 +11,26 @@ test('old faction standings, active contracts and ledgers migrate once without l
  const ledger={startSnapshot:{reputation:s.player.reputation},reputationDelta:{'free-merchants':2,'frontier-miners':3,'salvage-union':-1,'frontier-league':5}};migrateFactionTags(ledger);assert.deepEqual(ledger.startSnapshot.reputation,a.player.reputation);assert.deepEqual(ledger.reputationDelta,{concord:0,alliance:5,independents:4,pirates:0});
  assert.equal(canonicalFaction('frontier-league'),'alliance');assert.equal(canonicalFaction('salvage-union'),'independents');
 });
-test('standard equipment and finite magazines do not vary with spawn order or pilot difficulty',()=>{
- for(const id of Object.keys(SHIPS)){assert.ok(HULL_NPC_FITS[id],id);let baseline;for(const tier of ['novice','veteran','ace'])for(const index of [0,1,3,17]){const f=createEnemyLoadout({hullId:id,role:'patrol',pilot:{tier}},index);const signature=[f.guns,f.turrets,f.launchers,f.power,f.drive,f.defense,f.utility,f.racks,f.stats];if(baseline)assert.deepEqual(signature,baseline,id);baseline=signature;for(const k of ['guns','turrets','launchers','power','drive','defense','utility'])f[k].forEach((item,i)=>{if(item)assert.ok(itemFitsMount(OUTFIT_ITEMS[item],HULL_HARDPOINTS[id][k][i]),`${id} ${k} ${item}`);});assert.ok(Number.isFinite(f.stats.maxSpeed));assert.ok(f.missiles>=0);assert.match(f.fitId,/standard/);}}
+test('stock fits keep their guns, magazines and flight stats across pilot tiers',()=>{
+ for(const id of Object.keys(SHIPS)){
+  assert.ok(HULL_NPC_FITS[id],id);
+  const baseline=createEnemyLoadout({hullId:id,role:'patrol',pilot:{tier:'novice'}},0);
+  for(const tier of ['novice','veteran','ace'])for(const index of [0,1,3,17]){
+   const f=createEnemyLoadout({hullId:id,role:'patrol',pilot:{tier}},index);
+   for(const key of ['guns','turrets','launchers','power','drive','defense','racks'])assert.deepEqual(f[key],baseline[key],id);
+   const computer=['demon','talon'].includes(id)&&tier!=='novice'&&index%4===0;
+   const utility=[...baseline.utility],stats={...baseline.stats};
+   if(computer){
+    utility[utility.indexOf(null)]='fire-control';
+    stats.equipmentMass+=OUTFIT_ITEMS['fire-control'].mass;
+    stats.assistMultiplier=OUTFIT_ITEMS['fire-control'].effects.assistMultiplier;
+   }
+   assert.deepEqual(f.utility,utility,id);assert.deepEqual(f.stats,stats,id);
+   for(const k of ['guns','turrets','launchers','power','drive','defense','utility'])
+    f[k].forEach((item,i)=>{if(item)assert.ok(itemFitsMount(OUTFIT_ITEMS[item],HULL_HARDPOINTS[id][k][i]),id+' '+k+' '+item);});
+   assert.ok(Number.isFinite(f.stats.maxSpeed));assert.ok(f.missiles>=0);assert.match(f.fitId,/standard/);
+  }
+ }
  const custom=createEnemyLoadout({hullId:'talon'},0,{guns:['ripper',null,'ion-blaster'],turrets:[],launcher:'seeker',missiles:2});assert.deepEqual(custom.guns,['ripper',null,'ion-blaster',null],'shared weapon bays keep their authored positions and unused bays');assert.equal(custom.missiles,2);assert.equal(custom.fitId,'scenario');
 });
 test('career pirates have only Scrapper and Demon; independent hunters never acquire an unprovoking player',()=>{

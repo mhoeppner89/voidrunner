@@ -32,7 +32,7 @@ export function equipCareerItems(session,ship,{tutorialMiningPirate=false}={}){
   const baseId=equipmentBaseId(fit[key][i]),id=`${ship.lootKey}-${key}-${i}`;
   // The first pirate carries the exact green tier I weapon that introduces loot.
   const guaranteed=tutorialMiningPirate&&key==='launchers'&&!ship.guaranteedLootId;
-  const item=guaranteed?createEquipmentRecord(baseId,{id,tier:1,rarity:'uncommon',affixes:['efficient']}):rollEquipmentRecord(baseId,rng,Math.max(tier,OUTFIT_ITEMS[fit[key][i]]?.tier??1),id,{luck,owned});if(!item)continue;
+  const item=guaranteed?createEquipmentRecord(baseId,{id,tier:1,rarity:'uncommon',affixes:['quickLock']}):rollEquipmentRecord(baseId,rng,Math.max(tier,OUTFIT_ITEMS[fit[key][i]]?.tier??1),id,{luck,owned});if(!item)continue;
   if(guaranteed)ship.guaranteedLootId=item.id;
   fit[key][i]=item.id;ship.equipmentRecords.push({item,key,index:i});
  }

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {session} from '../helpers/session.mjs';
 import {createNewSave,hydrateSave} from '../../src/game/save.js';
+import {wearFighterDrive} from '../../src/game/weaponFlight.js';
 import {ExplorationMethods} from '../../src/game/exploration.js';
 import {FREIGHTER_LOGS,GRAVEYARD_CACHES,FREIGHTER_POSITION,FREIGHTER_WRECK_ID,CONVOY_POSITION,explorationLootId,normalizeExploration,explorationJournal,explorationDialogue} from '../../src/game/explorationData.js';
 import {combatWreckNode,updateCombatLoot,recoverWreckEntry} from '../../src/game/careerLoot.js';
@@ -37,3 +38,15 @@ test('a freighter waypoint cannot address a wreck in another system',()=>{const 
 test('triangulated coordinates hold their target lock beyond the sensor horizon',()=>{const s=make();unlock(s);s.explorationJournalAction('navigate');s.save.player.position=[...LOCATIONS.shardbelt.position];s.clearTarget=()=>{throw Error('Known coordinates were dropped');};s.maintainTargetLock();assert.equal(s.save.player.currentTargetId,FREIGHTER_WRECK_ID);});
 
 test('guided careers and isolated racing sessions do not seed distracting discovery crates',()=>{for(const race of [false,true]){const s=make();s.save=createNewSave(175,{tutorial:!race});if(race)s.save.player.raceReturn={shipId:'wayfarer'};s.wreckNodes=[];s.explorationSupplied=false;s.initializeExploration();assert.equal(Object.keys(s.save.world.combatWrecks??{}).length,0);}});
+
+test('exploration restores drive wear and applies the crippled penalty once per fresh fit',()=>{
+ const s=make();delete s.spawnShip;unlock(s);s.chooseExploration('fight');
+ let ship=s.ships.find(a=>a.explorationActor==='escort');ship.rotation=[0,0,0,1];
+ const speed=ship.combatFit.stats.maxSpeed;
+ const reload=()=>{tick(s);s.save=hydrateSave(JSON.parse(JSON.stringify(s.save)));s.ships=[];tick(s);return s.ships.find(a=>a.explorationActor==='escort');};
+ const hit=()=>wearFighterDrive(ship,ship.maxHull*.1,ship.position,[ship.position[0],ship.position[1],ship.position[2]+20]);
+ hit();ship=reload();assert.equal(ship.driveWear,.1);assert.ok(!ship.crippled);
+ hit();ship=reload();assert.equal(ship.driveWear,.2);assert.ok(ship.crippled);
+ assert.equal(ship.combatFit.stats.maxSpeed,speed*.5);assert.equal(ship.combatFit.stats.afterburnSpeed,ship.combatFit.stats.maxSpeed);
+ ship=reload();assert.equal(ship.combatFit.stats.maxSpeed,speed*.5);
+});
