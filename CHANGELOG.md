@@ -1,3 +1,7 @@
+## 0.8.2pn — No blue flash on touch controls
+
+- Touching the flight stick, throttle, pads or afterburner no longer tints them blue on Android, and a long press never selects, drags or opens a menu on the cockpit art or any sprite. The game's own pressed states are unchanged.
+
 ## 0.8.2pm — Violent break-ups, cargo icons, launchers keep their missiles
 
 - Destroyed ships come apart violently: hull sections fly off at about half to one ship length per second, smaller pieces faster and tumbling harder, and torn armour bursts out as many small fast flecks and a few slower plates. Explosions throw more sparks, faster, and more burning chunks. Loot still drifts where the ship died.

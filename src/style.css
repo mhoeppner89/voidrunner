@@ -148,7 +148,23 @@ body {
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
+  /* Touch browsers tint whatever is pressed (Android: a translucent blue box
+     over the stick, pads and lever) and offer a callout on long-pressed
+     images. The game draws its own pressed states. Both are inherited. */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
 }
+
+/* Sprites and painted art never drag, select or call out on long press. */
+img, svg, canvas {
+  -webkit-user-drag: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+/* A long press can still start a selection in WebKit; never paint it blue.
+   Text fields keep their normal selection. */
+#game-shell :not(input, textarea)::selection { background: transparent; }
 
 button,
 input,

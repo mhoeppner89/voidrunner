@@ -19,8 +19,8 @@ export class PaintedCockpit {
     ensureDom(){
         if(this.frame?.isConnected)return;
         const instruments=this.root.querySelector('.cockpit-instruments');
-        this.frame=new Image();this.frame.className='painted-cockpit-frame';this.frame.alt='';this.frame.setAttribute('aria-hidden','true');
-        this.forwardHull=new Image();this.forwardHull.className='painted-cockpit-forward-hull';this.forwardHull.alt='';this.forwardHull.setAttribute('aria-hidden','true');this.forwardHull.hidden=true;
+        this.frame=new Image();this.frame.className='painted-cockpit-frame';this.frame.alt='';this.frame.draggable=false;this.frame.setAttribute('aria-hidden','true');
+        this.forwardHull=new Image();this.forwardHull.className='painted-cockpit-forward-hull';this.forwardHull.alt='';this.forwardHull.draggable=false;this.forwardHull.setAttribute('aria-hidden','true');this.forwardHull.hidden=true;
         instruments.prepend(this.forwardHull,this.frame);
         this.damageHullMask=svg('image',{class:'canopy-hull-mask',width:1000,height:1000,preserveAspectRatio:'none',filter:'url(#canopy-opaque)'});
         this.root.querySelector('#canopy-damage-mask')?.append(this.damageHullMask);

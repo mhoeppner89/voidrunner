@@ -478,7 +478,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2pm';
+const GAME_VERSION = '0.8.2pn';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -5718,7 +5718,7 @@ export class GameUI {
         const encounterSource=this.encounterPortraitSource(faction,portraitIdentity,portraitIndex);
         const source=NPC_PORTRAIT_BY_ID[id]??encounterSource;
         bar.classList.toggle('has-portrait',Boolean(source));
-        if(source){const img=document.createElement('img');img.className='comms-portrait';img.src=source;img.alt=callsign;img.addEventListener('error',()=>{img.remove();bar.classList.remove('has-portrait');this.scheduleCommsFit();},{once:true});bar.append(img);}
+        if(source){const img=document.createElement('img');img.className='comms-portrait';img.draggable=false;img.src=source;img.alt=callsign;img.addEventListener('error',()=>{img.remove();bar.classList.remove('has-portrait');this.scheduleCommsFit();},{once:true});bar.append(img);}
         const text=document.createElement('span');text.className='talker-text';text.textContent=`${commsSenderLabel(callsign)}: ${line}`;bar.append(text);
         this.scheduleCommsFit();
     }
