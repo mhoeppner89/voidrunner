@@ -2,7 +2,9 @@
 <script type="module">
 // Rasterises the vector glyphs into 32×32 pixel sprites: hard-edged layers,
 // a top-left light, a dark rim, dithered lower hull and a 1px ink outline.
-import {SYMBOLS,COMMODITY_SYMBOLS,SIGNALS,ACCENTS,CARGO_PAINT,FALLBACK,TIER_PARTS,TIER_PAINT,SINGLE_TIER} from './itemGlyphs.mjs';
+import {COMMODITY_SYMBOLS,ACCENTS,CARGO_PAINT,FALLBACK,TIER_PAINT,SINGLE_TIER} from './itemGlyphs.mjs';
+import {EQUIPMENT_PARTS,TIER_EQUIPMENT_PARTS,METAL_PAINT} from './itemEquipment.mjs';
+import {renderDiagonal} from './diagonalSprites.mjs';
 const N=32, INK=[5,8,15], WHITE=[255,255,255];
 // Pixel steel is lighter than the old vector paint: small sprites need value contrast.
 const STEEL=TIER_PAINT[1];
@@ -55,11 +57,40 @@ function sprite(shape,paint,signal){
   flush();
   return [palette.map(c=>c.slice(1)).join(''),rle,codes.join('')];
 }
-const out={equipment:{},commodity:{}};
-for(const [id,shape] of Object.entries(SYMBOLS))for(const tier of SINGLE_TIER.has(id)?[1]:[1,2,3]){
-  const parts=(TIER_PARTS[id]??[]).slice(0,tier-1).join('');
-  out.equipment[tier>1?`${id}@${tier}`:id]=sprite({...shape,body:shape.body+parts},{...TIER_PAINT[tier],accent:ACCENTS[id]??'#9ed5e8'},SIGNALS[id]);
+// Palette + run-length encoding shared by both renderers (see sprite()).
+function encode(px,code){
+  const palette=[],codes=[],index=new Map();let rle='',prev=-1,len=0;
+  const flush=()=>{if(len)rle+=prev.toString(36)+len.toString(36);};
+  for(let i=0;i<N*N;i++){let v=0;if(px[i]){const key=toHex(px[i])+code[i];if(!index.has(key)){palette.push(toHex(px[i]));codes.push(code[i]);index.set(key,palette.length);}v=index.get(key);}
+    if(v===prev&&len<35)len++;else{flush();prev=v;len=1;}}
+  flush();
+  return [palette.map(c=>c.slice(1)).join(''),rle,codes.join('')];
 }
+// Diagonal weapons: banded materials, an ink outline, glow coded for recolour.
+function weaponSprite(id,tier){
+  const paint=TIER_PAINT[tier],body=hex(paint.body),face=hex(paint.face),edge=hex(paint.edge),line=hex(paint.line),accent=sat(hex(ACCENTS[id]??'#9ed5e8'),1.15);
+  const dark=mix(body,INK,.45),metal=METAL_PAINT[tier].map(hex);
+  const ramps={
+    // Tier III keeps its gold for trim bands; stair-step hull edges take a steel highlight.
+    hull:{hi:tier===3?mix(face,WHITE,.3):edge,lit:face,mid:body,lo:dark},
+    metal:{hi:metal[0],lit:metal[1],mid:metal[2],lo:metal[3]},
+    dark:{hi:mix(body,INK,.35),lit:mix(body,INK,.5),mid:mix(body,INK,.62),lo:mix(body,INK,.75)},
+    trim:{hi:mix(line,WHITE,.35),lit:line,mid:mix(line,body,.35),lo:mix(line,INK,.45)},
+  };
+  const extra=(TIER_EQUIPMENT_PARTS[id]??[]).slice(0,tier-1).flat(),all=[...EQUIPMENT_PARTS[id],...(TIER_EQUIPMENT_PARTS[id]??[]).flat()];
+  const cells=renderDiagonal([...EQUIPMENT_PARTS[id],...extra],{scaleFrom:all});
+  const px=new Array(N*N).fill(null),code=new Array(N*N).fill('0');
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+    const i=y*N+x,c=cells[i];
+    if(!c){if([[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>{const X=x+dx,Y=y+dy;return X>=0&&Y>=0&&X<N&&Y<N&&cells[Y*N+X];}))px[i]=INK;continue;}
+    if(c.mat==='glow'){px[i]=c.tone==='h'?mix(accent,WHITE,.55):accent;code[i]=c.tone==='h'?'h':'a';}
+    else px[i]=ramps[c.mat][c.tone];
+  }
+  return encode(px,code);
+}
+const out={equipment:{},commodity:{}};
+for(const id of Object.keys(EQUIPMENT_PARTS))for(const tier of SINGLE_TIER.has(id)?[1]:[1,2,3])
+  out.equipment[tier>1?`${id}@${tier}`:id]=weaponSprite(id,tier);
 out.equipment.fallback=sprite(FALLBACK,{...STEEL,accent:'#9ed5e8'});
 for(const [id,shape] of Object.entries(COMMODITY_SYMBOLS))out.commodity[id]=sprite(shape,CARGO_PAINT[id]);
 out.commodity.fallback=sprite(FALLBACK,{...STEEL,accent:'#9ed5e8'});

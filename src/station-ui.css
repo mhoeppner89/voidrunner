@@ -1132,7 +1132,7 @@
   background: radial-gradient(130% 50% at 50% 0%, var(--sx-screen-glow), transparent 70%) padding-box, var(--sx-screen) padding-box; border: 6px solid var(--sx-metal-mid); border-image: linear-gradient(155deg, var(--sx-metal-hi), var(--sx-metal) 14%, var(--sx-metal-mid) 48%, var(--sx-metal-lo) 82%, var(--sx-metal-deep)) 1; border-radius: 0;
   box-shadow: 0 0 0 1px #000, 0 30px 70px rgba(0, 0, 0, 0.6), inset 0 0 0 1px #000, inset 0 0 60px rgba(0, 0, 0, 0.6);
 }
-#ship-panel .ship-console { display: flex; flex-direction: column; width: min(1360px, calc(100vw - 48px)); height: min(880px, calc(100dvh - 48px)); max-width: none; max-height: none; padding: 0; }
+#ship-panel .ship-console { display: flex; flex-direction: column; width: min(1360px, calc(100vw - 48px)); height: min(880px, calc(100dvh - 48px)); max-width: 100%; max-height: 100%; padding: 0; }
 #ship-panel .ship-console-header { display: flex; align-items: center; gap: 14px; min-height: 72px; padding: 10px 20px; margin: 0; border-bottom: 1px solid var(--sx-line); background: none; }
 #ship-panel .ship-console-title { display: grid; gap: 6px; margin-right: auto; min-width: 0; }
 #ship-panel .ship-console-header h2 { margin: 0; font: 400 24px/1 var(--pixel-font); color: var(--sx-text); letter-spacing: 0.02em; }
@@ -1230,7 +1230,8 @@
    action keys stay fixed while the body scrolls. */
 #arena-panel .run-card {
   position: relative; display: flex; flex-direction: column; gap: 0;
-  width: min(1120px, calc(100vw - 32px)); height: min(740px, calc(100dvh - 32px)); max-width: none; max-height: none; padding: 0; overflow: hidden;
+  /* Capped at the panel's safe-area padded box: 100vw includes a phone's notch. */
+  width: min(1120px, calc(100vw - 32px)); height: min(740px, calc(100dvh - 32px)); max-width: 100%; max-height: 100%; padding: 0; overflow: hidden;
   color: var(--sx-text); font-family: var(--ui-text-font); text-shadow: none; touch-action: auto;
   background: radial-gradient(130% 50% at 50% 0%, var(--sx-screen-glow), transparent 70%) padding-box, var(--sx-screen) padding-box;
   border: 6px solid var(--sx-metal-mid); border-radius: 0;

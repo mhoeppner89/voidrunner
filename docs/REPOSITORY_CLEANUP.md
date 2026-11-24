@@ -40,6 +40,8 @@ None. Full suite: **1,388 passed / 0 failed** (0.8.2ph).
 
 Browser, fixed in 0.8.2ph: `controller.mjs` asserted the long-gone 0.8.2of title version (now any 0.8.x build), and `menu-clarity.mjs` failed on the desktop concourse's sideways overflow (the composite canvas is now clipped by its host). Browser: `tests/browser/space-pickups.mjs` is stale (found in 0.8.2pg). Its exploration-review scene `convoy` was renamed `distress-convoy` and the convoy choice it presses is no longer shown on that scene; the test needs the current distress flow. It also requires `node tools/playtest/exploration-review.mjs` to have generated `output/exploration-review/`.
 
+Browser: `tests/browser/story-menus.mjs` expects Mara's post-reactor line to mention an "Abbauauftrag"; since the first-combat dialogue revision (`abc1744`) the line reads "… ich habe einen Auftrag für uns." The test needs the current wording (found in 0.8.2pk; layout unaffected).
+
 On the iPhone WebKit profile, `tests/browser/concourse-ships.mjs` reports `nacre/market moved away from an unobstructed approved anchor`. Both the round 1 snapshot and the round 2 build produced the same 8 px market-button Y coordinate for an authored 7.26 px anchor at a 294 px scene height. The desktop profile passed.
 
 ### Resolved: stale balance and mock expectations

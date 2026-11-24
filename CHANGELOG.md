@@ -1,3 +1,8 @@
+## 0.8.2pl — Hardware icons, menus clear of the notch
+
+- Every equipment icon is redrawn as crisp pixel hardware on the diagonal: twin-barrelled pulse lasers, a lens-tipped beam, split magrail rails with a glowing channel, a flared scatter cannon, coil-wound ion cannon, ribbed plasma cannon, the missile, swarm pod and torpedo themselves, rotary PDC and laser dome, and systems as real parts (exhaust nozzle, thruster cluster, reactor core, charged cells, domed shield emitters, riveted armour, radar dish, cargo container, targeting optic, tractor emitter, salvage cutter, drones). Housings take the tier paint (blue steel, titanium, black alloy with gold bands), barrels a darker gunmetal, and glowing parts the item's signature colour. Higher tiers add hardware without shrinking the icon.
+- On phones with a notch or camera cutout, Options and the Arena screens no longer run under the cutout or past the right edge in landscape: menu cards stay inside the safe area.
+
 ## 0.8.2pk — Smoother phones, a readable dogfight, dodgeable missiles
 
 - Phones can now run at 60 fps in Auto: the game starts at 30, steps up after 12 seconds with headroom and falls back under load (with a 30 s cooldown). Battery saving and Smoother motion still force 30 and 60. Desktop follows high-refresh displays when there is room.
