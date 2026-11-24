@@ -1,3 +1,10 @@
+## 0.8.2po — Enemies fly better lines around rock and wrecks
+
+- Enemy pilots plan around the turn their ship can actually make, try shallow turns before swinging wide around a rock, and keep their speed through clear gaps. In matched duels time spent crawling fell from 14% to under 3%, full stops from 33 to 3, terrain bumps by three quarters, and they reach firing range sooner.
+- Magrail pilots keep chasing while they reload instead of hanging still for a shot; searching pilots hit rock and wrecks less.
+- A locked target behind a canopy strut or the console keeps its bracket and lead diamond, drawn over the frame; the edge arrow only appears when the target is really out of view.
+- Bigger ships break up with weight: fighters keep the violent break-up, transports and heavy hulls come apart slower, and a frigate's sections drift apart and tumble slowly.
+
 ## 0.8.2pn — No blue flash on touch controls
 
 - Touching the flight stick, throttle, pads or afterburner no longer tints them blue on Android, and a long press never selects, drags or opens a menu on the cockpit art or any sprite. The game's own pressed states are unchanged.

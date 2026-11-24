@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import {seededRandom} from './random.js';
+import {blastHeft} from './explosionFx.js';
+// Hull diagonal (world units) up to which a break-up stays fighter-violent.
+const WRECK_FIGHTER_LENGTH=36;
 
 // Cosmetic only. The hull is clipped once into closed, textured sections;
 // subsequent deaths reuse the buffers. Nothing enters collision or loot stores.
@@ -202,7 +205,8 @@ export class ShipWreckFactory {
             materials.set(original,m);return m;};
         this.texture??=interiorTexture();const interior=new THREE.MeshStandardMaterial({color:0xaaa69a,map:this.texture,roughness:.94,metalness:.58,emissive:0x8e3211,emissiveIntensity:.25,flatShading:true,side:THREE.DoubleSide});
         const structureMaterial=new THREE.MeshStandardMaterial({color:0x727d85,roughness:.76,metalness:.62,side:THREE.DoubleSide});
-        const length=template.size.length(),worldLength=length*Math.max(root.scale.x,root.scale.y,root.scale.z),centre=data.bounds.getCenter(new THREE.Vector3()),parts=[],momentum=new THREE.Vector3();let mass=0;
+        const length=template.size.length(),worldLength=length*Math.max(root.scale.x,root.scale.y,root.scale.z),
+            heft=blastHeft(worldLength,WRECK_FIGHTER_LENGTH,1.75),spinScale=worldLength<=WRECK_FIGHTER_LENGTH?Math.min(1.4,Math.sqrt(WRECK_FIGHTER_LENGTH/Math.max(worldLength,1))):heft,centre=data.bounds.getCenter(new THREE.Vector3()),parts=[],momentum=new THREE.Vector3();let mass=0;
         for(const section of template.sections){
             const group=new THREE.Group();group.position.copy(section.origin);root.add(group);
             for(const p of section.parts){const slot=template.materials[p.slot],original=slot?(Array.isArray(data.meshes[slot.mesh].mesh.material)?data.meshes[slot.mesh].mesh.material[slot.slot]:data.meshes[slot.mesh].mesh.material):null;
@@ -211,9 +215,11 @@ export class ShipWreckFactory {
             // A violent break-up: sections leave at about half to one ship
             // length per second, smaller ones faster and tumbling harder
             // (equal blast energy). Purely visual; loot boxes drift on their own.
+            // Heft: fighters (up to 36 units across) keep the violent break-up;
+            // heavier hulls slow steeply with size, so a frigate drifts apart.
             const smallness=Math.sqrt(length/Math.max(section.radius,1e-3));
-            const speed=length*(.45+random()*.55)*Math.min(2.6,smallness*.6),velocity=direction.multiplyScalar(speed);
-            const spinAxis=new THREE.Vector3(random()-.5,random()-.5,random()-.5).normalize(),spinRate=(.4+random()**2*2.2)*Math.min(3,smallness*.6)*THREE.MathUtils.clamp(Math.sqrt(35/Math.max(worldLength,1)),.18,1.4);
+            const speed=length*(.45+random()*.55)*Math.min(2.6,smallness*.6)*heft,velocity=direction.multiplyScalar(speed);
+            const spinAxis=new THREE.Vector3(random()-.5,random()-.5,random()-.5).normalize(),spinRate=(.4+random()**2*2.2)*Math.min(3,smallness*.6)*spinScale;
             const part={group,origin:section.origin,velocity,spinAxis,spinRate,mass:section.mass};parts.push(part);momentum.addScaledVector(velocity,part.mass);mass+=part.mass;
         }
         momentum.divideScalar(Math.max(1e-9,mass));for(const p of parts)p.velocity.sub(momentum);

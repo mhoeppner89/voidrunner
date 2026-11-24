@@ -18,6 +18,12 @@ test('target arrows remain for opaque cockpit points and the extended projection
  for(const p of [{x:640,y:650},{x:1281,y:300},{x:-1,y:300},{x:640,y:801}]){const edge=r.targetEdge({...p,visible:true,behind:false});assert.ok(edge&&Object.values(edge).every(Number.isFinite));}
  assert.ok(r.targetEdge({visible:true,behind:true,x:660,y:300}));
 });
+test('the locked target keeps its bracket over a strut or console; only leaving the view makes an arrow',()=>{
+ const {session:r}=tutorialFixture('earn-standing');r.renderer.viewportWidth=1280;r.renderer.viewportHeight=800;r.ui.cockpitPointVisible=(x,y)=>y<500;
+ assert.equal(r.targetEdge({visible:true,behind:false,x:640,y:650},true),undefined,'behind the console: bracket stays');
+ for(const p of [{x:1281,y:300},{x:640,y:801}])assert.ok(r.targetEdge({...p,visible:true,behind:false},true),'off screen: arrow');
+ assert.ok(r.targetEdge({visible:true,behind:true,x:640,y:650},true),'behind the pilot: arrow');
+});
 for(const phase of ['outbound','mining','returning'])test(`selecting Vesper while the miner is ${phase} preserves its deposit and delivers ore`,()=>{
  const {session:r,save}=tutorialFixture('earn-standing'),p=save.player,n=r.asteroids.find(n=>n.remaining>10&&!n.tunnelPart);
  p.dockedAt=undefined;p.position=[n.position[0],n.position[1],n.position[2]+asteroidCollisionRadius(n)+40];p.velocity.fill(0);p.throttle=0;p.currentTargetId=n.id;r.activeInstanceId='shardbelt';n.scanned=true;r.initializeMiningDrones();assert.ok(r.toggleMiningDrones().ok);

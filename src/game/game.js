@@ -8995,6 +8995,7 @@ export class GameSession {
         const flightStats=this.npcFlightStats(ship);
         if(flightStats)observeIncomingFire(this,ship);
         if(flightStats)this.updateTurrets(ship,ship.id,dt);
+        let selectedMount;
         if (ship.combatFit && (ship.campaignCombat || !ship.tutorialEnemy && !ship.tutorialCompanion) && !ship.capitalClass) {
             const distance = targetPosition.distanceTo(this.tmpA.fromArray(ship.position));
             const fit=ship.combatFit;
@@ -9006,11 +9007,11 @@ export class GameSession {
                 return Boolean(weapon) && this.save.world.time >= fit.fireAt?.[i] && distance < weaponRange(weapon);
             }) ?? equippedIndex;
             ship.combatWeaponIndex=index;
-            const selected=weaponForOutfit(fit.guns?.[fit.gunIndices?.[index]??index]);
-            if(selected){
-                ship.projectileSpeed=selected.speed;
-                ship.projectileLife=selected.life;
-                ship.fireRange=weaponRange(selected);
+            selectedMount=weaponForOutfit(fit.guns?.[fit.gunIndices?.[index]??index]);
+            if(selectedMount){
+                ship.projectileSpeed=selectedMount.speed;
+                ship.projectileLife=selectedMount.life;
+                ship.fireRange=weaponRange(selectedMount);
             }else{
                 ship.projectileSpeed=undefined;
                 ship.projectileLife=undefined;
@@ -9362,6 +9363,14 @@ export class GameSession {
         if (shipAvoidance)
             desired.add(shipAvoidance);
         desired.normalize();
+        // On the clear leg of a bypass a fighter can coast and point its
+        // guns across the pass. Unassisted flight with zero thrust holds
+        // the velocity that the full momentum corridor just cleared.
+        const coastShot=fieldNav?.clearCoast && offensiveHeading && !missileBreak && !terrainMove && !routed
+            && !judgment && !shipAvoidance && ship.combatPlan.visible && !ship.combatPlan.overshoot
+            && distance<ship.fireRange && distance>ship.combatPlan.preferredRange*.55
+            && fieldNav.nose.dot(lead)>.85 && Math.abs(velocity.dot(direct))<currentSpeed*.85;
+        if(coastShot){desired.copy(lead);spiraling=false;}
         let aceMove;
         if (!missileBreak && !judgment && !terrainMove && !routed && flightStats && (ship.pilot?.tier==='ace'||ship.pilot?.tier==='veteran'||ship.pilot?.tier==='novice')) {
             const nose=(this.tmpAceNose ??= new THREE.Vector3()).copy(FORWARD).applyQuaternion(orientation);
@@ -9459,8 +9468,28 @@ export class GameSession {
         // approach below can brake further while recovering its aim.
         if (!holdingCover && (!flightStats || navBrake<0.15))
             desiredSpeed = Math.max(desiredSpeed, ship.speed * (tactics?.role === 'gunship' ? 0.5 : 0.65));
+        const now=this.save.world.time;
+        const fit=ship.combatFit;
+        const forwardWeapon=WEAPONS[fit?.weapons?.[ship.combatWeaponIndex]]??WEAPONS[fit?.weapons?.[fit?.attackOrder?.[0]]];
+        const fireRange=pilotMod(ship,ship.fireRange??tactics?.range??ATTACK_FIRE_RANGE,'fireRangeMul');
+        const projectileLife=ship.projectileLife??tactics?.life??1.55;
+        const shotAvailable=!fleeing && !ship.combatPlan?.recovery?.active && !ship.recoveryTargetHidden
+            && !ship.holdFire && !ship.pursuitHoldFire && ship.fireCooldown<=0 && distance<fireRange
+            && canIntercept && (ship.projectileSpeed>10000 || intercept<projectileLife)
+            && (!ship.combatPlan?.movingEngagement || now>=(ship.energyRecoverUntil??0));
+        let gunSpeed, firingPass;
+        const shotEnd=this.tmpNpcShotEnd??=new THREE.Vector3();
         if (flightStats) {
-            desiredSpeed=combatThrottle(ship,this.save.world.time,distance,closing,targetVelocity?.dot(direct)??0,forward.dot(direct),tactics?.range??235,fieldNav.canBoost,headingChange);
+            firingPass=(selectedMount?.id==='gauss'||selectedMount?.id==='mortar') && shotAvailable && ship.combatPlan?.aimingRun && ship.combatPlan.attackWindowOpen
+                && ship.gunDecisionTarget===ship.targetId && !ship.patrolMemoryActive
+                && now>=fit.fireAt[ship.combatWeaponIndex] && now>=(ship.gunBurstPauseUntil??0)
+                && now-(ship.gunAlignedSince??Infinity)>=npcGunneryProfile(ship).settle
+                && ship.energy>=selectedMount.energyCost*disruptionFactor(ship,now)
+                && forward.dot(lead)>Math.cos(npcTriggerCone(ship,forwardWeapon,now))
+                && !this.lineBlocked(position,shotEnd.copy(position).addScaledVector(lead,distance),ship.id)
+                && !friendlyFiringLaneBlocked(this,ship,position,lead,distance);
+            desiredSpeed=combatThrottle(ship,this.save.world.time,distance,closing,targetVelocity?.dot(direct)??0,forward.dot(direct),tactics?.range??235,fieldNav.canBoost,headingChange,firingPass);
+            gunSpeed=desiredSpeed;
             if((aceMove?.kind==='boost-reversal'||aceMove?.kind==='immelmann')&&fieldNav.canBoost){ship.burning=true;desiredSpeed=ship.afterburnSpeed;}
             const maneuverThrottle=maneuverSpeed(aceMove,this.save.world.time,desiredSpeed,ship.speed);
             if(maneuverThrottle<desiredSpeed)ship.burning=false;
@@ -9471,11 +9500,20 @@ export class GameSession {
             if(terrainMove){desiredSpeed=Math.min(desiredSpeed,ship.speed*terrainMove.speedFactor);ship.burning=ship.burning&&terrainMove.canBoost;}
         }
         if (flightStats) {
+            const beforeTerrain=desiredSpeed;
             desiredSpeed=Math.min(desiredSpeed,fieldNav.speedLimit);
             const moveAge=aceMove?(this.save.world.time-aceMove.started)/(aceMove.durationScale??1):0;
-            const drifting=!missileBreak&&!judgment&&!terrainMove&&(committedShot&&ship.combatPlan?.aimingRun&&!ship.combatPlan.overshoot&&distance>ship.combatPlan.preferredRange*.55&&Math.abs(velocity.dot(direct))<currentSpeed*.85&&fieldNav.safeForManeuver&&!shipAvoidance||aceMove?.kind==='drift-pass'||aceMove?.kind==='boost-reversal'&&moveAge>=.65&&moveAge<2.4);
-            const poweredDrift=!missileBreak&&!judgment&&!terrainMove&&offensiveHeading&&ship.pilot?.tier==='ace'&&ship.combatPlan?.crossfire?.outnumbered&&distance<600&&distance>60&&!ship.combatPlan?.finishing&&currentSpeed>ship.speed*.5&&fieldNav.safeForManeuver&&!shipAvoidance;
-            this.integrateNpcFlight(ship,position,velocity,orientation,this.tmpQ2,poweredDrift?(velocity.dot(direct)<-currentSpeed*.25&&distance<350?0:desiredSpeed):drifting?0:desiredSpeed,ship.burning && (poweredDrift||!drifting),!drifting&&!poweredDrift,dt,!fieldNav.active&&(drifting||poweredDrift||!fieldNav.roundField&&ship.combatIntent==='hunt'));
+            // After rounding cover, keep the clear crossing velocity briefly
+            // while the nose tracks a slower target across the firing lane.
+            const trackingPass=fieldNav.openCoast && now-(fieldNav.lastBypass??-Infinity)<2
+                && !aceMove && !missileBreak && !judgment && !terrainMove && !shipAvoidance && !routed
+                && ship.combatIntent==='hunt' && ship.combatPlan.aimingRun && !ship.combatPlan.overshoot
+                && forward.dot(lead)>.85 && ship.combatPlan.targetVelocity.lengthSq()<ship.speed*ship.speed*.09
+                && distance>ship.combatPlan.clearance+currentSpeed*.6 && Math.abs(velocity.dot(direct))<currentSpeed*.8;
+            const drifting=trackingPass||coastShot||!missileBreak&&!judgment&&!terrainMove&&(committedShot&&ship.combatPlan?.aimingRun&&!ship.combatPlan.overshoot&&distance>ship.combatPlan.preferredRange*.55&&Math.abs(velocity.dot(direct))<currentSpeed*.85&&fieldNav.safeForManeuver&&!shipAvoidance||aceMove?.kind==='drift-pass'||aceMove?.kind==='boost-reversal'&&moveAge>=.65&&moveAge<2.4);
+            const poweredDrift=!coastShot&&!missileBreak&&!judgment&&!terrainMove&&offensiveHeading&&ship.pilot?.tier==='ace'&&ship.combatPlan?.crossfire?.outnumbered&&distance<600&&distance>60&&!ship.combatPlan?.finishing&&currentSpeed>ship.speed*.5&&fieldNav.safeForManeuver&&!shipAvoidance;
+            this.onNpcThrottle?.(ship,gunSpeed,beforeTerrain,firingPass,drifting||poweredDrift,routed,aceMove,judgment,terrainMove);
+            this.integrateNpcFlight(ship,position,velocity,orientation,this.tmpQ2,poweredDrift?(velocity.dot(direct)<-currentSpeed*.25&&distance<350?0:desiredSpeed):drifting?0:desiredSpeed,ship.burning && (poweredDrift||!drifting),!drifting&&!poweredDrift,dt,coastShot||!fieldNav.active&&(drifting||poweredDrift||!fieldNav.roundField&&ship.combatIntent==='hunt'));
             forward.copy(FORWARD).applyQuaternion(orientation).normalize();
         } else {
             const nextSpeed = damp(currentSpeed, desiredSpeed, evasive || fleeing || ship.burning ? 1.6 : 1.25, dt);
@@ -9488,19 +9526,15 @@ export class GameSession {
         const facing = forward.dot(lead);
         // Only short pulse/scatter opportunities widen the trigger window;
         // physical barrel direction and narrow aim assistance remain separate.
-        const fit=ship.combatFit;
-        const forwardWeapon=WEAPONS[fit?.weapons?.[ship.combatWeaponIndex]]??WEAPONS[fit?.weapons?.[fit?.attackOrder?.[0]]];
         const triggerReady=npcTriggerReady(ship,forwardWeapon,facing,this.save.world.time);
         const fireGate = Math.cos(npcTriggerCone(ship,forwardWeapon,this.save.world.time));
-        const fireRange = pilotMod(ship, ship.fireRange ?? tactics?.range ?? ATTACK_FIRE_RANGE, 'fireRangeMul');
         // The pursuit hold-fire window (see the hunt-chase hook in shipAI) keeps
         // a hunter from shooting during the short chase before the guns come up.
         // predicted is a relative vector and may have been reused during a
         // spiral. LOS must end on the actual world-space firing ray.
-        const shotEnd = (this.tmpNpcShotEnd ??= new THREE.Vector3()).copy(position).addScaledVector(lead, distance);
-        const projectileLife = ship.projectileLife ?? tactics?.life ?? 1.55;
-        if (!fleeing && !ship.combatPlan?.recovery?.active && !ship.recoveryTargetHidden && !ship.holdFire && !ship.pursuitHoldFire && distance < fireRange && canIntercept && (ship.projectileSpeed > 10000 || intercept < projectileLife) && facing > fireGate && triggerReady && ship.fireCooldown <= 0 && (ship.patrolMemoryActive ? this.save.world.time-ship.patrolMemory.seenAt<0.8 && forwardWeapon?.kind!=='beam' : !this.lineBlocked(position, shotEnd, ship.id)) && (!flightStats||!friendlyFiringLaneBlocked(this,ship,position,lead,distance))) {
-            if(!ship.combatPlan?.movingEngagement||this.save.world.time>=(ship.energyRecoverUntil??0))this.fireNpcGun(ship, lead);
+        shotEnd.copy(position).addScaledVector(lead, distance);
+        if (shotAvailable && facing > fireGate && triggerReady && (ship.patrolMemoryActive ? this.save.world.time-ship.patrolMemory.seenAt<0.8 && forwardWeapon?.kind!=='beam' : !this.lineBlocked(position, shotEnd, ship.id)) && (!flightStats||!friendlyFiringLaneBlocked(this,ship,position,lead,distance))) {
+            this.fireNpcGun(ship, lead);
         }
         if(flightStats)fireCrossfireOpportunity(this,ship);
     }
@@ -9583,7 +9617,10 @@ export class GameSession {
         }
         const navOut = this.tmpNavDesired ?? (this.tmpNavDesired = new THREE.Vector3());
         const goalDirection=(this.tmpTravelGoalDirection ??= new THREE.Vector3()).copy(destination).sub(position).normalize();
-        const fieldNav=flightStats?fieldCombatSteering(this,ship,destination,goalDirection,dt,navOut,false):undefined;
+        // A lost-contact sweep has no authored route. Its changing search
+        // bearing needs the same turn prediction as a moving combat target.
+        const sweeping = ship.search?.phase === 'sweep';
+        const fieldNav=flightStats?fieldCombatSteering(this,ship,destination,goalDirection,dt,navOut,sweeping):undefined;
         const brake = fieldNav?0:steerToward(this, ship, destination, {
             speed: velocity.length(),
             horizon: 2.0,
@@ -9635,6 +9672,17 @@ export class GameSession {
         tupleInto(ship.velocity, velocity);
         quatTupleInto(ship.rotation, orientation);
     }
+    // A crawling hull moves less than a hull thickness between these samples.
+    // Use its oriented collision mesh inside the conservative steering margin.
+    npcDepartureClear(ship, position, nav) {
+        const variant=npcFlightVariant(ship), scale=npcShipScaleForVariant(variant);
+        const orientation=nav.q.fromArray(ship.rotation);
+        const contact=nav.departureContact;
+        for(const obstacle of nav.obstacles){
+            if(shipVsObstacle(position,orientation,variant,scale,obstacle,contact))return false;
+        }
+        return true;
+    }
     resolveNpcCollisions(ship) {
         // NPC hard-collision pass: the same hullCollision.js module the player
         // uses, with the NPC's FULL hull (no forgiveness) — an NPC only bumps
@@ -9654,6 +9702,10 @@ export class GameSession {
         const contact = this.tmpNpcContact ?? (this.tmpNpcContact = { x: 0, y: 0, z: 0, push: 0 });
         const resolveContact = () => {
             clipped = true;
+            if(ship.fieldNav){
+                ship.fieldNav.contactNormal?.set(contact.x,contact.y,contact.z);
+                if(ship.fieldNav.noExit)ship.fieldNav.nextPlan=0;
+            }
             position.x += contact.x * contact.push;
             position.y += contact.y * contact.push;
             position.z += contact.z * contact.push;
@@ -12895,6 +12947,7 @@ export class GameSession {
         }
         const grid = new Map();
         const segmentGrid = new Map();
+        this.largeSteeringObstacles = [];
         const obstacles = this.activeFieldObstacles();
         const canRefresh = nodes && this.activeFieldObstacles === GameSession.prototype.activeFieldObstacles;
         this.fieldGridDrift = canRefresh ? {
@@ -12933,10 +12986,14 @@ export class GameSession {
             // their full corner reach so rotated rocks never let a beam slip
             // past a visible corner.
             const movingNode = canRefresh && sources[order]?.moving ? sources[order] : undefined;
+            // A centre-cell query can miss the plating of a large wreck
+            // even with the normal local steering padding.
+            const largeIndex = obstacle.radius > (shardbelt ? 240 : 180)
+                ? this.largeSteeringObstacles.push(obstacle) - 1 : -1;
             const keys = movingNode ? [] : undefined;
             addObstacleToSegmentGrid(segmentGrid, obstacle, size, this.cellKey, keys);
             if (movingNode)
-                this.fieldGridDrift.entries.push({ node: movingNode, obstacle, centerKey, keys });
+                this.fieldGridDrift.entries.push({ node: movingNode, obstacle, centerKey, keys, largeIndex });
         }
         this.obstacleGrid = grid;
         this.obstacleBoxIndex = indexObstacleCells(grid, size);
@@ -12966,6 +13023,7 @@ export class GameSession {
             for (const oldKey of entry.keys) removeObstacleFromCell(this.obstacleSegmentGrid, oldKey, before);
             entry.keys.length = 0;
             addObstacleToSegmentGrid(this.obstacleSegmentGrid, after, size, this.cellKey, entry.keys, true);
+            if (entry.largeIndex >= 0) this.largeSteeringObstacles[entry.largeIndex] = after;
             entry.obstacle = after;
         }
         if (centerCellsChanged) this.obstacleBoxIndex = indexObstacleCells(this.obstacleGrid, size);
@@ -14617,9 +14675,11 @@ export class GameSession {
     leadTuple = new Float64Array(3);
     leadScreen = {};
     leadTargetScreen = {};
+    // The lead diamond stays on screen behind cockpit struts: the HUD then
+    // draws it over the frame (behindFrame) instead of dropping it.
     visibleLeadPoint(screen) {
         return screen.visible && screen.x >= 0 && screen.x < this.renderer.viewportWidth &&
-            screen.y >= 0 && screen.y < this.renderer.viewportHeight && this.ui.cockpitPointVisible(screen.x,screen.y);
+            screen.y >= 0 && screen.y < this.renderer.viewportHeight;
     }
     combatSightBlocked() {
         const p=this.save.player;
@@ -14707,6 +14767,7 @@ export class GameSession {
         screen.solution = screen.inRange && this.volleyHitsTarget(ship,aimTarget,gun.speed,fit,HULL_HARDPOINTS[p.shipId],group);
         screen.close = Math.hypot(screen.x - this.leadTargetScreen.x, screen.y - this.leadTargetScreen.y) < 8;
         screen.relation = this.shipRelation(ship);
+        screen.behindFrame = !this.ui.cockpitPointVisible(screen.x, screen.y);
         return screen;
     }
     syncRender(dt, now) {
@@ -14772,17 +14833,20 @@ export class GameSession {
         if(shakeActive || this.bracketWasShaking){
             const target=this.getTargetRef(false);
             const projection=target && this.renderer.projectTargetToScreen?.(target.kind,target.id,target.position,target.mount);
-            this.ui.updateShakenBracket?.(projection,projection && this.targetEdge(projection),shakeActive);
+            this.ui.updateShakenBracket?.(projection,projection && this.targetEdge(projection,true),shakeActive);
         }
         this.bracketWasShaking=shakeActive;
         if(!this.save.player.dockedAt&&this.ui.planetTransitOverlay?.dataset.awaitingFlight==='true')this.ui.completeDepartureTransit();
         this.sampleFlightQuality(now);
     }
-    targetEdge(projection) {
+    // throughFrame: the locked target's bracket stays where the target is and
+    // draws over the cockpit frame; only leaving the viewport turns it into
+    // the edge arrow. Other markers (comms, race vector) still yield to struts.
+    targetEdge(projection, throughFrame = false) {
         const width = this.renderer.viewportWidth;
         const height = this.renderer.viewportHeight;
         if (projection.visible && !projection.behind&&projection.x>=0&&projection.x<width&&projection.y>=0&&projection.y<height
-            &&(this.ui?.cockpitPointVisible?.(projection.x,projection.y,this.save.player.shipId)??true))return undefined;
+            &&(throughFrame||(this.ui?.cockpitPointVisible?.(projection.x,projection.y,this.save.player.shipId)??true)))return undefined;
         const cx = width / 2;
         const cy = height / 2;
         let vx = projection.x - cx;
@@ -14827,9 +14891,11 @@ export class GameSession {
             // between sim steps; using their newer raw state made the bracket
             // lead and wiggle around the visible target while steering.
             const projection = this.renderer.projectTargetToScreen(target.kind, target.id, target.position, target.mount);
-            const edge = this.targetEdge(projection);
+            const edge = this.targetEdge(projection, true);
             const distance = this.surfaceDistance(player, target);
-            const screen = { screenX: projection.x, screenY: projection.y, onScreen: projection.visible && !projection.behind&&!edge, edge };
+            const onScreen = projection.visible && !projection.behind&&!edge;
+            const screen = { screenX: projection.x, screenY: projection.y, onScreen, edge,
+                behindFrame: onScreen && !this.ui.cockpitPointVisible(projection.x, projection.y) };
             if (target.kind === 'ship') {
                 const ship = this.ships.find((entry) => entry.id === target.id);
                 const targetForward = this.tmpRadarPos.copy(FORWARD).applyQuaternion(quat(ship.rotation, this.tmpRadarInv));

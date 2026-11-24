@@ -278,9 +278,15 @@ export function terrainFlightDistance(obstacle, position, direction, reach, limi
     if(side.lengthSq()<.01)side.set(1,0,0);
     const up=scratch.terrainUp.crossVectors(direction,side).normalize();
     let best=limit+forwardReach;
-    for(let i=0;i<5;i++){
+    // Torn plates can pass between the axial rays near a hangar. Cover
+    // the diagonals on the wreck mesh as well as its horizontal/vertical span.
+    const rays=obstacle.shape==='wreck-mesh'?9:5;
+    for(let i=0;i<rays;i++){
         const start=scratch.terrainStart.copy(position);
-        if(i>0)start.addScaledVector(i<3?side:up,i%2===0?-reach:reach);
+        if(i>=5){
+            const offset=reach*Math.SQRT1_2;
+            start.addScaledVector(side,i<7?offset:-offset).addScaledVector(up,i%2?offset:-offset);
+        }else if(i>0)start.addScaledVector(i<3?side:up,i%2===0?-reach:reach);
         scratch.terrainEnd.copy(start).addScaledVector(direction,best);
         const hit=segmentMeshHit(start,scratch.terrainEnd,obstacle);
         if(hit!==undefined)best*=hit;

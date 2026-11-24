@@ -84,7 +84,7 @@ export function holdingFiringWindow(ship,now) {
  return ship.pilot?.tier!=='novice'&&now<(ship.fireCommitUntil??0)&&pressure-prior<(ship.fireCommitDamageLimit??0)&&ship.energy>3;
 }
 
-export function combatThrottle(ship,now,distance,closing,targetRadial,noseDot,preferred,canBoost,turnAngle=0) {
+export function combatThrottle(ship,now,distance,closing,targetRadial,noseDot,preferred,canBoost,turnAngle=0,firingPass=false) {
  const crossfire=ship.combatPlan?.crossfire;
  const fuelReserve=(ship.combatFit?.stats?.fuel??0)*.35;
  // Flying a route round terrain: cruise, and burn the long clear legs.
@@ -100,16 +100,16 @@ export function combatThrottle(ship,now,distance,closing,targetRadial,noseDot,pr
   if(recovery.mode==='cover'&&recovery.coverDistance<100)return ship.speed*.25;
   return ship.burning?ship.afterburnSpeed:ship.speed;
  }
- if(ship.combatIntent==='hunt'&&!ship.fleeing&&!ship.covering&&ship.combatPlan?.finishing&&distance<220){ship.burning=false;return clamp(targetRadial+(distance-75)*.5,ship.speed*.25,ship.speed);}
+ const main=ship.combatFit.weapons?.at(-1);
+ const artillery=main==='gauss'||main==='mortar';
+ if((!artillery||firingPass)&&ship.combatIntent==='hunt'&&!ship.fleeing&&!ship.covering&&ship.combatPlan?.finishing&&distance<220){ship.burning=false;return clamp(targetRadial+(distance-75)*.5,ship.speed*.25,ship.speed);}
  if(!ship.fleeing&&!ship.covering&&ship.pilot?.tier==='ace'&&crossfire?.outnumbered&&distance<600){ship.burning=Boolean(canBoost&&ship.fuel>2);return ship.burning?ship.afterburnSpeed:ship.speed;}
  if(crossfire?.active){ship.burning=Boolean(canBoost&&ship.fuel>2);return ship.burning?ship.afterburnSpeed:ship.speed;}
  const hunting=ship.combatIntent==='hunt';
  preferred=ship.combatPlan?.preferredRange??preferred;
  const pressure=(ship.combatPressure??0)*Math.exp(-Math.max(0,now-(ship.combatPressureAt??now))/1.5);
  const threatened=now<(ship.evasiveUntil??0)||pressure>Math.max(4,(ship.shield+ship.hull*.4)*.06);
- const main=ship.combatFit.weapons?.at(-1);
- const artillery=main==='gauss'&&!threatened;
- const matching=artillery&&hunting&&ship.combatPlan?.aimingRun;
+ const matching=main==='gauss'&&firingPass&&hunting&&!threatened;
  const speedFloor=ship.speed*(matching?.25+.4*clamp((distance/preferred-.65)/.35,0,1):.65);
  const overshoot=hunting&&ship.combatPlan?.overshoot;
  canBoost=canBoost&&!overshoot;
@@ -129,7 +129,7 @@ export function combatThrottle(ship,now,distance,closing,targetRadial,noseDot,pr
  ship.burning=Boolean(canBoost&&ship.fuel>.5&&now<(ship.combatBoostUntil??0));
  if(ship.burning)return ship.afterburnSpeed;
  const turningShot=hunting&&ship.combatPlan?.aimingRun&&ship.combatPlan.angularRate>.15&&!threatened;
- let speed=(artillery&&hunting||turningShot)?clamp(targetRadial+(distance-preferred)*.6,speedFloor,ship.speed):ship.speed;
+ let speed=(matching||turningShot&&(!artillery||firingPass))?clamp(targetRadial+(distance-preferred)*.6,speedFloor,ship.speed):ship.speed;
  if(overshoot)speed=Math.max(speedFloor,Math.min(speed,targetRadial+ship.combatPlan.safeClosing));
  return speed;
 }

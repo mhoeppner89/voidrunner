@@ -8767,6 +8767,11 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 /* The edge cue must clear the transformed cockpit-instruments stacking
    context; otherwise the painted frame hides targets near the screen edge. */
 #target-edge-pointer { z-index:6; }
+/* A locked target behind a strut or console keeps its bracket and lead
+   diamond: both draw over the frame, with a dark rim to read on the paint. */
+.target-bracket.behind-frame, .lead-marker.behind-frame { z-index:6; filter:drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000); }
+.lead-marker.behind-frame { opacity:.75; }
+.lead-marker.behind-frame.on-solution { opacity:1; filter:drop-shadow(0 0 1px #000) drop-shadow(0 0 3px rgba(255,208,92,.6)); }
 
 /* Incoming comms grow inside each cockpit's free area, clear of monitors,
    touch controls and the aiming lane. Idle uses a compact hull-specific anchor. */

@@ -13,6 +13,14 @@ import { createStreakBurst, createShockRing } from './impactFx.js';
 //              ring in a random plane.
 //   breakup  — the hull snaps in two: blasts at both ends along one axis.
 export const EXPLOSION_VARIANTS = ['fireball', 'chain', 'breach', 'breakup'];
+// Heft: big things come apart slowly. A fighter's break-up stays violent
+// (heft 1); heavier hulls shed speed and tumble steeply with size, so a
+// frigate's pieces drift apart instead of flying like a fighter's scaled up.
+export function blastHeft(size, reference, power) {
+    return Math.min(1, Math.max(.02, (reference / Math.max(size, 1e-3)) ** power));
+}
+// Fighter explosions run at scale 1.6 (NPC_FIGHTER_SCALE).
+const FIGHTER_BLAST = 1.6, FIGHTER_SHARDS = FIGHTER_BLAST * .65;
 export function createShipExplosion(position, scale = 1, { velocity, variant, seed } = {}) {
     const random = seededRandom(seed ?? position.join(':') + ':blast');
     const kind = EXPLOSION_VARIANTS.includes(variant) ? variant : EXPLOSION_VARIANTS[Math.floor(random() * EXPLOSION_VARIANTS.length)];
@@ -108,12 +116,14 @@ export function createShipExplosion(position, scale = 1, { velocity, variant, se
     cloud.frustumCulled = false; cloud.raycast = () => undefined;
     root.add(cloud);
     // Hot sparks, then a few long-burning chunks trailing fire. Both live in
-    // the root's scaled frame, so a frigate's sparks fly proportionally.
+    // the root's scaled frame; heft keeps a frigate's from flying a fighter's
+    // pattern scaled up.
+    const heft = blastHeft(scale, FIGHTER_BLAST, .75);
     const parts = [
-        createStreakBurst({ count: kind === 'breach' ? 48 : 40, speedMin: 18, speedMax: 58, drag: 1.4, lifeMin: .45 * pace.value, lifeMax: 1.1 * pace.value, width: .15, lag: .06,
+        createStreakBurst({ count: kind === 'breach' ? 48 : 40, speedMin: 18 * heft, speedMax: 58 * heft, drag: 1.4, lifeMin: .45 * pace.value, lifeMax: 1.1 * pace.value, width: .15, lag: .06,
             hot: 0xfffbe8, cool: kind === 'breach' ? 0x5aa8ff : 0xff6a1e, random, delay: (i) => centres[i % centres.length][3] }),
         createStreakBurst({ count: kind === 'breakup' ? 12 : 8, direction: kind === 'breakup' ? (i, out, rnd) => out.copy(axis).multiplyScalar(i % 2 ? 1 : -1).add(new THREE.Vector3(rnd() - .5, rnd() - .5, rnd() - .5).multiplyScalar(.9)) : undefined,
-            speedMin: 8, speedMax: 20, drag: .5, lifeMin: 1.6 * pace.value, lifeMax: 2.6 * pace.value, width: .34, lag: .35, hot: 0xffd27a, cool: 0xc02a08, random }),
+            speedMin: 8 * heft, speedMax: 20 * heft, drag: .5, lifeMin: 1.6 * pace.value, lifeMax: 2.6 * pace.value, width: .34, lag: .35, hot: 0xffd27a, cool: 0xc02a08, random }),
         createShockRing({ radius: kind === 'breach' ? 9 : 4.5, life: kind === 'breach' ? .55 : .32, hex: kind === 'breach' ? 0xbfe2ff : 0xffd9a0, opacity: kind === 'breach' ? .8 : .45, thickness: kind === 'breach' ? .12 : .22,
             normal: kind === 'breach' ? [axis.x, axis.y + .6, axis.z] : undefined }),
     ];
@@ -154,9 +164,11 @@ export function createHullDebris(position, scale = 1, velocity = [0,0,0]) {
     chunks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);chunks.frustumCulled=false;
     chunks.raycast=()=>undefined;root.add(chunks);
     const parts=[],matrix=new THREE.Object3D(),color=new THREE.Color();
+    // Heavier hulls throw their plates out slower and tumble them less.
+    const heft=blastHeft(scale,FIGHTER_SHARDS,1.25),turn=Math.sqrt(heft);
     for(let i=0;i<COUNT;i++) {
         const z=random()*2-1,a=random()*Math.PI*2,r=Math.sqrt(1-z*z),mass=.22+random()**2.4*.9;
-        const speed=(4+random()*5)*Math.min(5,(.7/mass)**1.25)*scale,tumble=Math.min(6,.8/mass)*(1+random()*1.5);
+        const speed=(4+random()*5)*Math.min(5,(.7/mass)**1.25)*scale*heft,tumble=Math.min(6,.8/mass)*(1+random()*1.5)*turn;
         parts.push({velocity:[Math.cos(a)*r*speed,Math.sin(a)*r*speed,z*speed],
             size:[(.4+random()*.5)*mass*1.6*scale,(.08+random()*.14)*Math.sqrt(mass)*scale,(.35+random()*.5)*mass*1.6*scale],
             spin:[(random()*2-1)*tumble,(random()*2-1)*tumble,(random()*2-1)*tumble]});

@@ -57,6 +57,18 @@ test('debris plates are non-rectangular instanced meshes and keep drifting/spinn
  pieces.sort((x,y)=>x.size-y.size);const small=pieces.slice(0,6),big=pieces.slice(-6),mean=list=>list.reduce((sum,x)=>sum+x.distance,0)/list.length;
  assert.ok(mean(small)>mean(big)*2,`small ${mean(small).toFixed(1)} vs big ${mean(big).toFixed(1)}`);
 });
+test('heft: a fighter breaks up violently, a frigate drifts apart',async()=>{
+ const {blastHeft}=await import('../../src/game/explosionFx.js');
+ const shards=scale=>{const e=createHullDebris(actor.position,scale,[0,0,0]),m=e.object.children[0],matrix=new T.Matrix4(),pos=new T.Vector3(),q=new T.Quaternion(),s=new T.Vector3();e.update(1);let sum=0;for(let i=0;i<m.count;i++){m.getMatrixAt(i,matrix);matrix.decompose(pos,q,s);sum+=pos.length();}return sum/m.count/scale;};
+ // Spread after one second, in hull-scale units: equal for fighters, far less for a frigate.
+ assert.ok(Math.abs(shards(1.04)-shards(.8))<1e-6,'fighters keep the full break-up');
+ assert.ok(shards(7*2*.65)<shards(1.04)*.25,'a frigate throws its plates out far slower');
+ assert.equal(blastHeft(30,36,1.75),1);assert.ok(blastHeft(242.6,36,1.75)<.05);
+ const root=source(),factory=new ShipWreckFactory(),rate=scale=>{root.scale.setScalar(scale);const e=factory.create(root,{...actor,velocity:[0,0,0]}),size=new T.Box3().setFromObject(root).getSize(new T.Vector3()).length(),v=e.sections.reduce((n,p)=>n+p.velocity.length(),0)/e.sections.length*scale/size;e.dispose();return v;};
+ const fighter=rate(1),frigate=rate(12);
+ assert.ok(frigate<fighter*.1,`frigate sections ${frigate.toFixed(3)} vs fighter ${fighter.toFixed(3)} hull lengths per second`);
+ factory.dispose();
+});
 test('separate scene-mounted turrets retain their world pose, receive valid colour attributes and expire without touching live assets',()=>{
  const root=source(),factory=new ShipWreckFactory(),turret=new T.Group(),mesh=new T.Mesh(new T.BoxGeometry(1,1,2),root.children[0].material);turret.add(mesh);turret.position.set(40,73,-85);turret.rotation.y=.7;
  const e=factory.create(root,actor,[turret]);e.object.updateMatrixWorld(true);const part=e.sections.flatMap(p=>p.group.children).find(m=>!m.geometry.userData.shared);assert.ok(part);

@@ -17,8 +17,8 @@ import { GRAVEYARD_MODEL_WRECKS } from './graveyardLayout.js';
 //   says so, or (wreck fields, where hangars lie inside their section's box)
 //   when six short mesh rays meet nothing. Mesh rays are double-sided, so a
 //   point inside solid plating never counts as free.
-// - Edges: neighbouring nodes whose straight segment is clear along three
-//   parallel rays a hull width apart.
+// - Edges: neighbouring nodes whose straight segment is clear at the centre
+//   and around the hull perimeter.
 // - Query: A* from the ship to the nearest node that can see the target inside
 //   engagement range, then string-pulled so the pilot cuts every corner the
 //   terrain allows.
@@ -34,10 +34,11 @@ const DEFAULT_SPACING = 420;
 const RADIUS = 1850;
 // Free space a node needs (a fighter's reach plus a margin).
 const NODE_CLEARANCE = 30;
-// Lateral offset of the two side rays of an edge test.
+// Radius of the wing rays around the centreline.
 const EDGE_HALF_WIDTH = 16;
-// A request this close to the current roadmap's centre reuses it.
-const REUSE_DISTANCE = 900;
+const WING_OFFSETS = Array.from({length: 8}, (_, i) => [
+    EDGE_HALF_WIDTH * Math.cos(i * Math.PI / 4), EDGE_HALF_WIDTH * Math.sin(i * Math.PI / 4)
+]);
 const MAX_EXPANSIONS = 2500;
 // The 13 forward lattice neighbours (the other 13 are their reverses).
 const HALF_NEIGHBOURS = (() => {
@@ -77,13 +78,18 @@ export function fieldRoadmapState(session) { return session.fieldRoadmap; }
 // Ask for a roadmap around `center` in the active field. Keeps the current
 // one when it is for the same field and close enough; otherwise starts a new
 // build. Returns the roadmap (possibly still building) or undefined.
-export function requestFieldRoadmap(session, center) {
+export function requestFieldRoadmap(session, center, recenter = false) {
     const instanceId = session.activeInstanceId;
     if (!instanceId || !LOCATIONS[instanceId]) return undefined;
     const current = session.fieldRoadmap;
-    if (current && current.instanceId === instanceId
-        && Math.hypot(current.center[0] - center[0], current.center[1] - center[1], current.center[2] - center[2]) < REUSE_DISTANCE)
-        return current;
+    if (!recenter && current && current.instanceId === instanceId) {
+        // Keep the graph while the target has a full cell of neighbours.
+        // Opponents at opposite ends of one tunnel otherwise discard each
+        // other's in-progress build despite both being inside its lattice.
+        const interior = (current.n - 3) * current.spacing / 2;
+        if (Math.max(Math.abs(current.center[0] - center[0]), Math.abs(current.center[1] - center[1]),
+            Math.abs(current.center[2] - center[2])) <= interior) return current;
+    }
     const spacing = SPACING[instanceId] ?? DEFAULT_SPACING, n = Math.floor(RADIUS * 2 / spacing) + 1;
     const snap = (v) => Math.round(v / spacing) * spacing;
     session.fieldRoadmap = {
@@ -186,13 +192,19 @@ function edgeClear(session, map, a, b, s) {
     const p = map.positions;
     s.a.set(p[a * 3], p[a * 3 + 1], p[a * 3 + 2]);
     s.b.set(p[b * 3], p[b * 3 + 1], p[b * 3 + 2]);
-    if (session.lineBlocked(s.a, s.b)) return false;
-    s.c.copy(s.b).sub(s.a).normalize();
-    s.side.crossVectors(s.c, Math.abs(s.c.y) > 0.9 ? s.up.set(1, 0, 0) : s.up.set(0, 1, 0)).normalize();
+    return corridorClear(session, s.a, s.b, s);
+}
+
+// Apply the graph's hull-width test to entry legs and shortcuts too. A
+// visible node across a rock corner may still scrape a passing wing.
+function corridorClear(session, start, end, s) {
+    if (session.lineBlocked(start, end)) return false;
+    s.c.copy(end).sub(start).normalize();
+    s.side.crossVectors(s.c, Math.abs(s.c.y) > .9 ? s.up.set(1,0,0) : s.up.set(0,1,0)).normalize();
     s.up.crossVectors(s.side, s.c).normalize();
-    for (const [axis, sign] of [[s.side, 1], [s.up, -1]]) {
-        s.c.copy(s.a).addScaledVector(axis, sign * EDGE_HALF_WIDTH);
-        s.d.copy(s.b).addScaledVector(axis, sign * EDGE_HALF_WIDTH);
+    for (const [side, up] of WING_OFFSETS) {
+        s.c.copy(start).addScaledVector(s.side, side).addScaledVector(s.up, up);
+        s.d.copy(end).addScaledVector(s.side, side).addScaledVector(s.up, up);
         if (session.lineBlocked(s.c, s.d)) return false;
     }
     return true;
@@ -247,7 +259,7 @@ export function planCombatRoute(session, ship, start, target, engage) {
         if (i < 0 || map.stamp[i] === q) return;
         node(i, s.a);
         const d = s.a.distanceTo(start);
-        if (d > spacing * 2.6 || session.lineBlocked(start, s.a, ship?.id)) return;
+        if (d > spacing * 2.6 || !corridorClear(session,start,s.a,map.scratch)) return;
         map.stamp[i] = q; map.cost[i] = d; map.parent[i] = -1; push(i); entries += 1;
     };
     for (let dz = -2; dz <= 2; dz += 1) for (let dy = -2; dy <= 2; dy += 1) for (let dx = -2; dx <= 2; dx += 1) {
@@ -257,7 +269,19 @@ export function planCombatRoute(session, ship, start, target, engage) {
     }
     for (let i = map.latticeCount; i < map.nodeCount; i += 1)
         if (Math.abs(p[i * 3] - start.x) < spacing * 2 && Math.abs(p[i * 3 + 1] - start.y) < spacing * 2 && Math.abs(p[i * 3 + 2] - start.z) < spacing * 2) enter(i);
-    if (!entries) return undefined;
+    if (!entries) {
+        // A target can be inside a shared graph while its hunter cannot reach
+        // even one entry. Build around this pair once, retaining ordinary
+        // shared graphs (including a graph with entries but no route).
+        const center = [start.x + target.x, start.y + target.y, start.z + target.z]
+            .map(sum => Math.round(sum / (2 * spacing)) * spacing);
+        const fits = (point, radius) => Math.max(Math.abs(point.x-center[0]),
+            Math.abs(point.y-center[1]), Math.abs(point.z-center[2])) <= radius;
+        if (center.some((value, axis) => value !== map.center[axis]) &&
+            fits(start, half*spacing) && fits(target, (half-1)*spacing))
+            requestFieldRoadmap(session, center, true);
+        return undefined;
+    }
     let goal = -1, expansions = 0;
     while (heap.length && expansions < MAX_EXPANSIONS) {
         const i = pop();
@@ -278,13 +302,12 @@ export function planCombatRoute(session, ship, start, target, engage) {
     for (let i = goal; i >= 0; i = map.parent[i]) chain.push(i);
     chain.reverse();
     // String-pull: from the ship, skip to the furthest node still in clear
-    // sight (a hull-width corridor is the roadmap's job; the pilot's own
-    // controller keeps it off the surface between waypoints).
+    // reach through a hull-width corridor.
     const waypoints = [];
     let from = s.b.copy(start), index = 0;
     while (index < chain.length) {
         let reach = index;
-        for (let k = chain.length - 1; k > index; k -= 1) { if (!session.lineBlocked(from, node(chain[k], s.a), ship?.id)) { reach = k; break; } }
+        for (let k = chain.length - 1; k > index; k -= 1) { if (corridorClear(session,from,node(chain[k], s.a),map.scratch)) { reach = k; break; } }
         const pick = chain[reach];
         waypoints.push([p[pick * 3], p[pick * 3 + 1], p[pick * 3 + 2]]);
         from = node(pick, s.b);
@@ -310,7 +333,7 @@ export function combatRouteWaypoint(session, ship, position, target, engage, out
         r.checkAt = now + 0.2;
         r.blocked = session.lineBlocked(position, target, ship.id);
         // Corner-cutting: the next waypoint is in sight, so this one is done.
-        if (r.active && r.waypoints && r.index + 1 < r.waypoints.length && !session.lineBlocked(position, r.scratch.fromArray(r.waypoints[r.index + 1]), ship.id)) r.index += 1;
+        if (r.active && r.waypoints && r.index + 1 < r.waypoints.length && session.fieldRoadmap?.scratch && corridorClear(session,position,r.scratch.fromArray(r.waypoints[r.index + 1]),session.fieldRoadmap.scratch)) r.index += 1;
     }
     if (!r.blocked) {
         r.blockedSince = undefined;
@@ -319,17 +342,19 @@ export function combatRouteWaypoint(session, ship, position, target, engage, out
     }
     r.blockedSince ??= now;
     if (now - r.blockedSince < ROUTE_BLOCKED_DELAY) return undefined;
-    requestFieldRoadmap(session, [target.x, target.y, target.z]);
     const moved = Math.hypot(r.target[0] - target.x, r.target[1] - target.y, r.target[2] - target.z);
     if ((!r.waypoints || r.index >= r.waypoints.length || now - r.plannedAt > ROUTE_REPLAN || moved > ROUTE_TARGET_MOVED) && now >= r.failedUntil) {
+        target.toArray(r.target);
+        requestFieldRoadmap(session, r.target);
         const plan = planCombatRoute(session, ship, position, target, engage);
-        r.plannedAt = now; r.target[0] = target.x; r.target[1] = target.y; r.target[2] = target.z;
+        r.plannedAt = now;
         if (plan?.length) { r.waypoints = plan; r.index = 0; }
         else { r.waypoints = null; r.failedUntil = now + 1; }
     }
     if (!r.waypoints) { r.active = false; return undefined; }
-    let waypoint = r.scratch.fromArray(r.waypoints[r.index]);
-    while (position.distanceTo(waypoint) < WAYPOINT_REACHED && r.index + 1 < r.waypoints.length) waypoint = r.scratch.fromArray(r.waypoints[++r.index]);
+    // The checked corner cut above is the only handoff. Proximity alone
+    // cannot authorize a shortcut across a wall.
+    const waypoint = r.scratch.fromArray(r.waypoints[r.index]);
     r.leg = position.distanceTo(waypoint);
     if (r.index === r.waypoints.length - 1 && r.leg < WAYPOINT_REACHED) { r.active = false; return undefined; }
     r.active = true;

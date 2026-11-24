@@ -478,7 +478,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2pn';
+const GAME_VERSION = '0.8.2po';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -1066,7 +1066,8 @@ export class GameUI {
         bracket.classList.toggle('shake-tracking',active);
         pointer.classList.toggle('shake-tracking',active);
         bracket.classList.toggle('is-hidden',!projection?.visible || projection.behind || Boolean(edge));
-        if(projection)bracket.style.transform=`translate(${projection.x}px, ${projection.y}px)`;
+        if(projection){bracket.style.transform=`translate(${projection.x}px, ${projection.y}px)`;
+            if(active&&projection.visible&&!projection.behind&&!edge)bracket.classList.toggle('behind-frame',!this.cockpitPointVisible(projection.x,projection.y));}
         pointer.classList.toggle('is-hidden',!edge);
         if(edge){
             pointer.style.transform=`translate(${edge.x}px, ${edge.y}px)`;
@@ -1093,6 +1094,7 @@ export class GameUI {
         marker.classList.toggle('in-range',lead.inRange);
         marker.classList.toggle('on-solution',lead.solution);
         marker.classList.toggle('close-lead',lead.close);
+        marker.classList.toggle('behind-frame',Boolean(lead.behindFrame));
     }
     cockpitPointVisible(x,y,shipId=this.save?.player?.shipId) {
         if(shipId!==this.cockpitShipId)this.setCockpitShip(shipId);
@@ -4866,6 +4868,7 @@ export class GameUI {
         if (bracket && target.onScreen && target.screenX !== undefined && target.screenY !== undefined) {
             bracket.style.transform = `translate(${target.screenX}px, ${target.screenY}px)`;
             bracket.classList.toggle('is-hidden', false);
+            bracket.classList.toggle('behind-frame', Boolean(target.behindFrame));
         }
         else {
             bracket?.classList.toggle('is-hidden', true);
