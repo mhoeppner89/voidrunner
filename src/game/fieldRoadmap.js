@@ -197,7 +197,10 @@ function edgeClear(session, map, a, b, s) {
 
 // Apply the graph's hull-width test to entry legs and shortcuts too. A
 // visible node across a rock corner may still scrape a passing wing.
-function corridorClear(session, start, end, s) {
+const corridorScratch = {
+    c: new THREE.Vector3(), d: new THREE.Vector3(), side: new THREE.Vector3(), up: new THREE.Vector3()
+};
+export function corridorClear(session, start, end, s = corridorScratch) {
     if (session.lineBlocked(start, end)) return false;
     s.c.copy(end).sub(start).normalize();
     s.side.crossVectors(s.c, Math.abs(s.c.y) > .9 ? s.up.set(1,0,0) : s.up.set(0,1,0)).normalize();
@@ -230,7 +233,7 @@ function finishRoadmap(map) {
 // A route from `start` to a point that can see `target` within `engage`
 // range: an array of [x, y, z] waypoints (the last one has the line of
 // sight), or undefined when the roadmap is not ready or has no answer.
-export function planCombatRoute(session, ship, start, target, engage) {
+export function planCombatRoute(session, ship, start, target, engage, tactic, pressureAxis, maxLength = Infinity) {
     const map = session.fieldRoadmap;
     if (!map?.ready || map.instanceId !== session.activeInstanceId) return undefined;
     const s = map.planScratch ??= { a: new THREE.Vector3(), b: new THREE.Vector3(), heap: [], seen: new Map() };
@@ -238,7 +241,9 @@ export function planCombatRoute(session, ship, start, target, engage) {
     const cell = (v, k) => Math.round((v - map.center[k]) / spacing + half);
     const node = (i, out) => out.set(p[i * 3], p[i * 3 + 1], p[i * 3 + 2]);
     const heap = s.heap; heap.length = 0;
-    const f = (i) => map.cost[i] + Math.max(0, Math.hypot(p[i * 3] - target.x, p[i * 3 + 1] - target.y, p[i * 3 + 2] - target.z) - engage * 0.8);
+    // A shadow or a side-on firing position can lie in any direction. Set
+    // the heuristic to zero to find the nearest reachable one by route length.
+    const f = tactic ? i => map.cost[i] : (i) => map.cost[i] + Math.max(0, Math.hypot(p[i * 3] - target.x, p[i * 3 + 1] - target.y, p[i * 3 + 2] - target.z) - engage * 0.8);
     const push = (i) => {
         heap.push(i);
         for (let k = heap.length - 1; k > 0;) { const up = (k - 1) >> 1; if (f(heap[k]) >= f(heap[up])) break; [heap[k], heap[up]] = [heap[up], heap[k]]; k = up; }
@@ -259,7 +264,7 @@ export function planCombatRoute(session, ship, start, target, engage) {
         if (i < 0 || map.stamp[i] === q) return;
         node(i, s.a);
         const d = s.a.distanceTo(start);
-        if (d > spacing * 2.6 || !corridorClear(session,start,s.a,map.scratch)) return;
+        if (d > maxLength || d > spacing * 2.6 || !corridorClear(session,start,s.a,map.scratch)) return;
         map.stamp[i] = q; map.cost[i] = d; map.parent[i] = -1; push(i); entries += 1;
     };
     for (let dz = -2; dz <= 2; dz += 1) for (let dy = -2; dy <= 2; dy += 1) for (let dx = -2; dx <= 2; dx += 1) {
@@ -270,6 +275,7 @@ export function planCombatRoute(session, ship, start, target, engage) {
     for (let i = map.latticeCount; i < map.nodeCount; i += 1)
         if (Math.abs(p[i * 3] - start.x) < spacing * 2 && Math.abs(p[i * 3 + 1] - start.y) < spacing * 2 && Math.abs(p[i * 3 + 2] - start.z) < spacing * 2) enter(i);
     if (!entries) {
+        if (tactic) return undefined;
         // A target can be inside a shared graph while its hunter cannot reach
         // even one entry. Build around this pair once, retaining ordinary
         // shared graphs (including a graph with entries but no route).
@@ -288,13 +294,20 @@ export function planCombatRoute(session, ship, start, target, engage) {
         if (map.closed[i] === q) continue;
         map.closed[i] = q; expansions += 1;
         node(i, s.a);
-        if (s.a.distanceTo(target) <= engage && !session.lineBlocked(s.a, target, ship?.id)) { goal = i; break; }
+        if (tactic === 'cover') {
+            if (session.lineBlocked(s.a, target, ship.id)) { goal = i; break; }
+        } else if (s.a.distanceTo(target) <= engage && !session.lineBlocked(s.a, target, ship?.id)) {
+            // The pressure axis points from the target to the bait. Require
+            // at least a 90-degree split, reached by going around terrain.
+            if (!tactic || (map.parent[i] >= 0 && s.b.subVectors(s.a, target).dot(pressureAxis) <= 0
+                && session.lineBlocked(start, s.a))) { goal = i; break; }
+        }
         for (let k = map.offsets[i]; k < map.offsets[i + 1]; k += 1) {
             const j = map.neighbours[k];
             if (map.closed[j] === q) continue;
             node(j, s.b);
             const cost = map.cost[i] + s.a.distanceTo(s.b);
-            if (map.stamp[j] !== q || cost < map.cost[j]) { map.stamp[j] = q; map.cost[j] = cost; map.parent[j] = i; push(j); }
+            if (cost <= maxLength && (map.stamp[j] !== q || cost < map.cost[j])) { map.stamp[j] = q; map.cost[j] = cost; map.parent[j] = i; push(j); }
         }
     }
     if (goal < 0) return undefined;

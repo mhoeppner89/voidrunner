@@ -9,6 +9,7 @@ const {SpaceRenderer}=await import('../../src/game/render.js');
 const {EntityStore}=await import('../../src/game/entityStore.js');
 const {createNewSave,hydrateSave}=await import('../../src/game/save.js');
 const {WEAPONS,LEGACY_GUN_AMMO,AMMO_CAPACITY}=await import('../../src/game/weapons.js');
+const {cockpitLockState}=await import('../../src/game/weaponFlight.js');
 const {weaponDamage,disruptWeapons}=await import('../../src/game/weaponDamage.js');
 const {getEffectiveShipStats}=await import('../../src/game/shipStats.js');
 const {loadoutFor,HULL_HARDPOINTS,itemFitsMount,OUTFIT_ITEMS}=await import('../../src/game/outfitting.js');
@@ -124,7 +125,9 @@ test('enemy fittings obey mounts and finite missiles need a continuous lock and 
  ship.rotation=[0,0,0,1];ship.targetId='player';ship.combatFit=createEnemyLoadout(ship,0);ship.combatFit.missiles=1;ship.combatFit.racks?.forEach(r=>r.missiles=1);
  for(let i=0;i<30;i++){s.save.world.time=i/60;s.updateNpcOrdnance(ship,new THREE.Vector3(),1/60);}
  assert.equal(s.projectiles.length,0);assert.equal(ship.combatFit.warned,true);
+ assert.equal(cockpitLockState(s.ships,s.save.world.time,false),'acquiring');
  s.obstacles=[{x:0,y:0,z:90,radius:20,losRadius:20}];s.updateNpcOrdnance(ship,new THREE.Vector3(),1/60);assert.equal(ship.combatFit.lock,0);assert.equal(ship.combatFit.warned,false);s.obstacles=[];
+ assert.equal(cockpitLockState(s.ships,s.save.world.time,false),'off');
  for(let i=0;i<1000;i++){s.save.world.time=2+i/60;s.updateNpcOrdnance(ship,new THREE.Vector3(),1/60);}
  assert.equal(s.projectiles.filter(p=>p.kind==='missile').length,1);assert.equal(ship.combatFit.missiles,0);
 });
@@ -138,7 +141,7 @@ test('novices lock slowly and every subsequent missile requires a fresh warned l
    s.updateNpcOrdnance(ship,new THREE.Vector3(),1/60);
    if(s.projectiles.length>before)launches.push(s.save.world.time);
   }
-  assert.equal(launches.length,2);assert.equal(warnings.length,2);assert.deepEqual(sounds.map(([id])=>id),['missileLaunch','missileLaunch'],'locking stays visual; only launched missiles raise the incoming warning');
+  assert.equal(launches.length,2);assert.equal(warnings.length,2);assert.deepEqual(sounds.map(([id])=>id),['missileLaunch','missileLaunch'],'the NPC rack plays one launch pip per missile; the cockpit receiver follows the frame state');
   const lock=tier==='novice'?2:tier==='veteran'?1.5:1,gap=tier==='novice'?10:6;
   assert.ok(launches[0]>=lock-.02);assert.ok(launches[0]<lock+.1);
   assert.ok(launches[1]-launches[0]>=gap+lock-.02);

@@ -93,6 +93,7 @@ export const SOUND_EVENTS = {
     weaponSwitch: { bus: 'ui', spacing: 0.08, layers: [['mech-clack', 0.5, { rate: 0.8, vary: 0.04 }], ['ui-tab', 0.8]] },
     targetCycle: { bus: 'ui', spacing: 0.05, layers: [['target-cycle', 1]] },
     targetLock: { bus: 'ui', spacing: 0.4, priority: 2, layers: [['target-lock', 1]] },
+    lockWarble: { bus: 'cockpit', priority: 2, layers: [['lock-warble', .68]] },
     missileBreak: { bus: 'cockpit', spacing: 0.6, priority: 3, layers: [['break-cue', .8]] },
     // Launch and approach warnings share one pip sample and one channel, so
     // they space against each other and never stack. A salvo or wingmen

@@ -6,6 +6,7 @@ export function createLegionaryCockpit(base){
         ...base,
         // Preserve approved glass sizes; center them over the original PNG's
         // measured holes. Insets keep content inside its dimensional gaskets.
+        hardware:{xpdr:[670,566,104,30]},
         monitors:{
             own:{...base.monitors.own,x:418.71,y:605.89},
             radar:{...base.monitors.radar,x:790.52,y:623.47},

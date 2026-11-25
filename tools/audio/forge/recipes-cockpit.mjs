@@ -102,6 +102,18 @@ export default {
         variants: 1, peak: -7, group: 'flight',
         make: () => sequence(0.5, [[beep(NOTE.A6, 0.34, { release: 0.12 }), 0, 1], [key(NOTE.E6, 0.4, { tau: 0.12 }), 0, 0.5], [key(NOTE.A5, 0.4, { tau: 0.12 }), 0, 0.5]])[0],
     },
+    // Low, alternating receiver tones. Four half-second cycles share a seamless loop.
+    'lock-warble': {
+        variants: 1, peak: -12, group: 'flight', mono: true, loop: true,
+        make: () => {
+            const note = hz => d.mul(d.lowpass(d.osc(.21, hz, 'triangle'), 1100),
+                d.curve(.21, t => Math.min(1, t / .014, (.21 - t) / .032)));
+            const low = note(NOTE.A3), high = note(NOTE.D4);
+            const parts = [];
+            for (let beat = 0; beat < 4; beat++) parts.push([low, beat / 2, .88], [high, beat / 2 + .22, 1]);
+            return sequence(2, parts)[0];
+        },
+    },
     // A missile is in the air: four urgent pips.
     'missile-alert': {
         variants: 1, peak: -6, group: 'flight',

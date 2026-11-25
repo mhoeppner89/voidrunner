@@ -14,17 +14,19 @@ function playerAttackGroup(session, now) {
  if(now>=g.sampleAt&&now<g.next&&(!g.lead||combatTargetEligible(g.lead)&&g.lead.targetId==='player'))return g;
  g.sampleAt=now;g.next=now+.25;g.members.length=0;g.allies=1;
  const player=session.save.player;
- let best,bestScore=Infinity;
+ let best,bestScore=Infinity,flanker;
  for(const actor of session.ships){
-  if(actor.targetId!=='player'||!combatTargetEligible(actor)||actor.capitalClass||actor.fleeing||actor.patrolMemoryActive||actor.recoveryTargetHidden||actor.combatPlan?.recovery?.active)continue;
+  if(actor.targetId!=='player'||!combatTargetEligible(actor)||actor.capitalClass||actor.fleeing||actor.fieldTactic?.kind&&!actor.fieldTactic.firingUntil||actor.patrolMemoryActive||actor.recoveryTargetHidden||actor.combatPlan?.recovery?.active)continue;
   const x=player.position[0]-actor.position[0],y=player.position[1]-actor.position[1],z=player.position[2]-actor.position[2],distance=Math.hypot(x,y,z);
   if(distance>900)continue;
   g.members.push(actor);
+  if (now < (actor.flankShotUntil ?? 0) && actor.flankShotTarget === 'player') flanker=actor;
   const [qx,qy,qz,qw]=actor.rotation;
   const facing=(-2*(qx*qz+qw*qy)*x-2*(qy*qz-qw*qx)*y-(1-2*(qx*qx+qy*qy))*z)/Math.max(1,distance);
   const score=distance/Math.max(30,actor.speed)+(1-facing)*3+(actor.combatIntent==='evade'?4:0);
   if(score<bestScore){best=actor;bestScore=score;}
  }
+ if(flanker && g.lead!==flanker){g.lead=flanker;g.leadUntil=flanker.flankShotUntil;}
  if(!g.members.includes(g.lead)||now>=g.leadUntil||g.lead?.combatIntent==='evade'){
   g.lead=best;g.leadUntil=now+1.5;
  }

@@ -108,6 +108,7 @@ export class AudioManager {
     musicContext = 'open';
     currentContext = null;
     activeVoices = 0;
+    missileCueEndsAt = 0;
     pinkBuffer;
 
     async enable() {
@@ -256,6 +257,7 @@ export class AudioManager {
         // or replacing a session). Silence continuous flight layers here too.
         this.setPaused(false);
         if (station) {
+            this.setLockWarble('off');
             this.missileWarning = undefined;
             this.stopWork();
             this.engine?.silence();
@@ -284,12 +286,14 @@ export class AudioManager {
         const context = this.context;
         const now = context.currentTime;
         this.cinematicVoice?.stop(); this.cinematicVoice = undefined;
+        this.setLockWarble('off');
         this.music?.dispose();
         this.ambience?.dispose();
         this.engine?.dispose();
         this.stopWork();
         for (const release of [...(this.effectReleases ?? [])]) release();
         this.effectTimes?.clear();
+        this.missileCueEndsAt = 0;
         this.bank?.close();
         this.master?.gain.cancelScheduledValues(now);
         this.master?.gain.setTargetAtTime(0, now, 0.02);
@@ -356,6 +360,7 @@ export class AudioManager {
 
         // Docked: a fresh warning history for the next flight.
         if (this.stationMode) this.missileWarning = undefined;
+        this.setLockWarble(this.paused ? 'off' : flight?.lockState);
         const warning = stepMissileWarning(this.missileWarning ??= {}, dt, this.stationMode ? 0 : flight?.missileThreat ?? 0, Boolean(flight?.missileBreak), Boolean(flight?.missileCommitted), this.paused);
         if (warning.cue > 0) this.playCockpit('missileBreak', warning.cue);
         if (warning.alert > 0) this.play('missileAlert', warning.alert);
@@ -371,6 +376,39 @@ export class AudioManager {
             this.chatterTimer = 5 + Math.random() * 11;
             if (this.dangerLevel < 0.2) this.play('chatter', 0.55, Math.random() * 1.2 - 0.6);
         }
+    }
+
+    // One receiver loop for the whole cockpit. Change its speed in place,
+    // and release its voice as soon as the launch pip takes over.
+    setLockWarble(state) {
+        const rate = state === 'locked' ? 1.65 : state === 'acquiring' ? 1 : 0;
+        const voice = this.lockWarble;
+        if (!rate || this.effectsVolume <= .001 || this.context.currentTime < this.missileCueEndsAt) {
+            if (voice) {
+                const now = this.context.currentTime;
+                voice.gain.gain.setTargetAtTime(0, now, .002);
+                voice.source.stop(now + .01);
+                this.lockWarble = undefined;
+            }
+            return;
+        }
+        if (voice) {
+            if (voice.rate !== rate) {
+                voice.source.playbackRate.setTargetAtTime(rate, this.context.currentTime, .01);
+                voice.rate = rate;
+            }
+            return;
+        }
+        const [[sample, level]] = SOUND_EVENTS.lockWarble.layers;
+        const source = this.bank.loopSource(sample);
+        if (!source) return;
+        const gain = this.context.createGain();
+        gain.gain.value = level;
+        source.playbackRate.value = rate;
+        source.connect(gain); gain.connect(this.cockpitBus);
+        source.onended = () => { source.disconnect(); gain.disconnect(); };
+        source.start(this.context.currentTime, source.loopStart);
+        this.lockWarble = {source, gain, rate};
     }
 
     // A menu over the cockpit: the world drops back behind glass while the
@@ -543,6 +581,12 @@ export class AudioManager {
             // Bank still loading: nothing audible, nothing to keep.
             for (const node of nodes) node.disconnect();
             return;
+        }
+        // Reserve the receiver until the last scheduled pip or break tone ends.
+        // A throttled or unloaded cue never occupies the channel.
+        if (!spatial && (event.channel === 'missile-pips' || effect === 'missileBreak')) {
+            this.missileCueEndsAt = Math.max(this.missileCueEndsAt, now + longest);
+            this.setLockWarble('off');
         }
         this.activeVoices += 1;
         const release = () => {

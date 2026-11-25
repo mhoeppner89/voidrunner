@@ -3,6 +3,7 @@ import {combatTargetEligible} from './combatTargeting.js';
 import {WEAPONS,weaponRange,weaponShotDamage} from './weapons.js';
 import {observeNpcTargetMotion} from './npcGunnery.js';
 import {planCrossfire,npcPlayerAttackWindow} from './combatAwareness.js';
+import {advanceCoverSearches,planTerrainFlank,planApproachAmbush} from './combatTactics.js';
 import {planShieldRecovery} from './combatRecovery.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const UP=new THREE.Vector3(0,1,0),FORWARD=new THREE.Vector3(0,0,-1);
@@ -34,7 +35,7 @@ function attackTeam(session,ship,target,now) {
   team.next=now+.5;team.members.length=0;
   let best,bestScore=Infinity;
   for(const other of session.ships){
-   if(other.faction!==ship.faction||other.targetId!==ship.targetId||!combatTargetEligible(other)||other.fleeing||other.patrolMemoryActive||other.combatPlan?.recovery?.active)continue;
+   if(other.faction!==ship.faction||other.targetId!==ship.targetId||!combatTargetEligible(other)||other.fleeing||other.fieldTactic?.kind||other.patrolMemoryActive||other.combatPlan?.recovery?.active)continue;
    const x=target.x-other.position[0],y=target.y-other.position[1],z=target.z-other.position[2],distance=Math.hypot(x,y,z);
    if(distance>900)continue;
    team.members.push(other);
@@ -106,6 +107,7 @@ function chooseEscape(session,ship,s,now,novice) {
 export function planCombatFlight(session,ship,targetPosition,targetVelocity,lead,distance,closing) {
  const now=session.save.world.time,s=ship.combatPlan??=state();
  if(s.targetId!==ship.targetId){s.targetId=ship.targetId;s.next=0;s.lastProgress=now;s.bestFacing=-1;s.bestRangeError=Infinity;s.reapproachUntil=0;s.passUntil=0;ship.repositionUntil=0;ship.fireCommitUntil=0;}
+ if(ship.coverSearch?.pending)advanceCoverSearches(session);
  if(now<s.next)return s;
  const novice=ship.pilot?.tier==='novice',ace=ship.pilot?.tier==='ace';
  s.next=now+(novice?.3:.2);s.plans++;
@@ -181,17 +183,18 @@ export function planCombatFlight(session,ship,targetPosition,targetVelocity,lead
  }
 
  // Plan against the observed attacker, which need not be the current target.
- s.threatPosition.copy(targetPosition);s.threatNose.copy(s.direct).negate();
+ s.threatId=ship.targetId;s.threatPosition.copy(targetPosition);s.threatNose.copy(s.direct).negate();
  const threatId=now<(ship.combatThreatUntil??0)?ship.combatThreatId:ship.targetId;
  const threat=threatId==='player'?session.save.player:session.ships.find(x=>x.id===threatId);
- if(threat?.position&&!ship.patrolMemoryActive){
+ if(threat?.position&&!ship.patrolMemoryActive&&(threatId!=='player'||ship.targetId==='player'||session.shipTracksPlayer(ship))){
   s.delta.fromArray(threat.position);
   if(!session.lineBlocked(s.position,s.delta,ship.id)){
-   s.threatPosition.copy(s.delta);if(threat.rotation)s.threatNose.copy(FORWARD).applyQuaternion(s.q.fromArray(threat.rotation));
+   s.threatId=threatId;s.threatPosition.copy(s.delta);if(threat.rotation)s.threatNose.copy(FORWARD).applyQuaternion(s.q.fromArray(threat.rotation));
   }
  }
  s.delta.copy(s.threatPosition).sub(s.position).normalize();basis(s.delta,s.right,s.up);
  planShieldRecovery(session,ship,s,target,now,distance);
+ if(ship.targetId==='player' && session.activeInstanceId)planApproachAmbush(session,ship,s,targetPosition,now);
  planCrossfire(session,ship,s,now,distance);
  const closePass=distance<s.clearance||closing>10&&distance<s.clearance+Math.min(65,closing*.65);
  const needsBreak=now<(ship.evasiveUntil??0)||s.overshoot||closePass;
@@ -223,6 +226,7 @@ export function planCombatFlight(session,ship,targetPosition,targetVelocity,lead
  if(team?.leader&&team.members.length>1){
   s.teamRole=team.leader===ship?'pressure':'flank';s.teamLeaderId=team.leader.id;
   if(s.teamRole==='flank'){
+   planTerrainFlank(session,ship,s,team,targetPosition,now);
    let rank=0;for(const other of team.members){if(other===ship)break;if(other!==team.leader)rank++;}
    s.delta.copy(targetPosition).sub(s.candidate.fromArray(team.leader.position)).normalize();basis(s.delta,s.teamAxis,s.teamUp);
    const phase=rank*Math.PI*2/Math.max(2,team.members.length-1);

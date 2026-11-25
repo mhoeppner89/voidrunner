@@ -7,7 +7,7 @@ import {FRIGATE_MOUNTS,FRIGATE_CLEARANCE,FRIGATE_ENGINE_MOUNTS,FRIGATE_TORPEDO_M
 import {FRIGATE_COLLISION_TRIANGLES} from './frigateCollisionData.js';
 import {clearTurretArc,shipBlocksRay,updateAutomaticTurrets} from './turrets.js';
 import {disruptionFactor} from './weaponDamage.js';
-import {relativeIntercept,rackLockProgress} from './weaponFlight.js';
+import {relativeIntercept,beginRackLock,rackLockProgress} from './weaponFlight.js';
 import {SHIPS} from './data.js';
 // Live capital hulls render at twice their authored scale. PDCs use the same
 // extents through npcHullExtents; main batteries and assembly hits must agree.
@@ -86,26 +86,24 @@ export function frigateSubsystemExplosionScale(index){
 }
 // The frigate announces its lock before opening the two-cell launcher.
 function updateFrigateTorpedoes(session,ship,dt,targetPosition){
- const s=stateFor(ship),now=session.save.world.time;
- ship.capitalTorpedoWarning=false;
- if(s.torpedoTarget!==ship.targetId){s.torpedoTarget=ship.targetId;s.torpedoLock=0;}
+ const s=stateFor(ship),fit=ship.combatFit,now=session.save.world.time;
+ beginRackLock(fit,ship.targetId,'torpedo',now,dt);
  const targetActor=ship.targetId==='player'?session.save.player:session.ships.find(actor=>actor.id===ship.targetId);
  const targetHull=SHIPS[targetActor?.shipId??targetActor?.combatFit?.hullId];
  const torpedoTarget=!!targetActor&&(!!targetActor.capitalClass||targetActor.role==='trader'||targetActor.role==='miner'||targetHull?.role==='industrial'||(targetHull?.maxSpeed??Infinity)<=50);
- if(!targetPosition||!ship.targetId||!torpedoTarget||ship.holdFire||ship.pursuitHoldFire||ship.fleeing||ship.patrolMemoryActive||ship.capitalTorpedoes<1||!FRIGATE_TORPEDO_MOUNTS.some(i=>ship.capitalMountHull[i]>0)||now<(s.torpedoReadyAt??12)){s.torpedoLock=0;return;}
+ if(!targetPosition||!ship.targetId||!torpedoTarget||ship.holdFire||ship.pursuitHoldFire||ship.fleeing||ship.patrolMemoryActive||ship.capitalTorpedoes<1||!FRIGATE_TORPEDO_MOUNTS.some(i=>ship.capitalMountHull[i]>0)||now<(s.torpedoReadyAt??12)){fit.lock=0;return;}
  s.position.fromArray(ship.position);s.direction.copy(targetPosition).sub(s.position);
  const distance=s.direction.length();
  const launcher=LAUNCHERS.torpedo;
- if(distance<120 || distance>launcher.lockRange || session.lineBlocked(s.position,targetPosition,ship.id)){s.torpedoLock=0;return;}
+ if(distance<120 || distance>launcher.lockRange || session.lineBlocked(s.position,targetPosition,ship.id)){fit.lock=0;return;}
  s.direction.normalize();
  const facing=s.scratch.set(0,0,-1).applyQuaternion(s.q.fromArray(ship.rotation)).dot(s.direction);
  const aspect=targetActor.rotation?s.scratch.set(0,0,-1).applyQuaternion(s.q.fromArray(targetActor.rotation)).dot(s.direction):0;
- const previous=s.torpedoLock??0;
- s.torpedoLock=rackLockProgress(previous,launcher,ship.pilot?.tier,distance,facing,aspect,dt);
- if(!s.torpedoLock)return;
+ const previous=fit.lock??0;
+ fit.lock=rackLockProgress(previous,launcher,ship.pilot?.tier,distance,facing,aspect,dt);
+ if(!fit.lock)return;
  if(ship.targetId==='player')session.warnPlayerLock?.(t('TORPEDO LOCK · EVADE'),!previous);
- ship.capitalTorpedoWarning=true;
- if(s.torpedoLock<1||(!ship.capitalDisarmed&&ship.capitalAttack!=='SALVO'))return;
+ if(fit.lock<1||(!ship.capitalDisarmed&&ship.capitalAttack!=='SALVO'))return;
  // The single launcher fires two separated cells together, alternating rows.
  s.q.fromArray(ship.rotation);
 
@@ -114,7 +112,7 @@ function updateFrigateTorpedoes(session,ship,dt,targetPosition){
   const l=FRIGATE_TORPEDO_LAYOUT,x=i===0?-l.cellX:l.cellX,z=(s.torpedoCell??0)%2===0?-l.cellZ:l.cellZ;
   s.torpedoStarts[i].add(s.scratch.set(x,l.muzzleHeight,z).applyQuaternion(s.q));
 
-  if(session.lineBlocked(s.torpedoStarts[i],targetPosition,ship.id)){s.torpedoLock=0;return;}
+  if(session.lineBlocked(s.torpedoStarts[i],targetPosition,ship.id)){fit.lock=0;return;}
  }
  const salvo=session.projectileCounter+1;
  for(let i=0;i<2;i++){
@@ -124,9 +122,9 @@ function updateFrigateTorpedoes(session,ship,dt,targetPosition){
   session.projectiles.push({id:`p-${++session.projectileCounter}`,slot,salvo,kind:'missile',ownerId:ship.id,targetId:ship.targetId,faction:ship.faction,launcherId:'torpedo',hitWeapon:launcher,damage:launcher.damage,life:launcher.life,homingSpeed:launcher.homingSpeed,homingTurn:launcher.homingTurn,acceleration:launcher.acceleration,shield:launcher.projectileShield});
   ship.capitalTorpedoes--;
  }
- if(ship.targetId==='player')session.audio?.playCockpit?.('missileAlert',.9);
+ if(ship.targetId==='player')session.audio?.playCockpit?.('missileLaunch',.9);
  s.torpedoCell=((s.torpedoCell??0)+1)%2;
- s.torpedoLock=0;s.torpedoReadyAt=now+16;ship.capitalTorpedoWarning=false;
+ fit.lock=0;s.torpedoReadyAt=now+16;
 }
 export function updateFrigateBatteries(session,ship,dt,targetPosition,targetVelocity){
  if(!ship.capitalMountHull)equipFrigate(ship,!!ship.capitalBoss);
@@ -160,6 +158,8 @@ export function updateFrigateBatteries(session,ship,dt,targetPosition,targetVelo
   ship.capitalAttack=cycle.phase;ship.capitalAttackRemaining=Math.max(0,cycle.until-now);
  }
  updateFrigateTorpedoes(session,ship,dt,targetPosition);
+ ship.capitalTorpedoWarning=ship.combatFit.lock>0;
+ ship.combatFit.warned=ship.capitalTorpedoWarning && ship.targetId==='player';
  updateAutomaticTurrets(session,ship,ship.id,dt);
  for(let i=4;i<8;i++)if(ship.capitalMountHull[i]<=0){frigateMountPosition(ship,i,s.position);session.renderer.showDisabledCapitalMount?.(`${ship.id}-${i}`,s.position,s.q,ship,i);}
  for(let i=0;i<4;i++){

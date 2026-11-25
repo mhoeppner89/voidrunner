@@ -25,6 +25,7 @@ import { stationApproach, reserveStationDock, updateStationDock } from './statio
 import { COMMODITIES, LOCATIONS, activityLocationIdsForSystem, dockLocationIdsForSystem, marketLocationIdsForSystem } from './data.js';
 import { deliverCargo } from './economy.js';
 import { pick, randomBetween, seededRandom } from './random.js';
+import { interruptFieldTactic, releaseUnavailablePilot, flyFieldTactic, tryFieldAmbush } from './combatTactics.js';
 import { continueShieldRecovery } from './combatRecovery.js';
 import { continueTerrainManeuver } from './terrainManeuvers.js';
 
@@ -199,6 +200,7 @@ export const createSmuggleTask = (ship, session, port) => {
 // The per-ship AI entry point, called from updateShips. Civilian flight comes
 // before combat; working tasks otherwise yield to searches and engagements.
 export function updateShipAI(session, ship, dt) {
+    releaseUnavailablePilot(session, ship);
     if (updateStationDock(session, ship, dt)) return;
     // A captured hull and a powered-down surrender are inert: no task, no
     // interaction — the travel AI bleeds off their momentum.
@@ -224,6 +226,7 @@ export function updateShipAI(session, ship, dt) {
     // target and sends it into fighter attack passes. Authored encounters and
     // surrender/arrest decisions retain their own movement rules.
     if (isAmbientCivilian(session, ship)) {
+        interruptFieldTactic(session, ship);
         const threat = huntedBy(session, ship) ?? null;
         // Hostility records the attack/reputation consequence; it must not
         // make a rescued freighter turn back and hunt the player afterwards.
@@ -235,6 +238,7 @@ export function updateShipAI(session, ship, dt) {
         return;
     }
 
+    if (flyFieldTactic(session, ship, dt)) return;
     if (continueShieldRecovery(session, ship, dt)) return;
     if (continueTerrainManeuver(session, ship, dt)) return;
 
@@ -243,6 +247,8 @@ export function updateShipAI(session, ship, dt) {
     // ship that should only know the last observed point.
     const searching = session.updateSearchAI(ship, dt);
     if (searching) {
+        tryFieldAmbush(session, ship, session.save.world.time);
+        if (flyFieldTactic(session, ship, dt)) return;
         session.updateTravelAI(ship, dt);
         return;
     }

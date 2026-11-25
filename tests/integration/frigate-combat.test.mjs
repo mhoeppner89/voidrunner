@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from '../../vendor/three.module.min.js';
 import {equipFrigate,updateFrigateBatteries,updateFrigateAttack,frigateMountPosition,damageFrigateMount,frigateSubsystemExplosionScale,FRIGATE_GUN,FRIGATE_BOSS_GUN,FRIGATE_EXTENTS,visibleFrigateBatteries} from '../../src/game/capitalCombat.js';
+import {cockpitLockState} from '../../src/game/weaponFlight.js';
 import {WEAPON_DAMAGE_SCALE} from '../../src/game/weapons.js';
 import {FRIGATE_MOUNTS,FRIGATE_ENGINE_MOUNTS,FRIGATE_TORPEDO_LAYOUT} from '../../src/game/frigateMounts.js';
 import {clearTurretArc,updateAutomaticTurrets,FRIGATE_PDC_TURRET,PDC_TURRET} from '../../src/game/turrets.js';
@@ -317,14 +318,34 @@ test('frigate torpedoes have a finite magazine, warning, cooldown, and cover int
  for(let i=0;i<1800;i++){other.s.save.world.time=i/60;updateFrigateBatteries(other.s,other.ship,1/60,point,new THREE.Vector3());}
  assert.equal(other.s.projectiles.length,0);assert.equal(other.ship.capitalTorpedoWarning,false);
 });
+test('a frigate torpedo lock reaches the cockpit until interrupted or launched',()=>{
+ const {s,ship}=stage(),vel=new THREE.Vector3(),point=new THREE.Vector3(0,0,-380);
+ s.save.player.shipId='atlas';
+ s.save.player.position=point.toArray();
+ s.save.world.time=12;
+ const step=()=>{
+  s.save.world.time+=1/60;
+  updateFrigateBatteries(s,ship,1/60,point,vel);
+  return cockpitLockState(s.ships,s.save.world.time,false);
+ };
+ assert.equal(step(),'acquiring');
+ assert.equal(cockpitLockState(s.ships,s.save.world.time+1/60,false),'off','a skipped rack check expires');
+ ship.holdFire=true;
+ assert.equal(step(),'off');
+ ship.holdFire=false;
+ const states=new Set();
+ for(let i=0;i<600 && ship.capitalTorpedoes>0;i++) states.add(step());
+ assert.deepEqual([...states],['acquiring','locked','off']);
+ assert.equal(s.projectiles.filter(p=>p.launcherId==='torpedo').length,2);
+});
 test('frigate torpedoes reserve salvos for capital ships and slower hulls',()=>{
  const {s,ship}=stage(),point=new THREE.Vector3(0,0,-380);s.spawnGunProjectile=()=>{};s.save.player.shipId='talon';
  for(let i=0;i<45*60;i++){s.save.world.time=i/60;updateFrigateBatteries(s,ship,1/60,point,new THREE.Vector3());}
  assert.equal(s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length,0);assert.equal(ship.capitalTorpedoWarning,false);
- s.save.player.shipId='atlas';ship.capitalTorpedoes=2;ship.capitalRuntime.torpedoReadyAt=0;ship.capitalRuntime.torpedoLock=0;
+ s.save.player.shipId='atlas';ship.capitalTorpedoes=2;ship.capitalRuntime.torpedoReadyAt=0;ship.combatFit.lock=0;
  for(let i=0;i<35*60&&s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length<2;i++){s.save.world.time=45+i/60;updateFrigateBatteries(s,ship,1/60,point,new THREE.Vector3());}
  assert.equal(s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length,2,'a slow industrial hull should draw a paired salvo');
- const capital=s.spawnCapitalShip('concord-frigate',[0,0,-380],'rook','Capital target');ship.targetId=capital.id;ship.capitalTorpedoes=2;ship.capitalRuntime.torpedoReadyAt=0;ship.capitalRuntime.torpedoLock=0;
+ const capital=s.spawnCapitalShip('concord-frigate',[0,0,-380],'rook','Capital target');ship.targetId=capital.id;ship.capitalTorpedoes=2;ship.capitalRuntime.torpedoReadyAt=0;ship.combatFit.lock=0;
  for(let i=0;i<35*60&&s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length<4;i++){s.save.world.time=80+i/60;updateFrigateBatteries(s,ship,1/60,new THREE.Vector3(...capital.position),new THREE.Vector3());}
  assert.equal(s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length,4,'capital hulls should draw paired salvos regardless of speed');
 });

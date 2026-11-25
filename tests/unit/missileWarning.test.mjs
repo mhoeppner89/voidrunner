@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {stepMissileWarning,MISSILE_PIP_FLOOR,MISSILE_CUE_SPACING} from '../../src/game/audio.js';
+import {AudioManager,stepMissileWarning,MISSILE_PIP_FLOOR,MISSILE_CUE_SPACING} from '../../src/game/audio.js';
 import {breakCueTime,breakCueEnd,breakCueStart,BREAK_REACTION} from '../../src/game/weaponFlight.js';
 import {LAUNCHERS} from '../../src/game/weapons.js';
 
@@ -73,4 +73,74 @@ test('a dropped frame of tracking cannot fire an early pip',()=>{
     step(0);
     for(let i=0;i<40;i++)step(1);
     for(let i=1;i<pips.length;i++)assert.ok(pips[i]-pips[i-1]>=MISSILE_PIP_FLOOR-1e-9,`pips ${(pips[i]-pips[i-1]).toFixed(3)} s apart`);
+});
+
+test('the cockpit shows the most urgent live lock on the player', async () => {
+    const {cockpitLockState} = await import('../../src/game/weaponFlight.js');
+    const time = 18;
+    const attacker = (lock, warned = true) => ({
+        targetId:'player', hostile:true, hull:20,
+        combatFit:{lock, warned, lockTarget:'player', lockCheckedAt:time},
+    });
+    const acquiring = attacker(.6), locked = attacker(1);
+    const state = (ships, inbound = false) => cockpitLockState(ships, time, inbound);
+    assert.equal(state([]), 'off');
+    assert.equal(state([attacker(0), attacker(.4, false)]), 'off');
+    assert.equal(state([acquiring]), 'acquiring');
+    assert.equal(state([acquiring, locked]), 'locked');
+    assert.equal(state([locked, acquiring]), 'locked');
+    assert.equal(state([locked], true), 'missile');
+    assert.equal(state([{}, {...locked, hull:0}, {...locked, hostile:false}, {...locked, surrendered:true},
+        {...locked, targetId:'escort'}, {...locked, combatFit:{...locked.combatFit, lockTarget:'escort'}},
+        {...locked, combatFit:{...locked.combatFit, lockCheckedAt:time-dt}}]), 'off');
+});
+
+test('one forged receiver loop accelerates on lock and yields immediately to the launch pip', () => {
+    const a = new AudioManager(), played = [], rates = [], stopped = [], starts = [];
+    const source = {loopStart:.1, playbackRate:{setTargetAtTime:r=>rates.push(r)},
+        connect(){}, disconnect(){}, start:(...args)=>starts.push(args), stop:t=>stopped.push(t)};
+    const samples = {'missile-alert':.34, 'break-cue':.4};
+    a.bank = {loopSource:id=>{ assert.equal(id,'lock-warble'); return source; },
+        buffer:id=>({id,duration:samples[id]})};
+    a.context = {currentTime:3, createGain:()=>({gain:{setTargetAtTime(){}},connect(){},disconnect(){}})};
+    a.enabled = true;
+    a.effectTimes = new Map();
+    a.effectReleases = new Set();
+    a.effectsGain = a.cockpitBus = a.uiBus = a.context.createGain();
+    a.context.createBufferSource = () => ({
+        playbackRate:{}, connect(){}, disconnect(){}, start(){played.push(this.buffer.id);},
+    });
+    a.setLockWarble('acquiring');
+    a.setLockWarble('acquiring');
+    assert.deepEqual(starts, [[3,.1]]);
+    assert.equal(source.playbackRate.value,1);
+    a.setLockWarble('locked');
+    a.setLockWarble('locked');
+    assert.equal(rates.length,1);
+    assert.ok(rates[0]>1);
+    a.playCockpit('missileLaunch');
+    a.setLockWarble('missile');
+    assert.equal(a.lockWarble,undefined);
+    assert.deepEqual(stopped,[3.01]);
+    assert.deepEqual(played,['missile-alert']);
+    for (const time of [3+dt, 3.33]) {
+        a.context.currentTime = time;
+        a.setLockWarble('acquiring');
+        assert.equal(starts.length,1,'another attacker cannot interrupt the launch pips');
+    }
+    a.playCockpit('missileLaunch'); // The shared pip channel rejects this retrigger.
+    a.context.currentTime = 3.35;
+    a.setLockWarble('acquiring');
+    assert.equal(starts.length,2,'the receiver resumes when the playing sample ends');
+    for (const [cue,sample] of [['missileAlert','missile-alert'],['missileBreak','break-cue']]) {
+        a.context.currentTime += 1;
+        a.playCockpit(cue);
+        assert.equal(played.at(-1),sample);
+        a.context.currentTime += samples[sample]-.001;
+        a.setLockWarble('locked');
+        assert.equal(a.lockWarble,undefined,cue+' keeps its full sample clear');
+        a.context.currentTime += .002;
+        a.setLockWarble('locked');
+        assert.ok(a.lockWarble);
+    }
 });

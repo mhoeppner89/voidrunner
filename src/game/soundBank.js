@@ -37,7 +37,7 @@ const RECORDED = {
 };
 export const SOUNDS = { ...RECORDED, ...FORGED_SOUNDS };
 // Load order inside a group: what the first seconds of play need comes first.
-const PRIORITY = ['ui-click', 'engine-idle', 'engine-thrust', 'engine-afterburner', 'loop-engine-sub', 'laser', 'hit', 'shield', 'explosion'];
+const PRIORITY = ['ui-click', 'engine-idle', 'engine-thrust', 'engine-afterburner', 'loop-engine-sub', 'lock-warble', 'laser', 'hit', 'shield', 'explosion'];
 const CONCURRENCY = 6;
 
 export class SoundBank {

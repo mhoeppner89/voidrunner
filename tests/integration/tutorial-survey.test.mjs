@@ -111,6 +111,7 @@ test('stealth score yields to actual aggression and uses the audio context trans
 test('both languages explain genuine transponder controls and station access matches the lesson',()=>{
  for(const language of ['de','en']){
   const hide=Object.values(ADVENTURE_DIALOGUES['paul-hide'].nodes).map(n=>dialogueText(n.text,language)).join(' '),clear=Object.values(ADVENTURE_DIALOGUES['paul-clear'].nodes).map(n=>dialogueText(n.text,language)).join(' ');
+  for(const line of [hide,clear]){assert.match(line,/XPDR/);assert.match(line,/gedrückt|hold/i);assert.match(line,/\bB\b/);}
   assert.match(hide,/TRANSPONDER (AN|ON)/);assert.match(hide,/\bB\b/);assert.match(clear,/TRANSPONDER (AUS|OFF)/);assert.match(clear,/Patrouillen|patrols/);assert.match(clear,/mit oder ohne|with or without/);
  }
  const {session:s}=tutorialFixture();for(const location of Object.values(LOCATIONS).filter(l=>l.kind==='station'))assert.notEqual(s.darkDockPolicy(location.id),'deny',location.id);assert.equal(s.darkDockPolicy('helix'),'syndicate');

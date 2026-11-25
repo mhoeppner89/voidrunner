@@ -256,3 +256,38 @@ test('escape thrust stays on as slow velocity rolls toward a clear exit',()=>{
  fieldCombatSteering(s,ship,goal,heading,1/60,out);
  assert.equal(nav.speedLimit,0,'an obstructed sweep vetoes that thrust');
 });
+
+// Seed 942. The searching Prospector's centre was already moving off this
+// chimney face when its tail rotated back into it on four successive contacts.
+test('a searching Prospector clears the chimney face as its tail swings around',()=>{
+ const s=fieldWorld(942);
+ s.stageArenaSite('shardbelt-chimney');advanceFieldRoadmap(s,Infinity);
+ s.tmpCollide=new THREE.Vector3();s.damageShip=()=>{};
+ const ship=s.spawnShip('pirate',[18103,-7413,-195273],undefined,undefined,
+  {tier:'veteran',temperament:'steady'},{hullId:'prospector'});
+ ship.rotation=[.750,-.538,.005,-.384];ship.velocity=[0,2,10];
+ ship.flightAngularVelocity=v([.494,-.494,-.464]);
+ const lastSighting=[18318.525,-6568.456,-194943.217];
+ ship.search={phase:'approach',kind:'hostile',anchor:[...lastSighting]};
+ ship.destination=[...lastSighting];ship.targetId='player';ship.hostile=true;
+ s.save.player.position=[...lastSighting];
+ for(let tick=0;tick<240;tick++){
+  s.save.world.time=327.383+tick/60;
+  s.updateTravelAI(ship,1/60);
+  s.resolveNpcCollisions(ship);
+ }
+ assert.equal(ship.combatBumpAt,undefined,'the rotating hull must clear the rock');
+ assert.ok(Math.hypot(...ship.velocity)>ship.speed*.3,'the searcher accelerates away');
+});
+
+test('scraping terrain keeps the actual attacker in the fighter’s threat memory',()=>{
+ const s=session(),ship=s.spawnShip('pirate',[0,0,0]);
+ ship.shield=ship.maxShield;ship.combatThreatId='wing-leader';ship.combatThreatUntil=5;
+ ship.combatPressure=8;ship.combatPressureAt=1;s.save.world.time=2;
+ s.damageShip(ship,5,'environment');
+ assert.ok(ship.shield<ship.maxShield && ship.shieldDelay>0);
+ assert.equal(ship.combatThreatId,'wing-leader');
+ assert.equal(ship.combatThreatUntil,5);
+ assert.equal(ship.combatPressure,8);
+ assert.equal(ship.combatPressureAt,1);
+});

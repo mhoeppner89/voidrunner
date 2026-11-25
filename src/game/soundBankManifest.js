@@ -371,6 +371,16 @@ export const FORGED_SOUNDS = {
   ],
   "group": "flight"
  },
+ "lock-warble": {
+  "files": [
+   "fx/lock-warble-0.mp3"
+  ],
+  "group": "flight",
+  "loop": [
+   0.12,
+   2
+  ]
+ },
  "missile-alert": {
   "files": [
    "fx/missile-alert-0.mp3"

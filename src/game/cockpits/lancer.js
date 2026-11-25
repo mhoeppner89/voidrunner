@@ -3,6 +3,10 @@ export function createLancerCockpit(base){
     return {...base,id:'lancer',name:'Artemis',status:'approved',fixedInstruments:true,shell:new URL('../../../assets/cockpits/lancer-paint-v1.png',import.meta.url).href,
         artworkSize:[1850,850],glassUnderlap:14,
         screenInsets:{own:{x:18,y:14,bottom:18},radar:{x:27,y:24},target:{x:23,y:14,bottom:18,container:true}},
+        // The side housings have no bezel deep enough for a plate, so the pair
+        // rides on their top edges beside the cowl, like the hyperdrive plate
+        // on the cowl itself. Mirrored about the painted centre.
+        hardware:{xpdr:[630,591,104,30]},hardwareAxis:927,hardwareSeat:'top',
         monitors:{own:{...base.monitors.own},radar:{...base.monitors.radar,y:647},target:{...base.monitors.target}},
         housingTops:{own:611,radar:582,target:611},hyperdriveBottom:633,stickClearanceX:416,handOffsetX:-60,
         structure:{"style":"skeletal","rim":9,"edge":11,"corner":10,"near":0.32,"front":225,"bevel":0.01,"depth":0.045},

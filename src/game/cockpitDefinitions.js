@@ -32,10 +32,13 @@ export const COCKPITS=deepFreeze({
 
     scrapper:createScrapperCockpit(APPROVED_COCKPIT_LAYOUT),
     speedster:createSpeedsterCockpit(APPROVED_COCKPIT_LAYOUT),
-    wayfarer:{...APPROVED_COCKPIT_LAYOUT,id:'wayfarer',name:'Hestia / Wanderer',status:'approved',shell:asset('wayfarer-paint-atlas-v2.png')},
+    wayfarer:{...APPROVED_COCKPIT_LAYOUT,
+        hardware:{xpdr:[664,590,92,24]},hardwareSeat:'top',
+        id:'wayfarer',name:'Hestia / Wanderer',status:'approved',shell:asset('wayfarer-paint-atlas-v2.png')},
     // Fit live glass to the approved v4 painting. Never repaint it to chase a
     // subpixel DOM alignment error. Insets keep readouts clear of bevel corners.
     talon:{...APPROVED_COCKPIT_LAYOUT,width:1850,
+        hardware:{xpdr:[620,586,104,28]},
         monitors:{own:{x:423,y:634,width:299,height:161},radar:{x:799,y:653,width:255,height:161},target:{x:1129,y:634,width:294,height:161}},
         screenInsets:{own:{x:10,y:6},radar:{x:5,y:5},target:{x:20,y:6}},
         housingTops:{radar:560},hyperdriveBottom:633,stickClearanceX:416,
@@ -69,10 +72,35 @@ export const cockpitManifest=id=>{
 // shipping DOM controls in local HUD pixels, after removing previous stick sizing.
 export function cockpitLayout(c,W,H,{jumpHeight,baseline,throttle,corners}){
     const monitors=Object.fromEntries(Object.entries(c.monitors).map(([id,a])=>[id,{x:a.x/c.width*W,y:a.y/c.height*H,width:a.width/c.width*W,height:a.height/c.height*H}]));
+    // Hardware faces are measured in the original painting. The XPDR touch
+    // extension grows upwards from the bezel, away from the monitor glass.
+    // LOCK mirrors XPDR across the radar axis, so the pair always flanks the
+    // centre stack symmetrically (user request).
+    const [fx, fy, fw, fh] = c.hardware.xpdr, axis = c.hardwareAxis ?? c.monitors.radar.x + c.monitors.radar.width/2;
+    const scaled = x => ({x:x/c.width*W, y:fy/c.height*H, width:fw/c.width*W, height:fh/c.height*H});
+    // Phones shrink the painting; like the hyperdrive plate, the faces keep a
+    // readable minimum, growing vertically about their centre and outboard.
+    // A plate seated on a housing's top edge keeps its foot and grows upwards.
+    const readable = (r, outboard) => {
+        const width = Math.max(r.width, 46), height = Math.max(r.height, 15);
+        const y = c.hardwareSeat === 'top' ? r.y+r.height-height : r.y-(height-r.height)/2;
+        return {x:r.x-(outboard < 0 ? width-r.width : 0), y, width, height};
+    };
+    const left = fx+fw/2 < axis;
+    const hardware = {xpdr:readable(scaled(fx), left ? -1 : 1), lock:readable(scaled(2*axis-fx-fw), left ? 1 : -1)};
+    const face = hardware.xpdr;
+    const strip = c.xpdrHitStrip;
+    const width = strip ? strip.width/c.width*W : Math.max(44, face.width+12);
+    const height = Math.max(strip ? 56 : 44, face.height+8);
     const hyperWidth=Math.max(104,Math.min(monitors.radar.width*.96,200));
     const hyper={x:monitors.radar.x+(monitors.radar.width-hyperWidth)/2,y:H*(c.hyperdriveBottom??c.housingTop)/c.height-jumpHeight,width:hyperWidth,height:jumpHeight};
+    // Beside the hyperdrive plate, the extra width grows outboard so the two
+    // touch areas never share a pixel.
+    const centred = face.x+(face.width-width)/2;
+    const hitX = strip ? strip.x/c.width*W : face.x < hyper.x ? Math.min(centred, hyper.x-width) : Math.max(centred, hyper.x+hyper.width);
+    hardware.hit = {x:hitX, y:face.y+face.height-height, width, height};
     const edge=(c.stickClearanceX??c.monitors.own.x)/c.width*W-W*.012,stickSize=Math.max(baseline.width,Math.min(230,edge-24,baseline.width+Math.max(0,throttle.y-corners.bottom-8)));
-    return {monitors,hyper,stickSize,stickTranslate:(edge-stickSize)/2-baseline.x,bleed:Math.max(1.5,(c.glassUnderlap??3)*Math.max(W/c.width,H/c.height))};
+    return {monitors,hardware,hyper,stickSize,stickTranslate:(edge-stickSize)/2-baseline.x,bleed:Math.max(1.5,(c.glassUnderlap??3)*Math.max(W/c.width,H/c.height))};
 }
 
 // Optional stencil for code-only layout guides. Approved painted frames keep

@@ -9,6 +9,7 @@ export function createScrapperCockpit(base){
         // Center the unchanged live display sizes on the original painting's
         // measured holes. Internal margins protect its layered seals/bezels.
         // Never stencil or regenerate this detailed frame to fit the readouts.
+        hardware:{xpdr:[672,582,104,30]},
         monitors:{
             own:{...base.monitors.own,x:418,y:616},
             radar:{...base.monitors.radar,x:792,y:641.5},

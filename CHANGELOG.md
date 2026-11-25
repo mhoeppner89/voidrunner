@@ -1,3 +1,11 @@
+## 0.8.2pp — LOCK lamp, transponder switch, enemies use cover and flank
+
+- Every cockpit has two new plates beside HYPERDRIVE: a LOCK lamp (inspired by Wing Commander Privateer) and an XPDR switch. LOCK glows amber while an enemy acquires a missile lock, red once they have it, and flashes fast when a missile is on its way, with a short warble that gives way to the missile cues. Hold XPDR briefly and release to switch your transponder without opening a monitor; its green light shows when it is on. With reduced motion the lamp reads MSL instead of flashing.
+- Your own missile lock is shown Wing Commander style: four chevrons slide in from the sides and seat on the target box when locked. The box keeps its size and colour.
+- Enemy pilots fight smarter: with shields failing they break for real cover to recharge, a second fighter swings round your flank while its partner keeps you busy, and now and then one waits hidden and opens fire as you pass. Each move is short and capped, so fights keep moving; Arena opponents still never surrender.
+- New radio calls go with them (taking cover, going round the flank, springing an ambush, a crippled drive, a kill, a bandit on your tail), in English and German, and wait for what they announce to actually happen.
+- The carrier hangar Arena fight is busier: opponents press the attack instead of hanging back.
+
 ## 0.8.2po — Enemies fly better lines around rock and wrecks
 
 - Enemy pilots plan around the turn their ship can actually make, try shallow turns before swinging wide around a rock, and keep their speed through clear gaps. In matched duels time spent crawling fell from 14% to under 3%, full stops from 33 to 3, terrain bumps by three quarters, and they reach firing range sooner.

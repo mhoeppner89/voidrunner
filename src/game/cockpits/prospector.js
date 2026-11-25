@@ -5,6 +5,7 @@ export function createProspectorCockpit(base){
     return {
         ...base,
         // Measure the generated alpha openings; preserve the original PNG.
+        hardware:{xpdr:[526,576,104,28]},
         monitors:{own:{x:408,y:630,width:329,height:179},radar:{x:792,y:656,width:268,height:160},target:{x:1115,y:630,width:327,height:179}},
         screenInsets:{own:{x:8,y:0},radar:{x:5,y:0},target:{x:8,y:0}},
         housingTops:{radar:560},hyperdriveBottom:610,handOffsetX:-60,

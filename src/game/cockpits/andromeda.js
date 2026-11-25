@@ -4,6 +4,8 @@ export function createAndromedaCockpit(base){
     return {
         ...base,
         // Approved display sizes, gently centered on the original alpha holes.
+        // The plates cover the twin vents beside the cowl completely.
+        hardware:{xpdr:[624,576,128,34]},
         monitors:{
             own:{...base.monitors.own,x:419,y:627.5},
             radar:{...base.monitors.radar,x:793.5,y:648.5},

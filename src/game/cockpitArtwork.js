@@ -1,6 +1,12 @@
 // Shared, static cockpit frame and anchored three-pose pilot rig.
 import {getCockpitDefinition,cockpitLayout,cockpitApertureClip} from './cockpitDefinitions.js';
 export {STARTER_COCKPIT,hasPaintedCockpit,paintedCockpitAssets} from './cockpitDefinitions.js';
+import {getLanguage, t} from './i18n.js';
+const HOLD_MS = 300;
+const LOCK_LABELS = {
+    off: 'Missile lock warning clear', acquiring: 'Enemy acquiring missile lock',
+    locked: 'Enemy missile lock', missile: 'Missile tracking your ship',
+};
 const NS='http://www.w3.org/2000/svg';
 let clipSequence=0;
 const svg=(tag,attrs={})=>{const el=document.createElementNS(NS,tag);for(const [k,v]of Object.entries(attrs))el.setAttribute(k,v);return el;};
@@ -9,7 +15,7 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
 export class PaintedCockpit {
     active=false;dirty=true;placed=new Map();pose={x:0,y:0};engaged={};frameIndex=-1;angle=NaN;
-    constructor(root,{touch}={}){this.root=root;this.touchOverride=touch;this.alphaResources=new Map();}
+    constructor(root,{touch,toggleTransponder}={}){this.root=root;this.touchOverride=touch;this.toggleTransponder=toggleTransponder;this.alphaResources=new Map();}
     remember(el,properties){
         if(!el)return;
         let previous=this.placed.get(el);if(!previous){previous=new Map();this.placed.set(el,previous);}
@@ -22,6 +28,18 @@ export class PaintedCockpit {
         this.frame=new Image();this.frame.className='painted-cockpit-frame';this.frame.alt='';this.frame.draggable=false;this.frame.setAttribute('aria-hidden','true');
         this.forwardHull=new Image();this.forwardHull.className='painted-cockpit-forward-hull';this.forwardHull.alt='';this.forwardHull.draggable=false;this.forwardHull.setAttribute('aria-hidden','true');this.forwardHull.hidden=true;
         instruments.prepend(this.forwardHull,this.frame);
+        this.lamp = document.createElement('span');
+        this.lamp.className = 'painted-lock dash-face';
+        this.lamp.setAttribute('role', 'img');
+        this.lamp.innerHTML = '<b><span>LOCK</span><span class="missile-legend">MSL</span></b>';
+        this.switch = document.createElement('button');
+        this.switch.type = 'button';
+        this.switch.className = 'painted-xpdr';
+        this.switch.innerHTML = '<span class="dash-face"><b>XPDR</b></span>';
+        this.switch.style.setProperty('--hold-time', HOLD_MS + 'ms');
+        instruments.append(this.lamp, this.switch);
+        this.bindSwitch();
+        this.setHardware('off', true, true, true);
         this.damageHullMask=svg('image',{class:'canopy-hull-mask',width:1000,height:1000,preserveAspectRatio:'none',filter:'url(#canopy-opaque)'});
         this.root.querySelector('#canopy-damage-mask')?.append(this.damageHullMask);
         this.clipId=`painted-apertures-${++clipSequence}`;
@@ -40,6 +58,82 @@ export class PaintedCockpit {
         this.handImage=svg('image',{preserveAspectRatio:'none'});this.crop.append(this.handImage);
         const throttle=this.root.querySelector('[data-touch-throttle]');
         this.rail=document.createElement('div');this.rail.className='painted-throttle-rail';this.rail.setAttribute('aria-hidden','true');this.rail.append(...throttle.childNodes);throttle.append(this.rail);
+    }
+    bindSwitch() {
+        const button = this.switch;
+        const inside = event => {
+            const b = this.hold?.bounds;
+            return b && event.clientX >= b.left && event.clientX < b.right
+                && event.clientY >= b.top && event.clientY < b.bottom;
+        };
+        button.addEventListener('pointerdown', event => {
+            if (this.hold || event.button !== 0 || button.disabled) return;
+            event.preventDefault();
+            this.hold = {id:event.pointerId, start:event.timeStamp, bounds:button.getBoundingClientRect()};
+            if (!inside(event)) { this.endHold(); return; }
+            button.setPointerCapture(event.pointerId);
+            button.classList.add('holding');
+        });
+        button.addEventListener('pointermove', event => {
+            if (this.hold?.id !== event.pointerId || this.hold.cancelled || inside(event)) return;
+            // Keep capture until release. Otherwise the monitor under a sliding
+            // thumb would receive the pointerup and open its menu or hyperdrive.
+            this.cancelHold();
+        });
+        button.addEventListener('pointerup', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (this.hold?.id !== event.pointerId) return;
+            const flip = !this.hold.cancelled && inside(event) && event.timeStamp - this.hold.start >= HOLD_MS;
+            this.endHold();
+            if (flip) this.toggleTransponder?.();
+        });
+        for (const type of ['pointercancel','lostpointercapture']) button.addEventListener(type, event => {
+            if (this.hold?.id === event.pointerId) this.endHold();
+        });
+        button.addEventListener('keydown', event => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            // Let the button generate its native click, and keep Space out of flight input.
+            event.stopPropagation();
+            if (event.repeat) event.preventDefault();
+        });
+        button.addEventListener('click', event => {
+            event.stopPropagation();
+            // Native keyboard and assistive-technology activation.
+            if (event.detail === 0 && !button.disabled) this.toggleTransponder?.();
+        });
+        button.addEventListener('contextmenu', event => event.preventDefault());
+        window.addEventListener('blur', () => this.endHold());
+    }
+    cancelHold() {
+        this.hold.cancelled = true;
+        this.switch.classList.remove('holding');
+    }
+    endHold() {
+        if (!this.hold) return;
+        const {id} = this.hold;
+        this.hold = undefined;
+        this.switch.classList.remove('holding');
+        if (this.switch.hasPointerCapture(id)) this.switch.releasePointerCapture(id);
+    }
+    setHardware(state, broadcasting, showSwitch, enabled) {
+        if (!this.active || !this.lamp) return;
+        const language = getLanguage(), translated = this.hardwareLanguage !== language;
+        this.hardwareLanguage = language;
+        if (this.lockState !== state || translated) {
+            this.lockState = state;
+            this.lamp.dataset.state = state;
+            this.lamp.setAttribute('aria-label', t(LOCK_LABELS[state]));
+        }
+        if (this.broadcasting !== broadcasting || translated) {
+            this.broadcasting = broadcasting;
+            this.switch.setAttribute('aria-pressed', String(broadcasting));
+            this.switch.setAttribute('aria-label', t('Transponder. Hold and release to switch.'));
+        }
+        if (this.switch.hidden === showSwitch) this.switch.hidden = !showSwitch;
+        const disabled = !showSwitch || !enabled;
+        if (this.switch.disabled !== disabled) this.switch.disabled = disabled;
+        if (disabled) this.endHold();
     }
     loadAssets(shell){
         this.frame.src=shell;
@@ -95,7 +189,7 @@ export class PaintedCockpit {
         this.frameIndex=-1;this.angle=NaN;this.pose.x=this.pose.y=0;this.invalidate();
     }
     deactivate(){
-        if(!this.active)return;this.active=false;delete this.root.dataset.cockpitPaint;delete this.root.dataset.cockpitTouch;
+        if(!this.active)return;this.endHold();this.active=false;delete this.root.dataset.cockpitPaint;delete this.root.dataset.cockpitTouch;
         for(const [el,values]of this.placed)for(const [key,[value,priority]]of values){if(value)el.style.setProperty(key,value,priority);else el.style.removeProperty(key);}this.placed.clear();
         const stick=this.root.querySelector('[data-touch-stick]');if(this.oldOrigin===undefined)delete stick.dataset.origin;else stick.dataset.origin=this.oldOrigin;
         for(const el of this.root.querySelectorAll('.touch-right,[data-touch-throttle]'))el.inert=false;
@@ -112,7 +206,14 @@ export class PaintedCockpit {
         const stick=this.root.querySelector('[data-touch-stick]');this.remember(stick,['width','height','translate']);
         for(const k of ['width','height','translate'])stick.style.removeProperty(k);
         const baseline=rect('[data-touch-stick]'),throttle=rect('[data-touch-throttle]'),corners=rect('.hud-corner-buttons');
-        const {monitors,hyper,stickSize,stickTranslate,bleed}=cockpitLayout(this.definition,W,H,{jumpHeight:rect('#hyperdrive-card').height,baseline,throttle,corners});
+        const {monitors,hardware,hyper,stickSize,stickTranslate,bleed}=cockpitLayout(this.definition,W,H,{jumpHeight:rect('#hyperdrive-card').height,baseline,throttle,corners});
+        const place = (el, r) => this.style(el, {left:r.x+'px', top:r.y+'px', width:r.width+'px', height:r.height+'px'});
+        if (this.hold && (W !== this.layout?.width || H !== this.layout?.height
+            || origin.left !== this.layout?.left || origin.top !== this.layout?.top)) this.cancelHold();
+        place(this.lamp, hardware.lock);
+        place(this.switch, hardware.hit);
+        this.style(this.switch.firstElementChild, {left:(hardware.xpdr.x-hardware.hit.x)+'px',
+            width:hardware.xpdr.width+'px', height:hardware.xpdr.height+'px'});
         for(const [id,q]of Object.entries(monitors)){
             const inset=this.definition.screenInsets?.[id],px=(inset?.x??0)/this.definition.width*W,py=(inset?.y??0)/this.definition.height*H;
             const bottom=(inset?.bottom??inset?.y??0)/this.definition.height*H;
@@ -143,7 +244,7 @@ export class PaintedCockpit {
         for(const [key,value]of Object.entries({x:cx-base.socket[0]*baseScale,y:cy-base.socket[1]*baseScale,width:base.width*baseScale,height:base.height*baseScale}))this.mountImage.setAttribute(key,value);
         const blockers=[...Object.values(monitors).map(q=>({x:q.x-bleed,y:q.y-bleed,width:q.width+bleed*2,height:q.height+bleed*2})),hyper];
         if(touch)for(const sel of ['#touch-fire','#touch-missile','#touch-launcher-cycle','.touch-boost-right'])blockers.push(rect(sel));
-        this.layout={width:W,height:H,left:origin.left,top:origin.top,monitors,hyper,hand,mount,stick:area,touch,blockers};
+        this.layout={width:W,height:H,left:origin.left,top:origin.top,monitors,hardware,hyper,hand,mount,stick:area,touch,blockers};
         this.dirty=false;return true;
     }
     showPose(yaw,pitch){

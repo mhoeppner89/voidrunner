@@ -14,7 +14,7 @@ const canopy=await createCanopy(definition.id);
 const initialCanopy=canopy.project(definition.width/definition.height);
 const mockup=params.get('mockup')==='1';
 const shell=mockup?greyboxFrame(definition,initialCanopy):definition.shell??greyboxFrame(definition,initialCanopy);
-const instruments=mountInstruments(cockpit,definition,shell),artwork=instruments.artwork;
+const instruments=mountInstruments(cockpit,definition,shell,toggleTransponder),artwork=instruments.artwork;
 const forwardHull=params.get('hull-view')==='1'?(params.get('hull-art')==='1'?drawPaintedForwardHull(definition.id):drawForwardHull(definition.id,params.get('view-forward')??MORRIGAN_FORWARD_PLACEMENT.forward,params.get('hull-outward')??MORRIGAN_FORWARD_PLACEMENT.outward)):undefined;
 if(forwardHull){artwork.forwardHull.hidden=true;cockpit.append(forwardHull.image);}
 const frame=cockpitManifest(definition.id);
@@ -43,6 +43,7 @@ function setScene(name){
 
     updateHud();
 }
+function toggleTransponder(){state.transponder=!state.transponder;updateHud();}
 function updateHud(){instruments.update(state);}
 function sampleAndAdvance(dt){
     const blocked=window.cockpitReview?.reviewBlocked||!$('#review-options').hidden||$('#model-dialog').open;
@@ -70,7 +71,7 @@ function sampleAndAdvance(dt){
     if(a.missile&&state.missiles){state.missiles--;state.flash=.6;message('Missile launched. This is a layout preview.');}
     if(a.scan)message('Scan complete: coolant, 4 units. Fire to release cargo.');
     if(a.autopilot){state.jumping=!state.jumping;message(state.jumping?'Hyperdrive warm-up. Hold course.':'Hyperdrive cancelled.');}
-    if(a.transponder){state.transponder=!state.transponder;updateHud();}
+    if(a.transponder)toggleTransponder();
     if(a.wingOrder){state.wing=(state.wing+1)%3;updateHud();}
     if(a.shipMenu){state.ownPage=1-state.ownPage;updateHud();}
     state.lastInput=input.usingGamepad?'controller':Math.abs(input.joystickX)+Math.abs(input.joystickY)>.05?'touch':'keyboard/touch';

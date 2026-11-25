@@ -41,7 +41,7 @@ export const RUN_ACTS=[
   waves:[
    {name:'First contact',hint:'Choose your starting hull. One novice.',site:'verge-lanes',enemies:[enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice'})]},
    {name:'Scavengers',hint:'Two novice scavengers.',site:'acheron-horizon',enemies:[enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice'}),enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice',delay:8})]},
-   {name:'Cut loose',hint:'A veteran runner.',site:'mourning-carrier',enemies:[enemy('demon',{faction:'pirates',role:'pirate',tier:'veteran',missiles:1})]},
+   {name:'Cut loose',hint:'A veteran runner.',site:'mourning-carrier',enemies:[enemy('demon',{faction:'pirates',role:'pirate',tier:'veteran',guns:['pulse-cannon','pulse-cannon','beam-emitter','beam-emitter'],missiles:1})]},
    {name:'Hit and run',hint:'Agile escort pair.',site:'shardbelt-heart',enemies:[enemy('speedster',{faction:'pirates',role:'escort',tier:'veteran'}),enemy('speedster',{faction:'pirates',role:'escort',tier:'novice',delay:6})]},
    {name:'Tier climb',hint:'Upgrade to a tier-2 hull.',site:'redwake-belt',enemies:[enemy('demon',{faction:'pirates',role:'pirate',tier:'veteran',missiles:2}),enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice',delay:10})]},
   ],

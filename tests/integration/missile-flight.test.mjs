@@ -333,6 +333,7 @@ test('the closest live round cues the break once, at its best moment, and once p
  s.projStore.setPos(later.slot,0,0,-300);s.projStore.setVel(later.slot,0,0,300);
  scan();assert.equal(flight.missileBreak,false);
  shot.lostTrack=true;scan();assert.equal(flight.missileBreak,true);
- later.targetId='npc';scan();assert.equal(flight.missileThreat,0);assert.equal(flight.missileBreak,false);
+ later.targetId='npc';scan();assert.equal(flight.trackingMissile,false);assert.equal(flight.missileThreat,0);assert.equal(flight.missileBreak,false);
  later.targetId='player';s.projStore.setVel(later.slot,0,0,-300);scan();assert.equal(flight.missileThreat,0);
+ assert.equal(flight.trackingMissile,true,'a turning seeker still lights LOCK outside the closing-pip window');
 });

@@ -8,6 +8,7 @@ export function createMuleCockpit(base){
         continuousBow:false,
         // Keep the reviewed display sizes, centered on the original PNG's
         // measured alpha openings. Fit code to art; never stencil its rims.
+        hardware:{xpdr:[674,576,104,30]},
         monitors:{
             own:{...base.monitors.own,x:418.5,y:615},
             radar:{...base.monitors.radar,x:794.2,y:643.7},

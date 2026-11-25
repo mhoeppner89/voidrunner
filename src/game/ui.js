@@ -478,7 +478,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2po';
+const GAME_VERSION = '0.8.2pp';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -974,7 +974,9 @@ export class GameUI {
         this.targetLayout = host.querySelector('.screen-target-layout');
         this.targetScreen = host.querySelector('.cockpit-screen-target');
         this.boostButtons = host.querySelectorAll('.touch-boost');
-        this.cockpitArtwork = new PaintedCockpit(this.root);
+        this.cockpitArtwork = new PaintedCockpit(this.root, {toggleTransponder: () => {
+            if (!this.isModalOpen) this.actions?.toggleTransponder?.();
+        }});
         this.bindStaticEvents();
         bindEquipmentInventory(this);
         this.syncFullscreenButton();
@@ -1323,7 +1325,7 @@ export class GameUI {
           </div>
           <div class="hud-wing-tactics" id="hud-wing-tactics"></div>
           <div id="race-flight-vector" class="race-flight-vector is-hidden" aria-hidden="true"><svg viewBox="0 0 32 32"><g class="flight-vector-ring"><circle cx="16" cy="16" r="6"/><path d="M2 16h8M22 16h8M16 2v8"/></g><path class="flight-vector-arrow" d="M8 20l8-10 8 10"/></svg></div>
-          <div id="target-bracket" class="target-bracket is-hidden" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div id="target-bracket" class="target-bracket is-hidden" aria-hidden="true"><i></i><i></i><i></i><i></i><b class="lock-chevron"></b><b class="lock-chevron"></b><b class="lock-chevron"></b><b class="lock-chevron"></b></div>
           <div id="speaker-bracket" class="target-bracket speaker-bracket is-hidden" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
           <div id="target-edge-pointer" class="target-edge-pointer is-hidden" aria-hidden="true"><i></i><span></span></div>
           <i class="lead-marker" hidden aria-hidden="true"></i>
@@ -4836,8 +4838,14 @@ export class GameUI {
         }
         const bracket = this.el('#target-bracket');
         const progress=target?.kind==='ship'?(model?.rackProgress??0):0;
-        bracket?.style.setProperty('--rack-inset',Math.round(progress*16)+'%');
-        bracket?.classList.toggle('rack-locked',progress===1);
+        // Missile lock, old-school: the bracket stays put in its own colour
+        // while four chevrons slide in from each side and seat on the box.
+        if(bracket){
+            const gap=Math.round((1-progress)*28);
+            if(this.rackLockGap!==gap){bracket.style.setProperty('--lock-gap',gap+'px');this.rackLockGap=gap;}
+            bracket.classList.toggle('rack-locking',progress>0);
+            bracket.classList.toggle('rack-locked',progress===1);
+        }
         const edgePointer = this.el('#target-edge-pointer');
         // The target monitor carries the lock (name, bars, distance) — the old
         // top-right target panel was redundant with it and is gone.
@@ -5713,7 +5721,7 @@ export class GameUI {
         return portraits[index];
     }
     renderCommsMessage(bar,callsign,line,story=false,faction,portraitIndex,portraitIdentity=callsign) {
-        this.commsMessage={callsign,line,pinned:false};
+        this.commsMessage={callsign,line,story,pinned:false};
         delete bar.dataset.page;
         window.clearTimeout(this.commsPageTimer);
         bar.textContent='';
@@ -5783,7 +5791,7 @@ export class GameUI {
         bracket.classList.toggle('is-targeted',Boolean(speaker?.targeted));
         if(speaker)bracket.style.transform=`translate(${speaker.x}px, ${speaker.y}px)`;
     }
-    showPilotLine(callsign, line, relation = 'neutral', duration = 6000, story = false, faction, portraitIndex, portraitIdentity = callsign, speakerId) {
+    showPilotLine(callsign, line, relation = 'neutral', duration = 6000, story = false, faction, portraitIndex, portraitIdentity = callsign, speakerId, chatter = false) {
         relation=commsRelation(portraitIdentity,relation);
         // Append to the comms log (capped) so the chat panel can review the
         // whole conversation — nobody misses a line that faded off the bar.
@@ -5802,6 +5810,8 @@ export class GameUI {
         this.renderCommsMessage(bar,callsign,line,story,faction,portraitIndex,portraitIdentity);
         this.commsMessage.portraitIdentity=portraitIdentity;this.commsMessage.speakerId=speakerId;
         this.commsMessage.duration=duration;
+        // Direct mission transmissions keep the channel through the last page.
+        this.commsMessage.reserved=!chatter;
         bar.style.color = color;
         bar.style.borderColor = color;
         bar.classList.add('active');
@@ -5842,7 +5852,7 @@ export class GameUI {
     // shows the first handle and a count of the other senders.
     showGroupLine(callsigns, line, relation = 'neutral', duration = 6000, faction, portraitIndex, speakerId) {
         const names = callsigns.map((callsign) => callsignHandle(callsign)).join(', ');
-        this.showPilotLine(names, line, relation, duration, false, faction, portraitIndex, callsigns[0] ?? names,speakerId);
+        this.showPilotLine(names, line, relation, duration, false, faction, portraitIndex, callsigns[0] ?? names,speakerId,true);
     }
     // Story-mission display: a pinned transmission in the speaker relation color.
     // Unlike normal chatter it doesn't fade — it stays until dismissed (tap

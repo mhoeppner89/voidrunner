@@ -66,7 +66,7 @@ export function shipBlocksRay(session,actor,ownerId,target,point,state) {
     return session.ships.some(other=>other!==actor && other.id!==ownerId && other!==target && other.hull>0 && blocks(other.position,Math.max(...session.npcHullExtents(other))));
 }
 function selectedHostile(session,actor,ownerId,player) {
-    if(actor.patrolMemoryActive || actor.recoveryTargetHidden || actor.terrainManeuver?.active&&actor.terrainManeuver.targetHidden || actor.fleeing || actor.holdFire || actor.pursuitHoldFire || actor.combatPlan?.recovery?.active || (player && actor.mode!=='combat'))return;
+    if(actor.fieldTactic?.kind==='ambush' || actor.patrolMemoryActive || actor.recoveryTargetHidden || actor.terrainManeuver?.active&&actor.terrainManeuver.targetHidden || actor.fleeing || actor.holdFire || actor.pursuitHoldFire || actor.combatPlan?.recovery?.active || (player && actor.mode!=='combat'))return;
     const ref=player?session.getTargetRef():{kind:'ship',id:actor.targetId};
     if(!player && actor.targetId==='player' && actor.hostile && session.save.player.hull>0)return session.save.player;
     if(ref?.kind==='ship')return session.ships.find(s=>s.id===ref.id && combatTargetEligible(s) && (player?s.hostile:session.projectileCanHitShip({ownerId,faction:actor.faction,targetId:actor.targetId},s)));

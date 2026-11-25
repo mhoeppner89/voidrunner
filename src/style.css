@@ -3440,8 +3440,18 @@ button.primary {
   border-width: 3px;
 }
 
-#target-bracket i { margin:var(--rack-inset,0); border-color:var(--target-relation-color,#eec751); }
-#target-bracket.rack-locked i { border-color:var(--void-gold); filter:drop-shadow(0 0 3px var(--void-gold)); }
+#target-bracket i { border-color:var(--target-relation-color,#eec751); }
+/* Missile lock: chevrons on each side of the box point inward and close in
+   as the lock builds (--lock-gap, 28px → 0); seated means locked. The box
+   itself never changes. */
+#target-bracket .lock-chevron { display:none; position:absolute; width:9px; height:9px; color:var(--target-relation-color,#ff5340);
+  border:solid currentColor; border-width:3px 3px 0 0; filter:drop-shadow(0 0 3px currentColor); transition:translate 60ms linear; }
+#target-bracket.rack-locking .lock-chevron { display:block; }
+#target-bracket .lock-chevron:nth-of-type(1) { left:-13px; top:calc(50% - 6px); rotate:45deg; translate:calc(-1 * var(--lock-gap,28px)) 0; }
+#target-bracket .lock-chevron:nth-of-type(2) { right:-13px; top:calc(50% - 6px); rotate:225deg; translate:var(--lock-gap,28px) 0; }
+#target-bracket .lock-chevron:nth-of-type(3) { top:-13px; left:calc(50% - 6px); rotate:135deg; translate:0 calc(-1 * var(--lock-gap,28px)); }
+#target-bracket .lock-chevron:nth-of-type(4) { bottom:-13px; left:calc(50% - 6px); rotate:315deg; translate:0 var(--lock-gap,28px); }
+#target-bracket.rack-locked .lock-chevron { filter:drop-shadow(0 0 2px currentColor) drop-shadow(0 0 6px currentColor); }
 .speaker-bracket { pointer-events:none; }
 #speaker-bracket i { border-color:var(--speaker-yellow); }
 .speaker-bracket.is-targeted {
@@ -9773,4 +9783,75 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
  #game-shell[data-cockpit-paint] .cockpit-screen-own .screen-bars>div{min-height:8px;line-height:1}
  #game-shell[data-cockpit-paint] .cockpit-screen-target .screen-target-layout{padding:1px 3px;gap:2px}
  #game-shell[data-cockpit-paint] .cockpit-screen-target .screen-bars{gap:2px}
+}
+
+/* LOCK annunciator and XPDR switch: small siblings of the HYPERDRIVE plate
+   (brass ridge, navy face, its lettering), mirrored about the radar axis. */
+.painted-lock, .painted-xpdr { display:none }
+#game-shell[data-cockpit-paint] .dash-face {
+  display:grid; place-items:center; box-sizing:border-box; container-type:size;
+  border:2px ridge var(--console-brass); border-radius:2px;
+  background:linear-gradient(180deg,var(--console-face) 0%,var(--void-navy) 38%,var(--console-recess) 100%);
+  box-shadow:0 2px 2px #000,inset 0 2px 4px #000,inset 0 -1px 0 var(--console-edge);
+  pointer-events:none; user-select:none;
+}
+#game-shell[data-cockpit-paint] .painted-lock { position:absolute; z-index:4 }
+#game-shell[data-cockpit-paint] .dash-face b {
+  position:absolute; inset:1px; display:grid; place-items:center; border-radius:1px;
+  color:var(--legend,#b68a3d); background:var(--lens,transparent);
+  font:900 min(clamp(10px,1.45vw,14px),64cqh,21cqw)/1 var(--flight-font); letter-spacing:.1em;
+  text-shadow:var(--legend-shadow,1px 1px 0 #000);
+}
+/* Unlit, the lens is a dark red glass with the legend just readable. */
+#game-shell[data-cockpit-paint] .painted-lock {
+  --lens:linear-gradient(180deg,#2a1416,#170a0c 60%,#0e0608); --legend:#6e3b34;
+}
+#game-shell[data-cockpit-paint] .painted-lock[data-state="acquiring"] {
+  --lens:linear-gradient(180deg,#ffd27a,#e89a2a 55%,#b86a12); --legend:#2a1604;
+  --legend-shadow:0 1px 0 #ffe7b080; --bloom:#ffae3c99;
+}
+#game-shell[data-cockpit-paint] .painted-lock:is([data-state="locked"],[data-state="missile"]) {
+  --lens:linear-gradient(180deg,#ff8a6a,#e83a26 55%,#a8180f); --legend:#fff1d6;
+  --legend-shadow:0 1px 0 #5a0800; --bloom:#ff4a2aa6;
+}
+#game-shell[data-cockpit-paint] .painted-lock:not([data-state="off"]) { border-color:var(--console-brass-light); box-shadow:0 2px 2px #000,0 0 10px var(--bloom) }
+#game-shell[data-cockpit-paint] .painted-lock:not([data-state="off"]) b { box-shadow:inset 0 1px 0 #fff6,inset 0 -1px 2px #0006 }
+#game-shell[data-cockpit-paint] .painted-lock[data-state="acquiring"] b { animation:lock-pulse .5s steps(1,end) infinite }
+#game-shell[data-cockpit-paint] .painted-lock[data-state="missile"] b { animation:lock-pulse .167s steps(1,end) infinite }
+.painted-lock .missile-legend { display:none }
+@media (prefers-reduced-motion: reduce) {
+  #game-shell[data-cockpit-paint] .painted-lock[data-state="missile"] b { animation:none }
+  .painted-lock[data-state="missile"] b > :first-child { display:none }
+  .painted-lock[data-state="missile"] .missile-legend { display:inline }
+}
+@keyframes lock-pulse { 55%, 99.99% { background:linear-gradient(180deg,#2a1416,#170a0c 60%,#0e0608); color:#6e3b34; text-shadow:1px 1px 0 #000; box-shadow:none } }
+#game-shell[data-cockpit-paint] button.painted-xpdr:not([hidden]) {
+  display:block; position:absolute; z-index:4; padding:0; margin:0; min-width:0; min-height:0;
+  background:transparent; border:0; border-radius:0; box-shadow:none; transform:none;
+  cursor:pointer; pointer-events:auto; touch-action:none; user-select:none; -webkit-user-select:none;
+}
+#game-shell[data-cockpit-paint] .painted-xpdr .dash-face { position:absolute; bottom:0 }
+/* The status LED leads the legend; green while the transponder broadcasts. */
+#game-shell[data-cockpit-paint] .painted-xpdr b { padding-left:14%; color:#7f8d82 }
+#game-shell[data-cockpit-paint] .painted-xpdr b::before {
+  content:''; position:absolute; left:9%; top:50%; width:max(4px,9cqw); aspect-ratio:1; translate:0 -50%;
+  background:#1d2b24; border-radius:1px; box-shadow:inset 0 1px 1px #000a, 0 0 0 1px #050a08;
+}
+#game-shell[data-cockpit-paint] .painted-xpdr[aria-pressed="true"] b { color:#b68a3d }
+#game-shell[data-cockpit-paint] .painted-xpdr[aria-pressed="true"] b::before {
+  background:radial-gradient(circle at 40% 35%,#e6ffe9,#6fe58a 45%,#2c9a4a); box-shadow:0 0 0 1px #050a08, 0 0 6px #5cf08acc;
+}
+#game-shell[data-cockpit-paint] .painted-xpdr:focus-visible { outline:0 }
+#game-shell[data-cockpit-paint] .painted-xpdr:focus-visible .dash-face { outline:1px dashed rgba(255,208,92,.5); outline-offset:2px }
+#game-shell[data-cockpit-paint] .painted-xpdr.holding .dash-face { border-color:var(--console-brass-light) }
+#game-shell[data-cockpit-paint] .painted-xpdr.holding b::after {
+  content:''; position:absolute; left:0; right:0; bottom:0; height:2px;
+  background:#f1c978; box-shadow:0 0 4px #f1c97899; transform-origin:left; animation:xpdr-hold var(--hold-time) linear both;
+}
+@keyframes xpdr-hold { from { transform:scaleX(0) } to { transform:scaleX(1) } }
+
+@media (orientation:landscape) and (max-height:520px) {
+  #game-shell[data-cockpit-paint] .dash-face { border-width:1px; box-shadow:0 1px 1px #000 }
+  #game-shell[data-cockpit-paint] .dash-face b { inset:0; font-size:min(11px,74cqh,24cqw); letter-spacing:.04em; text-shadow:none }
+  #game-shell[data-cockpit-paint] .painted-xpdr b { padding-left:16% }
 }

@@ -5,6 +5,7 @@ export function createDemonCockpit(base){
         ...base,
         // Keep approved live display sizes, centered on measured alpha holes.
         // Insets protect the original dimensional bezels without a stencil.
+        hardware:{xpdr:[670,582,104,30]},
         monitors:{
             own:{...base.monitors.own,x:415.36,y:617.48},
             radar:{...base.monitors.radar,x:790.48,y:638.51},

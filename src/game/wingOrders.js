@@ -91,3 +91,23 @@ export const wingOrderTarget=(session,ship,order,heldId,{isOpponent=defaultOppon
     // re-forms rather than choosing a fight.
     return normalizeWingOrder(order)==='defensive'?undefined:nearestOf(legal);
 };
+
+// A tail warning needs a hostile with a firing track behind the pilot. The
+// wingman also needs a clear view of that hostile to make the call.
+export function wingTailThreat(session, wingman, wingPosition, playerPosition, nose, contact) {
+    const player = session.save.player;
+    const [x,y,z,w] = player.rotation;
+    nose.set(-2*(x*z+w*y), -2*(y*z-w*x), 2*(x*x+y*y)-1);
+    for (const enemy of session.ships) {
+        if (!enemy.hostile || enemy.targetId !== 'player' || !combatTargetEligible(enemy)
+            || !session.shipTracksPlayer(enemy)) continue;
+        contact.fromArray(enemy.position).sub(playerPosition);
+        const range = contact.length();
+        if (range > Math.min(500, enemy.fireRange ?? 500) || contact.dot(nose) > -range * .5) continue;
+        const [ex,ey,ez,ew] = enemy.rotation;
+        const towardPilot = 2*(ex*ez+ew*ey)*contact.x + 2*(ey*ez-ew*ex)*contact.y + (1-2*(ex*ex+ey*ey))*contact.z;
+        if (towardPilot < range * .5) continue;
+        contact.fromArray(enemy.position);
+        if (!session.lineBlocked(wingPosition, contact, wingman.id)) return enemy.id;
+    }
+}

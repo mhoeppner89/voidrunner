@@ -18,7 +18,7 @@ for(const [name,engine,device] of [['android',chromium,devices['Pixel 7 landscap
   await page.evaluate(async()=>{const r=__VOID_PRIVATEER__.getRuntime();await r.launch();await r.ui.cockpitArtwork?.ready;});
   await page.waitForFunction(()=>document.querySelector('[data-touch-stick]')?.getClientRects().length);
   const report=await page.evaluate(()=>{
-   const selectors=['[data-touch-stick]','[data-touch-stick-knob]','[data-touch-throttle]','[data-touch-throttle-thumb]','.touch-fire','.touch-missile','.touch-boost','.painted-hand-layer','.painted-hand-layer image','.painted-cockpit-frame','#screen-target-readout','canvas'];
+   const selectors=['.painted-xpdr','.painted-xpdr .dash-face','.painted-lock','[data-touch-stick]','[data-touch-stick-knob]','[data-touch-throttle]','[data-touch-throttle-thumb]','.touch-fire','.touch-missile','.touch-boost','.painted-hand-layer','.painted-hand-layer image','.painted-cockpit-frame','#screen-target-readout','canvas'];
    const bad=[];
    for(const selector of selectors)for(const el of document.querySelectorAll(selector)){
     const cs=getComputedStyle(el),tap=cs.webkitTapHighlightColor??cs.getPropertyValue('-webkit-tap-highlight-color');
@@ -34,7 +34,7 @@ for(const [name,engine,device] of [['android',chromium,devices['Pixel 7 landscap
   });
   assert.deepEqual(report,[],`${name}: controls and sprites must not highlight`);
   // A long press on the stick and on the painted frame selects nothing.
-  for(const selector of ['[data-touch-stick]','.painted-cockpit-frame']){
+  for(const selector of ['[data-touch-stick]','.painted-cockpit-frame','.painted-xpdr']){
    const box=await page.locator(selector).first().boundingBox();if(!box)continue;
    const x=box.x+box.width/2,y=box.y+box.height/2;
    await page.touchscreen.tap(x,y);

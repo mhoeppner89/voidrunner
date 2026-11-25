@@ -7,6 +7,7 @@ export function createSpeedsterCockpit(base){
         // Fit the live glass to the original generated alpha openings. Keep
         // the detailed PNG intact; content insets clear its chamfered corners.
         width:1850,
+        hardware:{xpdr:[670,586,104,30]},
         monitors:{own:{x:429,y:627,width:298,height:166},radar:{x:793,y:655,width:263,height:155},target:{x:1123,y:627,width:297,height:166}},
         screenInsets:{own:{x:4,y:10},radar:{x:10,y:6},target:{x:14,y:6}},
         housingTops:{radar:560},hyperdriveBottom:622,stickClearanceX:416,

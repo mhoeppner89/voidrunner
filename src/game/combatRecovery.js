@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {planCoverBreak} from './combatTactics.js';
 import {SHIPS} from './data.js';
 import {SHIELD_RECHARGE_RATE} from './combatResources.js';
 import {combatTargetEligible} from './combatTargeting.js';
@@ -24,15 +25,26 @@ export function planShieldRecovery(session,ship,plan,target,now,distance){
    plan.reapproachUntil=0;ship.breakUntil=0;ship.repositionUntil=0;
   }
  }
+ const critical=ship.shield<ship.maxShield*(novice?.35:ace?.2:.25)*(timid?1.4:aggressive?.75:1);
+ const inField=session.activeInstanceId && now>=(ship.nextCoverBreak??0);
+ const underFire=inField && ship.shieldDelay>0 && ship.shield<ship.maxShield*.6;
  const finishable=target&&target.shield<1&&target.hull<=(target.maxHull??hull?.hull??0)*.4&&ship.hull>ship.maxHull*.4;
- if(!r.active&&now>=r.readyAt&&r.attempts<(ace?2:1)&&plan.visible&&target&&!finishable&&!ship.fleeing&&!ship.holdFire&&ship.shield<ship.maxShield*(novice?.35:ace?.2:.25)*(timid?1.4:aggressive?.75:1)){
-  const cover=!r.speedAdvantage||timid?session.findCoverPoint(plan.position,r.threat):undefined;
+ if(!r.active&&now>=r.readyAt&&r.attempts<(ace?2:1)&&plan.visible&&target&&!target.combatPlan?.recovery?.active&&!finishable&&!ship.fleeing&&!ship.holdFire&&(critical||underFire)){
+  let routed;
+  if(inField && now >= (ship.coverCheckAt ?? 0)){
+   routed=planCoverBreak(session,ship,plan,now);
+  }
+  // Let the search finish before spending this withdrawal on a range break.
+  if(ship.coverSearch?.pending)return r;
+  const direct=!session.activeInstanceId&&(!r.speedAdvantage||timid)?session.findCoverPoint(plan.position,r.threat,true):undefined;
+  const cover=routed?r.cover.fromArray(routed.route.at(-1)):direct;
   const exitReady=distance>120&&(plan.nose.dot(plan.direct)<-.25||plan.travel.dot(plan.direct)<-stats.maxSpeed*.4||distance>clamp((ship.observedWeaponRange??400)+80,380,750));
-  if(r.speedAdvantage&&exitReady||cover){
+  if(critical&&r.speedAdvantage&&exitReady||cover){
    r.mode=cover?'cover':'range';if(cover)r.cover.set(cover.x,cover.y,cover.z);
    r.active=true;r.attempts++;r.started=now;r.startRange=distance;r.holdingRange=false;r.shieldGoal=ship.maxShield*((novice?.3:ace?.4:.35)+(timid?.05:aggressive?-.05:0));
    r.safeRange=clamp((ship.observedWeaponRange??400)+80,380,750);
    r.until=now+clamp(Math.max(0,ship.shieldDelay??4.5)+(r.shieldGoal-ship.shield)/(ship.combatFit?.stats?.shieldRegeneration??SHIELD_RECHARGE_RATE)+6,10,14);
+   if(routed){ship.nextCoverBreak=now+30;r.until=routed.until;r.shieldGoal=Math.min(ship.maxShield,Math.max(r.shieldGoal,ship.shield+ship.maxShield*.2));}
    r.side.copy(plan.right);r.up.copy(plan.up);ship.fireCommitUntil=0;plan.reapproachUntil=0;
    // Choose a clear oblique exit once, allowing the turn to finish before
    // changing course. The main nav controller still enforces hull clearance.
@@ -44,7 +56,7 @@ export function planShieldRecovery(session,ship,plan,target,now,distance){
     if(score>best){best=score;r.entry.copy(r.candidate);}
    }
    r.turnSign=r.entry.dot(r.side)<0?-1:1;
-  }else r.readyAt=now+2;
+  }else if(!inField)r.readyAt=now+2;
  }
  if(r.active){
   const age=now-r.started;

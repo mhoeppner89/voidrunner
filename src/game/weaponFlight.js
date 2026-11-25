@@ -30,6 +30,30 @@ export const BREAK_REACTION=.3;
 // defeats this rack (measured with tests/helpers/missile-flight.mjs), early
 // by the pilot's reaction time. NPC pilots time their breaks the same way.
 export const breakCueTime=rack=>(breakCueEnd(rack)+breakCueStart(rack))/2+BREAK_REACTION;
+// Fighters and capital tubes keep the receiver reading with the rack itself.
+export function beginRackLock(fit, target, rack, time, dt) {
+    if (fit.lockTarget !== target || fit.lockRack !== rack || time - (fit.lockCheckedAt ?? time) > dt + .001) {
+        fit.lock = 0;
+        fit.warned = false;
+    }
+    fit.lockTarget = target;
+    fit.lockRack = rack;
+    fit.lockCheckedAt = time;
+}
+// A pilot that has broken off can retain its last rack reading until the next
+// attack pass. Only a lock checked on the latest simulation step is live.
+export function cockpitLockState(ships, time, trackingMissile) {
+    if (trackingMissile) return 'missile';
+    let state = 'off';
+    for (const ship of ships) {
+        const fit = ship.combatFit;
+        if (!ship.hostile || ship.hull <= 0 || ship.surrendered || ship.targetId !== 'player'
+            || fit?.lockTarget !== 'player' || fit.lockCheckedAt !== time) continue;
+        if (fit.lock === 1) return 'locked';
+        if (fit.warned && fit.lock > 0) state = 'acquiring';
+    }
+    return state;
+}
 // Select the first closing round so a later swarm lane cannot mask a more
 // urgent warning. This writes the reused mixer model, including on docking.
 // missileBreak is true for the one frame the nearest round reaches its cue
@@ -37,12 +61,15 @@ export const breakCueTime=rack=>(breakCueEnd(rack)+breakCueStart(rack))/2+BREAK_
 // so the approach pips fall silent and the cue stands alone.
 export function updateMissileWarning(flight,projectiles,store,player,latency=0){
     flight.missileThreat=0;
+    flight.trackingMissile=false;
     flight.missileBreak=false;
     flight.missileCommitted=false;
     if(!projectiles)return;
     let nearest=Infinity,urgent;
     for(const shot of projectiles){
         if(shot.targetId!=='player' || shot.lostTrack || shot.life<=0 || (shot.kind!=='missile' && shot.kind!=='torpedo'))continue;
+        // A live seeker can still be turning toward us outside the audio cue window.
+        flight.trackingMissile=true;
         const i=shot.slot*3;
         const x=store.pos[i]-player.position[0],y=store.pos[i+1]-player.position[1],z=store.pos[i+2]-player.position[2];
         const vx=store.vel[i]-player.velocity[0],vy=store.vel[i+1]-player.velocity[1],vz=store.vel[i+2]-player.velocity[2];
