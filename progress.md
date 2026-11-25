@@ -2127,3 +2127,12 @@ Follow-up: phone and desktop performance pass (three rounds, reviewed).
 
 - Cockpit review fixes share the fighter and frigate rack reading, reserve the receiver until each audible missile cue ends, and distinguish inbound missiles as MSL under reduced motion. XPDR retains pointer capture on resize, handles native keyboard activation once, and hands input back from the controller. The isolated review switch and B now drive the same indicator. New regressions reproduced the previous failures before the fixes.
 - Verification passed for all 1,528 main tests, 70 render tests, 15 hulls on each of four browser profiles, and the full cockpit artwork and touch suite. The service worker cached the warble and missile pips on first request and returned identical audio offline.
+
+## 0.8.2pq — Hull balance and target selection
+
+- Split guns and missile sockets across all 15 flyable hulls, applied the revised flight and resource stats, and migrated career inventories and Arena checkpoints with their rack ammunition.
+- A temporarily obscured ship returns to the target monitor when the pilot regains contact. Manual selection, clearing the lock and leaving the sortie cancel that memory.
+- The fixed-step pulse comparison, model-space anchor measurements and desktop/Android fitting and dealer captures are in `output/hull-balance/`.
+- Verification passed for 1,562 main tests and 70 render tests. Desktop, Android and iPhone passed gameplay, offline resume, targeting, fitting and fire-group checks. Hestia cockpit hardware and artwork also passed on the small-phone profile.
+- Review fixes aligned cycling and reacquisition range, spaced automatic selection cues, preserved singular legacy slots and their ammunition, and removed unused item size fields. Tutorial combat prompts the pilot to select a raider. Navigation, mining and salvage still select their objectives when the pilot has no hostile or remembered target.
+- Review verification passed all 1,573 tests in the main suite and all 30 targeting, fitting and tutorial browser runs across desktop Chrome, Android Chrome and iPhone WebKit.

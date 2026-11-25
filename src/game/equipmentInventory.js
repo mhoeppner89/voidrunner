@@ -1,4 +1,4 @@
-import {BASE_OUTFIT_ITEMS,OUTFIT_ITEMS,HULL_HARDPOINTS,LOADOUT_KEYS,normalizeOutfitting,normalizeLoadout,projectLegacyEquipment,projectLegacyWeaponId,itemAvailable} from './outfitting.js';
+import {BASE_OUTFIT_ITEMS,OUTFIT_ITEMS,HULL_HARDPOINTS,LOADOUT_KEYS,normalizeOutfitting,normalizeLoadout,projectLegacyEquipment,projectLegacyWeaponId,itemFitsMount,itemAvailable} from './outfitting.js';
 import {resolveEquipmentDefinition,migratePulseRecord,runtimeEquipmentId,registerEquipmentDefinition,equipmentBaseId,forgetEquipmentDefinition,EQUIPMENT_RARITIES,EQUIPMENT_AFFIXES,NAMED_EQUIPMENT,RARITY_ORDER} from './equipmentCatalog.js';
 import {getEffectiveShipStats} from './shipStats.js';
 import {normalizeLauncherMagazines,launcherMagazineEntries,mountedLauncherEntries,weaponForOutfit} from './weapons.js';
@@ -104,7 +104,13 @@ export function normalizeEquipmentInventory(player,{disabled=false}={}){
   const item=createEquipmentRecord(raw,{location,factory});player.inventory.items[item.id]=item;seen.add(item.id);return item.id;
  };
  for(const [shipId,fit] of Object.entries(state.loadouts))for(const key of LOADOUT_KEYS)for(let i=0;i<fit[key].length;i++)if(fit[key][i])fit[key][i]=retain(fit[key][i],{kind:'installed',shipId,mountId:HULL_HARDPOINTS[shipId][key][i].id},state.factory?.[shipId]?.[key]?.[i]===true);
- for(const [raw,n] of Object.entries(state.locker))for(let i=0;i<n;i++)retain(raw,{kind:'station',stationId:player.dockedAt??player.lastDockedAt??'helix'},i<(state.factoryLocker?.[raw]??0));
+ for(const [raw,count] of Object.entries(state.locker)){
+  const item=player.inventory.items[raw], location=item?.location;
+  const stationId=player.storedShips?.[location?.shipId]?.locationId??player.dockedAt??player.lastDockedAt??'helix';
+  if(location?.kind==='installed' && ['gun','launcher'].includes(OUTFIT_ITEMS[raw]?.category))
+   item.location={kind:'station',stationId};
+  for(let i=0;i<count;i++)retain(raw,{kind:'station',stationId},i<(state.factoryLocker?.[raw]??0));
+ }
  for(const [id,item] of Object.entries(player.inventory.items)){
   if(!Object.hasOwn(BASE_OUTFIT_ITEMS,item?.baseId)||item.id!==id||!id.startsWith('eq-')&&!id.startsWith('loot-')){delete player.inventory.items[id];continue;}
   if(!['installed','cargo','station'].includes(item.location?.kind)||item.location.kind==='station'&&!LOCATIONS[item.location.stationId])item.location=player.dockedAt?{kind:'station',stationId:player.dockedAt}:{kind:'cargo'};
@@ -113,10 +119,10 @@ export function normalizeEquipmentInventory(player,{disabled=false}={}){
 }
 export const inventoryMounts=shipId=>{
  const spec=HULL_HARDPOINTS[shipId];if(!spec)return [];
- return [...spec.weapons.map((mount,index)=>({mount,index,key:'weapons'})),...spec.turrets.map((mount,index)=>({mount,index,key:'turrets'})),...spec.utility.map((mount,index)=>({mount,index,key:'utility'})),...spec.droneBays.map((bay,index)=>({mount:{id:`${shipId}-${bay.bayId}`,category:'drone',bayId:bay.bayId},index,key:'droneBays'}))];
+ return [...['guns','launchers','turrets','utility'].flatMap(key=>spec[key].map((mount,index)=>({mount,index,key}))),...spec.droneBays.map((bay,index)=>({mount:{id:`${shipId}-${bay.bayId}`,category:'drone',bayId:bay.bayId},index,key:'droneBays'}))];
 };
-export const mountItemId=(fit,mount)=>!mount?undefined:mount.key==='weapons'?fit.guns[mount.index]??fit.launchers[mount.index]:mount.key==='droneBays'?(fit.droneBays[mount.index]?.unitIds[0]?droneInventoryId(fit.droneBays[mount.index].unitIds[0]):undefined):fit[mount.key]?.[mount.index];
-export const equipmentFitsMount=(item,slot)=>Boolean(item&&slot&&(slot.key==='weapons'?['gun','launcher'].includes(item.category):slot.key==='turrets'?item.category==='turret':slot.key==='droneBays'?item.category==='drone':['power','drive','defense','utility'].includes(item.category)));
+export const mountItemId=(fit,mount)=>!mount?undefined:mount.key==='droneBays'?(fit.droneBays[mount.index]?.unitIds[0]?droneInventoryId(fit.droneBays[mount.index].unitIds[0]):undefined):fit[mount.key]?.[mount.index];
+export const equipmentFitsMount=(item,slot)=>Boolean(slot && itemFitsMount(item,slot.mount));
 export function equipmentInstallMount(player,item,requestedId){
  const slots=inventoryMounts(player.shipId).filter(slot=>equipmentFitsMount(item,slot)),fit=player.outfitting.loadouts[player.shipId];
  return slots.find(slot=>slot.mount.id===requestedId)??slots.find(slot=>!mountItemId(fit,slot));
@@ -198,8 +204,7 @@ export function equipmentAction(player,action,{id,baseId,tier=1,mountId,stationI
   if(!valid)return {ok:false,code:'This equipment does not fit this mount.'};
   for(const key of LOADOUT_KEYS)for(let i=0;i<fit[key].length;i++)if(fit[key][i]===id){fit[key][i]=null;draft.outfitting.factory[draft.shipId][key][i]=false;}
   const displaced=mountItemId(fit,slot);if(displaced&&inventory.items[displaced])inventory.items[displaced].location={kind:'station',stationId};
-  const key=slot.key==='weapons'?(definition.category==='gun'?'guns':'launchers'):slot.key;
-  if(slot.key==='weapons'){fit.guns[slot.index]=null;fit.launchers[slot.index]=null;}
+  const key=slot.key;
   fit[key][slot.index]=id;draft.outfitting.factory[draft.shipId][key][slot.index]=Boolean(item.factory);
  }else if(action==='remove'){
   if(item.location.kind!=='installed'||item.location.shipId!==draft.shipId)return {ok:false,code:'Item is not installed here.'};

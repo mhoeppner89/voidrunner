@@ -13,8 +13,8 @@ export function itemAtTier(baseId,tier=1){
  registerEquipmentDefinition(id,resolveEquipmentDefinition(base,{id,baseId,tier,rarity:'rare',affixes:base.category==='gun'?['efficient','rapid']:['tuned','compact']}));return id;
 }
 export function balanceFit(hull,guns=[],utilities=[],turrets=[],launchers=[]){
- const fit=normalizeLoadout(hull,{mountSchema:4,guns,utility:utilities,turrets,launchers});
- const player={shipId:hull,outfitting:{schema:4,locker:{},loadouts:{[hull]:fit}}},stats=getEffectiveShipStats(player);
+ const fit=normalizeLoadout(hull,{mountSchema:5,guns,utility:utilities,turrets,launchers});
+ const player={shipId:hull,outfitting:{schema:6,locker:{},loadouts:{[hull]:fit}}},stats=getEffectiveShipStats(player);
  const items=['guns','launchers','utility','turrets'].flatMap(k=>fit[k].filter(Boolean));
  return {hull,guns:fit.guns.filter(Boolean),utilities:fit.utility.filter(Boolean),turrets:fit.turrets.filter(Boolean),launchers:fit.launchers.filter(Boolean),stats,cost:SHIPS[hull].price+items.reduce((v,id)=>v+OUTFIT_ITEMS[id].price,0)};
 }
@@ -38,7 +38,7 @@ export function firingTrace(fit,{duration=24,passes=false,recharging=false}={}){
  return {hullDamage,shieldDamage,openingHull,openingShield,shots,blocked,energySpent,energy:p.energy,shield:p.shield};
 }
 export function bestFits(hull,budget,tier=1){
- const n=HULL_HARDPOINTS[hull].weapons.length,u=HULL_HARDPOINTS[hull].utility.length;let sustained,passes;let tested=0;
+ const n=HULL_HARDPOINTS[hull].guns.length,u=HULL_HARDPOINTS[hull].utility.length;let sustained,passes;let tested=0;
  for(const baseId of GUNS)for(let count=1;count<=n;count++)for(let r=0;r<=u;r++)for(let c=0;c<=u-r;c++){
   const guns=Array(count).fill(itemAtTier(baseId,tier)),utilities=[...Array(r).fill(itemAtTier('sustained-reactor',tier)),...Array(c).fill(itemAtTier('capacitor-bank',tier))];
   const fit=balanceFit(hull,guns,utilities);if(fit.cost>budget)continue;tested++;

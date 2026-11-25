@@ -37,7 +37,7 @@ test('rewards are scored against what they replace: upgrades and empty bays firs
  const worse=createEquipmentRecord('pulse-cannon',{id:'eq-test-worse',tier:1,rarity:'common',affixes:[]});
  registerInventoryDefinitions({items:{[better.id]:better,[worse.id]:worse}});
  // Every bay full: the plain gun can only replace a better one.
- fit.guns=fit.guns.map((id,i)=>fit.launchers[i]?null:better.id);
+ fit.guns.fill(better.id);
  assert.ok(rewardFitScore(save,worse.id)<1,'a plain gun over a better one is a downgrade');
  const upgrade=createEquipmentRecord('pulse-cannon',{id:'eq-test-upgrade',tier:3,rarity:'rare',affixes:[]});
  registerInventoryDefinitions({items:{[upgrade.id]:upgrade}});
@@ -58,14 +58,14 @@ test('moving a launcher between mounts keeps its missiles; the fullest stored ra
  const {fitRunItem}=await import('../../src/game/arenaRun.js');
  const {HULL_HARDPOINTS}=await import('../../src/game/outfitting.js');
  const {normalizeLauncherMagazines,launcherMagazineEntries}=await import('../../src/game/weapons.js');
- const save=ready(11,'talon',6),p=save.player;save.arenaRun.rewardChosen=true;
- normalizeLauncherMagazines(p,{fill:true});
- const spec=HULL_HARDPOINTS.talon,fit=p.outfitting.loadouts.talon,from=fit.launchers.findIndex(Boolean),rack=fit.launchers[from];
- const to=spec.weapons.findIndex((m,i)=>i!==from&&!fit.guns[i]&&!fit.launchers[i]);
+ const save=ready(11,'andromeda',6),p=save.player;save.arenaRun.rewardChosen=true;
+ p.outfitting.loadouts.andromeda.launchers[1]=null;normalizeLauncherMagazines(p,{fill:true});
+ const spec=HULL_HARDPOINTS.andromeda,fit=p.outfitting.loadouts.andromeda,from=fit.launchers.findIndex(Boolean),rack=fit.launchers[from];
+ const to=spec.launchers.findIndex((m,i)=>i!==from&&!fit.launchers[i]);
  assert.ok(from>=0&&to>=0,'fixture: a fitted rack and a free weapon mount');
  p.launcherMagazines[spec.launchers[from].id].rounds=2;normalizeLauncherMagazines(p);
- assert.ok(fitRunItem(save,'weapons',from,null),'take the rack off');
- assert.ok(fitRunItem(save,'weapons',to,rack),'mount it elsewhere');
+ assert.ok(fitRunItem(save,'launchers',from,null),'take the rack off');
+ assert.ok(fitRunItem(save,'launchers',to,rack),'mount it elsewhere');
  assert.equal(launcherMagazineEntries(p).find(e=>e.mount.id===spec.launchers[to].id)?.rounds,2);
  assert.equal(save.arenaRun.storedRounds?.[rack],undefined,'the stored count was used up');
 });

@@ -72,3 +72,48 @@ test('new story fighters use the shared hull flight and actual fitted weapons, r
  const rin=session.ships.find(s=>s.storyPersonId==='rin');rin.position=[0,0,0];rin.velocity=[0,0,0];rin.rotation=[0,0,0,1];rin.combatWeaponIndex=0;rin.targetId='test-enemy';session.ships=[rin,{id:'test-enemy',position:[0,0,-200],velocity:[0,0,0],rotation:[0,0,0,1],hull:200,hostile:true,hullId:'scrapper',variant:'scrapper'}];
  session.fireNpcGun(rin,new T.Vector3(0,0,-1));assert.ok(session.projectiles.length>0);assert.equal(session.projectiles[0].damage,weaponForOutfit(rin.combatFit.guns[0]).damageFlat);
 });
+
+test('entering Paul’s rescue advances navigation while preserving an obscured ship',()=>{
+ const {save,session}=tutorialFixture('rescue-paul');save.player.dockedAt=undefined;
+ const tracked=session.spawnShip('pirate',[0,0,-120]);
+ session.applyTarget({kind:'ship',id:tracked.id});session.dropTargetLock(tracked);
+ session.applyTutorialTransition({stepId:'rescue-paul'});
+ assert.equal(save.player.navTargetId,'mourning-line');
+ assert.equal(session.lostTargetId,tracked.id);
+ assert.equal(save.player.currentTargetId,undefined);
+});
+test('during Paul’s rescue the selection hint clears on a pilot pick and returns after a kill',()=>{
+ const {save,quest,session}=tutorialFixture('rescue-paul');save.player.dockedAt=undefined;
+ const first=session.ensureTutorialEnemy();
+ assert.equal(save.player.currentTargetId,undefined);
+ const hints=[];session.ui.setTutorialHint=(speaker,text)=>hints.push(text);
+ const update=()=>session.updateTutorialGuidance(session.tutorialFlightGuidance());
+ update();assert.equal(hints.at(-1),'Select the raider as your target.');
+ session.handleActions({targetNext:true});assert.equal(save.player.currentTargetId,first.id);
+ update();assert.equal(hints.at(-1),undefined);
+ first.hull=0;quest.flags['defeated-rescue-0']=true;save.player.currentTargetId=undefined;
+ const survivor=session.ensureTutorialEnemy();assert.notEqual(survivor.id,first.id);
+ assert.equal(save.player.currentTargetId,undefined);
+ update();assert.equal(hints.at(-1),'Select the raider as your target.');
+});
+test('a resumed Ash Moth fight prompts with an empty monitor even with the legacy focus flag',()=>{
+ const {save,quest}=tutorialFixture('defeat-raider');save.player.dockedAt=undefined;
+ quest.flags['focused-mining']=true;
+ const resumed=tutorialFixture('defeat-raider',hydrateSave(JSON.parse(JSON.stringify(save))));
+ resumed.session.ensureTutorialEnemy();
+ assert.ok(!Object.hasOwn(resumed.quest.flags,'focused-mining'));
+ assert.equal(resumed.save.player.currentTargetId,undefined);
+ assert.equal(resumed.session.tutorialFlightGuidance().text,'Select the raider as your target.');
+});
+test('a black-box wreck and a new route preserve a hostile selected by the pilot',()=>{
+ const {save,quest,session}=tutorialFixture('salvage-black-box');save.player.dockedAt=undefined;
+ const pirate=session.spawnShip('pirate',[0,0,-100]);
+ session.applyTarget({kind:'ship',id:pirate.id});
+ const drop={id:'released-recorder',position:[0,0,-30],remaining:1};session.wreckNodes.push(drop);quest.flags.blackBoxDropId=drop.id;
+ assert.equal(session.ensureTutorialFieldTarget().id,drop.id);
+ assert.equal(save.player.currentTargetId,pirate.id);
+ session.setTutorialDestination('mourning-line');
+ assert.equal(save.player.currentTargetId,pirate.id);
+ session.clearTarget();session.ensureTutorialFieldTarget();
+ assert.equal(save.player.currentTargetId,drop.id);
+});

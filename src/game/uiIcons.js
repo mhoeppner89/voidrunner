@@ -23,6 +23,7 @@ const PATHS = Object.freeze({
     fuel: '<path d="M6 21V5a2 2 0 012-2h6a2 2 0 012 2v16M4 21h14M16 9h2a2 2 0 012 2v6a1 1 0 01-2 0v-4"/><path d="M9 7h4"/>',
     paint: '<path d="M4 20c2 0 4-1 4-4l9-9-3-3-9 9c-1 1-1 3-1 4M14 4l6 6"/>',
     flight: '<path d="M12 3l2 7 7 2-7 2-2 7-2-7-7-2 7-2z"/>',
+    missile: '<path d="M7 10h9l5 2-5 2H7z"/><path d="M7 10L4 6h3l3 4M7 14l-3 4h3l3-4"/>',
     weapons: '<circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/>',
     journal: '<path d="M6 3h11a1 1 0 011 1v17H7a2 2 0 01-2-2V5a2 2 0 011-2zM9 7h6M9 11h6"/>',
     drones: '<circle cx="12" cy="12" r="3"/><path d="M5 5l4 4M19 5l-4 4M5 19l4-4M19 19l-4-4"/><circle cx="4.5" cy="4.5" r="1.5"/><circle cx="19.5" cy="4.5" r="1.5"/><circle cx="4.5" cy="19.5" r="1.5"/><circle cx="19.5" cy="19.5" r="1.5"/>',

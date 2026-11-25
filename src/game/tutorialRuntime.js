@@ -188,9 +188,7 @@ export const TutorialRuntimeMethods={
         if(!encounter||encounter!=='mining'&&this.activeInstanceId!=='mourning-line')return;
         this.ensureTutorialCompanion();
         const hulls=encounter==='mining'?['scrapper']:encounter==='rescue'?['scrapper','scrapper']:encounter==='patrol'?['scrapper','scrapper','demon','demon','demon']:['scrapper','scrapper','scrapper','demon'];
-        const ships=this.spawnTutorialEncounter(encounter,hulls);
-        if(encounter!=='patrol'&&ships[0]&&(!this.save.player.currentTargetId||!q.flags['focused-'+encounter])){q.flags['focused-'+encounter]=true;this.applyTarget({kind:'ship',id:ships[0].id,position:ships[0].position,name:ships[0].name});}
-        return ships[0];
+        return this.spawnTutorialEncounter(encounter,hulls)[0];
     },
     updateTutorialPatrol(ship,dt){
         if(ship.tutorialPatrolPassed){ship.targetId=undefined;ship.holdFire=true;ship.pursuitHoldFire=true;this.updateTravelAI(ship,dt);return;}
@@ -273,17 +271,17 @@ export const TutorialRuntimeMethods={
     ensureTutorialFieldTarget(){
         const q=getTutorialQuest(this.save);if(!isTutorialActive(this.save)||!this.renderer||this.save.player.systemId!=='helios-verge')return;
         if(q.stepId==='mine-shardbelt'){
-            const node=this.asteroids.find(n=>n.id===q.flags.oreTargetId);if(node){if(node.remaining<tutorialMiningQuantity(this.save)-(q.flags.oreRecovered??0)){node.remaining=tutorialMiningQuantity(this.save)-(q.flags.oreRecovered??0);this.save.world.depletedAsteroids[node.id]=node.remaining;}this.selectTarget('asteroid',node.id);}return node;
+            const node=this.asteroids.find(n=>n.id===q.flags.oreTargetId);if(node){if(node.remaining<tutorialMiningQuantity(this.save)-(q.flags.oreRecovered??0)){node.remaining=tutorialMiningQuantity(this.save)-(q.flags.oreRecovered??0);this.save.world.depletedAsteroids[node.id]=node.remaining;}this.selectTarget('asteroid',node.id,'tutorial');}return node;
         }
         if(q.stepId==='salvage-black-box'){
             const drop=q.flags.blackBoxDropId&&this.wreckNodes.find(n=>n.id===q.flags.blackBoxDropId&&n.remaining>0);
-            if(drop){this.selectTarget('wreck',drop.id);return drop;}
+            if(drop){this.selectTarget('wreck',drop.id,'tutorial');return drop;}
             if(q.flags.blackBoxDropId&&!this.save.world.combatWrecks?.[q.flags.blackBoxDropId])delete q.flags.blackBoxDropId;
             let node=this.wreckNodes.find(n=>n.id===q.flags.blackBoxTargetId);
             node??=this.wreckNodes.find(n=>n.zone==='frigate-alpha'&&!n.insideWreckId&&n.remaining>0)??this.wreckNodes.find(n=>n.zone==='frigate-alpha');
-            if(node){q.flags.blackBoxTargetId=node.id;if(node.remaining<=0){node.remaining=1;this.save.world.depletedWrecks[node.id]=1;}this.selectTarget('wreck',node.id);}return node;
+            if(node){q.flags.blackBoxTargetId=node.id;if(node.remaining<=0){node.remaining=1;this.save.world.depletedWrecks[node.id]=1;}this.selectTarget('wreck',node.id,'tutorial');}return node;
         }
-        const marker=this.tutorialFieldTarget();if(marker){this.applyTarget(marker);this.renderer.setMissionMarker?.(marker);}return marker;
+        const marker=this.tutorialFieldTarget();if(marker){if(this.tutorialMaySelectTarget())this.applyTarget(marker);this.renderer.setMissionMarker?.(marker);}return marker;
     },
     tutorialHidingPositionClear(position,obstacles=this.activeFieldObstacles('mourning-line')){
         const rotation=new THREE.Quaternion().fromArray(this.save.player.rotation),variant=playerShipVariant(this.save.player.shipId),hit={};
@@ -449,11 +447,26 @@ export const TutorialRuntimeMethods={
             return say('hidden','Stay hidden while the patrol passes.');
         }
         if(s==='defeat-raider'&&q.flags.firstRaiderSurrendered)return say('capture','Fly within 400 km of the pirate and hold there for two seconds to board.');
+        if(['raider-standoff','defeat-raider','rescue-paul','black-box-fight'].includes(s)
+            && !this.ships.some(ship=>ship.id===p.currentTargetId && ship.hull>0 && ship.hostile && !ship.surrendered))
+            return say('select-raider','Select the raider as your target.');
         const oneTask={'rescue-paul':'Help Paul defeat the two Balors.','defeat-raider':'Fire as the pirate crosses your sights: hold Space on desktop or FIRE on phone.','black-box-fight':'Defeat the four pirate ships.','carrier-wait':'Stay near the carrier while Paul checks the flight deck.','talk-paul':'Open Paul’s transmission.'};
         if(oneTask[s])return say(s,oneTask[s]);
     },
     updateTutorialGuidance(guidance){
+        const selectRaider=guidance?.key.endsWith(':select-raider');
+        if(!selectRaider && this.lastTutorialHint?.endsWith(':select-raider')){
+            this.ui.setTutorialHint?.();
+            this.lastTutorialHint=undefined;
+        }
         if(!guidance||this.storyLineActive()||this.ui.isModalOpen)return;
+        if(selectRaider){
+            if(this.lastTutorialHint!==guidance.key && !this.ui.commsMessage?.story){
+                this.ui.setTutorialHint?.(guidance.speaker,guidance.text,guidance.key);
+                this.lastTutorialHint=guidance.key;
+            }
+            return;
+        }
         const q=getTutorialQuest(this.save),now=this.save.world.time;
         // The first flight teaches controls. Later legs only remind a pilot who
         // has made no useful progress for a minute, once for that action.

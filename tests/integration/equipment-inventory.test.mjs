@@ -12,35 +12,37 @@ const make=()=>createNewSave(714,{tutorial:false});
 const ids=p=>Object.keys(p.inventory.items).sort();
 test('all hulls expose four physical mount types without size restrictions',()=>{
  for(const spec of Object.values(HULL_HARDPOINTS)){
-  assert.deepEqual(Object.keys(spec.mounts),['weapon','turret','utility']);
-  assert.equal(spec.guns,spec.launchers,'runtime views share the same weapon seats');
-  for(const m of [...spec.weapons,...spec.utility])assert.equal(m.size,undefined);
+  assert.deepEqual(Object.keys(spec.mounts),['gun','launcher','turret','utility']);
+  assert.notEqual(spec.guns,spec.launchers);
+  for(const m of [...spec.guns,...spec.launchers,...spec.utility])assert.equal(m.size,undefined);
  }
 });
 test('schema 3 fits and counted stock migrate once with all paid/factory copies intact',()=>{
  const s=make(),p=s.player;p.inventory=undefined;p.outfitting={schema:3,locker:{'pulse-cannon':2,'shield-mk2':1},factoryLocker:{},loadouts:{wayfarer:{guns:['beam-emitter','gauss-cannon'],launchers:['seeker-launcher'],turrets:['pdc'],power:['capacitor-bank'],drive:['engine-mk2'],defense:['shield-mk2'],utility:['radar-mk2','cargo-pods'],droneBays:p.outfitting.loadouts.wayfarer.droneBays,fireGroups:{activeGroup:'B',assignments:{'wayfarer-gun-0':'A','wayfarer-gun-1':'B'}}}},factory:{wayfarer:{guns:[true,false],launchers:[true],turrets:[false],power:[false],drive:[false],defense:[false],utility:[false,false]}}};p.equipment=[];
- normalizeEquipmentInventory(p);assert.equal(ids(p).length,13);assert.equal(p.outfitting.loadouts.wayfarer.launchers[2]!=null,true);
+ normalizeEquipmentInventory(p);assert.equal(ids(p).length,13);assert.equal(p.outfitting.loadouts.wayfarer.launchers[0]!=null,true);
  assert.equal(p.outfitting.loadouts.wayfarer.utility.filter(Boolean).length,3);const before=ids(p);
  for(let i=0;i<4;i++)normalizeEquipmentInventory(p);assert.deepEqual(ids(p),before);
- const restored=hydrateSave(JSON.parse(JSON.stringify(s)));assert.deepEqual(ids(restored.player),before);assert.equal(restored.player.outfitting.loadouts.wayfarer.fireGroups.assignments['wayfarer-weapon-1'],'B');
+ const restored=hydrateSave(JSON.parse(JSON.stringify(s)));assert.deepEqual(ids(restored.player),before);assert.equal(restored.player.outfitting.loadouts.wayfarer.fireGroups.assignments['wayfarer-gun-1'],'B');
  assert.equal(Object.values(p.inventory.items).filter(i=>i.factory).length,1);
 });
-test('gun and launcher replacements share a seat; ammo persists with stable mount IDs',()=>{
- const p=make().player,launcher=equipmentAction(p,'buy',{baseId:'seeker-launcher'});assert.ok(equipmentAction(p,'install',{id:launcher.id,mountId:'wayfarer-weapon-2'}).ok);const original=ids(p),b=equipmentAction(p,'buy',{baseId:'gauss-cannon'});assert.ok(b.ok);
- assert.ok(equipmentAction(p,'install',{id:b.id,mountId:'wayfarer-weapon-2'}).ok);assert.equal(p.outfitting.loadouts.wayfarer.launchers[2],null);
- const old=original.find(id=>p.inventory.items[id].baseId==='seeker-launcher');assert.equal(p.inventory.items[old].location.kind,'station');
- assert.ok(equipmentAction(p,'install',{id:old,mountId:'wayfarer-weapon-0'}).ok);assert.equal(p.outfitting.loadouts.wayfarer.guns[0],null);normalizeLauncherMagazines(p);p.launcherMagazines['wayfarer-weapon-0'].rounds=2;normalizeLauncherMagazines(p);assert.equal(p.launcherMagazines['wayfarer-weapon-0'].rounds,2);
- assert.equal(mountedLauncherEntries(p).length,1);assert.equal(new Set(Object.values(p.outfitting.loadouts).flatMap(f=>LOADOUT_KEYS.flatMap(k=>f[k]).filter(Boolean))).size,3);
+test('career fitting rejects guns in missile slots and launchers in gun slots',()=>{
+ const p=make().player,gun=equipmentAction(p,'buy',{baseId:'gauss-cannon'}),rack=equipmentAction(p,'buy',{baseId:'seeker-launcher'});
+ assert.ok(equipmentAction(p,'install',{id:rack.id,mountId:'wayfarer-launcher-0'}).ok);
+ assert.ok(equipmentAction(p,'install',{id:gun.id,mountId:'wayfarer-gun-0'}).ok);
+ const fit=structuredClone(p.outfitting);
+ assert.equal(equipmentAction(p,'install',{id:rack.id,mountId:'wayfarer-gun-0'}).ok,false);
+ assert.equal(equipmentAction(p,'install',{id:gun.id,mountId:'wayfarer-launcher-0'}).ok,false);
+ assert.deepEqual(p.outfitting,fit);
 });
 test('rare stats used in flight match the recovered item; common migration preserves baseline',()=>{
  const p=make().player,item=createEquipmentRecord('gauss-cannon',{tier:3,rarity:'rare',affixes:['efficient','rapid'],location:{kind:'station',stationId:'helix'}});p.inventory.items[item.id]=item;refreshInventoryProjection(p);
- assert.ok(equipmentAction(p,'install',{id:item.id,mountId:'wayfarer-weapon-0'}).ok);const w=weaponForOutfit(item.id);assert.ok(w.damageFlat>weaponForOutfit('gauss-cannon').damageFlat);assert.ok(w.cooldown<1.1);assert.equal(weaponForOutfit(item.id),w,'resolved flight object is cached');assert.ok(w.energyCost>0);
+ assert.ok(equipmentAction(p,'install',{id:item.id,mountId:'wayfarer-gun-0'}).ok);const w=weaponForOutfit(item.id);assert.ok(w.damageFlat>weaponForOutfit('gauss-cannon').damageFlat);assert.ok(w.cooldown<1.1);assert.equal(weaponForOutfit(item.id),w,'resolved flight object is cached');assert.ok(w.energyCost>0);
  const stats=getEffectiveShipStats(p);assert.equal(stats.energyCapacity,60);assert.equal(stats.reactorOutput,2.5);assert.ok(Math.abs(stats.overTierLoad-7.5)<1e-9);
 });
 test('station storage is local, cargo is mass-limited, sales are atomic and bundled parts cannot be sold',()=>{
  const p=make().player,b=equipmentAction(p,'buy',{baseId:'gauss-cannon'});assert.ok(b.ok);assert.ok(equipmentAction(p,'carry',{id:b.id}).ok);assert.equal(cargoMass(p),6);assert.ok(equipmentAction(p,'store',{id:b.id}).ok);
- p.dockedAt='rook';assert.equal(equipmentAction(p,'install',{id:b.id,mountId:'wayfarer-weapon-0'}).ok,false);p.dockedAt='helix';
- const factory=createEquipmentRecord('pulse-cannon',{factory:true,location:{kind:'station',stationId:'helix'}});p.inventory.items[factory.id]=factory;assert.ok(equipmentAction(p,'install',{id:factory.id,mountId:'wayfarer-weapon-0'}).ok);assert.ok(equipmentAction(p,'remove',{id:factory.id}).ok);assert.equal(equipmentAction(p,'sell',{id:factory.id}).ok,false);
+ p.dockedAt='rook';assert.equal(equipmentAction(p,'install',{id:b.id,mountId:'wayfarer-gun-0'}).ok,false);p.dockedAt='helix';
+ const factory=createEquipmentRecord('pulse-cannon',{factory:true,location:{kind:'station',stationId:'helix'}});p.inventory.items[factory.id]=factory;assert.ok(equipmentAction(p,'install',{id:factory.id,mountId:'wayfarer-gun-0'}).ok);assert.ok(equipmentAction(p,'remove',{id:factory.id}).ok);assert.equal(equipmentAction(p,'sell',{id:factory.id}).ok,false);
  const credit=p.credits;assert.ok(equipmentAction(p,'sell',{id:b.id}).ok);assert.ok(p.credits>credit);assert.equal(equipmentAction(p,'sell',{id:b.id}).ok,false);
  p.cargo.ore=1000;const next=equipmentAction(p,'buy',{baseId:'pulse-cannon'});assert.ok(next.ok,'station purchases do not need cargo space');const wallet=p.credits;assert.equal(equipmentAction(p,'carry',{id:next.id}).ok,false);assert.equal(p.credits,wallet);assert.equal(p.inventory.items[next.id].location.kind,'station');
 });
@@ -62,15 +64,15 @@ test('a full hold leaves the selected salvage in the wreck',()=>{
 });
 
 test('launcher ammunition follows its item through refits and save reloads',()=>{
- const s=make(),p=s.player,b=equipmentAction(p,'buy',{baseId:'seeker-launcher'});assert.ok(equipmentAction(p,'install',{id:b.id,mountId:'wayfarer-weapon-2'}).ok);const id=b.id;
- p.launcherMagazines['wayfarer-weapon-2'].rounds=2;
+ const s=make(),p=s.player,b=equipmentAction(p,'buy',{baseId:'seeker-launcher'});assert.ok(equipmentAction(p,'install',{id:b.id,mountId:'wayfarer-launcher-0'}).ok);const id=b.id;
+ p.launcherMagazines['wayfarer-launcher-0'].rounds=2;
  assert.ok(equipmentAction(p,'remove',{id}).ok);assert.equal(p.inventory.items[id].rounds,2);
- assert.ok(equipmentAction(p,'install',{id,mountId:'wayfarer-weapon-1'}).ok);assert.equal(p.launcherMagazines['wayfarer-weapon-1'].rounds,2);
- const restored=hydrateSave(JSON.parse(JSON.stringify(s)));assert.equal(restored.player.launcherMagazines['wayfarer-weapon-1'].rounds,2);
+ assert.ok(equipmentAction(p,'install',{id,mountId:'wayfarer-launcher-0'}).ok);assert.equal(p.launcherMagazines['wayfarer-launcher-0'].rounds,2);
+ const restored=hydrateSave(JSON.parse(JSON.stringify(s)));assert.equal(restored.player.launcherMagazines['wayfarer-launcher-0'].rounds,2);
 });
 test('trade-in preserves paid instances and retained ship switches preserve the same fit',async()=>{
  const {quoteShipTrade,commitShipTrade}=await import('../../src/game/shipTrade.js');
- const s=make(),p=s.player,b=equipmentAction(p,'buy',{baseId:'gauss-cannon'});assert.ok(equipmentAction(p,'install',{id:b.id,mountId:'wayfarer-weapon-0'}).ok);
+ const s=make(),p=s.player,b=equipmentAction(p,'buy',{baseId:'gauss-cannon'});assert.ok(equipmentAction(p,'install',{id:b.id,mountId:'wayfarer-gun-0'}).ok);
  const factory=Object.values(p.inventory.items).filter(i=>i.factory&&i.location.kind==='installed').map(i=>i.id);
  const q=quoteShipTrade(p,'talon');assert.ok(q.ok,q.code);assert.ok(commitShipTrade(p,q).ok);
  assert.equal(p.inventory.items[b.id].location.stationId,'helix');for(const id of factory)assert.equal(p.inventory.items[id],undefined);
@@ -131,7 +133,7 @@ test('old saves receive one untouched inventory-migration backup',async()=>{
 test('multiple launchers spend one energy charge per canister and cannot overdraw the capacitor',async()=>{
  const {GameSession}=await import('../../src/game/game.js');const {EntityStore}=await import('../../src/game/entityStore.js');const THREE=await import('../../vendor/three.module.min.js');const {normalizeLoadout}=await import('../../src/game/outfitting.js');const {fillLauncherMagazines}=await import('../../src/game/weapons.js');
  const s=Object.create(GameSession.prototype);s.save=make();s.projectiles=[];s.projStore=new EntityStore(64);s.projectileCounter=0;s.renderer={spawnMuzzleFlash(){}};s.audio={play(){},playCockpit(){}};s.setMonitorStatus=()=>{};s.addPlayerEmission=()=>{};s.tmpPlayerOrientation=new THREE.Quaternion();for(let i=0;i<7;i++)s['tmpP'+i]=new THREE.Vector3();const p=s.save.player;p.position=[0,0,0];p.rotation=[0,0,0,1];p.mode='combat';
- const fit=normalizeLoadout('wayfarer',{mountSchema:4,launchers:['swarm-launcher','swarm-launcher','swarm-launcher']});p.outfitting.loadouts.wayfarer=fit;
+ p.shipId='vanguard';const fit=normalizeLoadout('vanguard',{mountSchema:5,launchers:['swarm-launcher','swarm-launcher','swarm-launcher']});p.outfitting.loadouts.vanguard=fit;
  const target={id:'energy-target',hull:1000,position:[0,0,-200]};s.ships=[target];s.getTargetRef=()=>({kind:'ship',id:target.id});fillLauncherMagazines(p);p.launcherFireMode='together';p.energy=30;
  p.currentTargetId=target.id;target.rotation=[0,0,0,1];p.dockedAt=undefined;s.tmpQ2=new THREE.Quaternion();s.updatePlayerRackLocks(2);
  const before=p.missiles;s.fireMissile();assert.equal(s.projectiles.length,8);assert.equal(p.energy,2);assert.equal(p.missiles,before-2);

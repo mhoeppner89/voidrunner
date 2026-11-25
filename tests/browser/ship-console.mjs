@@ -46,7 +46,9 @@ for(const [name,engine,device] of profiles){
   assert.equal(await page.locator('[data-inventory-mount^="atlas-drone-"]').count(),4);await layout('Atlas drones in equipment');
   await page.locator('[data-inventory-mount="atlas-drone-4"]').scrollIntoViewIfNeeded();await page.screenshot({path:`${out}/${name}-atlas-drones.png`});
   // Docked roles use the same controls and never require a manual recall button.
-  await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();r.ui.hideShipMenu();r.save.player.transponder=true;r.dockAt('helix',true);r.ui.openMarketPoint('equipment');r.ui.inventoryTab='cargo';r.ui.renderDock();});
+  await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();r.ui.hideShipMenu();r.save.player.transponder=true;r.dockAt('helix',true);});
+  await page.waitForFunction(()=>!__VOID_PRIVATEER__.getRuntime().ui.concourseArrivalPending);
+  await page.evaluate(()=>{const ui=__VOID_PRIVATEER__.getRuntime().ui;ui.openMarketPoint('equipment');ui.inventoryTab='cargo';ui.renderDock();});
   await page.locator('[data-inventory-mount="atlas-drone-1"]:visible').click();if(await page.locator('[data-inventory-action="close-detail"]:visible').count())await page.locator('[data-inventory-action="close-detail"]:visible').click();
   const dockTab=page.locator('[data-inventory-tab]:visible');if(await dockTab.count())await dockTab.selectOption('cargo');else await page.locator('[data-inventory-action="tab"][data-tab="cargo"]:visible').click();
   await page.locator('.inventory-item:visible').filter({has:page.locator('[data-icon="repair-drone"]')}).click();

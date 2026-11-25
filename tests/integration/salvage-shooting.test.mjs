@@ -88,3 +88,12 @@ test('the opened side follows all six local impact directions',()=>{
   assert.ok(outer<.2,`face ${face} must be opened on the struck side`);
  }
 });
+
+test('releasing the tutorial flight recorder keeps a hostile the pilot selected',()=>{
+ const {session:s,save,quest,node}=setup('salvage-black-box');
+ quest.flags.blackBoxTargetId=node.id;
+ const pirate=s.spawnShip('pirate',[250,0,0]);s.applyTarget({kind:'ship',id:pirate.id});
+ fireBeam(s);
+ assert.ok(save.world.combatWrecks[quest.flags.blackBoxDropId]);
+ assert.equal(save.player.currentTargetId,pirate.id);
+});

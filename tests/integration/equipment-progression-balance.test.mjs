@@ -45,8 +45,8 @@ test('all hulls gain defenses and energy from matching fitted upgrades without f
 test('fully upgraded matching loadouts outperform bare hulls in sustained real-energy firing',()=>{
  for(const [hull,spec] of Object.entries(HULL_HARDPOINTS)){
   const tier=SHIPS[hull].tier,gun=createEquipmentRecord('pulse-cannon',{tier,rarity:'rare',affixes:['efficient','rapid']}),reactor=createEquipmentRecord('sustained-reactor',{tier,rarity:'rare',affixes:['tuned','compact']});
-  const baseline=balanceFit(hull,Array(spec.weapons.length).fill('pulse-cannon'));
-  const upgraded=balanceFit(hull,Array(spec.weapons.length).fill(gun.id),Array(spec.utility.length).fill(reactor.id));
+  const baseline=balanceFit(hull,Array(spec.guns.length).fill('pulse-cannon'));
+  const upgraded=balanceFit(hull,Array(spec.guns.length).fill(gun.id),Array(spec.utility.length).fill(reactor.id));
   const before=firingTrace(baseline),after=firingTrace(upgraded);
   assert.ok(after.hullDamage>before.hullDamage,`${hull}: ${after.hullDamage} vs ${before.hullDamage}`);
   assert.ok(after.shieldDamage>before.shieldDamage,hull);
@@ -58,8 +58,8 @@ test('matching higher-tier guns do not lose sustained damage to lower-tier versi
   const tier=SHIPS[hull].tier;if(tier<2)continue;
   for(const base of ['pulse-cannon','beam-emitter','gauss-cannon','ripper','ion-blaster','mortar']){
    const lower=createEquipmentRecord(base,{tier:tier-1}),higher=createEquipmentRecord(base,{tier});
-   const before=firingTrace(balanceFit(hull,Array(spec.weapons.length).fill(lower.id)));
-   const after=firingTrace(balanceFit(hull,Array(spec.weapons.length).fill(higher.id)));
+   const before=firingTrace(balanceFit(hull,Array(spec.guns.length).fill(lower.id)));
+   const after=firingTrace(balanceFit(hull,Array(spec.guns.length).fill(higher.id)));
    assert.ok(after.hullDamage>=before.hullDamage,`${hull} ${base}`);
   }
  }

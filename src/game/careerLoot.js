@@ -37,9 +37,9 @@ export function equipCareerItems(session,ship,{tutorialMiningPirate=false}={}){
   fit[key][i]=item.id;ship.equipmentRecords.push({item,key,index:i});
  }
  fit.weaponDefinitions=fit.gunIndices.map(i=>weaponForOutfit(fit.guns[i]));
- const stats=getEffectiveShipStats({shipId:fit.hullId,outfitting:{schema:4,locker:{},loadouts:{[fit.hullId]:{...fit,mountSchema:4}}}});
+ const stats=getEffectiveShipStats({shipId:fit.hullId,outfitting:{schema:6,locker:{},loadouts:{[fit.hullId]:{...fit,mountSchema:5}}}});
  fit.stats=stats;fit.resources={...stats,shield:stats.shield};ship.energy=stats.energyCapacity;
- for(let i=0;i<(fit.racks?.length??0);i++){const item=fit.launchers.filter(Boolean)[i];fit.racks[i].itemId=item;}
+ for(const rack of fit.racks??[])rack.itemId=fit.launchers[rack.index];
 }
 export function equipCapitalLoot(session,ship){
  if(session.arena)return;

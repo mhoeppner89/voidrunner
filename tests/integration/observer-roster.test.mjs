@@ -60,9 +60,9 @@ test('League hulls keep their authored role fits when the observer places them',
   assert.equal(ship.maxHull,SHIPS[id].hull);assert.equal(ship.speed,SHIPS[id].maxSpeed);
  }
  const andromeda=stage(s,catalog.find(entry=>entry.id==='andromeda'),catalog.length+1);
- assert.equal(andromeda.combatFit.launchers.length,HULL_HARDPOINTS.andromeda.launchers.length,'the shared launcher bays keep stable mount positions');
- assert.deepEqual(andromeda.combatFit.launchers.filter(Boolean),['torpedo-launcher','swarm-launcher'],'the Andromeda keeps both authored racks');
- assert.deepEqual(andromeda.combatFit.launchers.slice(-2),['torpedo-launcher','swarm-launcher'],'both authored racks stay in their fitted bays');
+ assert.equal(andromeda.combatFit.launchers.length,HULL_HARDPOINTS.andromeda.launchers.length,'the missile sockets keep stable mount positions');
+ assert.deepEqual(andromeda.combatFit.launchers.filter(Boolean),['torpedo-launcher','swarm-launcher','torpedo-launcher'],'Thor has all three racks');
+ assert.deepEqual(andromeda.combatFit.launchers.slice(0,2),['torpedo-launcher','swarm-launcher'],'both authored racks stay in their fitted bays');
 });
 
 test('quick matches stage symmetric teams with the selected stock hull',()=>{

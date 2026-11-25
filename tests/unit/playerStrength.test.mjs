@@ -21,12 +21,12 @@ test('combat-strength proxy uses full hull and equipment value, half cash, and n
     // The hull counts at its full current list price.
     const hullPrice = SHIPS.vanguard.price;
     assert.equal(breakdown.shipValue, hullPrice);
-    assert.equal(breakdown.installedEquipmentValue, 1920 + 6500 + 1800 + 4800 + 5400);
+    assert.equal(breakdown.installedEquipmentValue, 1920 + 6500 + 3 * 1800 + 4800 + 5400);
     assert.equal(breakdown.storedEquipmentValue, 14850);
     assert.equal(breakdown.cashValue, 500);
     assert.equal(breakdown.cargoValue, 0);
-    assert.equal(breakdown.total, hullPrice + 35770);
-    assert.equal(playerStrengthValue(player), hullPrice + 35770);
+    assert.equal(breakdown.total, hullPrice + 39370);
+    assert.equal(playerStrengthValue(player), hullPrice + 39370);
     assert.equal(player.cargo.gold, 999, 'cargo remains outside the proxy and unchanged');
 });
 

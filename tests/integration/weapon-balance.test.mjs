@@ -4,6 +4,8 @@ import {session} from '../helpers/session.mjs';
 import * as THREE from '../../vendor/three.module.min.js';
 import {WEAPONS,LAUNCHERS,TRACKING_LASER,weaponRange,weaponShotDamage} from '../../src/game/weapons.js';
 import {OUTFIT_ITEMS,loadoutFor} from '../../src/game/outfitting.js';
+import {SHIP_MOUNT_ANCHORS} from '../../src/game/shipMounts.js';
+import {npcShipScaleForVariant} from '../../src/game/render.js';
 import {TURRET_LAYOUTS} from '../../src/game/turretLayouts.js';
 const {relativeIntercept,guideMissile,closestHullPoint}=await import('../../src/game/weaponFlight.js');
 const V=(...n)=>new THREE.Vector3(...n);
@@ -81,7 +83,11 @@ test('NPC swarm launch consumes one canister and emits four warheads after the f
  ship.rotation=[0,0,0,1];ship.velocity=[10,0,0];ship.targetId='player';ship.combatFit.launcher='swarm';ship.combatFit.missiles=1;ship.combatFit.racks=[{launcher:'swarm',missiles:1,index:0,mountId:'test-swarm',cooldown:0}];
  for(let i=0;i<245;i++){s.save.world.time=i/60;s.updateNpcOrdnance(ship,V(),1/60);}
  assert.equal(ship.combatFit.missiles,0);assert.equal(s.projectiles.length,4);
- for(const p of s.projectiles){assert.equal(p.launcherId,'swarm');assert.ok(Math.abs(s.projStore.getVel(p.slot,V()).sub(V(...ship.velocity)).length()-300)<.001);}
+ const muzzle=V(...SHIP_MOUNT_ANCHORS[ship.hullId].launchers[0]).multiplyScalar(npcShipScaleForVariant(ship.variant)).add(V(...ship.position));
+ for(const p of s.projectiles){
+  assert.equal(p.launcherId,'swarm');assert.ok(Math.abs(s.projStore.getVel(p.slot,V()).sub(V(...ship.velocity)).length()-300)<.001);
+  assert.ok(s.projStore.getPos(p.slot,V()).distanceTo(muzzle)<.001,'each warhead leaves the actual rack');
+ }
 });
 
 test('PDC intercepts a full-speed seeker before impact while preserving its gun energy reserve',()=>{

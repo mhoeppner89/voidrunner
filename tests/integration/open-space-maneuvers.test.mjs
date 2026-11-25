@@ -61,7 +61,7 @@ test('an offensive cut yields to the physical close-pass separation route',()=>{
 test('real open-space flights execute each move, keep bounded motion and return to firing',()=>{
  const forward=new THREE.Vector3(0,0,-1),q=new THREE.Quaternion(),target=new THREE.Vector3(),velocity=new THREE.Vector3(),before=new THREE.Vector3(),after=new THREE.Vector3();
  for(const kind of ['high-yo-yo','lead-cut','scissors']){
-  const s=fixture(),ship=s.spawnShip('pirate',[0,0,kind==='high-yo-yo'?180:kind==='lead-cut'?110:-125],undefined,undefined,{tier:'ace',temperament:'steady'},{hullId:'talon'});
+  const s=fixture(),ship=s.spawnShip('pirate',[0,0,kind==='high-yo-yo'?195:kind==='lead-cut'?110:-125],undefined,undefined,{tier:'ace',temperament:'steady'},{hullId:'talon'});
   ship.targetId='player';ship.velocity=[0,0,kind==='high-yo-yo'?-110:-75];ship.rotation=[0,0,0,1];ship.fireCommitReadyAt=100;
   ship.combatFit.turrets=[];ship.combatFit.missiles=0;ship.combatFit.racks?.forEach(r=>r.missiles=0);s.npcFlightStats(ship);
   if(kind==='scissors'){ship.evasiveUntil=3;ship.evasiveLatencyUntil=0;ship.combatThreatUntil=5;ship.combatThreatId='player';ship.combatPressure=40;ship.combatPressureAt=0;ship.fireCommitDamageLimit=20;}

@@ -27,8 +27,8 @@ const hitWindows={
   1.25:[0,0,0], 1.5:[100,0,0], 1.75:[100,100,0], 2:[100,100,100], 2.5:[100,100,100],
  },
  swarm:{
-  0:[100,100,100], .25:[100,100,100], .5:[100,0,0], .75:[0,0,0], 1:[0,0,0],
-  1.25:[100,12.5,0], 1.5:[100,100,100], 1.75:[100,100,100], 2:[100,100,100], 2.5:[100,100,100],
+  0:[100,100,100], .25:[100,100,100], .5:[100,100,100], .51:[100,0,0], .54:[0,0,0], .75:[0,0,0], 1:[0,0,0],
+  1.25:[100,0,0], 1.5:[100,100,100], 1.75:[100,100,100], 2:[100,100,100], 2.5:[100,100,100],
  },
 };
 for(const [rack,times] of Object.entries(hitWindows)){
@@ -43,8 +43,9 @@ for(const [rack,times] of Object.entries(hitWindows)){
 test('roll and individual swarm lanes affect a grazing hit',()=>{
  const rolls=missileCells('seeker',{lead:.5,fixedBreakPlane:true})[0].byRoll;
  assert.ok(Math.min(...rolls)<Math.max(...rolls));
- const swarm=missileCells('swarm',{lead:1.25});
- assert.ok(swarm.some(({lanesByRoll})=>lanesByRoll.some(lanes=>Math.min(...lanes)<Math.max(...lanes))),'swarm lanes split');
+ // Loki rolls into a slightly off-axis salvo. Opposing lanes graze opposite sides.
+ const lanes=[0,1,2,3].map(lane=>missileTrial('swarm',429,.79,lane,3*Math.PI/4,MISSILE_PADDING,3.01,{bearing:.1}));
+ assert.deepEqual(lanes,[true,false,false,true]);
 });
 test('seeker and swarm hit steady headings across rolls and launch ranges',()=>{
  for(const npc of [undefined,npcFixture()])for(const rack of ['seeker','swarm']){
@@ -146,7 +147,7 @@ test('lock times follow aspect and skill, and a completed lock holds to 30 degre
 test('career and Arena deny an unlocked shot, then launch one round on the missile action',()=>{
  for(const arena of [null,{run:true}]){
   const s=session(),p=s.save.player;s.arena=arena;
-  p.outfitting.loadouts[p.shipId].launchers[2]='seeker-launcher';fillLauncherMagazines(p);const rounds=p.missiles;
+  p.outfitting.loadouts[p.shipId].launchers[0]='seeker-launcher';fillLauncherMagazines(p);const rounds=p.missiles;
   const ship=s.spawnShip('pirate',[0,0,-200]);ship.rotation=[0,0,0,1];p.currentTargetId=ship.id;
   s.getTargetRef=()=>({kind:'ship',id:ship.id});s.handleActions({missile:true});
   assert.equal(s.monitorStatusUntil,s.save.world.time+1);assert.equal(s.projectiles.length,0);assert.equal(p.missiles,rounds);
@@ -239,7 +240,7 @@ test('cover, an absent target and either active drive phase cancel acquisition a
  for(const block of ['cover','spooling','active','transit']){
   const s=session(),p=s.save.player,enemy=s.spawnShip('pirate',[0,0,-200]);
   enemy.rotation=[0,0,0,1];enemy.dark=true;p.currentTargetId=enemy.id;
-  p.outfitting.loadouts[p.shipId].launchers[2]='seeker-launcher';fillLauncherMagazines(p);
+  p.outfitting.loadouts[p.shipId].launchers[0]='seeker-launcher';fillLauncherMagazines(p);
   s.getTargetRef=()=>({kind:'ship',id:enemy.id});s.updatePlayerRackLocks(2);
   assert.equal(s.rackProgress,1);
   if(block==='cover')s.lineBlocked=()=>true;
@@ -252,7 +253,8 @@ test('cover, an absent target and either active drive phase cancel acquisition a
 });
 test('Together holds the salvo for the slowest eligible rack and skips empty mounts',()=>{
  for(const empty of [false,true]){
-  const s=session(),p=s.save.player,fit=p.outfitting.loadouts[p.shipId];
+  const s=session(),p=s.save.player; p.shipId='vanguard';
+  const fit=p.outfitting.loadouts.vanguard=p.outfitting.loadouts.wayfarer;
   fit.guns.fill(null);fit.launchers=['torpedo-launcher','swarm-launcher',null];
   const [torpedo]=fillLauncherMagazines(p);
   p.activeLauncherMountId=torpedo.mount.id;p.launcherFireMode='together';
@@ -293,27 +295,27 @@ test('swarm refunds follow physical magazines through hydration, installation an
  const rack=(id,baseId)=>Object.assign(createEquipmentRecord(baseId,{id,location:{kind:'station',stationId:'helix'}}),{rounds:12});
  const fitted=rack('eq-fitted','swarm-launcher'),stored=rack('eq-stored','shield-swarm-launcher'),locker=rack('eq-locker','swarm-launcher');
  for(const r of [fitted,stored,locker])p.inventory.items[r.id]=r;
- p.outfitting.loadouts.wayfarer.launchers[2]=fitted.id;p.launcherMagazines={'wayfarer-weapon-2':{launcherId:'swarm',rounds:10}};
+ p.outfitting.loadouts.wayfarer.launchers[0]=fitted.id;p.launcherMagazines={'wayfarer-launcher-0':{launcherId:'swarm',rounds:10}};
  p.ownedShips.push('scrapper');p.outfitting.loadouts.scrapper=createOutfittingState(['scrapper']).loadouts.scrapper;
  p.outfitting.loadouts.scrapper.guns[0]=null;p.outfitting.loadouts.scrapper.launchers[0]=stored.id;
- p.storedShips.scrapper={locationId:'helix',resources:{missiles:12,launcherMagazines:{'scrapper-weapon-0':{launcherId:'shield-swarm',rounds:12}}}};
+ p.storedShips.scrapper={locationId:'helix',resources:{missiles:12,launcherMagazines:{'scrapper-launcher-0':{launcherId:'shield-swarm',rounds:12}}}};
  const h=hydrateSave(original),balance=p.credits+(6+8+8)*240;
  assert.equal(h.player.credits,balance);assert.equal(h.player.swarmRefund,22);
- assert.equal(h.player.launcherMagazines['wayfarer-weapon-2'].rounds,4);assert.equal(h.player.storedShips.scrapper.resources.missiles,4);
- assert.ok(equipmentAction(h.player,'install',{id:locker.id,mountId:'wayfarer-weapon-2'}).ok);
- assert.equal(h.player.launcherMagazines['wayfarer-weapon-2'].rounds,4);
+ assert.equal(h.player.launcherMagazines['wayfarer-launcher-0'].rounds,4);assert.equal(h.player.storedShips.scrapper.resources.missiles,4);
+ assert.ok(equipmentAction(h.player,'install',{id:locker.id,mountId:'wayfarer-launcher-0'}).ok);
+ assert.equal(h.player.launcherMagazines['wayfarer-launcher-0'].rounds,4);
  assert.equal(h.player.inventory.items[fitted.id].rounds,4);assert.equal(h.player.inventory.items[stored.id].rounds,4);
  delete h.player.swarmRefund;const again=hydrateSave(h);assert.equal(again.player.credits,balance);assert.equal(again.player.swarmRefund,undefined);
  const run=newArenaRun(false,719),reward=rack('eq-arena-swarm','shield-swarm-launcher');
- run.arenaRun.rewardRecords={[reward.id]:reward};run.player.outfitting.loadouts.wayfarer.launchers[2]=reward.id;
- run.player.launcherMagazines={'wayfarer-weapon-2':{launcherId:'shield-swarm',rounds:12}};
+ run.arenaRun.rewardRecords={[reward.id]:reward};run.player.outfitting.loadouts.wayfarer.launchers[0]=reward.id;
+ run.player.launcherMagazines={'wayfarer-launcher-0':{launcherId:'shield-swarm',rounds:12}};
  run.arenaRun.checkpoint=structuredClone(run.player);
  const local=new Map(),prev=globalThis.window;
  try{
   globalThis.window={localStorage:{getItem:k=>local.get(k),setItem:(k,v)=>local.set(k,v)}};
   writeArenaRun(run);const loaded=readArenaRun();
   for(const player of [loaded.player,loaded.arenaRun.checkpoint]){
-   assert.equal(player.credits,run.player.credits+8*240);assert.equal(player.launcherMagazines['wayfarer-weapon-2'].rounds,4);
+   assert.equal(player.credits,run.player.credits+8*240);assert.equal(player.launcherMagazines['wayfarer-launcher-0'].rounds,4);
   }
   assert.equal(loaded.arenaRun.rewardRecords[reward.id].rounds,4);writeArenaRun(loaded);
   assert.equal(readArenaRun().player.credits,loaded.player.credits);

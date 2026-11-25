@@ -4,7 +4,7 @@ import {normalizeDistress} from './distressData.js';
 import {normalizeCareerLoot} from './careerLoot.js';
 import {normalizePaintDesign} from './paintDesign.js';
 import {FLEET_PAINTS} from './fleetPaintCatalog.js';
-import {normalizeEquipmentInventory,registerInventoryDefinitions,captureEquipmentAmmo} from './equipmentInventory.js';
+import {normalizeEquipmentInventory,registerInventoryDefinitions,captureEquipmentAmmo,createEquipmentRecord} from './equipmentInventory.js';
 import {migrateFactionReputation,migrateFactionTags} from './factions.js';
 import { createInitialMarket, normalizeMarketIntel, refreshAllPrices } from './economy.js';
 import { DEFAULT_NAV_LOCATION_BY_SYSTEM, DOCK_LOCATION_IDS, LOCATIONS, MISSION_LOCATION_IDS, SHIPS, commodityIds, navLocationIdsForSystem } from './data.js';
@@ -13,8 +13,8 @@ import { refreshMissionOffers } from './missions.js';
 import { normalizeRaceRecord } from './racing.js';
 import { clamp } from './random.js';
 import { getEffectiveShipStats } from './shipStats.js';
-import { AMMO_CAPACITY, LEGACY_GUN_AMMO, WEAPON_ORDER, WEAPONS, LAUNCHERS, mountedLauncherEntries, normalizeLauncherMagazines } from './weapons.js';
-import { HULL_HARDPOINTS, canonicalOutfitId,collapseOutfittingToSingleShip, createOutfittingState, normalizeOutfitting, projectLegacyEquipment, projectLegacyWeaponId } from './outfitting.js';
+import { AMMO_CAPACITY, LEGACY_GUN_AMMO, WEAPON_ORDER, WEAPONS, LAUNCHERS, launcherIdForOutfit, mountedLauncherEntries, normalizeLauncherMagazines } from './weapons.js';
+import { HULL_HARDPOINTS, legacySharedGunCount, usesSharedWeaponMounts, sharedWeaponEntries, outfitSlotValues, canonicalOutfitId,collapseOutfittingToSingleShip, createOutfittingState, normalizeOutfitting, projectLegacyEquipment, projectLegacyWeaponId } from './outfitting.js';
 import { combinedHullIntegrity, normalizeEnergy } from './combatResources.js';
 import { normalizeQuestStates } from './quests.js';
 import { startTutorialCampaign, migrateTutorialCampaign } from './tutorialCampaign.js';
@@ -33,7 +33,7 @@ export const SAVE_KEY = TURRET_TEST_MODE ? 'voidrunner-turret-test-v1'
 export const INVENTORY_MIGRATION_BACKUP_KEY=`${SAVE_KEY}-pre-inventory`;
 export const DRONE_MIGRATION_BACKUP_KEY = `${SAVE_KEY}-pre-drones`;
 export const SETTINGS_KEY = 'void-privateer-settings-v1';
-export const SAVE_VERSION = 20;
+export const SAVE_VERSION = 21;
 // Test-funds build: a fresh career starts with enough credits to try any ship,
 // outfitting module or trade route without grinding first.
 export const STARTING_CREDITS = 500000;
@@ -558,8 +558,7 @@ function refundSwarmCanisters(save,legacyPool){
         }
         for(const e of mounts){
             if(!swarm(e.launcherId))continue;
-            const mags=state.launcherMagazines??={},oldKey=`${shipId}-launcher-${e.index-HULL_HARDPOINTS[shipId].stockGunCount}`;
-            if(!mags[e.mount.id] && mags[oldKey]){mags[e.mount.id]=mags[oldKey];delete mags[oldKey];}
+            const mags=state.launcherMagazines??={};
             const mag=mags[e.mount.id],item=items[e.itemId]??rewards[e.itemId];
             if(mag?.launcherId!==e.launcherId && item?.rounds==null)continue;
             const rounds=retain(mag?.launcherId===e.launcherId?mag.rounds:item.rounds,e.launcher.capacity);
@@ -579,6 +578,50 @@ function refundSwarmCanisters(save,legacyPool){
     if(excess){
         p.credits+=excess*240;
         p.swarmRefund=(p.swarmRefund??0)+excess;
+    }
+}
+// Shared weapon mounts used a hull-specific offset for launcher magazines.
+function migrateSharedMagazines(player, run) {
+    for (const [shipId, fit] of Object.entries(player.outfitting?.loadouts ?? {})) {
+        if (!usesSharedWeaponMounts(player.outfitting.schema,fit)) continue;
+        const spec = HULL_HARDPOINTS[shipId];
+        const state = player.shipId === shipId ? player : player.storedShips?.[shipId]?.resources;
+        if (!spec || !state) continue;
+        const mags = state.launcherMagazines ?? {}, next = {};
+        const boundary = legacySharedGunCount(shipId);
+        const rackSlots = outfitSlotValues(fit,'launchers');
+        for (const [i, id] of sharedWeaponEntries(shipId,rackSlots)) {
+            const launcherId = launcherIdForOutfit(id);
+            if (!launcherId) continue;
+            const index = i - boundary, oldId = `${shipId}-weapon-${i}`;
+            const mount = spec.launchers[index], typedId = `${shipId}-launcher-${index}`;
+            const savedItem = player.inventory?.items?.[id] ?? run?.rewardRecords?.[id];
+            const mag = mags[oldId] ?? mags[typedId] ?? (Number.isFinite(savedItem?.rounds)
+                ? {launcherId,rounds:savedItem.rounds} : undefined);
+            if (!mag || mag.launcherId !== launcherId) continue;
+            if (mount) {
+                next[mount.id] = mag;
+                if (player.inventory?.items?.[id]) player.inventory.items[id].rounds = mag.rounds;
+                if (state.activeLauncherMountId === oldId) state.activeLauncherMountId = mount.id;
+            } else if (run) {
+                const pool = run.storedRounds ??= {};
+                (pool[id] ??= []).push(mag.rounds);
+            } else {
+                const inventory = player.inventory ??= {version:1,items:{}};
+                inventory.items ??= {};
+                let item = inventory.items[id];
+                if (!item) {
+                    const flags = outfitSlotValues(player.outfitting.factory?.[shipId], 'launchers');
+                    item = createEquipmentRecord(id,{factory:(flags?.[i] ?? flags?.[oldId]) === true});
+                    inventory.items[item.id] = item;
+                    rackSlots[Array.isArray(rackSlots) ? i : oldId] = item.id;
+                }
+                item.rounds = mag.rounds;
+                item.location = {kind:'station', stationId:player.storedShips?.[shipId]?.locationId ?? player.dockedAt ?? player.lastDockedAt ?? 'helix'};
+            }
+        }
+        state.launcherMagazines = next;
+        state.missiles = Object.values(next).reduce((total,mag) => total + mag.rounds,0);
     }
 }
 export const hydrateSave = (candidate) => {
@@ -800,13 +843,8 @@ export const hydrateSave = (candidate) => {
     // flat list on the first load so older callers still see the exact ids
     // they wrote; commitOutfitting refreshes it from canonical state. A save
     // that already carries canonical state gets a fresh projection now.
+    registerInventoryDefinitions({items:save.arenaRun?.rewardRecords});
     registerInventoryDefinitions(save.player.inventory);
-    if(parsedVersion<20){
-        const racks={};for(const [id,magazine] of Object.entries(save.player.launcherMagazines??{})){const match=id.match(/^(.+)-launcher-(\d+)$/);const spec=match?HULL_HARDPOINTS[match[1]]:undefined;racks[spec?`${match[1]}-weapon-${spec.stockGunCount+Number(match[2])}`:id]=magazine;}
-        save.player.launcherMagazines=racks;
-        const active=save.player.activeLauncherMountId?.match(/^(.+)-launcher-(\d+)$/);if(active&&HULL_HARDPOINTS[active[1]])save.player.activeLauncherMountId=`${active[1]}-weapon-${HULL_HARDPOINTS[active[1]].stockGunCount+Number(active[2])}`;
-    }
-
     const hadCanonicalOutfitting = Boolean(candidate.player?.outfitting);
     save.player.shipId = activeShipId;
     save.player.retainedFleetVersion = 1;
@@ -818,7 +856,16 @@ export const hydrateSave = (candidate) => {
             if(id!==activeShipId && record && LOCATIONS[record.locationId]) save.player.storedShips[id]=JSON.parse(JSON.stringify(record));
         }
         save.player.ownedShips=[activeShipId,...Object.keys(save.player.storedShips)];
-    } else save.player.outfitting = collapseOutfittingToSingleShip({...save.player,ownedShips:legacyFleet},activeShipId);
+    }
+    const checkpoint = save.arenaRun?.checkpoint;
+    if (checkpoint?.outfitting && Array.isArray(checkpoint.ownedShips)) {
+        const checkpointRun = {rewardRecords:save.arenaRun.rewardRecords,storedRounds:structuredClone(save.arenaRun.checkpointStoredRounds ?? save.arenaRun.storedRounds ?? {})};
+        migrateSharedMagazines(checkpoint, checkpointRun);
+        save.arenaRun.checkpointStoredRounds = checkpointRun.storedRounds;
+        normalizeOutfitting(checkpoint);
+    }
+    migrateSharedMagazines(save.player,save.arenaRun);
+    if (!retainsFleet) save.player.outfitting = collapseOutfittingToSingleShip({...save.player,ownedShips:legacyFleet},activeShipId);
     delete save.player.shipStates;
     save.player.outfitting = normalizeOutfitting(save.player);
     // Read the candidate, never the fallback's freshly granted Wayfarer fleet.
@@ -835,11 +882,11 @@ export const hydrateSave = (candidate) => {
      save.arenaRun.offers=[...new Set((save.arenaRun.offers??[]).map(canonicalOutfitId))];
      if(save.arenaRun.selectedReward)save.arenaRun.selectedReward=canonicalOutfitId(save.arenaRun.selectedReward);
     }
-    const checkpoint=save.arenaRun?.checkpoint;
     if(checkpoint?.outfitting && Array.isArray(checkpoint.ownedShips)){
         // Retry restores its own player and balance. Credit that timeline once.
         const rewardRecords=JSON.parse(JSON.stringify(save.arenaRun.rewardRecords??{}));
         refundSwarmCanisters({player:checkpoint,arenaRun:{rewardRecords}});
+        normalizeLauncherMagazines(checkpoint);
     }
     refundSwarmCanisters(save,sourceVersion<10?candidate.player?.missiles:undefined);
     normalizeEquipmentInventory(save.player,{disabled:Boolean(save.arena)});

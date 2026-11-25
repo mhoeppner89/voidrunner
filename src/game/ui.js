@@ -478,7 +478,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2pp';
+const GAME_VERSION = '0.8.2pq';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -884,7 +884,7 @@ const OUTFITTING_SCREEN_ART = Object.freeze([
     './art/outfitting/v2/dealer-workshop-backdrop-v2.png',
     './art/portraits/simplified/dealer-mechanic-portrait-v2.webp',
 ]);
-const OUTFIT_CATEGORY_KEYS = Object.freeze({ turrets:'TURRETS',power:'POWER',guns: 'GUNS', launchers: 'LAUNCHER', drive: 'DRIVE', defense: 'DEFENSE', utility: 'UTILITY' });
+const OUTFIT_CATEGORY_KEYS = Object.freeze({ turrets:'TURRETS',power:'POWER',guns: 'Gun', launchers: 'Missile', drive: 'DRIVE', defense: 'DEFENSE', utility: 'UTILITY' });
 const OUTFIT_CATEGORY_TO_KEY = Object.freeze({ gun: 'guns', launcher: 'launchers', drive: 'drive', defense: 'defense', utility: 'utility' });
 const OUTFIT_DEALER_CATEGORIES = Object.freeze({
     guns: Object.freeze({ label: 'GUNS', accepts: ['gun'] }),
@@ -4235,7 +4235,7 @@ export class GameUI {
         if(stage==='overview') {
             body=rows.map(x=>{
                 const item=OUTFIT_ITEMS[loadout[x.key]?.[x.index]];
-                return `<button type="button" class="fit-slot" data-outfit-slot="${x.mount.id}"><span>${escapeHtml(labelFor(x))}</span><b>${item?escapeHtml(equipmentName(item)):t('ADD EQUIPMENT')}</b><small>${item?escapeHtml(weaponDetails(item)):t('Choose a compatible module.')}</small></button>`;
+                return `<button type="button" class="fit-slot" data-outfit-slot="${x.mount.id}"><span>${x.key==='guns'?uiIcon('equipment',14):x.key==='launchers'?uiIcon('missile',14):''}${escapeHtml(labelFor(x))}</span><b>${item?escapeHtml(equipmentName(item)):t('ADD EQUIPMENT')}</b><small>${item?escapeHtml(weaponDetails(item)):t('Choose a compatible module.')}</small></button>`;
             }).join('');
             action=`<button data-outfit-view="locker">${t('STORED EQUIPMENT')}</button>`;
         } else if(stage==='equipment') {
@@ -4377,7 +4377,7 @@ export class GameUI {
                     ? t('TRADE UNAVAILABLE')
                     : '';
         const spec = ([label, value, delta, digits = 0, max]) => `<div class="ship-spec"><span title="${t(label)}">${specLabel(label)}</span><b>${value}</b>${active ? '' : this.statDelta(delta, digits)}<i class="ship-spec-bar" aria-hidden="true"><i style="width:${Math.max(4, Math.min(100, Number(value) / max * 100)).toFixed(1)}%"></i></i></div>`;
-        const mounts = [['Weapon','Weapon','weapons',hardpoints.weapons?.length??hardpoints.guns.length],['Utility','Utility','equipment',hardpoints.utility.length],['Drone bays','Drones','drones',hardpoints.droneBays?.length??0],['Turret','Turret','bounty',hardpoints.turrets?.length??0]];
+        const mounts = [['Guns','Guns','equipment',hardpoints.guns.length],['Missiles','Missiles','missile',hardpoints.launchers.length],['Utility','Utility','gear',hardpoints.utility.length],['Drone bays','Drones','drones',hardpoints.droneBays?.length??0],['Turret','Turret','bounty',hardpoints.turrets?.length??0]];
         return `<article class="ship-showroom ${active ? 'is-current' : ''}">
           <section class="ship-showroom-stage sx-panel" aria-labelledby="ship-showroom-name">
             <div class="ship-stage-heading"><span class="sx-label">T${ship.tier} · ${escapeHtml(t(shipRoleLabel(ship.role)))}</span><b>${escapeHtml(t(ship.className))}</b></div>
@@ -6065,7 +6065,8 @@ export class GameUI {
         }).join('');
         const racks=launcherMagazineEntries(player);
         const launchers=racks.length?`<section class="ship-launcher-controls"><header><h3>${t('LAUNCHER FIRING')}</h3>${racks.length>1?`<div class="ship-fire-modes">${['alternating','together','single'].map(mode=>command('launcher-fire-mode',`data-launcher-mode="${mode}"`,t(mode==='alternating'?'ALTERNATING':mode==='together'?'TOGETHER':'SELECTED RACK ONLY'),(player.launcherFireMode??'alternating')===mode)).join('')}</div>`:''}</header>${racks.map(entry=>`<div class="weapon-row"><span>${escapeHtml(equipmentName(OUTFIT_ITEMS[entry.itemId],{affixes:false}))}</span><em>${entry.rounds}/${entry.capacity}</em></div>`).join('')}</section>`:'';
-        return `<div class="ship-weapons"><nav class="ship-active-group" aria-label="${t('FIRE GROUP')}">${activeButtons}</nav><div class="ship-weapon-columns">${groups}</div>${launchers}</div>`;
+        const summary=`<span class="ship-mount-summary">${uiIcon('equipment',16)} ${t('Guns')} · ${spec.guns.length} &nbsp; ${uiIcon('missile',16)} ${t('Missiles')} · ${spec.launchers.length}</span>`;
+        return `<div class="ship-weapons"><div class="ship-weapon-toolbar"><nav class="ship-active-group" aria-label="${t('FIRE GROUP')}">${activeButtons}</nav>${summary}</div><div class="ship-weapon-columns">${groups}</div>${launchers}</div>`;
     }
     showShipMenu() {
         if (!this.save)

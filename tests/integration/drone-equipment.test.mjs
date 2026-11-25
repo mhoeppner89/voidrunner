@@ -27,9 +27,9 @@ test('ordinary lasers sell only while another installed ammo-free weapon remains
  assert.ok(equipmentAction(p,'remove',{id:lasers[0]}).ok);assert.ok(equipmentAction(p,'sell',{id:lasers[0]}).ok);
  assert.ok(equipmentAction(p,'remove',{id:lasers[1]}).ok);
  const b=equipmentAction(p,'buy',{baseId:'torpedo-launcher',stationId:'helix'});assert.equal(b.ok,false,'restricted shop stock still applies');
- const missile=equipmentAction(p,'buy',{baseId:'seeker-launcher'});assert.ok(equipmentAction(p,'install',{id:missile.id,mountId:'wayfarer-weapon-0'}).ok);
+ const missile=equipmentAction(p,'buy',{baseId:'seeker-launcher'});assert.ok(equipmentAction(p,'install',{id:missile.id,mountId:'wayfarer-launcher-0'}).ok);
  const before=p.credits;assert.equal(equipmentAction(p,'sell',{id:lasers[1]}).ok,false);assert.equal(p.credits,before);
- const gun=equipmentAction(p,'buy',{baseId:'pulse-cannon'});assert.ok(equipmentAction(p,'install',{id:gun.id,mountId:'wayfarer-weapon-1'}).ok);
+ const gun=equipmentAction(p,'buy',{baseId:'pulse-cannon'});assert.ok(equipmentAction(p,'install',{id:gun.id,mountId:'wayfarer-gun-1'}).ok);
  assert.ok(equipmentAction(p,'sell',{id:lasers[1]}).ok);
 });
 test('drones buy, replace, store and sell through ordinary equipment without duplicate ownership',()=>{

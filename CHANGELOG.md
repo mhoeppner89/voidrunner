@@ -1,3 +1,11 @@
+## 0.8.2pq — Gun and missile slots, round hull stats, lost targets come back
+
+- Guns and missiles now have their own slots: guns go only in gun slots, launchers only in missile slots. Bombers carry the most missiles (Thor 2 guns / 3 missiles, Bellona 3 / 3), and every ship has at least two guns. Hestia, Balor, Loki, Morrigan, Mercury, Gaia and Argo keep their layouts; Tyr now has 4 guns, Freya 3, Artemis 3 / 2, Victoria 4 / 2, Odin 3 / 2 and the Atlas Hauler 2 / 2. Fitting screens, the ship sheet and dealer cards show Guns and Missiles separately.
+- Saves are converted on load: anything that no longer fits its slot goes to station storage (in Arena, to the run's spares). Nothing is lost, and launchers keep their missiles.
+- Every hull's stats are rounded and rebalanced: Mercury is the fastest, most fragile tier-2 interceptor, Morrigan trades speed for its four guns, Tyr gives up some agility for its extra guns, Thor and Bellona are tougher missile platforms, and Victoria is the tier-3 gunship.
+- A target you lose behind rock or wreckage is selected again when it comes back into view, unless you picked or cleared a target in the meantime. A ship that surrenders or is destroyed is forgotten.
+- Tutorial fights no longer pick the enemy for you: a prompt asks you to select the raider. Mission objects and waypoints are still selected automatically.
+
 ## 0.8.2pp — LOCK lamp, transponder switch, enemies use cover and flank
 
 - Every cockpit has two new plates beside HYPERDRIVE: a LOCK lamp (inspired by Wing Commander Privateer) and an XPDR switch. LOCK glows amber while an enemy acquires a missile lock, red once they have it, and flashes fast when a missile is on its way, with a short warble that gives way to the missile cues. Hold XPDR briefly and release to switch your transponder without opening a monitor; its green light shows when it is on. With reduced motion the lamp reads MSL instead of flashing.

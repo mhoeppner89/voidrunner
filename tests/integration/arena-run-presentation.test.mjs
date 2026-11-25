@@ -24,18 +24,18 @@ test('run rewards and fitted summaries use the same quality colors and retain se
  assert.equal((markup.match(/data-run-action="reward"/g)||[]).length,3);assert.match(markup,/run-replacement/);assert.doesNotMatch(markup,/lead your target|Fits an empty mount/);
  s.arenaRun.rewardChosen=true;s.player.outfitting.loadouts[s.player.shipId].guns[0]='pulse-cannon-t3';assert.match(panel(s),/run-item-label[^>]*data-rarity="rare"/);
 });
-test('launcher rewards use a free shared bay before replacing a forward gun',()=>{
+test('launcher rewards use a missile slot and preserve every forward gun',()=>{
  const s=ready(),fit=s.player.outfitting.loadouts[s.player.shipId];fit.guns[1]=null;
- const free=runRewardPlan(s,'torpedo-launcher');assert.deepEqual(free.changes.map(({index,old,other})=>({index,old,other})),[{index:1,old:null,other:null},{index:2,old:null,other:null}]);
+ const free=runRewardPlan(s,'torpedo-launcher');assert.deepEqual(free.changes,[{key:'launchers',index:0,old:null}]);
  assert.deepEqual(free.replaced,[]);assert.equal(fit.guns[0],'pulse-cannon');
  s.arenaRun.wave=1;s.arenaRun.offers=['torpedo-launcher'];assert.equal(chooseRunReward(s,'torpedo-launcher'),true);
- const installed=s.player.outfitting.loadouts[s.player.shipId];assert.equal(installed.launchers[1],'torpedo-launcher');assert.equal(installed.guns[0],'pulse-cannon');
- const fullSave=ready(),fullFit=fullSave.player.outfitting.loadouts[fullSave.player.shipId];fullFit.guns[1]='ripper';fullFit.guns[2]='ripper';
+ const installed=s.player.outfitting.loadouts[s.player.shipId];assert.equal(installed.launchers[0],'torpedo-launcher');assert.equal(installed.guns[0],'pulse-cannon');
+ const fullSave=ready(),fullFit=fullSave.player.outfitting.loadouts[fullSave.player.shipId];fullFit.guns[1]='ripper';fullFit.launchers[0]='seeker-launcher';
  const full=runRewardPlan(fullSave,'torpedo-launcher');assert.equal(full.replaced.length,1);assert.equal(fullFit.guns[1],'ripper');
 });
 test('gun rewards fill a vacant weapon bay without replacing an installed gun',()=>{
  const s=ready(),fit=s.player.outfitting.loadouts[s.player.shipId];fit.guns[1]=null;
- const plan=runRewardPlan(s,'ripper');assert.deepEqual(plan.changes.map(({key,index,old})=>({key,index,old})),[{key:'guns',index:1,old:null},{key:'guns',index:2,old:null}]);
+ const plan=runRewardPlan(s,'ripper');assert.deepEqual(plan.changes.map(({key,index,old})=>({key,index,old})),[{key:'guns',index:1,old:null}]);
  assert.deepEqual(plan.replaced,[]);assert.equal(fit.guns[0],'pulse-cannon');
 });
 test('utility rewards use a vacant utility socket and leave installed equipment intact',()=>{

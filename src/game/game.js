@@ -627,7 +627,7 @@ const DARK_ENCOUNTER_MULT = 0.35;
 // resolved beyond the ordinary radar horizon, giving the pilot actionable
 // early warning. Dark contacts receive no multiplier and must build a track
 // inside their own physical-signature range.
-const THREAT_TARGET_MULT = 2.2;
+const TARGET_REACQUIRE_INTERVAL = 1; // Simulation seconds between automatic selection cues.
 const THREAT_NEAREST_MULT = 2.4;
 // The syndicate berth: a participating port admits an unlicensed dark ship for
 // a flat handling fee plus a cut of the hold. Concord ports deny clearance;
@@ -1600,6 +1600,10 @@ export class GameSession {
     tutorialSummary() {
         return tutorialCampaignSummary(this.save);
     }
+    tutorialMaySelectTarget() {
+        const id=this.save.player.currentTargetId;
+        return !this.lostTargetId && !(id && this.ships.some(ship=>ship.id===id && ship.hull>0 && ship.hostile && !ship.surrendered));
+    }
     setTutorialDestination(destinationId) {
         const destination = LOCATIONS[destinationId];
         if (!destination)
@@ -1608,7 +1612,7 @@ export class GameSession {
             this.save.world.plannedSystemId = null;
             this.save.world.plannedDestinationId = null;
             this.changeNavTarget(destinationId);
-            if (!this.save.player.dockedAt && this.renderer)
+            if (!this.save.player.dockedAt && this.renderer && this.tutorialMaySelectTarget())
                 this.applyTarget({ kind: 'location', id: destinationId, position: destination.position, name: destination.name });
             return true;
         }
@@ -1618,7 +1622,7 @@ export class GameSession {
         this.save.world.plannedSystemId = destination.systemId;
         this.save.world.plannedDestinationId = destinationId;
         this.changeNavTarget(route.nextJumpPointId);
-        if (!this.save.player.dockedAt && this.renderer) {
+        if (!this.save.player.dockedAt && this.renderer && this.tutorialMaySelectTarget()) {
             const jumpPoint = LOCATIONS[route.nextJumpPointId];
             this.applyTarget({ kind: 'location', id: jumpPoint.id, position: jumpPoint.position, name: jumpPoint.name });
         }
@@ -2324,6 +2328,7 @@ export class GameSession {
         this.setupObserver(this.arena, false);
     }
     setupArena(config, announce = true) {
+        this.lostTargetId = undefined;
         // Every arena attempt is a clean sortie: restore all weapon pools and
         // clear session-only heat/cooldowns before spawning the player or
         // hostiles. Career snapshots are untouched because arena saves are
@@ -4848,9 +4853,9 @@ export class GameSession {
             weaponId:weapon.id,visualScale:weapon.visualScale,mountId,pierce:weapon.pierce??0,splashRadius:weapon.splashRadius,splashMin:weapon.splashMin,splashDamage:weapon.splashDamage};
         this.projectiles.push(projectile);return projectile;
     }
-    mountedGunAnchor(player, spec, index, orientation, position, out) {
+    mountedGunAnchor(player, index, orientation, position, out) {
         const anchors=SHIP_MOUNT_ANCHORS[player.shipId];
-        const local=anchors?.guns?.[index] ?? anchors?.launchers?.[index-spec.stockGunCount] ?? DEFAULT_GUN_ANCHOR;
+        const local=anchors?.guns?.[index] ?? DEFAULT_GUN_ANCHOR;
         return out.fromArray(local).applyQuaternion(orientation).add(position);
     }
     readyMountedGun(fit, mount, index, group, firedA, firedB) {
@@ -4940,7 +4945,7 @@ export class GameSession {
             const alternating=group==='A'?alternatingA:alternatingB;
             const groupKey=group, ammoId=weapon.ammoId;
             if (!spendEnergy(player, (weapon.energyCost ?? 0) * disruption)) {this.gunFairNext=index;break;}
-            const anchorWorld=this.mountedGunAnchor(player,spec,index,orientation,position,this.tmpPlayerGunMuzzle??=new THREE.Vector3());
+            const anchorWorld=this.mountedGunAnchor(player,index,orientation,position,this.tmpPlayerGunMuzzle??=new THREE.Vector3());
             const direction = this.weaponAimDirection(position, velocity, weapon, target, baseDirection, this.tmpP6, anchorWorld);
             const anchorX = anchorWorld.x;
             const anchorY = anchorWorld.y;
@@ -5139,7 +5144,6 @@ export class GameSession {
             this.setMonitorStatus(t(!loaded.length ? 'LAUNCHERS EMPTY' : loaded.every(entry=>distance>entry.launcher.lockRange) ? 'MISSILE TARGET OUT OF RANGE' : 'LAUNCHERS RELOADING'));
             return;
         }
-        const spec=HULL_HARDPOINTS[player.shipId];
         const salvo=this.projectileCounter+1;
         let actualFired=0;
         for (const selected of firing) {
@@ -5151,7 +5155,7 @@ export class GameSession {
             const right = this.tmpP5.copy(RIGHT).applyQuaternion(orientation).normalize();
             const velocity = player.velocity;
             const { index, mount, launcher } = selected;
-            const localAnchor = (SHIP_MOUNT_ANCHORS[player.shipId]?.guns?.[index]??SHIP_MOUNT_ANCHORS[player.shipId]?.launchers?.[index-spec.stockGunCount]) ?? [0, -0.6, -1.8];
+            const localAnchor = SHIP_MOUNT_ANCHORS[player.shipId]?.launchers?.[index] ?? [0, -0.6, -1.8];
             const anchorWorld = this.tmpP0.set(localAnchor[0], localAnchor[1], localAnchor[2]).applyQuaternion(orientation).add(position);
             const anchorX = anchorWorld.x;
             const anchorY = anchorWorld.y;
@@ -6024,7 +6028,7 @@ export class GameSession {
             this.save.world.combatWrecks??={};this.save.world.combatWrecks[id]=drop;
             const live=combatWreckNode(drop);this.wreckNodes.push(live);this.renderer.addCombatLootNode?.(live);
             node.remaining=Math.max(0,node.remaining-1);this.save.world.depletedWrecks[node.id]=node.remaining;
-            if(entry.tutorialRecorder){quest.flags.blackBoxDropId=id;this.applyTarget({kind:'wreck',id,position,name:t('BLACK BOX SIGNAL')});break;}
+            if(entry.tutorialRecorder){quest.flags.blackBoxDropId=id;if(this.tutorialMaySelectTarget())this.applyTarget({kind:'wreck',id,position,name:t('BLACK BOX SIGNAL')});break;}
         }
         this.extractionCarry.set(node.id,Math.min(accumulated,threshold-.001));
         if(released){
@@ -6373,7 +6377,7 @@ export class GameSession {
             return;
         // A dark contact can only be resolved inside the dark-detection line,
         // so the auto-scan never reads a ship the sensors can't see.
-        if (target.kind === 'ship' && !this.playerSeesShip(entity, 1))
+        if (target.kind === 'ship' && !this.playerSeesShip(entity))
             return;
         const stats = this.playerStats();
         if (this.surfaceDistance(vec(this.save.player.position), target) <= stats.scanRange)
@@ -6412,7 +6416,7 @@ export class GameSession {
             const locked = this.ships.find((entry) => entry.id === target.id);
             // A dark contact can only be resolved inside the dark-detection
             // line; a rock between pilot and target blocks the scan entirely.
-            if (!locked || !this.playerSeesShip(locked, 1)) {
+            if (!locked || !this.playerSeesShip(locked)) {
                 this.setMonitorStatus(t('CONTACT LOST · SIGNAL BLOCKED'));
                 return;
             }
@@ -6550,11 +6554,9 @@ export class GameSession {
         this.handleTutorialEvent('flight-lesson',{id:'target-monitor'});
     }
     targetNearestHostile() {
-        // The nearest-hostile lock rides the wider threat multiplier for live
-        // identity broadcasts. Dark contacts require a stable physical track,
-        // so target selection cannot leak hidden ships.
+        // Nearest-hostile selection uses the same track as cycling and reacquisition.
         const nearest = this.ships
-            .filter((entry) => entry.hostile && entry.hull > 0 && this.playerSeesShip(entry, THREAT_NEAREST_MULT))
+            .filter((entry) => entry.hostile && entry.hull > 0 && this.canTargetShip(entry))
             .sort((a, b) => vec(a.position).distanceToSquared(vec(this.save.player.position)) - vec(b.position).distanceToSquared(vec(this.save.player.position)))[0];
         if (!nearest) {
             this.setMonitorStatus(t('NO HOSTILE IN SENSOR RANGE'));
@@ -6572,7 +6574,7 @@ export class GameSession {
             return;
         const player = vec(this.save.player.position);
         const nearest = this.ships
-            .filter((entry) => entry.hostile && entry.hull > 0 && this.playerSeesShip(entry, THREAT_TARGET_MULT))
+            .filter((entry) => entry.hostile && entry.hull > 0 && this.canTargetShip(entry))
             .sort((a, b) => player.distanceToSquared(vec(a.position)) - player.distanceToSquared(vec(b.position)))[0];
         if (!nearest || nearest.id === this.save.player.currentTargetId)
             return;
@@ -6597,7 +6599,7 @@ export class GameSession {
         // threat-aware early warning, while dark ships need a stable signature
         // track. A current lock remains in the cycle during its short cover
         // grace so it is not silently replaced mid-fight.
-        const shipSeen = (entry) => this.playerSeesShip(entry, THREAT_TARGET_MULT) || entry.id === this.save.player.currentTargetId;
+        const shipSeen = (entry) => this.canTargetShip(entry);
         // Tier 1 — opponents: hostile ships the pilot can resolve, closest first.
         const opponents = this.ships
             .filter((entry) => entry.hostile && entry.hull > 0 && shipSeen(entry))
@@ -6751,7 +6753,8 @@ export class GameSession {
         return true;
     }
     selectTarget(kind, id, source) {
-        this.capitalSubtarget=undefined;
+        if (source === 'automatic' && this.lostTargetId) return;
+        if (source === 'tutorial' && !this.tutorialMaySelectTarget()) return;
         let target;
         const tutorialTarget = this.tutorialFieldTarget();
         if (tutorialTarget?.kind === kind && tutorialTarget.id === id) {
@@ -6788,7 +6791,7 @@ export class GameSession {
         }
         else if (kind === 'ship') {
             const ship = this.ships.find((entry) => entry.id === id && !entry.claimed && !entry.captured && entry.hull > 0);
-            if (ship && this.playerSeesShip(ship, 1)) {
+            if (ship && this.canTargetShip(ship)) {
                 this.save.player.mode = 'combat';
                 target = { kind, id, position: ship.position, name: ship.name };
             }
@@ -6847,6 +6850,8 @@ export class GameSession {
         // autoScanTarget, so selection needs no manual scan gate here.
     }
     applyTarget(target) {
+        this.capitalSubtarget = undefined;
+        this.lostTargetId = undefined;
         // Map/world selection or an automatic lock starts a new cycle gesture.
         this.targetCycle = undefined;
         if(this.autopilot&&this.hyperdriveWaypoint&&target.id!==this.hyperdriveWaypoint.id)this.disengageHyperdrive();
@@ -6871,6 +6876,9 @@ export class GameSession {
         this.audio.play('targetCycle');
     }
     clearTarget() {
+        this.lostTargetId = undefined;
+        this.rackLocks?.clear();
+        this.rackProgress = 0;
         this.targetCycle = undefined;
         if(this.autopilot&&this.hyperdriveWaypoint)this.disengageHyperdrive();
         this.save.player.currentTargetId = undefined;
@@ -6881,8 +6889,19 @@ export class GameSession {
     // one-frame pebble flicker the target on and off.
     maintainTargetLock() {
         const id = this.save.player.currentTargetId;
-        if (!id)
+        if (!id) {
+            if (!this.lostTargetId) return;
+            const ship = this.ships.find(entry => entry.id === this.lostTargetId);
+            if (!ship || ship.hull <= 0 || ship.captured || ship.claimed || ship.surrendered || ship.poweredDown
+                || (this.lostTargetWasHostile && !ship.hostile) || ship.stationDock?.phase === 'docked') {
+                this.lostTargetId = undefined;
+            } else if (this.save.world.time >= (this.targetReacquireAfter ?? 0) && this.canTargetShip(ship)) {
+                this.targetReacquireAfter = this.save.world.time + TARGET_REACQUIRE_INTERVAL;
+                this.applyTarget({kind:'ship', id:ship.id, position:ship.position, name:ship.name});
+            }
             return;
+        }
+        this.lostTargetId = undefined;
         // Known mission coordinates survive beyond the sensor horizon, as race
         // gathering markers do. Scanning and extraction still require range.
         if (id === this.tutorialFieldTarget()?.id || id === this.explorationWaypoint()?.id || id === this.distressWaypoint()?.id) return;
@@ -6892,7 +6911,7 @@ export class GameSession {
         if (ship) {
             const shipPosition = vec(ship.position, this.tmpRadarPos);
             const distance = player.distanceTo(shipPosition);
-            if (distance > this.lockTrackedRange(ship)) {
+            if (ship.jumpPursuit || distance > this.lockTrackedRange(ship)) {
                 this.dropTargetLock(ship);
                 return;
             }
@@ -6930,6 +6949,8 @@ export class GameSession {
     }
     dropTargetLock(ship) {
         this.clearTarget();
+        this.lostTargetId = ship.id;
+        this.lostTargetWasHostile = ship.hostile;
         this.setMonitorStatus(t('CONTACT LOST · LOCK BROKEN'));
     }
     cycleCapitalSubtarget() {
@@ -7043,6 +7064,7 @@ export class GameSession {
         if (!route || !jumpPoint.destinationSystemId || !LOCATIONS[jumpPoint.destinationLocationId])
             return false;
         if (!this.requestDroneDeparture('cross-gate', jumpPoint.id)) return false;
+        this.lostTargetId = undefined;
         const jump = {
             routeId: route.id,
             fromSystemId: this.save.player.systemId,
@@ -7136,6 +7158,7 @@ export class GameSession {
         return this.beginGalaxyGateTransition(jumpPoint);
     }
     clearTransientSpace() {
+        this.lostTargetId = undefined;
         this.rackLocks?.clear();
         this.rackProgress=0;
         this.shakeStrength=0;
@@ -7368,6 +7391,7 @@ export class GameSession {
         const nav = this.hyperdriveDestination();
         if (!this.requestDroneDeparture('hyperdrive')) return;
         this.hyperdriveReturnThrottle = this.save.player.throttle;
+        this.lostTargetId = undefined;
         const pitch=actions.pitch??0,yaw=actions.yaw??0,roll=actions.roll??0;
         this.hyperdriveEntrySteering=Math.max(Math.abs(pitch),Math.abs(yaw),Math.abs(roll))>0.35?{pitch,yaw,roll}:undefined;
         this.hyperdriveWaypoint=nav.kind==='waypoint'?nav:undefined;
@@ -10099,8 +10123,12 @@ export class GameSession {
         if(friendlyFiringLaneBlocked(this,ship,start,forward,distance) || friendlyFiringLaneBlocked(this,ship,start,dir,distance))return;
         if(!spendEnergy(ship,(launcher.energyCost??0)*disruptionFactor(ship,time)))return;
         const count=launcher.volley??1,salvo=this.projectileCounter+1;
-        const muzzle=aim.muzzle.copy(start).addScaledVector(forward,this.npcHullExtents(ship)[2]);
-        const right=aim.right.copy(RIGHT).applyQuaternion(aim.rotation.fromArray(ship.rotation));
+        aim.rotation.fromArray(ship.rotation);
+        const anchor=SHIP_MOUNT_ANCHORS[fit.hullId]?.launchers?.[fit.activeRack?.index];
+        const muzzle=anchor
+            ? aim.muzzle.fromArray(anchor).multiplyScalar(npcShipScaleForVariant(npcFlightVariant(ship))).applyQuaternion(aim.rotation).add(start)
+            : aim.muzzle.copy(start).addScaledVector(forward,this.npcHullExtents(ship)[2]);
+        const right=aim.right.copy(RIGHT).applyQuaternion(aim.rotation);
         const up=aim.up.copy(UP).applyQuaternion(aim.rotation);
         for(let i=0;i<count;i++){
             const slot=this.projStore.alloc(),shot=aim.shot.copy(forward);
@@ -10131,7 +10159,7 @@ export class GameSession {
             const fit=ship.combatFit, index=opportunity?.index??ship.combatWeaponIndex;
             const weapon=weaponForOutfit(fit.guns?.[fit.gunIndices?.[index]??index]);
             if (!weapon || this.save.world.time < fit.fireAt[index] || this.save.world.time<(ship.gunBurstPauseUntil??0)) return;
-            const anchor=(SHIP_MOUNT_ANCHORS[fit.hullId]?.guns[fit.gunIndices?.[index]??index]??SHIP_MOUNT_ANCHORS[fit.hullId]?.launchers?.[(fit.gunIndices?.[index]??index)-HULL_HARDPOINTS[fit.hullId].stockGunCount])??[0,0,-2.5];
+            const anchor=SHIP_MOUNT_ANCHORS[fit.hullId]?.guns[fit.gunIndices?.[index]??index]??[0,0,-2.5];
             const start=new THREE.Vector3().fromArray(anchor).multiplyScalar(npcShipScaleForVariant(npcFlightVariant(ship))).applyQuaternion(new THREE.Quaternion().fromArray(ship.rotation)).add(vec(ship.position));
             const target=opportunity?.target??(ship.patrolMemoryActive?undefined:ship.targetId==='player'?this.save.player:this.ships.find(s=>s.id===ship.targetId&&s.hull>0));
             const aiming=weapon.kind==='beam'&&target?new THREE.Vector3().fromArray(target.position).sub(start).normalize():direction;
@@ -10698,6 +10726,7 @@ export class GameSession {
     // follows the temperament weights, and cargo/credit dumps spawn pickups.
     surrenderShip(ship, options = {}) {
         if(this.arena)return;
+        if (this.lostTargetId === ship.id) this.lostTargetId = undefined;
         ship.surrendered = true;
         ship.hostile = false;
         ship.fleeing = false;
@@ -11111,6 +11140,7 @@ export class GameSession {
         this.audio?.play?.('kill', .8);
         const lootWreck=this.addCareerWreck(ship,true);
         ship.cargo={};
+        if (this.lostTargetId === ship.id) this.lostTargetId = undefined;
         ship.claimed = true;
         ship.captured = true;
         ship.hostile = false;
@@ -11244,6 +11274,7 @@ export class GameSession {
             tutorialEncounter: ship.tutorialEncounter, tutorialIndex: ship.tutorialIndex,
             attackerId, wreckId: lootWreck?.id,
         });
+        if (this.lostTargetId === ship.id) this.lostTargetId = undefined;
         if (this.save.player.currentTargetId === ship.id)
             this.save.player.currentTargetId = undefined;
     }
@@ -11357,6 +11388,7 @@ export class GameSession {
             this.save.player.fuel = stats.fuel;
             fillLauncherMagazines(this.save.player);
             this.save.player.currentTargetId = undefined;
+            this.lostTargetId = undefined;
             this.save.player.dockedAt = location.id;
             this.save.player.systemId = location.systemId;
             this.renderer.setSystem?.(location.systemId);
@@ -11395,6 +11427,7 @@ export class GameSession {
         this.save.player.fuel = stats.fuel * 0.35;
         clearLauncherMagazines(this.save.player);
         this.save.player.dockedAt = dock;
+        this.lostTargetId = undefined;
         this.save.player.systemId = location.systemId;
         this.renderer.setSystem?.(location.systemId);
         this.renderer.setCockpitVisible(false);
@@ -12293,7 +12326,7 @@ export class GameSession {
     // dark pirate can't pin a dark pilot in place — they only stop you when
     // you can see them.
     hostilesVisibleNear(position, radius) {
-        return this.ships.some((ship) => ship.hostile && ship.hull > 0 && position.distanceTo(vec(ship.position)) < radius && this.playerSeesShip(ship, 1));
+        return this.ships.some((ship) => ship.hostile && ship.hull > 0 && position.distanceTo(vec(ship.position)) < radius && this.playerSeesShip(ship));
     }
     // Identity and emissions are deliberately separate. A beam, hot drive, or
     // gun burst can reveal where a dark ship is without telling the observer
@@ -12435,21 +12468,23 @@ export class GameSession {
     playerTracksShip(ship) {
         return Boolean(this.arena || ship.id === this.save.player.currentTargetId || (ship.playerSensorAwareness ?? 0) >= SENSOR_TRACK_THRESHOLD);
     }
-    // The player's sensor resolves a ship once its staged awareness reaches a
-    // firing-quality track. Threat multipliers still extend lit early warning;
-    // dark signatures cannot be multiplied into magical long-range contacts.
-    playerSeesShip(ship, threatMult = 1) {
+    // A pilot can cycle or reacquire a ship throughout the same horizon that holds a lock.
+    canTargetShip(ship) {
+        return this.playerSeesShip(ship, this.lockTrackedRange(ship));
+    }
+    playerSeesShip(ship, range) {
         if(ship.jumpPursuit)return false;
         const player = vec(this.save.player.position, this.tmpRadarPlayer);
         const locked = ship.id === this.save.player.currentTargetId;
         const shipPos = this.tmpRadarPos.set(ship.position[0], ship.position[1], ship.position[2]);
         const distance = player.distanceTo(shipPos);
-        const range = locked ? this.lockTrackedRange(ship) : this.playerStats().radarRange * (ship.dark ? 1 : threatMult);
+        if (locked) range = this.lockTrackedRange(ship);
+        else range ??= Math.min(this.playerStats().radarRange, this.lockTrackedRange(ship));
         if (distance > range)
             return false;
         if (locked)
             return this.save.world.time < (ship.playerLockOccludedUntil ?? Infinity);
-        return this.playerTracksShip(ship) && !this.lineBlocked(player, shipPos);
+        return this.playerTracksShip(ship) && !this.lineBlocked(player, shipPos, ship.id);
     }
     clearStationLandingGuidance() {
         if (this.stationLandingBeaconId || this.stationLandingClearanceId || this.stationLandingGuideId)
@@ -12957,7 +12992,7 @@ export class GameSession {
                     if (!clear) continue;
                     position.fromArray(node.position).addScaledVector(direction, distance);
                     setFlag(this.save, getTutorialQuest(this.save).id, 'blackBoxTargetId', node.id);
-                    this.selectTarget('wreck', node.id);
+                    this.selectTarget('wreck', node.id, 'tutorial');
                     return true;
                 }
             }
@@ -13695,6 +13730,7 @@ export class GameSession {
         this.afterburning = false;
         this.save.player.systemId = LOCATIONS[locationId].systemId;
         this.save.player.dockedAt = locationId;
+        this.lostTargetId = undefined;
         this.save.player.lastDockedAt = locationId;
         this.save.player.velocity = [0, 0, 0];
         this.save.player.angularVelocity = [0, 0, 0];
@@ -13830,6 +13866,7 @@ export class GameSession {
             }
             this.save.player.dockedAt = undefined;
             this.clearStationLandingGuidance();
+            this.lostTargetId = undefined;
             this.flightDialogueAfter = this.save.world.time + 3;
             this.tutorialAmbientAfter = this.save.world.time + 12;
             // The syndicate receipt and any unpaid pending berth fee cover only the
@@ -14862,7 +14899,7 @@ export class GameSession {
             const pellets=gun.pellets??1, firstShot=counter;
             if(gun.kind!=='beam')counter+=pellets;
             if(gun.kind==='beam'||gun.speed!==speed)continue;
-            const muzzle=this.mountedGunAnchor(p,spec,i,orientation,position,this.tmpP5);
+            const muzzle=this.mountedGunAnchor(p,i,orientation,position,this.tmpP5);
             const aim=this.weaponAimDirection(position,p.velocity,gun,aimTarget,nose,this.tmpP6,muzzle,ship);
             const scatter=gun.kind==='ripper'||gun.kind==='pdc';
             const rng=scatter?this.mountedScatterRandom(firstShot,mount.id):null;

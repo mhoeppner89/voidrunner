@@ -99,3 +99,107 @@ test('cycling through a remote mission goal preserves route planning and the rap
     f.advance(2000); assert.equal(f.pick(), remote.id);
     assert.equal(f.s.save.player.navTargetId, remote.id);
 });
+
+for (const override of [false, true]) test(`a ship returning from cover ${override ? 'leaves a manual selection alone' : 'is reselected with a fresh missile lock'}`, t => {
+    const {s} = fixture(t);
+    delete s.playerSeesShip;
+    s.tmpRadarPlayer = s.tmpA;
+    s.tmpRadarPos = s.tmpB;
+    const cues = [];
+    s.audio.play = cue => cues.push(cue);
+    s.selectTarget('ship', 'a');
+    s.rackLocks = new Map([['rack', {progress:1}]]);
+    s.rackProgress = 1;
+    s.obstacles.push({id:'rock', x:50, y:0, z:0, losRadius:10});
+    s.maintainTargetLock();
+    s.save.world.time += 10;
+    s.maintainTargetLock();
+    assert.equal(s.save.player.currentTargetId, undefined);
+    s.maintainTargetLock();
+    assert.equal(s.save.player.currentTargetId, undefined);
+    s.ships[1].position = [0,200,0];
+    s.selectTarget('ship', 'b', 'automatic');
+    assert.equal(s.save.player.currentTargetId, undefined, 'a scripted contact leaves the remembered ship alone');
+    if (override) {
+        s.selectTarget('ship', 'b');
+    }
+    s.obstacles.length = 0;
+    s.maintainTargetLock();
+    assert.equal(s.save.player.currentTargetId, override ? 'b' : 'a');
+    assert.deepEqual(cues, ['targetCycle','targetCycle']);
+    assert.equal(s.rackLocks.size, 0);
+    assert.equal(s.rackProgress, 0);
+});
+
+for (const cancel of ['none','clear','destroy','despawn','capture','dock']) test(`career sensor return after ${cancel}`, t=>{
+    const {s}=fixture(t);
+    delete s.playerSeesShip;s.arena=undefined;s.tmpRadarPlayer=s.tmpA;s.tmpRadarPos=s.tmpB;
+    const ship=s.ships[0];ship.playerSensorAwareness=1;
+    s.selectTarget('ship',ship.id);ship.position=[100000,0,0];s.maintainTargetLock();
+    assert.equal(s.save.player.currentTargetId,undefined);
+    if(cancel==='clear')s.clearTarget();
+    if(cancel==='destroy')ship.hull=0;
+    if(cancel==='despawn')s.ships=[];
+    if(cancel==='capture')ship.captured=true;
+    if(cancel==='dock')ship.stationDock={phase:'docked'};
+    s.maintainTargetLock();
+    s.ships=[ship];Object.assign(ship,{position:[100,0,0],hull:100,captured:false,stationDock:undefined});
+    s.maintainTargetLock();assert.equal(s.save.player.currentTargetId,cancel==='none'?ship.id:undefined);
+});
+
+function trackingFixture(t) {
+    const {s} = fixture(t);
+    delete s.playerSeesShip;
+    s.tmpRadarPlayer = s.tmpA;
+    s.tmpRadarPos = s.tmpB;
+    s.ships.length = 1;
+    return {s, ship:s.ships[0], step(seconds = 1/60) {
+        s.save.world.time += seconds;
+        s.maintainTargetLock();
+    }};
+}
+
+test('a dark pirate beyond the lock horizon cannot chatter or be cycled back in', t => {
+    const {s, ship, step} = trackingFixture(t);
+    const cues = [];
+    s.audio.play = cue => cues.push(cue);
+    ship.dark = true;
+    s.selectTarget('ship', ship.id);
+    ship.position[0] = 1010;
+    for (let i = 0; i < 12; i++) step();
+    assert.deepEqual(cues, ['targetCycle']);
+    assert.ok(!s.targetCandidates().some(candidate => candidate.id === ship.id));
+    ship.position[0] = 990;
+    step(1);
+    assert.equal(s.save.player.currentTargetId, ship.id);
+    for (let i = 0; i < 12; i++) { ship.position[0] = i % 2 ? 990 : 1010; step(); }
+    assert.deepEqual(cues, ['targetCycle','targetCycle']);
+});
+
+test('a visible 2250 km hostile can be reacquired wherever cycling would keep it locked', t => {
+    const {s,ship,step} = trackingFixture(t);
+    ship.position[0] = 2250;
+    s.cycleTarget();
+    assert.equal(s.save.player.currentTargetId,ship.id);
+    s.obstacles.push({id:'rock',x:750,y:0,z:0,losRadius:20});
+    step();step(10);
+    assert.equal(s.save.player.currentTargetId,undefined);
+    s.obstacles.length=0;
+    assert.ok(s.targetCandidates().some(candidate=>candidate.id===ship.id));
+    step(1);step();
+    assert.equal(s.save.player.currentTargetId,ship.id);
+});
+
+for (const change of ['surrender','neutral','power-down']) test('losing contact across a change of allegiance or prize state: '+change, t => {
+    const {s,ship,step}=trackingFixture(t);
+    s.selectTarget('ship',ship.id);
+    ship.position[0]=100000;step();
+    if(change==='surrender')ship.surrendered=true;
+    if(change==='neutral')ship.hostile=false;
+    if(change==='power-down')ship.poweredDown=true;
+    step();
+    Object.assign(ship,{hostile:true,surrendered:false,poweredDown:false});ship.position[0]=100;
+    step(1);
+    assert.equal(s.save.player.currentTargetId,undefined);
+    assert.equal(s.lostTargetId,undefined);
+});

@@ -35,8 +35,14 @@ test('shipping Vanguard is the exact approved clean hull with packed paint',asyn
 test('player and NPC collision calibration and all firing/nozzle anchors match the approved geometry',()=>{
  extent.forEach((v,i)=>assert.ok(Math.abs(v-runtime.recommendedCollisionHalfExtentsPlayer[i])<1e-8));
  const npc=GameSession.prototype.npcHullExtents.call({}, {variant:'warden'});npc.forEach((v,i)=>assert.ok(Math.abs(v-extent[i]*npcShipScaleForVariant('warden'))<1e-8));
- for(const [key,rows]of [['guns',runtime.guns],['launchers',runtime.launchers],['drive',runtime.engines]])assert.deepEqual(SHIP_MOUNT_ANCHORS.vanguard[key],rows.map(m=>m.runtimePlayer[key==='drive'?'center':'position']));
- for(const m of [...runtime.guns,...runtime.launchers]){assert.equal(ray(m.runtimePlayer.position,[0,0,-1]).length,0);assert.ok(ray(m.runtimePlayer.position,[0,0,1],1).length);}
+ for(const [key,rows]of [['guns',runtime.guns],['launchers',runtime.launchers],['drive',runtime.engines]]){
+  const positions=rows.map(m=>m.runtimePlayer[key==='drive'?'center':'position']);
+  if(key==='guns')positions.push([0,.9,-1.487]); // New centreline gun on the pressure hull.
+  assert.deepEqual(SHIP_MOUNT_ANCHORS.vanguard[key],positions);
+ }
+ for(const position of [...SHIP_MOUNT_ANCHORS.vanguard.guns,...SHIP_MOUNT_ANCHORS.vanguard.launchers]){
+  assert.equal(ray(position,[0,0,-1]).length,0);assert.ok(ray(position,[0,0,1],1).length);
+ }
  assert.equal(cfg.enginePorts.length,runtime.engines.length);
  for(const m of runtime.engines){assert.equal(ray(m.runtimePlayer.center,[0,0,1]).length,0);assert.ok(ray(m.runtimePlayer.center,[0,0,-1],1).length);}
 });

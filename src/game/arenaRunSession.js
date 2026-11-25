@@ -62,7 +62,7 @@ export const ArenaRunMethods={
  },
  setupRun(){
   const r=this.save.arenaRun;
-  if(r.phase==='combat'){if(r.checkpoint){this.save.player=clone(r.checkpoint);normalizeEquipmentInventory(this.save.player,{disabled:true});delete this.save.player.prevPosition;delete this.save.player.prevRotation;}Object.assign(r,r.checkpointStats??{});this._statsDirty=true;r.phase='prepare';r.rewardChosen=true;r.hullChosen=true;
+  if(r.phase==='combat'){if(r.checkpoint){this.save.player=clone(r.checkpoint);if(r.checkpointStoredRounds)r.storedRounds=clone(r.checkpointStoredRounds);delete r.checkpointStoredRounds;normalizeEquipmentInventory(this.save.player,{disabled:true});delete this.save.player.prevPosition;delete this.save.player.prevRotation;}Object.assign(r,r.checkpointStats??{});this._statsDirty=true;r.phase='prepare';r.rewardChosen=true;r.hullChosen=true;
    // Wingman losses belong to the interrupted attempt: a resumed wave restores
    // the crew that started it, exactly like the player checkpoint above.
    if(Array.isArray(r.checkpointWingmen))r.wingmen=clone(r.checkpointWingmen);delete r.checkpointWingmen;}
@@ -106,7 +106,7 @@ export const ArenaRunMethods={
   this.spawnRunWingmen();
   this.gunCooldown=0;this.mountFireAt={};this.groupFireAt=undefined;this.groupFireHull=undefined;this.missileCooldown=0;this.ui.runFitNotice='';
   this.save.player.mode='combat';this.save.player.currentTargetId=undefined;
-  r.phase='combat';r.checkpoint=clone(this.save.player);delete r.checkpoint.turretRuntime;delete r.checkpoint.prevPosition;delete r.checkpoint.prevRotation;
+  r.phase='combat';r.checkpointStoredRounds=clone(r.storedRounds??{});r.checkpoint=clone(this.save.player);delete r.checkpoint.turretRuntime;delete r.checkpoint.prevPosition;delete r.checkpoint.prevRotation;
   r.checkpointStats={elapsed:r.elapsed,damage:r.damage,missiles:r.missiles};
   r.checkpointWingmen=clone(r.wingmen??[]);
   r.countdown=3;r.startedAt=this.save.world.time;r.entry=null;r.nextEnemy=0;r.warned=-1;r.waveMissiles=this.save.player.missiles??0;delete r.clearAt;
@@ -318,7 +318,7 @@ export const ArenaRunMethods={
    equipFrigate(ship,true);ship.hostile=true;ship.targetId='player';ship.arenaRunEnemy=true;ship.noSurrender=true;ship.faction='pirates';
    delete ship.task;delete ship.capitalHome;ship.holdFire=false;ship.playerAwareness=1;
    ship.rotation=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),origin.clone().sub(point).normalize()).toArray();
-   this.selectTarget('ship',ship.id);this.ui.pushEvent(t('Frigate entering. Lure it into the rocks, then torpedo its rear engines. Select systems on the target monitor.'),'warning',6000);return true;
+   this.selectTarget('ship',ship.id,'automatic');this.ui.pushEvent(t('Frigate entering. Lure it into the rocks, then torpedo its rear engines. Select systems on the target monitor.'),'warning',6000);return true;
   }
   const ship=this.spawnShip(role,point.toArray(),undefined,undefined,{tier:r.hard?(tier==='novice'?'veteran':tier==='veteran'?'ace':tier):tier},{faction,hullId});
   ship.faction=faction;
@@ -328,15 +328,10 @@ export const ArenaRunMethods={
   ship.arenaEntryIntelUntil=this.save.world.time+6;
   // The opponent flies its hull's real stock fit unless the wave overrides a
   // mount, so an Arena Run Concord Blade is the same Blade the career spawns.
-  ship.combatFit=createEnemyLoadout(ship,index,runEnemyFit(spec));
-  ship.combatFit.missiles=spec.missiles??0;
-  // The per-rack firing path must respect the announced wave stock too.
-  // Leaving factory-full racks here silently restored ammunition on update.
-  let rounds=ship.combatFit.missiles;
-  for(const rack of ship.combatFit.racks??[]){rack.missiles=Math.min(rounds,rack.missiles);rounds-=rack.missiles;}
+  ship.combatFit=createEnemyLoadout(ship,index,{...runEnemyFit(spec),missiles:spec.missiles??0});
   ship.energy=ship.combatFit.stats.energyCapacity;
   ship.rotation=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),origin.clone().sub(point).normalize()).toArray();
-  if(!this.ships.some(s=>s.id===this.save.player.currentTargetId&&s.hull>0))this.selectTarget('ship',ship.id);
+  if(!this.ships.some(s=>s.id===this.save.player.currentTargetId&&s.hull>0))this.selectTarget('ship',ship.id,'automatic');
   const arrival=call?t(call):t('Opponent entering ahead.');
   this.ui.pushEvent(ship.combatFit.missiles>0?`${arrival} ${t('Missile carrier: {count} missiles.',{count:ship.combatFit.missiles})}`:arrival,'warning',5000);return true;
  },
@@ -381,8 +376,8 @@ export const ArenaRunMethods={
    this.clearTransientSpace();this.save.player.velocity=[0,0,0];
    if(r.cleared===RUN_WAVES.length){r.phase='won';recordArenaRun(this.save);}
    else{recoverRun(this.save);r.wave++;if(r.wave===RUN_WAVES.length-1){const p=this.save.player;p.hull=getEffectiveShipStats(p).hull;recoverRun(this.save,true);}r.phase='prepare';r.rewardChosen=false;r.selectedReward=null;this.ui.runFitOpen=false;r.hullChosen=!DECISION_WAVES.includes(r.wave);r.hullOffers=r.hullChosen?[]:runHullOffers(this.save);r.wingmanOffers=r.hullChosen?[]:runWingmanOffers(this.save);r.offers=r.hullChosen?runOffers(this.save):[];}
-   delete r.checkpoint;delete r.checkpointWingmen;writeArenaRun(this.save);this.showRunPreparation();
+   delete r.checkpoint;delete r.checkpointStoredRounds;delete r.checkpointWingmen;writeArenaRun(this.save);this.showRunPreparation();
   }
  },
- loseArenaRun(){const r=this.save.arenaRun;if(!r||r.phase!=='combat')return;r.phase='lost';r.missiles+=Math.max(0,r.waveMissiles-(this.save.player.missiles??0));delete r.checkpoint;delete r.checkpointWingmen;this.deathTimer=0;this.clearTransientSpace();this.ui.setRunInbound?.(null);recordArenaRun(this.save);writeArenaRun(this.save);this.showRunPreparation();},
+ loseArenaRun(){const r=this.save.arenaRun;if(!r||r.phase!=='combat')return;r.phase='lost';r.missiles+=Math.max(0,r.waveMissiles-(this.save.player.missiles??0));delete r.checkpoint;delete r.checkpointStoredRounds;delete r.checkpointWingmen;this.deathTimer=0;this.clearTransientSpace();this.ui.setRunInbound?.(null);recordArenaRun(this.save);writeArenaRun(this.save);this.showRunPreparation();},
 };

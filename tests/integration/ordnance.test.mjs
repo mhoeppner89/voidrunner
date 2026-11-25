@@ -53,7 +53,7 @@ test('anti-shield racks fire their typed volleys and persist separate one-canist
 test('automatic ship locks enter combat mode and stale tool modes still fire at a locked ship',()=>{
  for(const mode of ['mining','salvage']){
   const s=session(),p=s.save.player;p.shipId='wayfarer';p.ownedShips=['wayfarer'];
-  const fit=loadoutFor(p);fit.launchers[2]='seeker-launcher';p.outfitting.loadouts.wayfarer=fit;
+  const fit=loadoutFor(p);fit.launchers[0]='seeker-launcher';p.outfitting.loadouts.wayfarer=fit;
   fillLauncherMagazines(p);const before=launcherMagazineEntries(p)[0].rounds;
   const enemy=s.spawnShip('pirate',[0,0,-100]);s.renderer.setTarget=()=>{};
   s.getTargetRef=()=>({kind:'ship',id:enemy.id,position:enemy.position});

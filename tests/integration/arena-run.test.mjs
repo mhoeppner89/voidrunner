@@ -7,7 +7,7 @@ import {MAX_RUN_WINGMEN,ARENA_HULL_OFFER_COUNT,PLAYER_FLYABLE_HULLS,HULL_FACTION
 import {LOCATIONS,SHIPS} from '../../src/game/data.js';
 import {loadoutFor,createOutfittingState,validateLoadout,HULL_HARDPOINTS,LOADOUT_KEYS,OUTFIT_ITEMS,itemFitsMount} from '../../src/game/outfitting.js';
 import {getEffectiveShipStats} from '../../src/game/shipStats.js';
-import {launcherMagazineEntries} from '../../src/game/weapons.js';
+import {fillLauncherMagazines,launcherMagazineEntries} from '../../src/game/weapons.js';
 import {GameUI} from '../../src/game/ui.js';
 import {equipmentBaseId} from '../../src/game/equipmentCatalog.js';
 import {setLanguage} from '../../src/game/i18n.js';
@@ -42,7 +42,7 @@ function closeOpeningWithWeapon(save){
  const r=save.arenaRun;r.openingPicks=2;r.hullChosen=true;r.rewardChosen=true;r.decisions[0]=true;
  if(!loadoutFor(save.player).guns.some(Boolean)){
   save.player.outfitting.locker['pulse-cannon']=1;
-  assert.equal(fitRunItem(save,'weapons',0,'pulse-cannon'),true,'the post-opening fixture has its first fitted weapon');
+  assert.equal(fitRunItem(save,'guns',0,'pulse-cannon'),true,'the post-opening fixture has its first fitted weapon');
  }
  return save;
 }
@@ -303,8 +303,8 @@ test('wing orders are range-gated against the pilot: aggressive, defensive, brea
 
 test('baseline service restores limited hull and one missile; loss remains lost on reload',()=>{
  storage();const s=runSession(),p=s.save.player,stats=getEffectiveShipStats(p);p.outfitting.locker['seeker-launcher']=1;
- const freeWeapon=HULL_HARDPOINTS[p.shipId].weapons.findIndex((_,i)=>!loadoutFor(p).guns[i]&&!loadoutFor(p).launchers[i]);
- assert.equal(fitRunItem(s.save,'weapons',freeWeapon,'seeker-launcher'),true,'the service fixture has a real launcher magazine');p.hull=stats.hull*.3;
+ const freeWeapon=loadoutFor(p).launchers.indexOf(null);
+ assert.equal(fitRunItem(s.save,'launchers',freeWeapon,'seeker-launcher'),true,'the service fixture has a real launcher magazine');p.hull=stats.hull*.3;
  const magazine=launcherMagazineEntries(p)[0];p.launcherMagazines[magazine.mount.id].rounds=0;
  recoverRun(s.save);assert.ok(Math.abs(p.hull-stats.hull*.6)<1e-8);assert.equal(p.missiles,1);
  s.startRunWave();p.hull=0;s.recoverPlayer();assert.equal(s.save.arenaRun.phase,'lost');assert.equal(readArenaRun().arenaRun.phase,'lost');assert.equal(Boolean(arenaRecord().unlockedHard),false);
@@ -417,7 +417,7 @@ test('repair is offered at 80% or below, replaced above it, including saved offe
 
 test('actual undocked preparation fits earned thrusters and preserves inventory through swaps and reloads',()=>{
  storage();const s=runSession(),p=s.save.player;assert.equal(p.dockedAt,undefined);p.outfitting.locker['thrusters-mk2']=1;p.outfitting.locker['beam-emitter']=2;
- assert.equal(fitRunItem(s.save,'weapons',1,'beam-emitter'),true,'a second opening weapon keeps the disarm check meaningful');
+ assert.equal(fitRunItem(s.save,'guns',1,'beam-emitter'),true,'a second opening weapon keeps the disarm check meaningful');
  const before=getEffectiveShipStats(p);s.arenaRunAction('fit','thrusters-mk2','utility','0');assert.equal(loadoutFor(p).utility[0],'thrusters-mk2');assert.ok(getEffectiveShipStats(p).angularAcceleration>before.angularAcceleration);assert.equal(p.dockedAt,undefined);assert.equal(p.credits,0);
  assert.equal(loadoutFor(readArenaRun().player).utility[0],'thrusters-mk2');
  assert.equal(fitRunItem(s.save,'utility',1,'engine-mk2'),false,'unearned equipment is not available in another shared utility mount');
@@ -426,6 +426,17 @@ test('actual undocked preparation fits earned thrusters and preserves inventory 
  assert.equal(fitRunItem(s.save,'guns',0,''),true);assert.equal(fitRunItem(s.save,'guns',1,''),false,'at least one gun must remain');
  assert.equal(fitRunItem(s.save,'guns',0,'beam-emitter'),true);writeArenaRun(s.save);assert.equal(loadoutFor(readArenaRun().player).guns.filter(x=>x==='beam-emitter').length,2);
  s.startRunWave();assert.equal(fitRunItem(s.save,'utility',0,'thrusters-mk2'),false,'combat fitting remains blocked');
+});
+test('an Arena reinforcement preserves a lost contact for reacquisition',()=>{
+ storage();const s=runSession(),wave=RUN_WAVES[1],p=s.save.player;
+ s.save.arenaRun.entry=[0,0,-600];
+ assert.ok(s.spawnRunEnemy(wave.enemies[0],0));
+ const first=s.ships[0];s.renderer.setTarget=()=>{};s.dropTargetLock(first);
+ delete s.selectTarget;
+ s.save.arenaRun.entry=[30,0,-600];
+ assert.ok(s.spawnRunEnemy(wave.enemies[1],1));
+ assert.equal(p.currentTargetId,undefined);
+ assert.equal(s.lostTargetId,first.id);
 });
 test('each wave spawns exactly the finite ordnance its spec declares, and announces carriers',()=>{
  for(const hard of [false,true])for(let wave=0;wave<RUN_WAVES.length;wave++){
@@ -451,18 +462,20 @@ test('new runs enter a frozen countdown directly, preserving throttle at every w
  const saved=readArenaRun();const resumed=runSession();resumed.save=saved;resumed.setupRun();assert.equal(resumed.save.player.throttle,.83);
  resumed.startRunWave();assert.equal(resumed.save.player.throttle,.83);
 });
-test('weapon rewards fill empty shared bays first and preserve replaced equipment',()=>{
+test('weapon rewards fill empty gun slots first and preserve replaced equipment',()=>{
  for(const hull of ['wayfarer','lancer','talon']){
   storage();const save=newArenaRun(false,70);save.player.shipId=hull;save.player.ownedShips=[hull];
   save.player.outfitting=createOutfittingState([hull]);save.arenaRun.wave=1;save.arenaRun.hullChosen=true;save.arenaRun.rewardChosen=false;save.arenaRun.offers=['pulse-cannon'];
+  if(hull==='lancer')save.player.outfitting.loadouts[hull].guns[2]=null;
   const fit=loadoutFor(save.player),originalFit=JSON.parse(JSON.stringify(fit)),spec=HULL_HARDPOINTS[hull];
-  const free=spec.weapons.map((_,i)=>!fit.guns[i]&&!fit.launchers[i]?i:-1).filter(i=>i>=0),plan=runRewardPlan(save,'pulse-cannon');
+  const free=spec.guns.map((_,i)=>!fit.guns[i]?i:-1).filter(i=>i>=0),plan=runRewardPlan(save,'pulse-cannon');
   assert.ok(plan);assert.equal(plan.count,2);
   if(free.length){assert.ok(plan.changes.every(change=>free.includes(change.index)));assert.deepEqual(plan.replaced,[]);}
   else assert.ok(plan.replaced.length,'a full weapon rack may replace a fitted item');
   assert.equal(chooseRunReward(save,'pulse-cannon'),true);
   const after=loadoutFor(save.player),changed=new Set(plan.changes.map(change=>change.index));
-  for(let i=0;i<spec.weapons.length;i++)assert.equal(after.guns[i]??after.launchers[i],changed.has(i)?'pulse-cannon':originalFit.guns[i]??originalFit.launchers[i]);
+  assert.deepEqual(after.launchers,originalFit.launchers);
+  for(let i=0;i<spec.guns.length;i++)assert.equal(after.guns[i],changed.has(i)?'pulse-cannon':originalFit.guns[i]);
   assert.ok(validateLoadout(save.player,hull,after).ok);
   for(const id of plan.replaced)assert.ok(save.player.outfitting.locker[id]>=plan.replaced.filter(x=>x===id).length);
   const before=JSON.stringify(save.player.outfitting);assert.equal(chooseRunReward(save,'pulse-cannon'),false);assert.equal(JSON.stringify(save.player.outfitting),before);
@@ -502,14 +515,14 @@ test('frigate spawn search stays ahead even when early positions are obstructed'
 
 test('hull changes retain equipped guns and groups ahead of stored beams, including save reload',()=>{
  storage();const save=closeOpeningWithWeapon(newArenaRun(false,903)),p=save.player;
- p.outfitting.locker.ripper=1;assert.equal(fitRunItem(save,'weapons',1,'ripper'),true);
+ p.outfitting.locker.ripper=1;assert.equal(fitRunItem(save,'guns',1,'ripper'),true);
  const currentFit=p.outfitting.loadouts[p.shipId];
  currentFit.fireGroups.activeGroup='B';
  const mounts=HULL_HARDPOINTS[p.shipId].guns;currentFit.fireGroups.assignments[mounts[0].id]='A';currentFit.fireGroups.assignments[mounts[1].id]='B';
  p.outfitting.locker={'beam-emitter':4,...p.outfitting.locker};
  Object.assign(save.arenaRun,{wave:4,hullChosen:false,hullOffers:['lancer']});assert.equal(changeRunHull(save,'lancer'),true);
  assert.deepEqual(loadoutFor(p).guns.slice(0,2),['pulse-cannon','ripper']);
- assert.equal(loadoutFor(p).guns.filter(id=>id==='beam-emitter').length,2,'stored beams fill remaining compatible bays after the equipped pair');
+ assert.equal(loadoutFor(p).guns.filter(id=>id==='beam-emitter').length,1,'stored beams fill remaining compatible bays after the equipped pair');
  const after=loadoutFor(p);assert.equal(after.fireGroups.activeGroup,'B');assert.equal(after.fireGroups.assignments[HULL_HARDPOINTS.lancer.guns[1].id],'B');
  writeArenaRun(save);assert.deepEqual(loadoutFor(readArenaRun().player).guns,after.guns);
 });
@@ -540,8 +553,9 @@ test('arena opponents fly the fit their hull authors, and the run ends on the fr
  for(let wave=0;wave<RUN_WAVES.length;wave++)for(const [i,spec] of RUN_WAVES[wave].enemies.entries()){
   if(spec.role==='frigate')continue;
   const s=runSession(wave);assert.ok(s.spawnRunEnemy(spec,i),`wave ${wave} enemy ${i}`);const fit=s.ships.at(-1).combatFit;
-  const authoredGuns=runEnemyFit(spec).guns.filter(Boolean);
-  assert.deepEqual(fit.guns.filter(Boolean),authoredGuns,`wave ${wave} enemy ${i} retains the authored guns in shared weapon bays`);assert.ok(fit.attackOrder.every(index=>fit.weapons[index]));
+  const mounts=HULL_HARDPOINTS[spec.hullId],authoredGuns=runEnemyFit(spec).guns.filter(Boolean);
+  assert.equal(authoredGuns.length,mounts.guns.length);assert.equal(fit.racks.length,mounts.launchers.length);
+  assert.deepEqual(fit.guns.filter(Boolean),authoredGuns,`wave ${wave} enemy ${i} retains the authored guns in gun slots`);assert.ok(fit.attackOrder.every(index=>fit.weapons[index]));
  }
  const save=newArenaRun();save.player.shipId='lancer';save.player.ownedShips=['lancer'];save.player.outfitting=createOutfittingState(['lancer']);assert.equal(runRewardPlan(save,'ion-blaster').changes.length,1,'ion reward retains a hull-damage gun');
 });
@@ -681,4 +695,16 @@ test('a hired veteran rides through a later hull change and the rest of the run'
  assert.equal(r.wingmen[0].alive,true);assert.equal(r.wingmen[0].id,wing.id);
  writeArenaRun(save);
  assert.equal(readArenaRun().arenaRun.wingmen[0].id,wing.id,'and survives a reload');
+});
+
+test('changing from Thor to a smaller hull preserves each individual seeker magazine',()=>{
+ storage();const save=newArenaRun(false,411),p=save.player,r=save.arenaRun;
+ Object.assign(p,{shipId:'andromeda',ownedShips:['andromeda'],outfitting:createOutfittingState(['andromeda'])});
+ fillLauncherMagazines(p);
+ [1,3,2].forEach((rounds,i)=>{p.launcherMagazines[`andromeda-launcher-${i}`].rounds=rounds;});
+ Object.assign(r,{wave:4,phase:'prepare',hullOffers:['legionary'],hullChosen:false});
+ assert.ok(changeRunHull(save,'legionary'));
+ assert.equal(p.launcherMagazines['legionary-launcher-0'].rounds,1);
+ assert.deepEqual(r.storedRounds['seeker-launcher'],[3,2]);
+ assert.equal(p.outfitting.locker['seeker-launcher'],2);
 });

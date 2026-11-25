@@ -1,5 +1,5 @@
 import {LEAGUE_FITS} from './leagueContent.js';
-import {HULL_HARDPOINTS, OUTFIT_ITEMS,canonicalOutfitId, itemFitsMount,normalizeLoadout} from './outfitting.js';
+import {HULL_HARDPOINTS, OUTFIT_ITEMS,canonicalOutfitId, itemFitsMount} from './outfitting.js';
 import {LAUNCHERS, WEAPONS, launcherIdForOutfit, weaponRange, weaponIdForOutfit,weaponForOutfit} from './weapons.js';
 import {getEffectiveShipStats} from './shipStats.js';
 // Approved hulls have a recognizable stock fit; explicit observer/scenario fits override it.
@@ -10,16 +10,16 @@ export const HULL_NPC_FITS = Object.freeze({
  mule:{guns:['pulse-cannon','pulse-cannon'],turret:'pdc',launcher:'seeker-launcher'},
  wayfarer:{guns:['beam-emitter','beam-emitter'],turret:'pdc',launcher:'seeker-launcher'},
  talon:{guns:['pulse-cannon','pulse-cannon','ion-blaster'],launcher:'shield-seeker-launcher'},
- lancer:{guns:['pulse-cannon-t2','ion-blaster'],launchers:['seeker-launcher','shield-seeker-launcher'],turret:'pdc',drive:'thrusters-mk2'},
- prospector:{guns:['pulse-cannon'],turret:'pdc',launcher:'seeker-launcher'},
+ lancer:{guns:['pulse-cannon-t2','pulse-cannon-t2','ion-blaster'],launchers:['seeker-launcher','shield-seeker-launcher'],turret:'pdc',drive:'thrusters-mk2'},
+ prospector:{guns:['pulse-cannon','pulse-cannon'],turret:'pdc',launcher:'seeker-launcher'},
  // A hauler mans the turret mounts its civilian crew can actually crew (`false`
  // leaves a reviewed hardpoint empty) and keeps its regulation point defence.
  // The hull keeps every mount; the stock NPC fit fills fewer of them, which is
  // what puts a tier-3 hauler at the tier-2 combat level instead of ahead of it
  // (see .freebuff/balance/main-loadouts.mjs).
- atlas:{guns:['gauss-cannon'],turrets:['pdc','pdc',false,false],launcher:'seeker-launcher',defense:'shield-mk2'},
- vanguard:{guns:['pulse-cannon-t2','mortar'],launchers:['torpedo-launcher','torpedo-launcher','swarm-launcher'],turret:'pdc',defense:'shield-mk2'},
- blade:{guns:['pulse-cannon-t2','gauss-cannon'],launchers:['seeker-launcher','shield-seeker-launcher'],turret:'pdc',power:'sustained-reactor'},
+ atlas:{guns:['gauss-cannon','gauss-cannon'],turrets:['pdc','pdc',false,false],launcher:'seeker-launcher',defense:'shield-mk2'},
+ vanguard:{guns:['pulse-cannon-t2','mortar','pulse-cannon-t2'],launchers:['torpedo-launcher','torpedo-launcher','swarm-launcher'],turret:'pdc',defense:'shield-mk2'},
+ blade:{guns:['pulse-cannon-t2','pulse-cannon-t2','gauss-cannon','gauss-cannon'],launcher:'seeker-launcher',turret:'pdc',power:'sustained-reactor'},
 });
 // Observer presets are deliberately expressed as real outfitting item ids.
 // createEnemyLoadout checks each choice against the hull's current physical
@@ -45,7 +45,7 @@ export function createEnemyLoadout(ship, index, arenaFit) {
     const explicit=arenaFit&&typeof arenaFit==='object';
     const observerFit=explicit?arenaFit:(OBSERVER_FITS[arenaFit]??HULL_NPC_FITS[hullId]);
     const guns=spec.guns.map((mount,i)=>{
-        const item=observerFit?.guns?.[i];
+        const item=observerFit?.guns?.[i] ?? (!explicit && OBSERVER_FITS[arenaFit] ? observerFit.guns.at(-1) : null);
         if(!item)return null;
         return itemFitsMount(OUTFIT_ITEMS[item],mount)?canonicalOutfitId(item):'pulse-cannon';
     });
@@ -54,15 +54,15 @@ export function createEnemyLoadout(ship, index, arenaFit) {
         return item && itemFitsMount(OUTFIT_ITEMS[item],mount) ? item : null;
     });
     const launchers=spec.launchers.map((mount,i)=>{
-        const rackIndex=i-spec.stockGunCount;if(rackIndex<0||rackIndex>=spec.stockLauncherCount)return null;
-        const item=observerFit?.launchers?.[rackIndex] ?? observerFit?.launcher;
+        const choice=observerFit?.launchers?.[i] ?? observerFit?.launcher;
+        const item=LAUNCHERS[choice] ? `${choice}-launcher` : choice;
         return item && itemFitsMount(OUTFIT_ITEMS[item],mount) ? item : null;
     });
     const gunIndices=guns.flatMap((id,i)=>id?[i]:[]);
     const weapons=gunIndices.map(i=>weaponIdForOutfit(guns[i]));
     // Weapon choice defines close-range interceptor versus ranged fighter doctrine.
     const profile=profileForWeapons(weapons.filter(Boolean),ship.pilot?.tier);
-    const equipmentLoadout={mountSchema:4,guns,launchers,turrets,
+    const equipmentLoadout={mountSchema:5,guns,launchers,turrets,
         power:spec.power.map((mount)=>observerFit?.power && itemFitsMount(OUTFIT_ITEMS[observerFit.power],mount)?observerFit.power:null),
         drive:spec.drive.map((mount)=>observerFit?.drive && itemFitsMount(OUTFIT_ITEMS[observerFit.drive],mount)?observerFit.drive:null),
         defense:spec.defense.map((mount)=>observerFit?.defense && itemFitsMount(OUTFIT_ITEMS[observerFit.defense],mount)?observerFit.defense:null),
@@ -75,13 +75,21 @@ export function createEnemyLoadout(ship, index, arenaFit) {
         (ship.pilot?.tier==='ace'||ship.pilot?.tier==='veteran') && index%4===0)utilities.push('fire-control');
     equipmentLoadout.utility=spec.utility.map((mount,i)=>utilities?.[i]&&itemFitsMount(utilities[i],mount)?utilities[i]:null);
     const stats=observerFit
-        ? getEffectiveShipStats({shipId:hullId,outfitting:{schema:4,locker:{},loadouts:{[hullId]:equipmentLoadout}}})
+        ? getEffectiveShipStats({shipId:hullId,outfitting:{schema:6,locker:{},loadouts:{[hullId]:equipmentLoadout}}})
         : getEffectiveShipStats({shipId:hullId,equipment:[]});
-    const launcher = explicit && arenaFit.launcher && LAUNCHERS[arenaFit.launcher] ? arenaFit.launcher : launcherIdForOutfit(launchers.find(Boolean));
+    const launcher=launcherIdForOutfit(launchers.find(Boolean));
+    let remaining=explicit && Number.isFinite(arenaFit.missiles) ? Math.max(0,Math.floor(arenaFit.missiles)) : Infinity;
+    const racks=[];
+    for(const [index,itemId] of launchers.entries()){
+        if(!itemId)continue;
+        const id=launcherIdForOutfit(itemId),missiles=Math.min(remaining,LAUNCHERS[id].capacity);
+        racks.push({index,launcher:id,itemId,missiles});
+        remaining-=missiles;
+    }
     return {hullId,guns,weapons,gunIndices,weaponDefinitions:gunIndices.map(i=>weaponForOutfit(guns[i])),turrets,launchers,power:equipmentLoadout.power,drive:equipmentLoadout.drive,defense:equipmentLoadout.defense,utility:equipmentLoadout.utility,fitId:explicit ? 'scenario' : OBSERVER_FITS[arenaFit]?arenaFit:`${hullId}-standard`,profile,stats,attackOrder:[...weapons.keys()].filter(i=>weapons[i]).reverse(),resources:{...stats,shield:stats.shield},fireAt:weapons.map(()=>0),
         launcher,
-        racks: launchers.some(Boolean) ? launchers.filter(Boolean).map(id=>{const launcher=launcherIdForOutfit(id);return {launcher,itemId:id,missiles:LAUNCHERS[launcher].capacity};}) : undefined,
-        missiles:explicit ? (arenaFit.missiles??(LAUNCHERS[launcher]?.capacity??0)) : (LAUNCHERS[launcher]?.capacity??0),
+        racks:racks.length?racks:undefined,
+        missiles:racks.reduce((sum,rack)=>sum+rack.missiles,0),
         droneTypes:NPC_DRONE_DEFAULTS[hullId]};
 }
 

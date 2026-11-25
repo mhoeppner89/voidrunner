@@ -333,11 +333,11 @@ const staleBeforeCommit = clone(staleService);
 assert.equal(commitDroneService(staleService, { authorized: true, expected: staleQuote }).code, 'stale-quote');
 assert.deepEqual(staleService, staleBeforeCommit, 'a stale quote leaves ownership, loadout and credits unchanged');
 
-// Ore calibration is intentionally pinned to the 0.8.2 benchmark: 32 one-mass
+// Ore calibration is intentionally pinned to the 0.8.2 benchmark: 30 one-mass
 // Wayfarer units and a 315-credit base price.
 assert.equal(COMMODITIES.ore.mass, 1.0, 'ore mass benchmark');
 assert.equal(COMMODITIES.ore.basePrice, 315, 'ore base-price benchmark');
-assert.equal(SHIPS.wayfarer.cargo / COMMODITIES.ore.mass, 32, 'a stock Wayfarer holds 32 ore units');
-assert.equal(SHIPS.wayfarer.cargo * COMMODITIES.ore.basePrice, 10080, 'base-price haul benchmark');
+assert.equal(SHIPS.wayfarer.cargo / COMMODITIES.ore.mass, 30, 'a stock Wayfarer holds 30 ore units');
+assert.equal(SHIPS.wayfarer.cargo * COMMODITIES.ore.basePrice, 9450, 'base-price haul benchmark');
 
 console.log('all drone assertions passed');

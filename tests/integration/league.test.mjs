@@ -38,7 +38,7 @@ test('Astra and Torsas have two mining-capable bays',()=>{
 });
 test('Alliance spillover is confined to frontier locations and Andromeda carries both rack types',()=>{
  assert.equal(leagueTrafficChance('acheron','haven'),1);assert.equal(leagueTrafficChance('meridian','argent'),0);assert.equal(leagueTrafficChance('helios-verge','helix'),0);assert.ok(leagueTrafficChance('pale-ring','shepherd')>leagueTrafficChance('helios-verge','cairn'));
- const s=fixture(),ship=s.spawnShip('patrol',[0,0,800],undefined,undefined,undefined,{faction:'alliance',hullId:'andromeda'});assert.deepEqual(ship.combatFit.racks.map(r=>r.launcher),['torpedo','swarm']);
+ const s=fixture(),ship=s.spawnShip('patrol',[0,0,800],undefined,undefined,undefined,{faction:'alliance',hullId:'andromeda'});assert.deepEqual(ship.combatFit.racks.map(r=>r.launcher),['torpedo','swarm','torpedo']);
 });
 test('Alliance patrol acquires Concord, never an unprovoking trader or player',()=>{
  const s=fixture();s.arena=null;s.canSee=()=>true;s.shipTracksPlayer=()=>false;s.deferentialPilot=()=>false;s.save.player.dockedAt=undefined;

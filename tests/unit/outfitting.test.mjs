@@ -1,3 +1,4 @@
+import {WEAPONS} from '../../src/game/weapons.js';
 import {SHIPS} from '../../src/game/data.js';
 import assert from 'node:assert/strict';
 import {
@@ -61,9 +62,7 @@ all(OUTFIT_ITEM_IDS, (id) => {
         return false;
     if (item.lootOnly)
         return item.tier >= 3 && Number.isFinite(item.mass) && item.mass > 0;
-    return ['S', 'M'].includes(item.size)
-        && item.sizes.length > 0
-        && Number.isFinite(item.mass) && item.mass > 0
+    return Number.isFinite(item.mass) && item.mass > 0
         && (item.category !== 'gun' || (Number.isFinite(item.energyCost) && item.energyCost > 0))
         && item.power === undefined
         && item.availability.length > 0
@@ -72,28 +71,22 @@ all(OUTFIT_ITEM_IDS, (id) => {
 assert.equal(Object.keys(LEGACY_OUTFIT_ID_MAP).length, 5);
 
 const expectedCounts = {
-    wayfarer: { gun: 2, turret:1,power:1, launcher: 1, drive: 1, defense: 1, utility: 2 },
-    talon: { gun: 3, turret:0,power:1, launcher: 1, drive: 1, defense: 1, utility: 1 },
-    vanguard: { gun: 2, turret:2,power:1, launcher: 3, drive: 1, defense: 1, utility: 2 },
-    prospector: { gun: 1, turret:1,power:1, launcher: 1, drive: 1, defense: 1, utility: 3 },
-    lancer: { gun: 2, turret:1,power:1, launcher: 2, drive: 1, defense: 1, utility: 1 },
-    atlas: { gun: 1, turret:4,power:1, launcher: 1, drive: 1, defense: 1, utility: 4 },
+    wayfarer:[2,1,1,3], scrapper:[4,1,0,2], speedster:[2,1,0,2], talon:[3,1,0,2],
+    vanguard:[3,3,2,4], prospector:[2,1,1,5], lancer:[3,2,1,3], atlas:[2,2,4,6],
 };
-for (const [shipId, counts] of Object.entries(expectedCounts)) {
-    const spec = HULL_HARDPOINTS[shipId];
-    const expected = { weapon: counts.gun + counts.launcher, turret: counts.turret, utility: {wayfarer:3,talon:2,vanguard:4,prospector:5,lancer:3,atlas:6}[shipId] };
+for (const [shipId, [gun,launcher,turret,utility]] of Object.entries(expectedCounts)) {
+    const spec = HULL_HARDPOINTS[shipId], expected = {gun, launcher, turret, utility};
     assert.deepEqual(spec.slotCounts, expected, `${shipId} hardpoint matrix`);
-    assert.equal(spec.guns, spec.launchers, `${shipId} exposes one shared weapon-bay list`);
-    assert.equal(spec.weapons.length, expected.weapon);
-    assert.ok(spec.weapons.every((slot) => slot.category === 'weapon' && slot.size === undefined), `${shipId} weapon bays are generic and sizeless`);
+    for (const category of ['gun','launcher'])
+        assert.ok(spec.mounts[category].every(slot => slot.category === category && slot.size === undefined));
     assert.equal(spec.drive.length, 0);
     assert.equal(spec.defense.length, 0);
     assert.equal(spec.power.length, 0);
     assert.equal(spec.utility.length, expected.utility);
     assert.ok(spec.utility.every((slot) => slot.category === 'utility' && slot.size === undefined), `${shipId} utility bays are generic and sizeless`);
     const factory = defaultLoadoutFor(shipId);
-    const installedGroups = spec.weapons
-        .map((mount, index) => factory.guns[index] || factory.launchers[index] ? factory.fireGroups.assignments[mount.id] : undefined)
+    const installedGroups = spec.guns
+        .map((mount, index) => factory.guns[index] ? factory.fireGroups.assignments[mount.id] : undefined)
         .filter(Boolean);
     if (installedGroups.length > 1 && shipId!=='wayfarer')
         assert.deepEqual(new Set(installedGroups), new Set(['A', 'B']), `${shipId} factory guns start in usable A/B groups`);
@@ -113,17 +106,19 @@ assert.equal(commitOutfitting(regroupedPlayer, regroupedQuote).ok, true, 'fire-g
 assert.equal(regroupedPlayer.outfitting.loadouts.wayfarer.fireGroups.assignments[regroupedMount.id], 'B');
 assert.equal(regroupedPlayer.credits, regroupedBeforeCredits, 'fire-group edit does not change credits');
 
-// Weapons share generic bays regardless of gun or launcher type; utility gear
-// shares its own generic bays. Item size metadata remains catalog information,
-// not a physical fit restriction.
-const sharedWeaponBay = HULL_HARDPOINTS.wayfarer.weapons[0];
+for (const item of [...Object.values(OUTFIT_ITEMS),...Object.values(WEAPONS)])
+    for (const field of ['size','sizes','compatibleSizes','sizeCompatibility','mountSize'])
+        assert.ok(!Object.hasOwn(item,field), item.id + ' advertises obsolete ' + field);
+
+// Guns and launchers have dedicated bays. Utility gear shares its own generic bays.
+const gunBay = HULL_HARDPOINTS.wayfarer.guns[0];
 const sharedUtilityBay = HULL_HARDPOINTS.wayfarer.utility[0];
-assert.equal(sharedWeaponBay.size, undefined);
+assert.equal(gunBay.size, undefined);
 assert.equal(sharedUtilityBay.size, undefined);
-assert.equal(itemFitsMount('ripper', sharedWeaponBay), true);
-assert.equal(itemFitsMount('pulse-mk2', sharedWeaponBay), true);
-assert.equal(itemFitsMount('torpedo-launcher', sharedWeaponBay), true);
-assert.equal(itemFitsMount('capital-shield-generator', sharedWeaponBay), false);
+assert.equal(itemFitsMount('ripper', gunBay), true);
+assert.equal(itemFitsMount('pulse-mk2', gunBay), true);
+assert.equal(itemFitsMount('torpedo-launcher', gunBay), false);
+assert.equal(itemFitsMount('capital-shield-generator', gunBay), false);
 assert.equal(itemFitsMount('sustained-reactor', sharedUtilityBay), true);
 assert.equal(itemFitsMount('cargo-pods', sharedUtilityBay), true);
 assert.equal(itemFitsMount('pulse-mk2', sharedUtilityBay), false);
@@ -146,28 +141,28 @@ assert.equal(quoteOutfitting(noOutfittingService, 'wayfarer', noOutfittingServic
 assert.equal(quoteOutfitting(player, 'wayfarer', player.outfitting.loadouts.wayfarer, { locationId: 'helix' }).code, 'location-mismatch', 'a location override cannot shop at another dock');
 
 const empty = {
-    guns: [null, null, null], launchers: [null, null, null], turrets: [null],
-    power: [], drive: [], defense: [], utility: [null, null, null], mountSchema: 4,
+    guns: [null, null], launchers: [null], turrets: [null],
+    power: [], drive: [], defense: [], utility: [null, null, null], mountSchema: 5,
 };
 const duplicateDraft = {
-    guns: [null, null], launchers: [null, null],
+    guns: [null, null], launchers: [null],
     turrets: ['pdc', 'pdc', null, null],
     power: [], drive: [], defense: [],
     utility: ['cargo-pods', 'cargo-pods', null, null, null, null],
-    mountSchema: 4,
+    mountSchema: 5,
 };
 const atlasPlayer = capablePlayer({ shipId: 'atlas', ownedShips: ['atlas'], outfitting: createOutfittingState(['atlas']) });
 assert.equal(validateLoadout(atlasPlayer, 'atlas', duplicateDraft).ok, true, 'duplicate guns and cargo pods are legal');
 const uniqueDraft = {
-    guns: [null, null], launchers: [null, null], turrets: [null, null, null, null],
-    power: [], drive: [], defense: [], utility: ['radar-mk2', 'radar-mk2', null, null, null, null], mountSchema: 4,
+    guns: [null, null], launchers: [null], turrets: [null, null, null, null],
+    power: [], drive: [], defense: [], utility: ['radar-mk2', 'radar-mk2', null, null, null, null], mountSchema: 5,
 };
 assert.equal(validateLoadout(atlasPlayer, 'atlas', uniqueDraft).code, 'duplicate-unique-module');
 
 const energyHungry = {
     ...empty,
-    guns: ['ripper', 'ripper', null],
-    launchers: [null, null, 'seeker-launcher'],
+    guns: ['ripper', 'ripper'],
+    launchers: ['seeker-launcher'],
     utility: ['engine-mk2', 'shield-mk2', 'salvage-mk2'],
 };
 assert.equal(validateLoadout(player, 'wayfarer', energyHungry).ok, true, 'high-drain weapons are legal fits and constrained by the flight capacitor');
@@ -176,8 +171,8 @@ assert.equal(validateLoadout(player, 'wayfarer', energyHungry).ok, true, 'high-d
 // for weighing too much.
 const fullBays = {
     ...empty,
-    guns: ['ripper', 'ripper', null],
-    launchers: [null, null, 'seeker-launcher'],
+    guns: ['ripper', 'ripper'],
+    launchers: ['seeker-launcher'],
     utility: ['engine-mk2', 'armor-mk2', 'capacitor-bank'],
     turrets: ['tracking-turret'],
 };
@@ -197,8 +192,8 @@ assert.equal(validateLoadout(player, 'wayfarer', { ...empty, utility: ['cargo-po
 const before = clone(player);
 const fit = {
     ...empty,
-    guns: ['ripper', 'ripper', null],
-    launchers: [null, null, 'seeker-launcher'],
+    guns: ['ripper', 'ripper'],
+    launchers: ['seeker-launcher'],
 };
 const quoteA = quoteOutfitting(player, 'wayfarer', fit);
 const quoteB = quoteOutfitting(player, 'wayfarer', fit);
@@ -257,7 +252,7 @@ const legacyPlayer = {
     weaponId: 'gauss',
 };
 const migrated = migrateLegacyOutfitting(legacyPlayer);
-assert.equal(migrated.loadouts.wayfarer.guns.filter((id) => id === 'beam-emitter').length, 2);
+assert.equal(migrated.loadouts.wayfarer.guns.filter((id) => id === 'beam-emitter').length, 1);
 assert.ok(migrated.loadouts.wayfarer.guns.includes('pulse-cannon-t2'), 'a legacy weapon stays fitted alongside the factory beams');
 assert.equal(migrated.loadouts.talon.guns.includes('gauss-cannon'), true);
 assert.equal((migrated.locker.pdc ?? 0) + migrated.loadouts.wayfarer.turrets.filter((id) => id === 'pdc').length, 2);
@@ -323,9 +318,9 @@ const mountedMk2 = capablePlayer({shipId:'talon',ownedShips:['talon'],
 });
 mountedMk2.outfitting.loadouts.talon.guns[2] = 'pulse-mk2';
 mountedMk2.outfitting.loadouts.talon.fireGroups.activeGroup = 'B';
-for (const mount of HULL_HARDPOINTS.talon.weapons)
+for (const mount of HULL_HARDPOINTS.talon.guns)
     mountedMk2.outfitting.loadouts.talon.fireGroups.assignments[mount.id] = 'A';
-mountedMk2.outfitting.loadouts.talon.fireGroups.assignments['talon-weapon-2'] = 'B';
+mountedMk2.outfitting.loadouts.talon.fireGroups.assignments['talon-gun-2'] = 'B';
 assert.equal(projectLegacyWeaponId(mountedMk2, 'talon'), 'pulse');
 assert.equal(projectLegacyWeaponId(mountedMk2, 'talon', 'B'), 'pulse');
 
@@ -578,7 +573,7 @@ const malformedResources = hydrateSave({
 });
 for (const key of ['fuel', 'shield', 'hull', 'energy', 'missiles'])
     assert.equal(Number.isFinite(malformedResources.player[key]), true, `${key} is repaired to a finite current resource`);
-assert.equal(malformedResources.player.hull, 190);
+assert.equal(malformedResources.player.hull, 200);
 assert.equal(malformedResources.player.energy, 60);
 
 const malformedTransforms = hydrateSave({

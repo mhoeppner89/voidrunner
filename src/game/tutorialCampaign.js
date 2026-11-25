@@ -87,8 +87,11 @@ export const tutorialLaunchBlock = save => {
 };
 const transition=(save,q,next)=>{const fromStepId=q.stepId;setStep(save,TUTORIAL_QUEST_ID,next);return {changed:true,quest:q,fromStepId,stepId:next};};
 export const migrateTutorialCampaign = save => {
-    const q=getTutorialQuest(save);if(!q||q.flags?.campaignVersion===2)return;
+    const q=getTutorialQuest(save);if(!q)return;
     q.flags??={};
+    // Older campaigns persisted the tutorial's automatic combat selections.
+    delete q.flags['focused-mining'];delete q.flags['focused-rescue'];delete q.flags['focused-black-box'];
+    if(q.flags.campaignVersion===2)return;
     // Completed and deliberately skipped careers keep their open-world status.
     if(q.completedAt!==undefined||q.flags.skipped){q.flags.campaignVersion=2;q.flags.openWorld=true;q.flags.gateOpen=true;return;}
     const old=q.stepId;

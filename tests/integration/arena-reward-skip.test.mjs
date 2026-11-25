@@ -38,12 +38,12 @@ test('skipping pays once, keeps an armed opening, and boosts only the next round
 });
 test('a spare earned launcher starts full once; repeatedly refitting a spent launcher cannot reload it',()=>{
  const s=ready('wayfarer');s.arenaRun.offers=['torpedo-launcher'];assert.ok(chooseRunReward(s,'torpedo-launcher'));
- const e=launcherMagazineEntries(s.player)[0],index=HULL_HARDPOINTS[s.player.shipId].weapons.findIndex(m=>m.id===e.mount.id);
+ const e=launcherMagazineEntries(s.player)[0],index=HULL_HARDPOINTS[s.player.shipId].launchers.findIndex(m=>m.id===e.mount.id);
  assert.equal(s.player.outfitting.locker['torpedo-launcher'],1);
- assert.ok(fitRunItem(s,'weapons',index,''));assert.ok(fitRunItem(s,'weapons',index,'torpedo-launcher'));
+ assert.ok(fitRunItem(s,'launchers',index,''));assert.ok(fitRunItem(s,'launchers',index,'torpedo-launcher'));
  assert.equal(launcherMagazineEntries(s.player)[0].rounds,e.capacity);
  s.player.launcherMagazines[e.mount.id].rounds=0;
- assert.ok(fitRunItem(s,'weapons',index,''));assert.ok(fitRunItem(s,'weapons',index,'torpedo-launcher'));
+ assert.ok(fitRunItem(s,'launchers',index,''));assert.ok(fitRunItem(s,'launchers',index,'torpedo-launcher'));
  assert.equal(launcherMagazineEntries(s.player)[0].rounds,0);
 });
 test('Arena and career use identical weapon and collision impact',()=>{

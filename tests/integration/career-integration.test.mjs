@@ -22,14 +22,14 @@ async function model(t,id){globalThis.createImageBitmap??=async()=>({});t.mock.m
 function triangleCount(root){let count=0;root.traverse(o=>{if(o.isMesh)count+=(o.geometry.index?.count??o.geometry.attributes.position.count)/3;});return count;}
 test('approved careers have distinct tiers, capacities and legal stock fits',()=>{
  assert.equal(SHIPS.scrapper.role,'fighter');assert.equal(SHIPS.scrapper.tier,1);assert.ok(SHIPS.scrapper.shield<SHIPS.legionary.shield&&SHIPS.scrapper.maxSpeed<SHIPS.legionary.maxSpeed);
- assert.equal(HULL_HARDPOINTS.scrapper.stockGunCount,4);assert.equal(HULL_HARDPOINTS.scrapper.stockLauncherCount,1);
- assert.ok(HULL_HARDPOINTS.scrapper.guns.every(m=>m.category==='weapon'),'guns and launchers share physical, size-agnostic weapon mounts');
+ assert.equal(HULL_HARDPOINTS.scrapper.guns.length,4);assert.equal(HULL_HARDPOINTS.scrapper.launchers.length,1);
+ assert.ok(HULL_HARDPOINTS.scrapper.guns.every(m=>m.category==='gun'),'guns use dedicated, sizeless mounts');
  assert.equal(SHIPS.demon.role,'interceptor');assert.equal(SHIPS.demon.tier,2);assert.equal(SHIPS.mule.role,'transport');assert.equal(SHIPS.mule.tier,2);assert.ok(SHIPS.mule.cargo<SHIPS.atlas.cargo&&SHIPS.mule.cargo>SHIPS.torsas.cargo);assert.equal(HULL_HARDPOINTS.mule.turrets.length,2);
  for(const[id,count]of[['scrapper',4],['demon',4],['mule',2]]){let stock;for(const index of [0,1,2,7]){const f=createEnemyLoadout({hullId:id,role:id==='mule'?'trader':'pirate'},index);assert.equal(f.weapons.length,count);for(const k of ['guns','launchers','turrets'])f[k].forEach((item,i)=>{if(item)assert.ok(itemFitsMount(OUTFIT_ITEMS[item],HULL_HARDPOINTS[id][k][i]));});const signature=[f.guns,f.launchers,f.turrets];if(stock)assert.deepEqual(signature,stock);stock=signature;}assert.ok(PLAYER_FLYABLE_HULLS.includes(id));}
- assert.equal(createEnemyLoadout({hullId:'demon'},0).profile.role,'interceptor');assert.deepEqual(createEnemyLoadout({hullId:'mule'},0).turrets,['pdc','pdc']);const explicit=createEnemyLoadout({hullId:'demon'},0,{guns:['ripper',null,null,null]});assert.deepEqual(explicit.guns.slice(0,HULL_HARDPOINTS.demon.stockGunCount),['ripper',null,null,null]);assert.equal(explicit.guns[HULL_HARDPOINTS.demon.stockGunCount],null,'the shared rack mount stays free of a gun');
+ assert.equal(createEnemyLoadout({hullId:'demon'},0).profile.role,'interceptor');assert.deepEqual(createEnemyLoadout({hullId:'mule'},0).turrets,['pdc','pdc']);const explicit=createEnemyLoadout({hullId:'demon'},0,{guns:['ripper',null,null,null]});assert.deepEqual(explicit.guns.slice(0,HULL_HARDPOINTS.demon.guns.length),['ripper',null,null,null]);assert.equal(explicit.guns.length,4);
 });
 test('both new hulls can be bought, retained and reloaded with the right ammunition and mounts',()=>{
- for(const id of ['demon','mule']){let s=createNewSave(818,{tutorial:false});s.player.credits=500000;s.player.dockedAt=id==='demon'?'blackglass':'helix';const q=quoteShipTrade(s.player,id,{keepCurrent:true});assert.ok(q.ok,q.code);assert.ok(commitShipTrade(s.player,q).ok);fillLauncherMagazines(s.player);const launcher=launcherMagazineEntries(s.player)[0];assert.equal(launcher.index,HULL_HARDPOINTS[id].stockGunCount,'the rack occupies the first shared weapon mount after the gun mounts');s.player.launcherMagazines[launcher.mount.id].rounds=2;s=hydrateSave(JSON.parse(JSON.stringify(s)));assert.equal(s.player.shipId,id);assert.ok(s.player.ownedShips.includes('wayfarer'));assert.equal(s.player.outfitting.loadouts[id].guns.length,HULL_HARDPOINTS[id].guns.length);const restored=launcherMagazineEntries(s.player)[0];assert.equal(restored.launcherId,'seeker','the owned equipment-instance definition survives the save round trip');assert.equal(restored.index,HULL_HARDPOINTS[id].stockGunCount);assert.equal(restored.rounds,2);if(id==='mule')assert.deepEqual(s.player.outfitting.loadouts[id].turrets.map(item=>OUTFIT_ITEMS[item]?.baseId),['pdc','pdc']);}
+ for(const id of ['demon','mule']){let s=createNewSave(818,{tutorial:false});s.player.credits=500000;s.player.dockedAt=id==='demon'?'blackglass':'helix';const q=quoteShipTrade(s.player,id,{keepCurrent:true});assert.ok(q.ok,q.code);assert.ok(commitShipTrade(s.player,q).ok);fillLauncherMagazines(s.player);const launcher=launcherMagazineEntries(s.player)[0];assert.equal(launcher.index,0,'the first rack occupies the first missile slot');s.player.launcherMagazines[launcher.mount.id].rounds=2;s=hydrateSave(JSON.parse(JSON.stringify(s)));assert.equal(s.player.shipId,id);assert.ok(s.player.ownedShips.includes('wayfarer'));assert.equal(s.player.outfitting.loadouts[id].guns.length,HULL_HARDPOINTS[id].guns.length);const restored=launcherMagazineEntries(s.player)[0];assert.equal(restored.launcherId,'seeker','the owned equipment-instance definition survives the save round trip');assert.equal(restored.index,0);assert.equal(restored.rounds,2);if(id==='mule')assert.deepEqual(s.player.outfitting.loadouts[id].turrets.map(item=>OUTFIT_ITEMS[item]?.baseId),['pdc','pdc']);}
  assert.ok(LOCATIONS.helix.shipsForSale.includes('mule'));assert.ok(LOCATIONS.blackglass.shipsForSale.includes('demon'));assert.ok(LOCATIONS.blackglass.shipsForSale.includes('scrapper'));
 });
 test('Demon and Mule hull/equipment geometry, collision bounds and engine counts agree with runtime scale',async t=>{
@@ -85,3 +85,20 @@ test('normal traffic, observer and rotated gun origins use the new hulls',()=>{
  for(let i=0;i<90;i++){s.save.world.time+=1/60;s.updateTurrets(ship,ship.id,1/60);}
  assert.ok(rounds.some(p=>p.targetMissile===flank));assert.ok(rounds.every(p=>p.targetMissile!==stern));assert.equal(ship.turretRuntime.length,2);assert.ok(rounds.every(p=>Math.abs(p.start.x)>2));
  });
+
+test('the new muzzle and launcher positions clear the shipping mesh and touch forward-facing armor',async t=>{
+ const changed={legionary:{guns:[2,3]},torsas:{guns:[2]},andromeda:{launchers:[2]},prospector:{guns:[0,1]},
+  vanguard:{guns:[2]},lancer:{guns:[2]},blade:{guns:[2,3]},astra:{guns:[2],launchers:[0,1]},atlas:{guns:[0,1],launchers:[0,1]}};
+ for(const [id,groups] of Object.entries(changed)){
+  const config=GLB_SHIP_CONFIG[SHIPS[id].variant],hull=await model(t,id);
+  hull.rotation.y=config.yaw;hull.scale.setScalar(config.scale*(config.baseScale??1));hull.updateMatrixWorld(true);
+  hull.traverse(mesh=>{if(mesh.isMesh)for(const material of [].concat(mesh.material))material.side=THREE.DoubleSide;});
+  for(const [kind,indices] of Object.entries(groups))for(const i of indices){
+   const origin=new THREE.Vector3(...SHIP_MOUNT_ANCHORS[id][kind][i]),label=`${id} ${kind} ${i+1}`;
+   const ray=new THREE.Raycaster(origin,new THREE.Vector3(0,0,-1),.00001,100);
+   assert.equal(ray.intersectObject(hull,true).length,0,label+' clears the hull');
+   ray.ray.direction.z=1;ray.far=.06;
+   assert.ok(ray.intersectObject(hull,true).length,label+' is seated against the hull');
+  }
+ }
+});

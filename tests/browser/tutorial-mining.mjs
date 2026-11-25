@@ -1,3 +1,4 @@
+import {selectTutorialRaider} from '../helpers/tutorial-browser.mjs';
 import {chromium,webkit,devices} from 'playwright';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -69,45 +70,59 @@ for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1280,heig
    await page.screenshot({path:`${out}/${name}-combat-lesson-${nodes}.png`});
    await page.locator('#adventure-panel [data-ui-command="adventure-choice"]').last().click();assert.ok(++nodes<=4);
   }
-  assert.equal(nodes,3);
+  assert.equal(nodes,4);
+  await selectTutorialRaider(page,device,'mining');
   const combat=await page.evaluate(()=>{
    const r=__VOID_PRIVATEER__.getRuntime(),q=r.save.quests.find(q=>q.id==='the-spare-key');r.refreshStoryLine();
    if(!q.flags['briefingRead-combat']||r.ui.isModalOpen)throw Error('Combat lesson did not release flight');
-   const rin=r.ships.find(s=>s.storyPersonId==='rin'),before={time:r.save.world.time,position:[...rin.position]},shots=[],launches=rin.combatFit.missiles,fire=r.fireNpcGun; if(r.save.wingOrder!=='defensive')throw Error('First lesson should begin with covering fire');r.fireNpcGun=function(ship,...args){const prior=ship.lastCombatShotAt,result=fire.call(this,ship,...args);if(ship===rin&&ship.lastCombatShotAt!==prior)shots.push(this.save.world.time-before.time);return result;};
+   const rin=r.ships.find(s=>s.storyPersonId==='rin'),before={time:r.save.world.time,position:[...rin.position]},shots=[],rounds=()=>rin.combatFit.racks.reduce((sum,rack)=>sum+rack.missiles,0),initialRounds=rounds(),fire=r.fireNpcGun; if(r.save.wingOrder!=='defensive')throw Error('First lesson should begin with covering fire');r.fireNpcGun=function(ship,...args){const prior=ship.lastCombatShotAt,result=fire.call(this,ship,...args);if(ship===rin&&ship.lastCombatShotAt!==prior)shots.push(this.save.world.time-before.time);return result;};
    // The old test stopped at the standoff. Drive actual combat frames to catch
    // companion AI exceptions, which the RAF guard otherwise logs repeatedly.
    for(let i=0;i<60;i++){r.lastFrame=performance.now()-100;r.frame(performance.now());cancelAnimationFrame(r.frameId);}
    if(r.frameErrorAt)throw Error('A flight frame failed during the first fight');
    if(r.save.world.time-before.time<4||rin.position.every((v,i)=>v===before.position[i]))throw Error('Combat did not resume');
    const enemy=r.ships.find(s=>s.tutorialEncounter==='mining'&&s.hull>0);if(!enemy)throw Error('Pirate disappeared during lesson');
-   const elapsed=r.save.world.time-before.time;r.fireNpcGun=fire;if(shots.length>1||shots.some((time,i)=>i===0?time<2.99:time-shots[i-1]<4.99))throw Error('Rin fired too often '+JSON.stringify(shots));if(rin.combatFit.missiles!==launches)throw Error('Rin launched training missiles');r.damageShip(enemy,100000,window.innerWidth<1000?rin.id:'player',enemy.position);
-   if(q.stepId!=='land-mining')throw Error('First combat did not complete');
-   return{elapsed,coveringShots:shots,rinMoved:true,read:q.flags['briefingRead-combat'],step:q.stepId};
+   const elapsed=r.save.world.time-before.time;r.fireNpcGun=fire;if(shots.length>1||shots.some((time,i)=>i===0?time<2.99:time-shots[i-1]<4.99))throw Error('Rin fired too often '+JSON.stringify(shots));if(rounds()!==initialRounds)throw Error('Rin launched training missiles');r.damageShip(enemy,100000,window.innerWidth<1000?rin.id:'player',enemy.position);
+   if(!enemy.surrendered || r.ui.adventure?.conversationId!=='tutorial-surrender')throw Error('Missing first surrender and boarding lesson');
+   return{elapsed,coveringShots:shots,rinMoved:true,read:q.flags['briefingRead-combat']};
   });await page.screenshot({path:`${out}/${name}-combat-resumed.png`});assert.deepEqual(errors,[]);
+  while(await page.locator('#adventure-panel').isVisible())await page.locator('#adventure-panel [data-ui-command="adventure-choice"]').last().click();
+  await page.evaluate(()=>{
+   const r=__VOID_PRIVATEER__.getRuntime(),enemy=r.ships.find(s=>s.tutorialEncounter==='mining'&&s.surrendered);
+   r.save.world.time+=2;r.damageShip(enemy,100000,'player',enemy.position);
+   if(r.tutorialSummary().stepId!=='land-mining')throw Error('First combat did not complete');
+  });
   const loot=await page.evaluate(()=>{
    const r=__VOID_PRIVATEER__.getRuntime(),q=r.save.quests.find(q=>q.id==='the-spare-key'),w=r.save.world.combatWrecks[q.flags.tutorialLootWreckId];
-   if(r.ui.adventure?.conversationId!=='tutorial-loot')throw Error('Rin loot explanation did not open');
+   if(r.ui.adventure?.conversationId!=='tutorial-loot-surrender-killed')throw Error('Rin loot explanation did not open');
    const item=w?.contents.find(e=>e.item?.rarity==='uncommon'&&e.item?.tier===1)?.item;if(!item||item.baseId!=='seeker-launcher'||w.contents.length!==1)throw Error('Expected only the guaranteed green tier I missile launcher');
    const before=r.save.world.time;for(let i=0;i<5;i++){r.lastFrame=performance.now()-100;r.frame(performance.now());cancelAnimationFrame(r.frameId);}
    if(before!==r.save.world.time)throw Error('Loot explanation did not pause flight');
    return{wreck:w.id,item:item.id};
   });
-  let lootNodes=0,explanation='';while(await page.locator('#adventure-panel').isVisible()){
+  const lootPages=new Set();let lootNodes=0,explanation='',readRarity=false;while(await page.locator('#adventure-panel').isVisible()){
+   lootPages.add(await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.adventure.nodeId));
    explanation+=' '+await page.locator('.adventure-speech').innerText();
    const fits=await page.locator('.adventure-speech').evaluate(e=>{const b=e.getBoundingClientRect(),buttons=[...document.querySelectorAll('.adventure-choices button')].map(x=>x.getBoundingClientRect());return e.scrollWidth<=e.clientWidth+1&&buttons.every(x=>x.top>=b.bottom-1&&x.left>=0&&x.right<=innerWidth+1&&x.bottom<=innerHeight+1);});assert.ok(fits,`${name}: loot lesson clips`);
-   await page.screenshot({path:`${out}/${name}-loot-lesson-${lootNodes}.png`});await page.locator('#adventure-panel [data-ui-command="adventure-choice"]').last().click();assert.ok(++lootNodes<=4);
-  }assert.equal(lootNodes,3);assert.match(explanation,/Technikstufe.*Seltenheit.*weiß.*grün.*blau.*unabhängig.*BERGEN/s);
+   await page.screenshot({path:`${out}/${name}-loot-lesson-${lootNodes}.png`});const choices=page.locator('#adventure-panel [data-ui-command="adventure-choice"]');
+   if(!readRarity && await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().ui.adventure.nodeId==='find')){readRarity=true;await choices.first().click();}
+   else await choices.last().click();
+   assert.ok(++lootNodes<=5);
+  }assert.deepEqual(lootPages,new Set(['reproach','find','rarity','recover']));assert.match(explanation,/weiß.*grün.*blau.*Technikstufen.*unabhängig.*über die Beute/is);
   await page.evaluate(({wreck})=>{
    const r=__VOID_PRIVATEER__.getRuntime(),p=r.save.player,w=r.save.world.combatWrecks[wreck],node=r.wreckNodes.find(n=>n.id===wreck);r.refreshStoryLine();
-   p.position.splice(0,3,w.position[0],w.position[1]+node.radius+25,w.position[2]);p.velocity.fill(0);p.angularVelocity.fill(0);p.throttle=0;node.velocity.fill(0);w.velocity.fill(0);r.resetPlayerInterpolation(true);r.selectTarget('wreck',wreck);r.autoScanTarget();
+   p.position.splice(0,3,w.position[0],w.position[1]+node.radius+25,w.position[2]);p.velocity.fill(0);p.angularVelocity.fill(0);p.throttle=0;w.velocity.fill(0);r.resetPlayerInterpolation(true);r.selectTarget('wreck',wreck);r.autoScanTarget();
    if(!node.scanned)throw Error('Loot wreck did not scan automatically');r.ui.updateHud(r.buildHudModel());r.ui.showShipMenu();
   },loot);
   await page.locator('[data-ui-command="ship-section"][data-ship-section="equipment"]').click();
   const green=page.locator(`[data-inventory-id="${loot.item}"]`);assert.equal(await green.getAttribute('data-rarity'),'uncommon');assert.match(await green.innerText(),/I/);assert.equal(await green.evaluate(e=>getComputedStyle(e).getPropertyValue('--item-color').trim()),'#72df95');await page.screenshot({path:`${out}/${name}-green-loot.png`});await page.locator('[data-ui-command="close-ship"]').click();
-  if(name==='desktop')await page.keyboard.down('m');else{const box=await page.locator('#touch-missile').boundingBox();assert.ok(box);await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();}
-  await page.evaluate(({item})=>{const r=__VOID_PRIVATEER__.getRuntime();for(let i=0;i<100&&!r.save.player.inventory.items[item];i++){r.lastFrame=performance.now()-100;r.frame(performance.now());cancelAnimationFrame(r.frameId);}if(!r.save.player.inventory.items[item])throw Error('Normal salvage input did not recover the guaranteed item: '+r.utilityReadout);},loot);
-  if(name==='desktop')await page.keyboard.up('m');else await page.mouse.up();
-  const recovered=await page.evaluate(({item})=>{const r=__VOID_PRIVATEER__.getRuntime(),i=r.save.player.inventory.items[item];if(r.frameErrorAt)throw Error('Loot recovery raised a frame error');return{tier:i.tier,rarity:i.rarity,location:i.location.kind,lessonRead:r.save.quests.find(q=>q.id==='the-spare-key').flags['briefingRead-loot']};},loot);assert.deepEqual(recovered,{tier:1,rarity:'uncommon',location:'cargo',lessonRead:true});assert.deepEqual(errors,[]);
+  await page.evaluate(({item,wreck})=>{
+   const r=__VOID_PRIVATEER__.getRuntime(),p=r.save.player,w=r.save.world.combatWrecks[wreck];
+   p.position.splice(0,3,...w.position);r.resetPlayerInterpolation(true);
+   for(let i=0;i<100&&!p.inventory.items[item];i++){r.lastFrame=performance.now()-100;r.frame(performance.now());cancelAnimationFrame(r.frameId);}
+   if(!p.inventory.items[item])throw Error('Flying over the wreck did not recover its launcher');
+  },loot);
+  const recovered=await page.evaluate(({item})=>{const r=__VOID_PRIVATEER__.getRuntime(),i=r.save.player.inventory.items[item];if(r.frameErrorAt)throw Error('Loot recovery raised a frame error');return{tier:i.tier,rarity:i.rarity,location:i.location.kind,lessonRead:r.save.quests.find(q=>q.id==='the-spare-key').flags['briefingRead-loot-surrender-killed']};},loot);assert.deepEqual(recovered,{tier:1,rarity:'uncommon',location:'cargo',lessonRead:true});assert.deepEqual(errors,[]);
   report.push({name,setup,mined,departure,briefing,combat,loot,recovered,errors});await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));console.log(name,'full frame mining, continued extraction, steering, automatic recall, paused combat/loot lessons, live combat and green tier I salvage passed');
  }finally{await browser.close();}
 }

@@ -37,7 +37,7 @@ for(const [name,engine,device] of [['desktop',chromium,{viewport:{width:1440,hei
   await page.screenshot({path:`${out}/${name}-normal-trade.png`});
   await page.locator('[data-trade="sell:food:1"]').click();assert.ok(await page.locator('#adventure-panel').isHidden(),'partial sale cannot trigger the gift');
   await page.locator('[data-trade="sell:food:999"]').click();
-  await read('reactor-gift',/Energieregeneration.*Lager/s);await read('install-instructions',/LAGER.*EINBAUEN/s);
+  await read('reactor-gift',/Ersatz-Reaktor.*Lager.*Energiereserve schneller/s);await read('install-instructions',/LAGER.*EINBAUEN/s);
   assert.ok(await page.locator('#adventure-panel').isHidden());
   const before=await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();return{credits:r.save.player.credits,regen:r.playerStats().reactorOutput};});
   await page.locator('[data-ui-command="story"]').click();assert.equal(await page.locator('#story-panel [data-ui-command="tutorial-reactor"]').count(),0);await page.locator('[data-ui-command="close-story"]').click();

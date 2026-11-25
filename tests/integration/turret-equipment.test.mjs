@@ -11,22 +11,22 @@ test('new starter is two beams and an empty turret; displaced duplicate weapons 
  const fresh=createNewSave(8);assert.deepEqual(fresh.player.outfitting.loadouts.wayfarer.guns.filter(Boolean).map(equipmentBaseId),['beam-emitter','beam-emitter']);
  assert.deepEqual(fresh.player.outfitting.loadouts.wayfarer.turrets,[null]);assert.equal(fresh.player.outfitting.loadouts.wayfarer.fireGroups.activeGroup,'ALL');
  const old=createNewSave(8);old.version=13;old.player.shipId='lancer';old.player.ownedShips=['lancer'];old.player.outfitting=createOutfittingState(['lancer']);
- delete old.player.inventory;old.player.outfitting.schema=1;old.player.outfitting.loadouts.lancer.guns=['gauss-cannon','gauss-cannon','gauss-cannon'];
- old.player.outfitting.factory.lancer.guns=[false,false,false];
+ delete old.player.inventory;old.player.outfitting.schema=1;old.player.outfitting.loadouts.lancer.guns=Array(4).fill('gauss-cannon');
+ old.player.outfitting.factory.lancer.guns=Array(4).fill(false);
  const a=hydrateSave(old),b=hydrateSave(JSON.parse(JSON.stringify(a)));
- for(const save of [a,b]){assert.equal(Object.values(save.player.inventory.items).filter(i=>i.baseId==='gauss-cannon'&&i.location.kind==='station').length,1);assert.deepEqual(save.player.outfitting.loadouts.lancer.guns.filter(Boolean).map(equipmentBaseId),['gauss-cannon','gauss-cannon']);}
+ for(const save of [a,b]){assert.equal(Object.values(save.player.inventory.items).filter(i=>i.baseId==='gauss-cannon'&&i.location.kind==='station').length,1);assert.deepEqual(save.player.outfitting.loadouts.lancer.guns.filter(Boolean).map(equipmentBaseId),Array(3).fill('gauss-cannon'));}
 });
 
 test('Fire all cycles with populated groups only and low energy cannot starve one gun',()=>{
  const s=session(),p=s.save.player,fit=p.outfitting.loadouts.wayfarer;
- fit.fireGroups.assignments['wayfarer-weapon-1']='B';
+ fit.fireGroups.assignments['wayfarer-gun-1']='B';
  for(const group of ['A','B','ALL','A']){s.cycleWeapon();assert.equal(s.activeFireGroup(),group);}
- fit.fireGroups.assignments['wayfarer-weapon-1']='A';s.cycleWeapon();assert.equal(s.activeFireGroup(),'ALL');
+ fit.fireGroups.assignments['wayfarer-gun-1']='A';s.cycleWeapon();assert.equal(s.activeFireGroup(),'ALL');
  const counts={};s.fireBeam=(owner,w,start,dir,id)=>counts[id]=(counts[id]??0)+1;
  p.energy=0;s.gunCooldown=0;
  for(let i=0;i<600;i++){s.save.world.time=i/60;regenerateCombatResources(p,s.playerStats(),1/60);s.fireMountedPlayerGuns();}
- assert.ok(counts['wayfarer-weapon-0']>5);assert.ok(counts['wayfarer-weapon-1']>5);
- assert.ok(Math.abs(counts['wayfarer-weapon-0']-counts['wayfarer-weapon-1'])<=1);
+ assert.ok(counts['wayfarer-gun-0']>5);assert.ok(counts['wayfarer-gun-1']>5);
+ assert.ok(Math.abs(counts['wayfarer-gun-0']-counts['wayfarer-gun-1'])<=1);
 });
 
 function missile(s,position,targetId='player') {

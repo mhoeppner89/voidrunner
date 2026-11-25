@@ -206,7 +206,7 @@ function enoughRunEquipment(save,id,owned){
   &&REWARD_GRADES.indexOf(OUTFIT_ITEMS[other]?.rarity??RUN_EQUIPMENT_RARITY[equipmentBaseId(other)]??'common')>=grade;
  let count=owned.filter(asGood).length;
  for(const [other,n] of Object.entries(p.outfitting.locker))if(asGood(other))count+=n;
- return count>=(item.category==='gun'?HULL_HARDPOINTS[p.shipId].guns.filter(m=>itemFitsMount(item,m)).length:1);
+ return count>=(item.category==='gun'?HULL_HARDPOINTS[p.shipId].guns.length:item.category==='launcher'?HULL_HARDPOINTS[p.shipId].launchers.length:1);
 }
 // How much a reward does for this ship and fit. Above 1 it improves the
 // build: a better grade than what it replaces, an empty bay filled, or
@@ -244,11 +244,9 @@ export function runOffers(save){
  const eligible=id=>runRewardPlan(save,id)&&!enoughRunEquipment(save,id,owned);
  const candidates=Object.fromEntries(Object.entries(rewardPools).map(([key,ids])=>[key,ids.filter(id=>r.wave===0||r.wave>=(rewardWave[id]??1)).map(id=>runRewardItem(save,id)).filter(eligible).map(id=>({id,sort:rng()})).sort((a,b)=>a.sort-b.sort).map(x=>x.id)]));
  const offers=[];
- // Offer a heavy boss weapon where mounts permit it; small hulls get
- // scatterguns for exposed batteries. Stored copies do not block this offer.
+ // Offer a fitted counter to the frigate. Stored copies do not block the offer.
  if(r.wave===RUN_WAVES.length-1){
-  const heavy=HULL_HARDPOINTS[p.shipId].weapons.length>1;
-  const counters=heavy?['torpedo-launcher','mortar']:['ripper'];
+  const counters=['torpedo-launcher','mortar'];
   if(!owned.some(id=>counters.includes(equipmentBaseId(id)))){const counter=counters.map(id=>runRewardItem(save,id)).find(id=>runRewardPlan(save,id));if(counter)offers.push(counter);}
  }
  for(const key of ['offense','survival','handling']){if(key==='offense'&&offers.length)continue;const id=pickForFit(save,candidates[key].filter(id=>!offers.includes(id)),rng);if(id)offers.push(id);}
@@ -291,26 +289,16 @@ export function runRewardPlan(save,id){
  const fit=loadoutFor(p),key=item.category==='gun'?'guns':item.category==='launcher'?'launchers':item.category==='turret'?'turrets':'utility';if(!key)return null;
  let indices=spec[key].map((m,i)=>itemFitsMount(item,m)?i:-1).filter(i=>i>=0);
  if(!indices.length)return null;
- if(['guns','launchers'].includes(key)){
-  // Guns and launchers are two views of the same physical bays. An empty
-  // launcher slot is not free if a gun occupies that index (and vice versa).
-  const free=indices.filter(i=>!fit.guns[i]&&!fit.launchers[i]);
-  if(free.length){
-   const count=equipmentBaseId(id)==='ion-blaster'?1:Math.min(2,spec.weapons.length,key==='launchers'?Math.max(0,fit.guns.filter(Boolean).length+free.length-1):2);
-   indices=free.slice(0,count);
-  }else if(key==='guns'&&equipmentBaseId(id)!=='ion-blaster'){
-   // When every bay is occupied, prefer the usual pair but do not waste a
-   // duplicate on a mount that already carries this exact gun.
-   const paired=indices.slice(0,Math.min(2,spec.weapons.length));
-   const replace=paired.filter(i=>fit.guns[i]!==id);
-   indices=replace.length?replace:spec[key].map((m,i)=>itemFitsMount(item,m)&&fit.guns[i]!==id?i:-1).filter(i=>i>=0).slice(0,2);
-  }else indices=[indices.find(i=>fit[key][i]&&fit[key][i]!==id)??indices.find(i=>fit[key][i]!==id)??indices[0]];
- }else indices=[indices.find(i=>!fit[key][i])??indices.find(i=>fit[key][i]!==id)??indices[0]];
- if(indices.every(i=>fit[key][i]===id))return null;
- const changes=indices.map(index=>({key,index,old:fit[key][index],otherKey:key==='guns'?'launchers':key==='launchers'?'guns':null,other:(key==='guns'?fit.launchers:key==='launchers'?fit.guns:[])?.[index]}));
- for(const change of changes){fit[key][change.index]=id;if(change.otherKey)fit[change.otherKey][change.index]=null;}
+ const free=indices.filter(i=>!fit[key][i]);
+ const paired=(key==='guns' && equipmentBaseId(id)!=='ion-blaster') || (key==='launchers' && free.length>0);
+ const maxChanges=paired?2:1;
+ indices=(free.length?free:indices.filter(i=>fit[key][i]!==id)
+  .sort((a,b)=>equipmentRating(OUTFIT_ITEMS[fit[key][a]])-equipmentRating(OUTFIT_ITEMS[fit[key][b]]))).slice(0,maxChanges);
+ if(!indices.length)return null;
+ const changes=indices.map(index=>({key,index,old:fit[key][index]}));
+ for(const change of changes)fit[key][change.index]=id;
  if(!validateLoadout(p,p.shipId,fit).ok||!fit.guns.some(Boolean))return null;
- return {id,count:['gun','launcher','turret'].includes(item.category)?2:changes.length,changes,replaced:changes.flatMap(c=>[c.old,c.other]).filter(Boolean)};
+ return {id,count:['gun','launcher','turret'].includes(item.category)?2:changes.length,changes,replaced:changes.map(c=>c.old).filter(Boolean)};
 }
 export function chooseRunReward(save,id){
  refreshRunRepairOffer(save);const r=save.arenaRun;if(r.phase!=='prepare'||r.rewardChosen||!r.hullChosen||!r.offers.includes(id))return false;
@@ -328,9 +316,8 @@ export function chooseRunReward(save,id){
  else{
   // Commit the complete fit together so a pair cannot fail halfway through.
   const p=save.player,state=JSON.parse(JSON.stringify(p.outfitting)),fit=state.loadouts[p.shipId];
-  for(const {index,old,other} of plan.changes)for(const item of [old,other])if(OUTFIT_ITEMS[item]?.category==='launcher')stashRackRounds(r,item,rackRoundsAt(p,index));
-  for(const {key,index,old,other,otherKey} of plan.changes){
-   if(other){state.locker[other]=(state.locker[other]??0)+1;fit[otherKey][index]=null;state.factory[p.shipId][otherKey][index]=false;}
+  for(const {index,old} of plan.changes)if(OUTFIT_ITEMS[old]?.category==='launcher')stashRackRounds(r,old,rackRoundsAt(p,index));
+  for(const {key,index,old} of plan.changes){
    if(old){state.locker[old]=(state.locker[old]??0)+1;if(state.factory[p.shipId][key][index])state.factoryLocker[old]=(state.factoryLocker[old]??0)+1;}
    fit[key][index]=id;state.factory[p.shipId][key][index]=false;
   }
@@ -364,11 +351,10 @@ function loadRackRounds(p,r,itemId,index){
 }
 export function fitRunItem(save,key,index,id){
  const r=save.arenaRun;if(!save.arena?.run||r.phase!=='prepare'||!r.rewardChosen)return false;
- const p=save.player,draft=loadoutFor(p);if(![...LOADOUT_KEYS,'weapons'].includes(key)||!Number.isInteger(index)||index<0||index>=(key==='weapons'?HULL_HARDPOINTS[p.shipId].weapons.length:draft[key].length))return false;
- if(key==='weapons')key=id&&OUTFIT_ITEMS[id]?.category==='launcher'?'launchers':draft.launchers[index]&&!draft.guns[index]?'launchers':'guns';
- const old=draft[key][index]??(['guns','launchers'].includes(key)?draft[key==='guns'?'launchers':'guns'][index]:null),next=id||null;if(next===old)return true;
+ const p=save.player,draft=loadoutFor(p);
+ if(!LOADOUT_KEYS.includes(key)||!Number.isInteger(index)||index<0||index>=draft[key].length)return false;
+ const old=draft[key][index],next=id||null;if(next===old)return true;
  if(next&&!(p.outfitting.locker[next]>0))return false;
- if(['guns','launchers'].includes(key)){draft.guns[index]=null;draft.launchers[index]=null;}
  draft[key][index]=next;
  const validation=validateLoadout(p,p.shipId,draft);if(!validation.ok||!draft.guns.some(Boolean))return false;
  const removedRounds=old&&OUTFIT_ITEMS[old]?.category==='launcher'?rackRoundsAt(p,index):undefined;
@@ -485,10 +471,12 @@ export function changeRunHull(save,id){
   for(const key of LOADOUT_KEYS)for(const [i,item] of old[key].entries())if(item){locker[item]=(locker[item]??0)+1;if(oldFactory[key][i])factoryLocker[item]=(factoryLocker[item]??0)+1;}
   p.shipId=id;p.ownedShips=[id];p.outfitting=createOutfittingState([id]);const fit=p.outfitting.loadouts[id],spec=HULL_HARDPOINTS[id],flags=p.outfitting.factory[id];
   for(const key of LOADOUT_KEYS){fit[key].fill(null);flags[key].fill(false);}p.outfitting.locker=locker;p.outfitting.factoryLocker=factoryLocker;
+  const rackSources=new Map();
   const install=(key,index,item,sourceIndex)=>{
-   const mount=spec[key][index];if(!item||fit[key][index]||(['guns','launchers'].includes(key)&&(fit.guns[index]||fit.launchers[index]))||!locker[item]||!itemFitsMount(OUTFIT_ITEMS[item],mount))return false;
+   const mount=spec[key][index];if(!item||fit[key][index]||!locker[item]||!itemFitsMount(OUTFIT_ITEMS[item],mount))return false;
    fit[key][index]=item;locker[item]--;
    if(factoryLocker[item]>0){flags[key][index]=true;factoryLocker[item]--;}
+   if(key==='launchers'&&sourceIndex!==undefined)rackSources.set(index,sourceIndex);
    if(key==='guns'&&sourceIndex!==undefined)fit.fireGroups.assignments[mount.id]=old.fireGroups.assignments[oldSpec.guns[sourceIndex].id];
    return true;
   };
@@ -502,12 +490,24 @@ export function changeRunHull(save,id){
   fit.fireGroups.activeGroup=old.fireGroups.activeGroup;
   if(fit.fireGroups.activeGroup!=='ALL'&&!spec.guns.some((m,i)=>fit.guns[i]&&fit.fireGroups.assignments[m.id]===fit.fireGroups.activeGroup))fit.fireGroups.activeGroup='ALL';
   p.equipment=projectLegacyEquipment(p,p.outfitting);p.weaponId=projectLegacyWeaponId(p);
-  p.hull=getEffectiveShipStats(p).hull*fraction;p.launcherMagazines={};p.missiles=0;
-  // Transfer ammunition only between racks of the same type; never turn seekers into torpedoes.
-  const ammo={};for(const e of magazines)ammo[e.launcherId]=(ammo[e.launcherId]??0)+e.rounds;
-  for(const e of normalizeLauncherMagazines(p)){const rounds=Math.min(e.capacity,ammo[e.launcherId]??0);p.launcherMagazines[e.mount.id].rounds=rounds;ammo[e.launcherId]-=rounds;}
+  if(r.wave!==0&&!fit.guns.some(Boolean)){Object.assign(p,snapshot);return false;}
+  p.hull=getEffectiveShipStats(p).hull*fraction;
+  p.launcherMagazines={};p.missiles=0;
+  const used=new Set(rackSources.values());
+  for(const entry of magazines){
+   if(!used.has(entry.index))stashRackRounds(r,entry.itemId,entry.rounds);
+  }
   normalizeLauncherMagazines(p);
-  if(r.wave!==0&&!loadoutFor(p).guns.some(Boolean)){Object.assign(p,JSON.parse(JSON.stringify(snapshot)));return false;}
+  for(const [i,item] of fit.launchers.entries()){
+   if(!item)continue;
+   const source=rackSources.get(i);
+   if(source===undefined){loadRackRounds(p,r,item,i);continue;}
+   const previous=magazines.find(e=>e.mount.id===oldSpec.launchers[source].id);
+   if(!previous)continue;
+   p.launcherMagazines[spec.launchers[i].id].rounds=previous.rounds;
+   if(previous.selected)p.activeLauncherMountId=spec.launchers[i].id;
+  }
+  normalizeLauncherMagazines(p);
  }
  markDecision(save);r.wingmanOffers=[];r.offers=runOffers(save);return true;
 }

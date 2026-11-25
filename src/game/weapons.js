@@ -20,20 +20,20 @@ export const WEAPON_DAMAGE_SCALE = 0.8;
 export const PROJECTILE_SPEEDS=Object.freeze({normal:500,gauss:1200,plasma:300});
 export const WEAPONS = {
     pulse:{id:'pulse',nameKey:'PULSE LASER',hudNameKey:'PULSE',kind:'laser',slot:1,
-        speed:PROJECTILE_SPEEDS.normal,range:450,cooldown:.17,damageFlat:15,energyCost:3.2,assist:1,audioKey:'laser',mountSize:'S'},
+        speed:PROJECTILE_SPEEDS.normal,range:450,cooldown:.17,damageFlat:15,energyCost:3.2,assist:1,audioKey:'laser'},
     beam:{id:'beam',nameKey:'BEAM EMITTER',hudNameKey:'BEAM',kind:'beam',slot:7,
-        speed:100000,range:350,cooldown:.4,damageFlat:13,energyCost:3.5,assist:1.4,audioKey:'beam',mountSize:'S'},
+        speed:100000,range:350,cooldown:.4,damageFlat:13,energyCost:3.5,assist:1.4,audioKey:'beam'},
     gauss:{id:'gauss',nameKey:'MAGRAIL',hudNameKey:'MAGRAIL',kind:'gauss',slot:2,
-        speed:PROJECTILE_SPEEDS.gauss,range:600,cooldown:1.1,damageFlat:56,energyCost:14,shieldBypass:.15,assist:.5,audioKey:'gauss',mountSize:'M'},
+        speed:PROJECTILE_SPEEDS.gauss,range:600,cooldown:1.1,damageFlat:56,energyCost:14,shieldBypass:.15,assist:.5,audioKey:'gauss'},
     pdc:{id:'pdc',nameKey:'POINT-DEFENSE CLUSTER',hudNameKey:'PDC',kind:'pdc',slot:3,equipmentId:'pdc-cluster',
-        speed:PROJECTILE_SPEEDS.normal,range:300,cooldown:.07,damageFlat:1.2,energyCost:.6,shieldMul:.15,assist:1,audioKey:'pdc',mountSize:'S',
+        speed:PROJECTILE_SPEEDS.normal,range:300,cooldown:.07,damageFlat:1.2,energyCost:.6,shieldMul:.15,assist:1,audioKey:'pdc',
         burstSize:10,shotInterval:.07,burstPause:1,interceptInterval:.6,interceptEnergy:4},
     ripper:{id:'ripper',nameKey:'RIPPER SCATTERGUN',hudNameKey:'RIPPER',kind:'ripper',slot:4,equipmentId:'ripper-scattergun',
-        speed:PROJECTILE_SPEEDS.normal,range:350,cooldown:.72,damageFlat:7,energyCost:9,hullMul:1.35,pellets:7,spreadRad:.018,assist:1,audioKey:'ripper',mountSize:'S'},
+        speed:PROJECTILE_SPEEDS.normal,range:350,cooldown:.72,damageFlat:7,energyCost:9,hullMul:1.35,pellets:7,spreadRad:.018,assist:1,audioKey:'ripper'},
     ion:{id:'ion',nameKey:'ION PROJECTOR',hudNameKey:'ION',kind:'ion',slot:5,equipmentId:'ion-lance',
-        speed:PROJECTILE_SPEEDS.normal,range:400,cooldown:.62,damageFlat:6,energyCost:9,shieldMul:12,jamSeconds:1.0,assist:1,audioKey:'ion',mountSize:'M'},
+        speed:PROJECTILE_SPEEDS.normal,range:400,cooldown:.62,damageFlat:6,energyCost:9,shieldMul:12,jamSeconds:1.0,assist:1,audioKey:'ion'},
     mortar:{id:'mortar',nameKey:'SUNLANCE PLASMA MORTAR',hudNameKey:'PLASMA MORTAR',kind:'mortar',slot:6,equipmentId:'sunlance-mortar',
-        speed:PROJECTILE_SPEEDS.plasma,range:500,cooldown:1.5,damageFlat:100,energyCost:18,splashRadius:18,splashMin:4,splashDamage:28,assist:.35,audioKey:'mortar',mountSize:'M'},
+        speed:PROJECTILE_SPEEDS.plasma,range:500,cooldown:1.5,damageFlat:100,energyCost:18,splashRadius:18,splashMin:4,splashDamage:28,assist:.35,audioKey:'mortar'},
 };
 WEAPONS['frigate-battery']={id:'frigate-battery',nameKey:'CAPITAL ANTI-FIGHTER CANNON',hudNameKey:'CAP CANNON',kind:'laser',speed:520,range:600,cooldown:1.4,damageFlat:72,energyCost:40,assist:.7,audioKey:'laser'};
 WEAPONS['cruiser-battery']={id:'cruiser-battery',nameKey:'CAPITAL RAIL BATTERY',hudNameKey:'CAP RAIL',kind:'gauss',speed:900,range:1900,cooldown:7,damageFlat:200,energyCost:80,shieldMul:.8,hullMul:1.3,assist:.3,audioKey:'gauss'};

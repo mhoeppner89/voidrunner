@@ -25,6 +25,7 @@ import {EQUIPMENT_NAMING} from './equipmentNaming.js';
 // Player address is informal "du" throughout, matching the frontier voice of
 // the English lines. Values are plain text — never HTML.
 export const DE_CATALOG = {
+    'Select the raider as your target.': 'Wähle den Piraten als Ziel.',
   "Shields failing. Taking cover!": "Schilde brechen ein. Ich suche Deckung!",
   "Too hot! Ducking behind cover.": "Zu heiß! Ich gehe in Deckung.",
   "Cover me. Shields won't hold.": "Gib mir Deckung. Die Schilde halten nicht.",
@@ -3583,7 +3584,9 @@ export const DE_CATALOG = {
     "Top tier in this role": "Höchste Stufe in dieser Rolle",
     "Outfitting budget: {low}–{high} extra.": "Ausrüstungsbudget: {low}–{high} zusätzlich.",
     "Systems": "Systeme",
+    "An elite expedition cutter with two drone bays, mining capability and three forward guns. Faster and more versatile than a freighter, with less industrial capacity.": "Ein Expeditionskutter mit zwei Drohnenbuchten, Bergbauausrüstung und drei Bugkanonen. Schneller und vielseitiger als ein Frachter, mit weniger Industriekapazität.",
     "Gun": "Kanone",
+    "Guns": "Kanonen",
     "Launcher": "Werfer",
     "Drone": "Drohne",
     "Station directory": "Stationsverzeichnis",
