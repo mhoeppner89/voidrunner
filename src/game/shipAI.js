@@ -75,6 +75,17 @@ export const rollNpcCargo = (ship, session) => {
         const commodity = pick(rng, TRADER_CARGO_POOL);
         cargo[commodity] = Math.round((cargo[commodity] ?? 0) + randomBetween(rng, 4, 18));
     }
+    if (ship.variant === 'drover' && ship.missingPods) {
+        // Divide indivisible units between the same numbered pods as a spill.
+        for (const [commodity, full] of Object.entries(cargo)) {
+            let loaded = 0;
+            for (let pod = 0; pod < 6; pod++) {
+                if (!(ship.missingPods & (1 << pod))) loaded += Math.floor(full / 6) + Number(pod < full % 6);
+            }
+            if (loaded) cargo[commodity] = loaded;
+            else delete cargo[commodity];
+        }
+    }
     return cargo;
 };
 const dist2 = (a, b) => {
@@ -424,8 +435,10 @@ const legTick = (ship, session, task, nextLeg) => {
         task.dwellPoint = undefined;
         // Loaded for the outbound leg: a trader picks up a fresh hold at the
         // port (smugglers ship what the manifest cannot show — no market hit).
-        if (task.kind === 'trade')
+        if (task.kind === 'trade') {
             ship.cargo = rollNpcCargo(ship, session);
+            if (ship.capitalSpawnKey) session.checkpointCorvette(ship);
+        }
         ship.destination = nextLeg(ship, session, task);
         return;
     }
@@ -433,9 +446,11 @@ const legTick = (ship, session, task, nextLeg) => {
     if (approach && !ship.stationDockCompleted) {
         ship.destination = approach;
         if (ship.stationQueue === task.port || Math.hypot(approach[0]-ship.position[0],approach[1]-ship.position[1],approach[2]-ship.position[2]) < 65) {
-            reserveStationDock(session, ship, task.port);
+            // A bulk hauler exchanges cargo at the outer approach. Fighter berths are too small.
+            if(ship.variant==='drover')ship.stationDockCompleted=task.port;
+            else reserveStationDock(session, ship, task.port);
         }
-        return;
+        if(!ship.stationDockCompleted)return;
     }
     if (ship.stationDockCompleted || staleAt(ship)) {
         delete ship.stationDockCompleted;
@@ -448,6 +463,7 @@ const legTick = (ship, session, task, nextLeg) => {
         if (task.kind === 'trade' && ship.cargo && Object.keys(ship.cargo).some((id) => ship.cargo[id] > 0)) {
             deliverCargo(session.save.world.market, task.port, ship.cargo, session.save.world.seed, session.save.world.economyClock);
             ship.cargo = {};
+            if (ship.capitalSpawnKey) session.checkpointCorvette(ship);
         }
         return;
     }

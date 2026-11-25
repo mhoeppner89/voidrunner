@@ -66,13 +66,13 @@ function hullCrossesLane(session,actor,start,direction,distance) {
  const radius=Math.max(extents[0],extents[1],extents[2])+2;
  return x*x+y*y+z*z-along*along<radius*radius;
 }
-export function friendlyFiringLaneBlocked(session,ship,start,direction,distance) {
+export function friendlyFiringLaneBlocked(session,ship,start,direction,distance,targetId=ship.targetId) {
  const player=session.save.player;
  // Allied forward guns can physically hit the pilot, just like their turrets.
- if(!ship.hostile&&!ship.observerTeam&&ship.targetId!=='player'&&player.hull>0&&!player.dockedAt
+ if(!ship.hostile&&!ship.observerTeam&&targetId!=='player'&&player.hull>0&&!player.dockedAt
     &&hullCrossesLane(session,player,start,direction,distance))return true;
  for(const other of session.ships){
-  if(!allied(ship,other)||other.id===ship.targetId)continue;
+  if(!allied(ship,other)||other.id===targetId)continue;
   if(hullCrossesLane(session,other,start,direction,distance))return true;
  }
  return false;

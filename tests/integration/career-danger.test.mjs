@@ -69,7 +69,8 @@ function sample(systemId,{locationId,dark=false,calm=false,beam=false,mission=fa
         counts.demons+=pirates.filter(ship=>ship.hullId==='demon').length;
         counts.aces+=pirates.filter(ship=>ship.pilot.tier==='ace').length;
         counts.novices+=pirates.filter(ship=>ship.pilot.tier==='novice').length;
-        counts.maxGroup=Math.max(counts.maxGroup,pirates.length);counts.seconds+=s.nextEncounterAt-s.save.world.time;
+        // The original fighter group rolls independently of the optional attached corvette.
+        counts.maxGroup=Math.max(counts.maxGroup,pirates.filter(s=>!s.capitalClass).length);counts.seconds+=s.nextEncounterAt-s.save.world.time;
         for(const ship of s.ships)assert.equal(ship.combatFit.fitId,`${ship.hullId}-standard`);
     }
     counts.threatsPerHour=counts.hostileWindows/counts.seconds*3600;

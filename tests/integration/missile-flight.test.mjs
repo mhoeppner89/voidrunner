@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Vector3,Quaternion} from '../../vendor/three.module.min.js';
-import {MISSILE_PADDING,guideMissile,rackLockProgress} from '../../src/game/weaponFlight.js';
-import {LAUNCHERS,fillLauncherMagazines} from '../../src/game/weapons.js';
+import {MISSILE_PADDING,guideMissile,rackLockProgress,torpedoMobilityFactor} from '../../src/game/weaponFlight.js';
+import {LAUNCHERS,fillLauncherMagazines,launcherMagazineEntries} from '../../src/game/weapons.js';
 import {missileTrial,missileCells,npcFixture,steadyFlights} from '../helpers/missile-flight.mjs';
 import {CRUISER_MOUNTS} from '../../src/game/cruiserModelData.js';
 import {observeIncomingFire} from '../../src/game/combatPiloting.js';
@@ -338,4 +338,66 @@ test('the closest live round cues the break once, at its best moment, and once p
  later.targetId='npc';scan();assert.equal(flight.trackingMissile,false);assert.equal(flight.missileThreat,0);assert.equal(flight.missileBreak,false);
  later.targetId='player';s.projStore.setVel(later.slot,0,0,-300);scan();assert.equal(flight.missileThreat,0);
  assert.equal(flight.trackingMissile,true,'a turning seeker still lights LOCK outside the closing-pip window');
+});
+
+test('torpedo acquisition multiplies speed and relative angular-rate falloffs',()=>{
+ const rack=LAUNCHERS.torpedo,bearing=new Vector3(0,0,-1),range=200;
+ for(const [speed,speedFactor] of [[30,1],[40,1],[50,.5],[60,0],[70,0]]){
+  for(const [degrees,crossingFactor] of [[3,1],[5,1],[10,.5],[15,0],[20,0]]){
+   const shooter=[range*degrees*Math.PI/180,0,0],target=[0,0,speed];
+   const factor=torpedoMobilityFactor(rack,shooter,target,bearing,range);
+   assert.ok(Math.abs(factor-speedFactor*crossingFactor)<1e-10,`${speed} units/s, ${degrees}°/s`);
+   assert.ok(Math.abs(rackLockProgress(0,rack,null,range,1,-1,1.5,factor)-.5*factor)<1e-10);
+   for(const other of [LAUNCHERS.seeker,LAUNCHERS.swarm])
+    assert.equal(torpedoMobilityFactor(other,shooter,target,bearing,range),1);
+  }
+ }
+ assert.equal(torpedoMobilityFactor(rack,[35,0,0],[35,0,0],bearing,20),1,'shared transverse drift cancels');
+ assert.equal(rackLockProgress(.75,rack,null,range,1,-1,.75,0),.5,'blocked progress decays at the ordinary rate');
+});
+
+test('a fast fighter prevents player release and shows TOO FAST; a cruising Atlas or parked fighter locks normally',()=>{
+ const s=session(),p=s.save.player,enemy=s.spawnShip('pirate',[0,0,-350]);
+ enemy.rotation=[0,1,0,0];enemy.velocity=[0,0,70];p.currentTargetId=enemy.id;
+ p.outfitting.loadouts[p.shipId].launchers[0]='torpedo-launcher';fillLauncherMagazines(p);
+ s.getTargetRef=()=>({kind:'ship',id:enemy.id});
+ for(let i=0;i<600;i++)s.updatePlayerRackLocks(1/60);
+ assert.equal(s.rackProgress,0);assert.equal(s.rackLocks.get(p.activeLauncherMountId).tooFast,true);
+ s.fireMissile();assert.equal(s.projectiles.length,0);assert.equal(s.rackMotionBlocksLaunch(launcherMagazineEntries(p),enemy.id),true);
+ for(const [id,speed] of [['atlas',35],['talon',0]]){
+  enemy.hullId=id;enemy.velocity=[0,0,speed];s.rackLocks.clear();
+  for(let i=0;i<179;i++)s.updatePlayerRackLocks(1/60);
+  assert.equal(s.rackLocks.get(p.activeLauncherMountId).tooFast,false);assert.ok(s.rackProgress>.99&&s.rackProgress<1);
+  s.updatePlayerRackLocks(1/60);assert.equal(s.rackProgress,1);
+ }
+ // Even a zero-time release check must reject an old completed lock.
+ enemy.velocity=[0,0,70];s.fireMissile();assert.equal(s.projectiles.length,0);
+ s.updatePlayerRackLocks(.75);assert.equal(s.rackProgress,.75);
+ p.currentTargetId=undefined;s.updatePlayerRackLocks(0);assert.equal(s.rackLocks.size,0);
+});
+
+test('NPC tubes prefer a lockable enemy capital or transport while guns keep their fighter target',()=>{
+ for(const preferred of ['frigate','corvette','transport']){
+  const s=session(),p=s.save.player;p.position=[1000,0,0];
+  const bomber=s.spawnShip('pirate',[0,0,0],undefined,'Thor',{tier:'ace'},{hullId:'andromeda',faction:'pirates'});
+  bomber.rotation=[0,0,0,1];bomber.velocity=[0,0,0];bomber.energy=100;bomber.holdFire=false;
+  const fighter=s.spawnShip('patrol',[-70,0,-250]);fighter.velocity=[0,0,70];bomber.targetId=fighter.id;
+  const add=(role,position,faction='concord')=>{
+   const actor=s.spawnShip(role,position,undefined,undefined,undefined,{faction});
+   actor.holdFire=false;actor.pendingMug=false;actor.velocity=[0,0,25];return actor;
+  };
+  const ally=add('escort',[-88,0,-300],'pirates');ally.capitalClass='frigate';
+  const fast=add('patrol',[15,0,-170]);fast.capitalClass='frigate';fast.velocity=[0,0,70];
+  const hidden=add('patrol',[25,0,-190]);hidden.capitalClass='frigate';
+  s.lineBlocked=(_start,end)=>end.x===25;
+  const mark=add('escort',[45,0,-340]);
+  if(preferred==='transport')mark.hullId='mule';else mark.capitalClass=preferred;
+  const fit=bomber.combatFit;fit.racks=[{launcher:'swarm',missiles:1},{launcher:'torpedo',missiles:1}];
+  for(let i=0;i<240&&!s.projectiles.length;i++){
+   s.save.world.time=i/60;s.updateNpcOrdnance(bomber,new Vector3(...fighter.position),1/60);
+  }
+  assert.equal(bomber.targetId,fighter.id);assert.equal(s.projectiles.length,1,preferred);
+  assert.equal(s.projectiles[0].launcherId,'torpedo');assert.equal(s.projectiles[0].targetId,mark.id);
+  assert.equal(fit.racks[0].missiles,1);
+ }
 });

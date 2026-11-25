@@ -2136,3 +2136,20 @@ Follow-up: phone and desktop performance pass (three rounds, reviewed).
 - Verification passed for 1,562 main tests and 70 render tests. Desktop, Android and iPhone passed gameplay, offline resume, targeting, fitting and fire-group checks. Hestia cockpit hardware and artwork also passed on the small-phone profile.
 - Review fixes aligned cycling and reacquisition range, spaced automatic selection cues, preserved singular legacy slots and their ammunition, and removed unused item size fields. Tutorial combat prompts the pilot to select a raider. Navigation, mining and salvage still select their objectives when the pilot has no hostile or remembered target.
 - Review verification passed all 1,573 tests in the main suite and all 30 targeting, fitting and tutorial browser runs across desktop Chrome, Android Chrome and iPhone WebKit.
+
+## Torpedo balance
+
+- Measured “The line” with a Thor, three stock tubes, one plasma cannon and both Victoria escorts. The baseline frigate fell in 36.85 s and 32.67 s on seeds 718 and 719.
+- In 0.8.2pr the same frigate fell in 34.17 s and 26.63 s. All six torpedoes landed in each run, and the plasma cannon finished the fight. With ideal tracking on each Victoria escort, full lock occupied 6.8% of their combined live time, down from 62.4%. The per-seed data is in `output/torpedo-balance/`.
+- All 1,578 main tests passed, including all 73 Arena tests. Desktop Chrome showed TOO FAST and ZU SCHNELL on the target monitor and seated the chevrons again when the target slowed.
+- Torpedo review verified friendly firing lanes, hostile player transport selection, partial lock decay, grouped rack warnings and capital-only shield piercing on splash. All ten review regressions failed before the fixes. All 1,588 main tests and the desktop Wayfarer hardware check passed, including the live frigate lock and paired launch.
+
+## Corvette flight and subsystem targeting
+
+- Drovers carry six detachable cargo pods and fly with Free Merchants escorts. Ironjaws carry two broadside guns and join pirate raids in regions that can field more than one fighter. Both use the approved models, authored paint and collision geometry.
+- The four armed capital hulls share their subsystem definitions. V, right-stick click and the cockpit button cycle generators, engines and the hull. Mini markers follow visible intact parts and fade behind the ship’s own collision mesh.
+- Live flight views of both ranges, damaged ships, combat, break-ups and Pixel 7 landscape are in [the corvette review](output/corvettes/).
+- Verification passed all 1,600 main tests and 70 render tests. Desktop Chrome, Pixel 7 Chrome and iPhone WebKit passed targeting and HUD checks, 45 cockpit hardware cases with the live frigate check, and 19 corvette views.
+
+- All eleven corvette review regressions failed on the reviewed build and passed after repair. A seed-718 reload keeps the detached pod and seven remaining electronics. The title imports 3.05 MB across 117 modules (HEAD 3.96 MB across 122). With one pod missing, median wreck construction fell from 70.60 ms to 0.30 ms over nine paired runs.
+- Verification passed 1,611 main tests, 70 render tests, 19 live corvette views and 30 desktop/Android cockpit hardware cases, including both live frigate lock checks. Measurements and test logs are in `output/review-corvettes/`.

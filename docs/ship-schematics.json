@@ -120,6 +120,22 @@
     "aspect": 0.3229190476190476
   },
   {
+    "variant": "drover",
+    "path": "assets/models/capital/drover.glb",
+    "sha256": "ecd0730ee21a5fd1eff59b089babd2cf0e8c96e80958b75e5efbf3970a358184",
+    "contourVertices": 279,
+    "glassContours": 14,
+    "aspect": 0.3854166666666667
+  },
+  {
+    "variant": "ironjaw",
+    "path": "assets/models/capital/ironjaw.glb",
+    "sha256": "d41574df04231c2cd591be93a8c8d22e01d00654eb8fee7e0339804c4bcf4ffa",
+    "contourVertices": 253,
+    "glassContours": 10,
+    "aspect": 0.3906238095238095
+  },
+  {
     "variant": "concord-frigate",
     "path": "assets/models/capital/concord-frigate.glb",
     "sha256": "6c3d0d2c2d1d96a177b5613210ee18e7dbd08bed10646e9ef4c8b11778f84be7",

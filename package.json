@@ -74,6 +74,7 @@
     "clean:generated": "node tools/maintenance/clean-generated.mjs",
     "test:browser:cockpit": "node tests/browser/cockpit-hardware.mjs && node tests/browser/cockpit-artwork.mjs && node tests/browser/touch-highlight.mjs",
     "review:finish": "node tools/playtest/comic-style-review.mjs",
+    "test:browser:corvettes": "node tests/browser/corvettes.mjs",
     "test:browser:target-cycling": "node tests/browser/target-cycling.mjs",
     "review:cockpit": "node tools/playtest/cockpit-layout.mjs",
     "test:browser:cockpit-review": "node tests/browser/cockpit-layout.mjs",

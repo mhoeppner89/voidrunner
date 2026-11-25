@@ -160,10 +160,10 @@ test('special dealer offers are expensive, fixed within a rotation, bought once 
  assert.equal(equipmentAction(restored.player,'buy',{baseId:offer.baseId,tier:offer.tier,offerId:offer.offerId,world:{...restored.world,time:restored.world.time+1800}}).ok,false);
 });
 
-test('base racks deliver equal magazine damage and refill cost',async()=>{
+test('a torpedo magazine carries triple the base missile damage at the same refill cost',async()=>{
  const {LAUNCHERS}=await import('../../src/game/weapons.js');
  for(const rack of Object.values(LAUNCHERS)){
-  assert.equal(rack.damage*rack.volley*rack.capacity,240,rack.id);
+  assert.equal(rack.damage*rack.volley*rack.capacity,rack.id==='torpedo'?720:240,rack.id);
   assert.equal(rack.unitCost*rack.capacity,960,rack.id);
  }
 });

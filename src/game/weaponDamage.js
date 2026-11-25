@@ -1,7 +1,10 @@
 // One damage calculation for all actors. Hull multipliers never amplify shield damage.
-export function weaponDamage(shield, amount, weapon = {}) {
+// `target` is the struck actor; only corvette/capital hulls (capitalClass)
+// receive a weapon's capitalShieldBypass.
+export const shieldBypassFor = (weapon = {}, target) => Math.max(weapon.shieldBypass ?? 0, target?.capitalClass ? weapon.capitalShieldBypass ?? 0 : 0);
+export function weaponDamage(shield, amount, weapon = {}, target) {
     const damage = Math.max(0, Number(amount) || 0);
-    const bypass = damage * Math.max(0, Math.min(1, weapon.shieldBypass ?? 0));
+    const bypass = damage * Math.max(0, Math.min(1, shieldBypassFor(weapon, target)));
     const shieldMultiplier = Math.max(0.01, weapon.shieldMul ?? 1);
     const absorbed = Math.min(Math.max(0, shield), (damage - bypass) * shieldMultiplier);
     const hull = (bypass + Math.max(0, damage - bypass - absorbed / shieldMultiplier)) * (weapon.hullMul ?? 1);

@@ -47,7 +47,7 @@ export function cockpitLockState(ships, time, trackingMissile) {
     let state = 'off';
     for (const ship of ships) {
         const fit = ship.combatFit;
-        if (!ship.hostile || ship.hull <= 0 || ship.surrendered || ship.targetId !== 'player'
+        if (!ship.hostile || ship.hull <= 0 || ship.surrendered
             || fit?.lockTarget !== 'player' || fit.lockCheckedAt !== time) continue;
         if (fit.lock === 1) return 'locked';
         if (fit.warned && fit.lock > 0) state = 'acquiring';
@@ -177,10 +177,23 @@ export function closestHullPoint(point,actor,extents,out) {
 }
 
 const acquireCone=Math.cos(20*Math.PI/180),holdCone=Math.cos(30*Math.PI/180);
-export function rackLockProgress(progress,launcher,pilot,distance,alignment,aspect,dt){
+// The line-of-sight angular speed is |unit bearing × relative velocity| / range.
+const lockFalloff=(value,full,zero)=>Math.min(1,Math.max(0,(zero-value)/(zero-full)));
+export function torpedoMobilityFactor(launcher,shooterVelocity,targetVelocity,bearing,distance){
+    if(launcher.zeroLockSpeed===undefined)return 1;
+    if(!targetVelocity||!shooterVelocity)return 0;
+    const speed=Math.hypot(targetVelocity[0],targetVelocity[1],targetVelocity[2]);
+    const speedFactor=lockFalloff(speed,launcher.fullLockSpeed,launcher.zeroLockSpeed);
+    if(!speedFactor||distance<=0)return 0;
+    relative.fromArray(targetVelocity).sub(transverse.fromArray(shooterVelocity));
+    const angularRate=relative.cross(bearing).length()/distance;
+    return speedFactor*lockFalloff(angularRate,launcher.fullLockAngularRate,launcher.zeroLockAngularRate);
+}
+export function rackLockProgress(progress,launcher,pilot,distance,alignment,aspect,dt,mobility=1){
     if(distance>launcher.lockRange || alignment<(progress===1?holdCone:acquireCone))return 0;
     const scale=pilot==='novice'?2:pilot==='veteran'?1.5:1;
     const seconds=launcher.lockTime*scale*(.75-.25*Math.max(-1,Math.min(1,aspect)));
-    const next=progress+dt/seconds;
+    if(mobility===0)return Math.max(0,progress-dt/seconds);
+    const next=progress+mobility*dt/seconds;
     return next>=1-1e-12?1:next;
 }

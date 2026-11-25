@@ -123,6 +123,27 @@
       "previousSource": "docs/fleet-rebuild/astra/astra.blend"
     },
     {
+      "id": "drover",
+      "runtime": "assets/models/capital/drover.glb",
+      "runtimeSha256": "ecd0730ee21a5fd1eff59b089babd2cf0e8c96e80958b75e5efbf3970a358184",
+      "source": "authoring/models/drover/drover.blend",
+      "sourceSha256": "12d81a2a244640fe9087bca8b84449397452ec5f21070422ed376d3462af2851"
+    },
+    {
+      "id": "ironjaw",
+      "runtime": "assets/models/capital/ironjaw.glb",
+      "runtimeSha256": "d41574df04231c2cd591be93a8c8d22e01d00654eb8fee7e0339804c4bcf4ffa",
+      "source": "authoring/models/ironjaw/ironjaw.blend",
+      "sourceSha256": "bb725b1cbf7c2a5bea56dc1ec5a796b7543b79ebd08d31b4888b4847f898c97d"
+    },
+    {
+      "id": "ironjaw-broadside",
+      "runtime": "assets/models/turrets/ironjaw-broadside.glb",
+      "runtimeSha256": "6030ec6b49e3583f77892a518a884f1283082c88df2add5079190d7fa933bc32",
+      "source": "authoring/models/ironjaw/ironjaw.blend",
+      "sourceSha256": "bb725b1cbf7c2a5bea56dc1ec5a796b7543b79ebd08d31b4888b4847f898c97d"
+    },
+    {
       "id": "concord-frigate",
       "runtime": "assets/models/capital/concord-frigate.glb",
       "runtimeSha256": "6c3d0d2c2d1d96a177b5613210ee18e7dbd08bed10646e9ef4c8b11778f84be7",

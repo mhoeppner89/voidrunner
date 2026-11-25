@@ -11,6 +11,8 @@ Models and references are ignored by Git. Keep an external copy; a fresh clone i
 
 For maintenance use the tools under `tools/assets`. `npm run verify:sources` checks local native-file and shipping-asset hashes. Opening the native sources in Blender is the additional check for editable meshes and packed images.
 
+Keep callsigns and individual ship names in the interface. Hulls use faction colours and insignia. Freight numbers identify detachable pods.
+
 ## Station architecture
 
 `tools/assets/station_volumes.py` adds each port's pressure hulls, connected engineering structure and inhabited lower decks in the editable source frame. The station builders call this before surface detailing and export; collision uses those same shipped surfaces.

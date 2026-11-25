@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {CAPITAL_HULLS} from './capitalHulls.js';
 import {CRUISER_MOUNTS} from './cruiserModelData.js';
 import {FRIGATE_MOUNTS,FRIGATE_ENGINE_MOUNTS} from './frigateMounts.js';
 import {BATTLESHIP_ENGINE_GLOWS} from './battleshipModelData.js';
@@ -38,7 +39,7 @@ export function capitalExhaustLayout(variant){
  if(variant==='concord-carrier')return CARRIER_ENGINE_GLOWS;
  if(variant==='concord-cruiser')return CRUISER_MOUNTS.filter(m=>m.kind==='engine').map(m=>({index:m.index,maxHull:m.hull,radius:m.radius*.77,position:[m.position[0],m.position[1],564.0942*1.001]}));
  if(variant==='concord-frigate')return FRIGATE_ENGINE_MOUNTS.map(index=>{const m=FRIGATE_MOUNTS[index];return {index,maxHull:m.hull,radius:m.radius*.68,position:[m.position[0]*37.46,m.position[1]*44.92,m.position[2]*112.9+.46]};});
- return [];
+ return CAPITAL_HULLS[variant]?.mounts.filter(m=>m.exhaustRadius).map(m=>({index:m.index,maxHull:m.hull,radius:m.exhaustRadius,position:[m.position[0],m.position[1],m.position[2]+.1]}))??[];
 }
 export function createCapitalEngineExhaust(variant){
  const root=new THREE.Group();root.name='capital-engine-exhaust';

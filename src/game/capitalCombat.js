@@ -1,128 +1,181 @@
+import {CORVETTES} from './corvetteMounts.js';
+import {segmentShipColliderHit} from './shipCollision.js';
 import {t} from './i18n.js';
-import {combatTargetEligible} from './combatTargeting.js';
-import {WEAPON_DAMAGE_SCALE,LAUNCHERS} from './weapons.js';
+import {friendlyFiringLaneBlocked} from './combatPlanning.js';
+import {combatTargetEligible, tracksActivePlayer} from './combatTargeting.js';
+import {WEAPON_DAMAGE_SCALE,LAUNCHERS,CORVETTE_BROADSIDE} from './weapons.js';
 import * as THREE from 'three';
 import {integrateFlightVelocity} from './flightDynamics.js';
-import {FRIGATE_MOUNTS,FRIGATE_CLEARANCE,FRIGATE_ENGINE_MOUNTS,FRIGATE_TORPEDO_MOUNTS,FRIGATE_TORPEDO_LAYOUT} from './frigateMounts.js';
+import {FRIGATE_MOUNTS,FRIGATE_CLEARANCE,FRIGATE_TORPEDO_MOUNTS,FRIGATE_TORPEDO_LAYOUT} from './frigateMounts.js';
 import {FRIGATE_COLLISION_TRIANGLES} from './frigateCollisionData.js';
 import {clearTurretArc,shipBlocksRay,updateAutomaticTurrets} from './turrets.js';
 import {disruptionFactor} from './weaponDamage.js';
-import {relativeIntercept,beginRackLock,rackLockProgress} from './weaponFlight.js';
-import {SHIPS} from './data.js';
+import {relativeIntercept,beginRackLock,rackLockProgress,torpedoMobilityFactor} from './weaponFlight.js';
 // Live capital hulls render at twice their authored scale. PDCs use the same
 // extents through npcHullExtents; main batteries and assembly hits must agree.
-export const FRIGATE_EXTENTS=[37.46,44.92,112.9];
+import {capitalHull,capitalMountPosition,FRIGATE_EXTENTS,CAPITAL_HULLS} from './capitalHulls.js';
+export {FRIGATE_EXTENTS,capitalMountPosition as frigateMountPosition};
+const frigateMountPosition=capitalMountPosition;
 export const FRIGATE_GUN=Object.freeze({id:'frigate-battery',kind:'laser',speed:520,range:600,life:600/520,damageFlat:72*WEAPON_DAMAGE_SCALE,energyCost:12});
 export const FRIGATE_BOSS_GUN=FRIGATE_GUN;
 const FRIGATE_FLIGHT_ACCELERATION=4.8;
 const FRIGATE_LATERAL_DAMPING=1.5;
+export const FRIGATE_HULL=2600;
 const FRIGATE_SHIELD_CAPACITY=650;
-const FRIGATE_GENERATOR_HULL=95;
 const FRIGATE_GENERATOR_REGEN=16;
 const forward=new THREE.Vector3(0,0,-1);
 export function equipFrigate(ship,boss=false){
- ship.capitalBoss=boss;
- ship.combatFit={hullId:'concord-frigate',turrets:[null,null,null,null,'pdc','pdc','pdc','pdc'],stats:{energyCapacity:240},weapons:[],guns:[],attackOrder:[],fireAt:[],missiles:0};
- ship.energy=240;ship.capitalMountHull=FRIGATE_MOUNTS.map((m,i)=>m.hull??(i<4?100:65));
- {ship.maxShield=FRIGATE_SHIELD_CAPACITY;ship.shield=ship.maxShield;ship.maxHull=1400;ship.hull=1400;ship.shieldRegen=FRIGATE_GENERATOR_REGEN*2;ship.turnRate=.12;ship.capitalBaseSpeed??=ship.speed;ship.speed=ship.capitalBaseSpeed;ship.capitalTorpedoes=LAUNCHERS.torpedo.capacity;}
+ ship.capitalClass='frigate';ship.capitalBoss=boss;
+ ship.combatFit={hullId:'concord-frigate',turrets:CAPITAL_HULLS['concord-frigate'].weapons.map(m=>m.kind==='pdc'?'pdc':null),stats:{energyCapacity:240},weapons:[],guns:[],attackOrder:[],fireAt:[],missiles:0};
+ ship.energy=240;ship.capitalMountHull=CAPITAL_HULLS['concord-frigate'].mounts.map(m=>m.hull);
+ {ship.maxShield=FRIGATE_SHIELD_CAPACITY;ship.shield=ship.maxShield;ship.maxHull=FRIGATE_HULL;ship.hull=ship.maxHull;ship.shieldRegen=FRIGATE_GENERATOR_REGEN*2;ship.turnRate=.12;ship.capitalBaseSpeed??=ship.speed;ship.speed=ship.capitalBaseSpeed;ship.capitalTorpedoes=LAUNCHERS.torpedo.capacity;}
+}
+export function equipCorvette(ship){
+ const spec=CORVETTES[ship.variant],mounts=capitalHull(ship).mounts;
+ ship.hullId=ship.variant;ship.capitalBaseSpeed=ship.speed=spec.speed;ship.afterburnSpeed=0;ship.turnRate=.25;ship.engineThrust=1;
+ ship.shield=ship.maxShield=ship.capitalShieldCapacity=spec.shield;ship.hull=ship.maxHull=spec.hull;ship.shieldRegen=10;
+ ship.capitalMountHull=mounts.map(m=>m.hull);ship.noSurrender=true;ship.mugCapable=false;
+ ship.combatFit={hullId:ship.variant,fitId:ship.variant+'-standard',stats:{energyCapacity:200},turrets:mounts.map(m=>m.kind==='pdc'?'pdc':m.kind==='laser'?'tracking-turret':null),guns:[],weapons:[],attackOrder:[],fireAt:[],missiles:0};
+ ship.energy=200;
 }
 function stateFor(ship){
- return ship.capitalRuntime??={position:new THREE.Vector3(),normal:new THREE.Vector3(),direction:new THREE.Vector3(),scratch:new THREE.Vector3(),local:new THREE.Vector3(),inverse:new THREE.Quaternion(),q:new THREE.Quaternion(),goal:new THREE.Quaternion(),target:new THREE.Vector3(),velocity:new THREE.Vector3(),lead:new THREE.Vector3(),torpedoStarts:[new THREE.Vector3(),new THREE.Vector3()],turn:new THREE.Quaternion(),mounts:FRIGATE_MOUNTS.map(()=>({direction:new THREE.Vector3(),fireAt:0,chargeAt:0,rounds:0}))};
-}
-export function frigateMountPosition(ship,index,out){
- const s=stateFor(ship),m=FRIGATE_MOUNTS[index];s.q.fromArray(ship.rotation);
- return out.fromArray(m.position).multiply(s.scratch.fromArray(FRIGATE_EXTENTS)).applyQuaternion(s.q).add(s.scratch.fromArray(ship.position));
-}
-function frigateMountLocalHitCenter(m,out,s){
- out.fromArray(m.position).multiply(s.scratch.fromArray(FRIGATE_EXTENTS));
- if(m.hitCenterOffset)out.add(s.scratch.fromArray(m.hitCenterOffset));
- else if(m.kind==='generator'||m.kind==='torpedo')out.y+=m.side*(m.hitOffset??3);
- return out;
+ return ship.capitalRuntime??={position:new THREE.Vector3(),normal:new THREE.Vector3(),direction:new THREE.Vector3(),scratch:new THREE.Vector3(),local:new THREE.Vector3(),inverse:new THREE.Quaternion(),q:new THREE.Quaternion(),goal:new THREE.Quaternion(),target:new THREE.Vector3(),velocity:new THREE.Vector3(),lead:new THREE.Vector3(),torpedoStarts:[new THREE.Vector3(),new THREE.Vector3()],torpedoRay:new THREE.Vector3(),turn:new THREE.Quaternion(),mounts:capitalHull(ship).mounts.map(()=>({direction:new THREE.Vector3(),fireAt:0,chargeAt:0,rounds:0}))};
 }
 export function frigateMountHitPosition(ship,index,out){
  const s=stateFor(ship);s.q.fromArray(ship.rotation);
- return frigateMountLocalHitCenter(FRIGATE_MOUNTS[index],out,s).applyQuaternion(s.q).add(s.scratch.fromArray(ship.position));
+ return out.fromArray(capitalHull(ship).mounts[index].hitCenter).applyQuaternion(s.q).add(s.scratch.fromArray(ship.position));
+}
+// Work in the live pitch frame so the barrel volumes follow both turret axes.
+function broadsideBarrelHit(s, mount, segment, padding) {
+ const b = mount.barrels;
+ const frame = s.barrelFrame ??= {forward:new THREE.Vector3(), right:new THREE.Vector3(),
+  up:new THREE.Vector3(), origin:new THREE.Vector3(), start:new THREE.Vector3(), delta:new THREE.Vector3()};
+ const {forward, right, up, origin, start, delta} = frame;
+ forward.copy(s.mounts[mount.index].direction).applyQuaternion(s.inverse);
+ if (!forward.lengthSq()) forward.set(mount.bearing,0,0);
+ right.set(-forward.z,0,forward.x).normalize();
+ up.crossVectors(right,forward);
+ origin.copy(s.local).sub(s.scratch.fromArray(mount.localPosition));
+ origin.y -= b.pivotHeight;
+ start.set(origin.dot(right),origin.dot(up)-b.height,origin.dot(forward)-b.reach);
+ if (segment) delta.set(s.direction.dot(right),s.direction.dot(up),s.direction.dot(forward));
+ else delta.set(0,0,0);
+ let nearest = Infinity;
+ for (let side=-1; side<=1; side+=2) {
+  let near=0, far=1;
+  for (let axis=0; axis<3; axis++) {
+   const o=start.getComponent(axis)-(axis===0?side*b.offset:0), d=delta.getComponent(axis), h=b.half[axis]+padding;
+   if (Math.abs(d)<1e-10) {
+    if (Math.abs(o)>h) {far=-1; break;}
+   } else {
+    const t0=(-h-o)/d, t1=(h-o)/d;
+    near=Math.max(near,Math.min(t0,t1));
+    far=Math.min(far,Math.max(t0,t1));
+   }
+  }
+  if (near<=far) nearest=Math.min(nearest,near);
+ }
+ return nearest;
 }
 // Damage is localized in three dimensions; a hit on the opposite side or
 // another deck cannot leak through the hull into a nearby component.
-export function damageFrigateMount(ship,position,damage){
- if(ship.capitalClass!=='frigate'||!position||damage<=0||!ship.capitalMountHull)return -1;
+export function damageCapitalMount(ship,position,damage){
+ if(!ship.capitalMountHull||!position||damage<=0)return -1;
  const s=stateFor(ship);s.local.fromArray(position).sub(s.scratch.fromArray(ship.position)).applyQuaternion(s.inverse.fromArray(ship.rotation).invert());
  let nearest=1,index=-1;
- for(let i=0;i<FRIGATE_MOUNTS.length;i++){
-  if(ship.capitalMountHull[i]<=0)continue;
-  const m=FRIGATE_MOUNTS[i];frigateMountLocalHitCenter(m,s.lead,s);
+ for(const m of capitalHull(ship).mounts){
+  const i=m.index;if(ship.capitalMountHull[i]<=0)continue;
+  s.lead.fromArray(m.hitCenter);
   const half=m.hitHalfExtents;
   let normalized;
   if(m.hitShape==='cylinder'){
    const dx=s.local.x-s.lead.x,dy=s.local.y-s.lead.y,dz=s.local.z-s.lead.z;
    normalized=Math.max(Math.hypot(dx,dy)/(m.hitRadius+.9),Math.abs(dz)/(m.hitHalfLength+.9));
-  }else normalized=half?Math.hypot((s.local.x-s.lead.x)/(half[0]+.9),(s.local.y-s.lead.y)/(half[1]+.9),(s.local.z-s.lead.z)/(half[2]+.9)):s.local.distanceTo(s.lead)/((m.radius??(i<4?6.2:4))+.9);
+  }else if(m.hitShape==='box'){
+   normalized=Math.max(Math.abs(s.local.x-s.lead.x)/(half[0]+.9),Math.abs(s.local.y-s.lead.y)/(half[1]+.9),Math.abs(s.local.z-s.lead.z)/(half[2]+.9));
+  }else normalized=half?Math.hypot((s.local.x-s.lead.x)/(half[0]+.9),(s.local.y-s.lead.y)/(half[1]+.9),(s.local.z-s.lead.z)/(half[2]+.9)):s.local.distanceTo(s.lead)/(m.radius+.9);
+  if(m.barrels && broadsideBarrelHit(s,m,false,.9)===0)normalized=0;
   if(normalized<nearest){nearest=normalized;index=i;}
  }
- if(index>=0){ship.capitalMountHull[index]=Math.max(0,ship.capitalMountHull[index]-damage);applyFrigateSubsystemEffects(ship);}
+ if(index>=0){ship.capitalMountHull[index]=Math.max(0,ship.capitalMountHull[index]-damage);applyCapitalSubsystemEffects(ship);}
  return index;
 }
-export function applyFrigateSubsystemEffects(ship){
+export function applyCapitalSubsystemEffects(ship){
  const hull=ship.capitalMountHull;if(!hull)return;
- let engine=0;for(const i of FRIGATE_ENGINE_MOUNTS)engine+=Math.max(0,Math.min(1,(hull[i]??160)/160))/3;
- ship.speed=(ship.capitalBaseSpeed??18)*(.15+.85*engine);
- ship.turnRate=.12*(.12+.88*engine);
- // Generators supply the entire shield system: either intact generator
- // preserves the 650-point pool, while both destroyed clear it completely.
- const generators=[hull[9]??FRIGATE_GENERATOR_HULL,hull[10]??FRIGATE_GENERATOR_HULL];
- ship.maxShield=generators.some(health=>health>0)?FRIGATE_SHIELD_CAPACITY:0;
+ let thrust=0,engineCount=0,regen=0,booster=true;
+ for(const m of capitalHull(ship).mounts){
+  const fraction=Math.max(0,Math.min(1,hull[m.index]/m.hull));
+  if(m.kind==='engine'){thrust+=fraction;engineCount++;}
+  if(m.kind==='generator')regen+=fraction;
+  if(m.kind==='booster')booster=fraction>0;
+ }
+ thrust/=engineCount;
+ if(ship.capitalClass==='corvette'){
+  ship.engineThrust=thrust;ship.speed=(booster?ship.capitalBaseSpeed:25)*thrust;
+  ship.turnRate=.25*thrust;ship.maxShield=regen>0?ship.capitalShieldCapacity:0;ship.shieldRegen=10*regen;
+ }else{
+  ship.speed=(ship.capitalBaseSpeed??18)*(.15+.85*thrust);ship.turnRate=.12*(.12+.88*thrust);
+  ship.maxShield=regen>0?FRIGATE_SHIELD_CAPACITY:0;ship.shieldRegen=FRIGATE_GENERATOR_REGEN*regen;
+ }
  ship.shield=Math.min(Math.max(0,ship.shield??0),ship.maxShield);
- // Each generator supplies one 16/s recharge increment.
- ship.shieldRegen=FRIGATE_GENERATOR_REGEN*generators.reduce((rate,health)=>rate+Math.max(0,health)/FRIGATE_GENERATOR_HULL,0);
 }
-export function frigateSubsystemLabel(index){return index<4?`BATTERY ${index+1}`:index<8?`PDC ${index-3}`:FRIGATE_MOUNTS[index]?.label??'HULL';}
-export function frigateSubsystemExplosionScale(index){
- const mount=FRIGATE_MOUNTS[index];if(!mount)return .45;
+export function frigateSubsystemLabel(index){return CAPITAL_HULLS['concord-frigate'].mounts[index]?.labelKey??'HULL';}
+export function capitalSubsystemExplosionScale(index,hull=CAPITAL_HULLS['concord-frigate']){
+ const mount=hull.mounts[index];if(!mount)return .45;
  const radius=mount.hitShape==='cylinder'?Math.max(mount.hitRadius??0,mount.hitHalfLength??0)
   :mount.hitHalfExtents?Math.max(...mount.hitHalfExtents)
-  :mount.radius??(index<4?6.2:4);
+  :mount.radius;
  return Math.max(.35,Math.min(2.5,radius*1.18/6.5));
+}
+// Both launch cells must see a clear shot before the rack commits the pair.
+export function frigateTorpedoLaneClear(session,ship,target,targetId){
+ const s=stateFor(ship),layout=FRIGATE_TORPEDO_LAYOUT;
+ s.q.fromArray(ship.rotation);
+ const z=(s.torpedoCell??0)%2===0?-layout.cellZ:layout.cellZ;
+ for(let i=0;i<Math.min(2,ship.capitalTorpedoes);i++){
+  const muzzle=frigateMountPosition(ship,FRIGATE_TORPEDO_MOUNTS[0],s.torpedoStarts[i]);
+  muzzle.add(s.scratch.set(i===0?-layout.cellX:layout.cellX,layout.muzzleHeight,z).applyQuaternion(s.q));
+  const ray=s.torpedoRay.subVectors(target,muzzle),distance=ray.length();
+  if(!distance||session.lineBlocked(muzzle,target,ship.id)||
+   friendlyFiringLaneBlocked(session,ship,muzzle,ray.multiplyScalar(1/distance),distance,targetId))return false;
+ }
+ return true;
 }
 // The frigate announces its lock before opening the two-cell launcher.
 function updateFrigateTorpedoes(session,ship,dt,targetPosition){
  const s=stateFor(ship),fit=ship.combatFit,now=session.save.world.time;
- beginRackLock(fit,ship.targetId,'torpedo',now,dt);
- const targetActor=ship.targetId==='player'?session.save.player:session.ships.find(actor=>actor.id===ship.targetId);
- const targetHull=SHIPS[targetActor?.shipId??targetActor?.combatFit?.hullId];
- const torpedoTarget=!!targetActor&&(!!targetActor.capitalClass||targetActor.role==='trader'||targetActor.role==='miner'||targetHull?.role==='industrial'||(targetHull?.maxSpeed??Infinity)<=50);
- if(!targetPosition||!ship.targetId||!torpedoTarget||ship.holdFire||ship.pursuitHoldFire||ship.fleeing||ship.patrolMemoryActive||ship.capitalTorpedoes<1||!FRIGATE_TORPEDO_MOUNTS.some(i=>ship.capitalMountHull[i]>0)||now<(s.torpedoReadyAt??12)){fit.lock=0;return;}
- s.position.fromArray(ship.position);s.direction.copy(targetPosition).sub(s.position);
- const distance=s.direction.length();
+ if(!targetPosition||!ship.targetId||ship.holdFire||ship.pursuitHoldFire||ship.fleeing||ship.patrolMemoryActive||ship.capitalTorpedoes<1||!FRIGATE_TORPEDO_MOUNTS.some(i=>ship.capitalMountHull[i]>0)||now<(s.torpedoReadyAt??12)){fit.lock=0;return;}
  const launcher=LAUNCHERS.torpedo;
+ const primary=ship.targetId==='player'?session.save.player:session.ships.find(actor=>actor.id===ship.targetId);
+ s.position.fromArray(ship.position);s.direction.copy(forward).applyQuaternion(s.q.fromArray(ship.rotation));
+ const targetActor=session.preferredTorpedoTarget(ship,primary,targetPosition,launcher,s.position,s.direction,120);
+ if(!targetActor){fit.lock=0;return;}
+ const targetId=targetActor===session.save.player?'player':targetActor.id;
+ if(targetActor!==primary)targetPosition=s.target.fromArray(targetActor.position);
+ beginRackLock(fit,targetId,'torpedo',now,dt);
+ s.direction.copy(targetPosition).sub(s.position);
+ const distance=s.direction.length();
  if(distance<120 || distance>launcher.lockRange || session.lineBlocked(s.position,targetPosition,ship.id)){fit.lock=0;return;}
  s.direction.normalize();
  const facing=s.scratch.set(0,0,-1).applyQuaternion(s.q.fromArray(ship.rotation)).dot(s.direction);
- const aspect=targetActor.rotation?s.scratch.set(0,0,-1).applyQuaternion(s.q.fromArray(targetActor.rotation)).dot(s.direction):0;
+ const aspect=targetActor.rotation?s.scratch.set(0,0,-1).applyQuaternion(s.turn.fromArray(targetActor.rotation)).dot(s.direction):0;
  const previous=fit.lock??0;
- fit.lock=rackLockProgress(previous,launcher,ship.pilot?.tier,distance,facing,aspect,dt);
+ const mobility=torpedoMobilityFactor(launcher,ship.velocity,targetActor.velocity,s.direction,distance);
+ fit.lock=rackLockProgress(previous,launcher,ship.pilot?.tier,distance,facing,aspect,dt,mobility);
  if(!fit.lock)return;
- if(ship.targetId==='player')session.warnPlayerLock?.(t('TORPEDO LOCK · EVADE'),!previous);
- if(fit.lock<1||(!ship.capitalDisarmed&&ship.capitalAttack!=='SALVO'))return;
- // The single launcher fires two separated cells together, alternating rows.
+ if(targetId==='player')session.warnPlayerLock?.(t('TORPEDO LOCK · EVADE'),!previous);
+ if(fit.lock<1||mobility===0||(!ship.capitalDisarmed&&ship.capitalAttack!=='SALVO'))return;
+ if(!frigateTorpedoLaneClear(session,ship,targetPosition,targetId)){fit.lock=0;return;}
  s.q.fromArray(ship.rotation);
-
- for(let i=0;i<Math.min(2,ship.capitalTorpedoes);i++){
-  frigateMountPosition(ship,FRIGATE_TORPEDO_MOUNTS[0],s.torpedoStarts[i]);
-  const l=FRIGATE_TORPEDO_LAYOUT,x=i===0?-l.cellX:l.cellX,z=(s.torpedoCell??0)%2===0?-l.cellZ:l.cellZ;
-  s.torpedoStarts[i].add(s.scratch.set(x,l.muzzleHeight,z).applyQuaternion(s.q));
-
-  if(session.lineBlocked(s.torpedoStarts[i],targetPosition,ship.id)){fit.lock=0;return;}
- }
  const salvo=session.projectileCounter+1;
  for(let i=0;i<2;i++){
   if(ship.capitalTorpedoes<=0)continue;
   const slot=session.projStore.alloc();session.projStore.setPosV(slot,s.torpedoStarts[i]);
   s.velocity.copy(forward).applyQuaternion(s.q).multiplyScalar(launcher.speed).add(s.scratch.fromArray(ship.velocity));session.projStore.setVelV(slot,s.velocity);
-  session.projectiles.push({id:`p-${++session.projectileCounter}`,slot,salvo,kind:'missile',ownerId:ship.id,targetId:ship.targetId,faction:ship.faction,launcherId:'torpedo',hitWeapon:launcher,damage:launcher.damage,life:launcher.life,homingSpeed:launcher.homingSpeed,homingTurn:launcher.homingTurn,acceleration:launcher.acceleration,shield:launcher.projectileShield});
+  session.projectiles.push({id:`p-${++session.projectileCounter}`,slot,salvo,kind:'missile',ownerId:ship.id,targetId,faction:ship.faction,launcherId:'torpedo',hitWeapon:launcher,damage:launcher.damage,life:launcher.life,homingSpeed:launcher.homingSpeed,homingTurn:launcher.homingTurn,acceleration:launcher.acceleration,shield:launcher.projectileShield,splashRadius:launcher.splashRadius,splashMin:launcher.splashMin});
   ship.capitalTorpedoes--;
  }
- if(ship.targetId==='player')session.audio?.playCockpit?.('missileLaunch',.9);
+ if(targetId==='player')session.audio?.playCockpit?.('missileLaunch',.9);
  s.torpedoCell=((s.torpedoCell??0)+1)%2;
  fit.lock=0;s.torpedoReadyAt=now+16;
 }
@@ -138,7 +191,7 @@ export function updateFrigateBatteries(session,ship,dt,targetPosition,targetVelo
  let cycle;
  {
   cycle=s.cycle??={phase:'RECOVERING',until:now+4,serial:0};
-  const armed=ship.capitalMountHull[0]>0||ship.capitalMountHull[1]>0||ship.capitalMountHull[2]>0||ship.capitalMountHull[3]>0;
+  const armed=capitalHull(ship).mounts.some(m=>m.kind==='battery'&&ship.capitalMountHull[m.index]>0);
   ship.capitalDisarmed=!armed;
   let visible=armed&&target&&s.target.distanceTo(s.position.fromArray(ship.position))<=weapon.range&&!session.lineBlocked(s.position,s.target,ship.id);
   if(armed&&target&&!visible){
@@ -159,10 +212,11 @@ export function updateFrigateBatteries(session,ship,dt,targetPosition,targetVelo
  }
  updateFrigateTorpedoes(session,ship,dt,targetPosition);
  ship.capitalTorpedoWarning=ship.combatFit.lock>0;
- ship.combatFit.warned=ship.capitalTorpedoWarning && ship.targetId==='player';
+ ship.combatFit.warned=ship.capitalTorpedoWarning && ship.combatFit.lockTarget==='player';
  updateAutomaticTurrets(session,ship,ship.id,dt);
- for(let i=4;i<8;i++)if(ship.capitalMountHull[i]<=0){frigateMountPosition(ship,i,s.position);session.renderer.showDisabledCapitalMount?.(`${ship.id}-${i}`,s.position,s.q,ship,i);}
- for(let i=0;i<4;i++){
+ for(const {kind,index:i} of capitalHull(ship).mounts)if(kind==='pdc'&&ship.capitalMountHull[i]<=0){frigateMountPosition(ship,i,s.position);session.renderer.showDisabledCapitalMount?.(`${ship.id}-${i}`,s.position,s.q,ship,i);}
+ for(const {kind,index:i} of capitalHull(ship).mounts){
+  if(kind!=='battery')continue;
   if(ship.capitalMountHull[i]<=0){frigateMountPosition(ship,i,s.position);session.renderer.showDisabledCapitalMount?.(`${ship.id}-main-${i}`,s.position,s.q,ship,i);continue;}
   const m=FRIGATE_MOUNTS[i],gun=s.mounts[i];
   frigateMountPosition(ship,i,s.position);if(m.normal)s.normal.fromArray(m.normal);else s.normal.set(0,0,0).setComponent(m.axis,m.side);s.normal.applyQuaternion(s.q);
@@ -247,7 +301,50 @@ function secondaryEnemy(session,ship,actor){
   &&actor.instanceId===ship.instanceId
   &&session.projectileCanHitShip(probe,actor);
 }
-export function updateFrigateAttack(session,ship,targetPosition,targetVelocity,dt){
+export function updateCorvetteWeapons(session,ship,dt,targetPosition,targetVelocity){
+ const s=stateFor(ship),now=session.save.world.time;
+ ship.capitalBatteriesAt=now;ship.energy=Math.min(200,ship.energy+15*dt);
+ if(ship.targetId==='player' && !tracksActivePlayer(session,ship))targetPosition=undefined;
+ if(targetPosition)s.target.copy(targetPosition);
+ updateAutomaticTurrets(session,ship,ship.id,dt);
+ s.q.fromArray(ship.rotation);
+ for(const m of capitalHull(ship).mounts){
+  if(m.kind==='laser'||m.kind==='pdc'){
+   if(ship.capitalMountHull[m.index]<=0){
+    capitalMountPosition(ship,m.index,s.position);
+    session.renderer.showDisabledCapitalMount?.((s.mounts[m.index].disabledKey??=ship.id+'-'+m.index),s.position,s.q,ship,m.index);
+   }
+   continue;
+  }
+  if(m.kind!=='broadside')continue;
+  const gun=s.mounts[m.index],weapon=CORVETTE_BROADSIDE;
+  capitalMountPosition(ship,m.index,s.position);
+  s.normal.set(m.bearing,0,0).applyQuaternion(s.q);
+  if(!gun.direction.lengthSq())gun.direction.copy(s.normal);
+  let aim=false;
+  if(ship.capitalMountHull[m.index]>0&&targetPosition&&!ship.surrendered&&!ship.poweredDown&&!ship.captured&&!ship.holdFire&&!ship.pursuitHoldFire&&!ship.patrolMemoryActive){
+   const flight=relativeIntercept(s.position,s.target.toArray(s.targetTuple??=[]),ship.velocity,targetVelocity?.isVector3?targetVelocity.toArray(s.velocityTuple??=[]):targetVelocity??zeroVelocity,weapon.speed,s.lead);
+   s.direction.copy(s.lead).normalize();
+   aim=flight<=weapon.life&&s.direction.dot(s.normal)>.5;
+   if(aim){
+    s.lead.add(s.position);s.scratch.copy(s.position).addScaledVector(s.direction,2);s.scratch.addScaledVector(s.local.set(0,1,0).applyQuaternion(s.q),1.3);
+    aim=segmentShipColliderHit(s.scratch,s.lead,ship.position,ship.rotation,ship.variant,2)===undefined&&!session.lineBlocked(s.position,s.lead,ship.id)
+      &&!friendlyFiringLaneBlocked(session,ship,s.position,s.direction,s.position.distanceTo(s.lead),ship.targetId);
+   }
+  }
+  if(!aim)s.direction.copy(s.normal);
+  s.turn.setFromUnitVectors(gun.direction,s.direction);
+  s.turn.slerp(newIdentity,1-Math.min(1,dt/Math.max(.00001,gun.direction.angleTo(s.direction))));
+  gun.direction.applyQuaternion(s.turn).normalize();
+  session.renderer.showTurret?.((gun.key??=ship.id+'-main-'+m.index),s.position,gun.direction,'S','broadside',s.q,1,0,1,1,ship,m.index);
+  if(!aim||now<gun.fireAt||gun.direction.dot(s.direction)<.998||ship.energy<weapon.energyCost)continue;
+  s.lead.copy(s.position).addScaledVector(s.local.set(0,1,0).applyQuaternion(s.q),1.3).addScaledVector(gun.direction,6);
+  session.spawnGunProjectile(ship.id,weapon,s.lead,gun.direction,ship.velocity,ship.targetId,gun.key);
+  session.renderer.spawnMuzzleFlash?.(s.lead.x,s.lead.y,s.lead.z,0xffb366);
+  ship.energy-=weapon.energyCost;gun.fireAt=now+weapon.cooldown;
+ }
+}
+export function updateCapitalBroadsideAttack(session,ship,targetPosition,targetVelocity,dt){
  const s=stateFor(ship),n=navigationFor(ship);
  n.position.fromArray(ship.position);n.q.fromArray(ship.rotation);
  n.radial.copy(targetPosition).sub(n.position);const distance=n.radial.length();
@@ -256,7 +353,8 @@ export function updateFrigateAttack(session,ship,targetPosition,targetVelocity,d
   s.attackTarget=ship.targetId;s.local.copy(n.radial).applyQuaternion(s.inverse.copy(n.q).invert());
   s.attackSide=s.local.x>=0?1:-1;
  }
- const preferred=FRIGATE_GUN.range*.69,band=FRIGATE_GUN.range*.06;
+ const corvette=ship.capitalClass==='corvette';
+ const preferred=corvette?520:FRIGATE_GUN.range*.69,band=corvette?20:FRIGATE_GUN.range*.06;
  // Aim a broadside at the primary. If a valid enemy is substantially
  // opposite it, bisect the pair so one can fall on each side of the hull.
  n.axis.copy(n.radial);
@@ -307,10 +405,13 @@ export function updateFrigateAttack(session,ship,targetPosition,targetVelocity,d
   if(avoid.lengthSq()>.001)n.desired.addScaledVector(avoid,ship.speed).clampLength(0,ship.speed);
  }
 
+ const trafficAvoidance=corvette&&session.getShipAvoidance?.(n.position,n.velocity.fromArray(ship.velocity),ship);
+ if(trafficAvoidance)n.desired.addScaledVector(trafficAvoidance,ship.speed).clampLength(0,ship.speed);
+
  // Aim the bow along the requested flight path, then roll one broadside onto
  // the target. Inertial side slip is damped by the same assisted-flight model
  // used by other ships rather than being commanded every combat step.
- if(n.desired.lengthSq()>.001)n.heading.copy(n.desired).normalize();
+ if(n.desired.lengthSq()>.001&&(!corvette||trafficAvoidance||distance>600||distance<400))n.heading.copy(n.desired).normalize();
  n.goal.setFromUnitVectors(forward,n.heading);
  n.right.set(1,0,0).applyQuaternion(n.goal);
  n.tangent.crossVectors(n.right,n.axis);
@@ -328,7 +429,8 @@ export function updateFrigateAttack(session,ship,targetPosition,targetVelocity,d
  n.position.addScaledVector(n.velocity,dt);
  n.velocity.toArray(ship.velocity);n.position.toArray(ship.position);
  s.goal.copy(n.goal);ship.capitalPreferredRange=preferred;
- updateFrigateBatteries(session,ship,dt,targetPosition,targetVelocity);
+ if(corvette)updateCorvetteWeapons(session,ship,dt,targetPosition,targetVelocity);
+ else updateFrigateBatteries(session,ship,dt,targetPosition,targetVelocity);
 }
 const zeroVelocity=[0,0,0];
 const worldUp=new THREE.Vector3(0,1,0);
@@ -355,15 +457,16 @@ export function segmentFrigateHullHit(start,end,ship){
 }
 
 // Exposed mount envelopes supplement the ordinary ellipsoid hull collision.
-export function segmentFrigateMountHit(start,end,ship,padding=0){
- if(ship.capitalClass!=='frigate'||!ship.capitalMountHull)return undefined;
+export function segmentCapitalMountHit(start,end,ship,padding=0){
+ if(!ship.capitalMountHull||ship.capitalClass==='cruiser')return undefined;
  const s=stateFor(ship);s.inverse.fromArray(ship.rotation).invert();
  s.local.copy(start).sub(s.scratch.fromArray(ship.position)).applyQuaternion(s.inverse);
  s.direction.copy(end).sub(start).applyQuaternion(s.inverse);const a=s.direction.lengthSq();if(a<1e-14)return undefined;
  let nearest=Infinity;
- for(let i=0;i<FRIGATE_MOUNTS.length;i++){
-  if(ship.capitalMountHull[i]<=0)continue;
-  const m=FRIGATE_MOUNTS[i];frigateMountLocalHitCenter(m,s.lead,s);
+ for(const m of capitalHull(ship).mounts){
+  const i=m.index;if(ship.capitalMountHull[i]<=0)continue;
+  if(m.barrels)nearest=Math.min(nearest,broadsideBarrelHit(s,m,true,padding));
+  s.lead.fromArray(m.hitCenter);
   s.scratch.copy(s.local).sub(s.lead);const half=m.hitHalfExtents;
   if(m.hitShape==='cylinder'){
    const {x:ox,y:oy,z:oz}=s.scratch,{x:dx,y:dy,z:dz}=s.direction,r=m.hitRadius+padding,h=m.hitHalfLength+padding;
@@ -374,7 +477,17 @@ export function segmentFrigateMountHit(start,end,ship,padding=0){
    if(Math.abs(dz)>1e-14){let t=-h-oz;t/=dz;if(t>=0&&t<=1){const x=ox+dx*t,y=oy+dy*t;if(x*x+y*y<=r*r)hit=Math.min(hit,t);}t=h-oz;t/=dz;if(t>=0&&t<=1){const x=ox+dx*t,y=oy+dy*t;if(x*x+y*y<=r*r)hit=Math.min(hit,t);}}
    nearest=Math.min(nearest,hit);continue;
   }
-  const rx=(half?.[0]??m.radius??(i<4?6.2:4))+padding,ry=(half?.[1]??m.radius??(i<4?6.2:4))+padding,rz=(half?.[2]??m.radius??(i<4?6.2:4))+padding;
+  if(m.hitShape==='box'){
+   let near=0,far=1;
+   for(let axis=0;axis<3;axis++){
+    const o=s.scratch.getComponent(axis),d=s.direction.getComponent(axis),h=half[axis]+padding;
+    if(Math.abs(d)<1e-10){if(Math.abs(o)>h){far=-1;break;}continue;}
+    const a=(-h-o)/d,b=(h-o)/d;near=Math.max(near,Math.min(a,b));far=Math.min(far,Math.max(a,b));
+   }
+   if(near<=far)nearest=Math.min(nearest,near);
+   continue;
+  }
+  const rx=(half?.[0]??m.radius)+padding,ry=(half?.[1]??m.radius)+padding,rz=(half?.[2]??m.radius)+padding;
   const dx=s.direction.x/rx,dy=s.direction.y/ry,dz=s.direction.z/rz,ox=s.scratch.x/rx,oy=s.scratch.y/ry,oz=s.scratch.z/rz;
   const aa=dx*dx+dy*dy+dz*dz,b=2*(ox*dx+oy*dy+oz*dz),c=ox*ox+oy*oy+oz*oz-1,disc=b*b-4*aa*c;
   if(disc<0)continue;const t=(-b-Math.sqrt(disc))/(2*aa);if(t>=0&&t<=1)nearest=Math.min(nearest,t);
@@ -387,7 +500,7 @@ export function visibleFrigateBatteries(session,ship,observer){
  const point=new THREE.Vector3().fromArray(observer);
  for(let i=0;i<FRIGATE_MOUNTS.length;i++){frigateMountPosition(ship,i,s.position);s.clearance=FRIGATE_CLEARANCE[i];
   const m=FRIGATE_MOUNTS[i];
-  const exposed=i<8?clearTurretArc(ship,m,FRIGATE_EXTENTS,point,s):s.local.copy(point).sub(s.position).applyQuaternion(s.inverse).getComponent(m.axis)*m.side>0;
+  const exposed=m.size?clearTurretArc(ship,m,FRIGATE_EXTENTS,point,s):s.local.copy(point).sub(s.position).applyQuaternion(s.inverse).getComponent(m.axis)*m.side>0;
   if(exposed&&!session.lineBlocked(s.position,point,ship.id))indices.push(i);
  }
  return indices;
@@ -397,3 +510,6 @@ export function visibleFrigateBatteries(session,ship,observer){
 // Shields retain ordinary weapon interactions, including ion's specialist role.
 const lightCapitalWeapons=new Set(['pulse','pulse-mk2','beam','ripper','pdc','tracking-turret']);
 export const frigateHullDamageScale=weapon=>weapon?.id==='gauss'?.6:lightCapitalWeapons.has(weapon?.id)?.08:1;
+
+// Existing frigate callers share the same subsystem and broadside simulation.
+export {damageCapitalMount as damageFrigateMount, segmentCapitalMountHit as segmentFrigateMountHit, applyCapitalSubsystemEffects as applyFrigateSubsystemEffects, capitalSubsystemExplosionScale as frigateSubsystemExplosionScale, updateCapitalBroadsideAttack as updateFrigateAttack};

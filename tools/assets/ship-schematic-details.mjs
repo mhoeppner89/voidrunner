@@ -2,6 +2,9 @@
 // y is bow-to-stern length. These show existing structure, never change the hull.
 const box=(x0,y0,x1,y1)=>[[x0,y0],[x1,y0],[x1,y1],[x0,y1],[x0,y0]];
 export const SCHEMATIC_DETAILS={
+ drover:{features:['bridge','six cargo pods','engine block'],paths:[[[0,.18],[.45,.18]],[[.25,.25],[.25,.7]],[[.25,.38],[.75,.38]],[[.25,.54],[.75,.54]],[[0,.74],[.65,.74]]]},
+ ironjaw:{features:['bridge','broadside sponsons','port booster'],paths:[[[0,.2],[.45,.2]],[[.3,.27],[.3,.56]],[[.3,.48],[.55,.48]],[[0,.75],[.6,.75]]]},
+
  blade:{features:['twin launcher fairings','swept wing roots'],paths:[[[.25,.53],[.55,.59],[.55,.76],[.25,.73],[.25,.53]],[[.58,.77],[.78,.86]]]},
  speedster:{features:['paired compact drives'],paths:[box(.17,.80,.58,.94)]},
  legionary:{features:['diamond wing spars','paired rear drives'],paths:[[[.17,.42],[.67,.55],[.31,.68]],box(.12,.83,.39,.94)]},

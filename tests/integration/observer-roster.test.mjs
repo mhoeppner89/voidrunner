@@ -19,16 +19,16 @@ function observerSession(){
 }
 const stage=(s,entry,index)=>s.spawnObserverDraftUnit({id:`observer-unit-${index}`,shipType:entry.id,team:'blue',tier:'veteran',fit:entry.defaultFit??'varied',position:[index*60,0,index*20]});
 
-test('the observer catalog lists every flyable hull once and all four capitals',()=>{
+test('the observer catalog lists every flyable hull once and all capital hulls',()=>{
  const s=observerSession(),catalog=s.observerCatalog();
- assert.deepEqual(catalog.map(entry=>entry.id),[...PLAYER_FLYABLE_HULLS,'frigate','cruiser','battleship','carrier']);
+ assert.deepEqual(catalog.map(entry=>entry.id),[...PLAYER_FLYABLE_HULLS,'frigate','cruiser','battleship','carrier','drover','ironjaw']);
  assert.equal(new Set(catalog.map(entry=>entry.id)).size,catalog.length);
  for(const id of PLAYER_FLYABLE_HULLS){
   assert.ok(SHIPS[id],`${id} has hull stats`);
   assert.ok(HULL_HARDPOINTS[id],`${id} has hardpoints`);
   assert.ok(GLB_SHIP_CONFIG[SHIPS[id].variant],`${id} has a render variant`);
  }
- assert.equal(catalog.filter(entry=>entry.capital).length,4);
+ assert.equal(catalog.filter(entry=>entry.capital).length,6);
 });
 
 test('every catalog entry stages a real, legally fitted ship',()=>{
@@ -37,7 +37,12 @@ test('every catalog entry stages a real, legally fitted ship',()=>{
   const ship=stage(s,entry,index);
   assert.ok(ship,entry.id);
   assert.equal(ship.observerShipType,entry.id);
-  if(entry.capital){assert.equal(ship.capitalClass,entry.id);return;}
+  if(entry.capital){
+   const corvette=['drover','ironjaw'].includes(entry.id);
+   assert.equal(ship.capitalClass,corvette?'corvette':entry.id);
+   assert.equal(ship.variant,corvette?entry.id:'concord-'+entry.id);
+   return;
+  }
   assert.equal(ship.pilot.tier,'veteran');
   const hullId=ship.combatFit.hullId;
   assert.equal(hullId,entry.id);

@@ -1,3 +1,4 @@
+import { shieldBypassFor } from './weaponDamage.js';
 import {SYSTEM_STAR_PROFILE,SPACE_EXPOSURE,applySpaceLighting,createSpaceEnvironment} from './spaceLighting.js';
 import {stabilizeMaterialNormals} from './materialNormals.js';
 import {createPixelResolveMaterial,createPixelSceneTarget,pixelTargetSamples,bindPixelResolve,FINITE_COLOUR_GLSL} from './pixelResolve.js';
@@ -14,7 +15,7 @@ import {TURRET_LAYOUTS} from './turretLayouts.js';
 import {createCapitalEngineExhaust,updateCapitalEngineExhaust} from './capitalEngineExhaust.js';
 import {createBattleshipArmament} from './battleshipModels.js';
 import {bindCarrierArmament} from './carrierModels.js';
-import {CRUISER_MOUNTS,CRUISER_ARMAMENT_COUNT} from './cruiserModelData.js';
+import {CRUISER_MOUNTS} from './cruiserModelData.js';
 import {createCruiserTurret,createCruiserPdc,createCruiserEngineDamage,updateCruiserEngineDamage} from './cruiserModels.js';
 import { createShipExplosion, createHullDebris } from './explosionFx.js';
 import {derelictSurfaceObstacles,createDerelictVents,createDriveLeak} from './derelictFx.js';
@@ -25,7 +26,8 @@ import {cockpitDamageStage} from './cockpitDamage.js';
 import {createGraveyardPlating,prepareGraveyardModel,arrangeGraveyardModel,batchGraveyardModelAsync,clipWreckSections,createCollisionWreck,installWreckDrawRanges} from './graveyardArt.js';
 import {createTurretModel,paintFrigateTurret} from './turretModels.js';
 import {createFrigateSystems,updateFrigateSystems,setFrigateComponentDamage,frigateEngineFraction} from './frigateComponents.js';
-import {FRIGATE_MOUNTS} from './frigateMounts.js';
+import {capitalHull} from './capitalHulls.js';
+import {createDetachedPod} from './shipWreckFx.js';
 import * as THREE from 'three';
 import { createRingVolume } from './ringVolume.js';
 import { createRingParticles } from './ringParticles.js';
@@ -143,6 +145,18 @@ export const GLB_SHIP_CONFIG = {
     // one actually enters the scene. Carrier and cruiser were normalized to a
     // two-unit longitudinal axis during export; their scales are measured from
     // the shipped battleship bounds for exact 0.8x and 0.5x visible lengths.
+    drover: {
+        path: 'assets/models/capital/drover.glb', yaw: -Math.PI / 2, scale: 14, baseScale: 1,
+        enginePorts: [], preload: false, preserveColor: true, authoredPaint: true,
+        collisionSource: 'authoring/models/drover/support/collision.json',
+        placeholderVariant: 'atlas-freighter', placeholderScale: 2,
+    },
+    ironjaw: {
+        path: 'assets/models/capital/ironjaw.glb', broadsidePath:'assets/models/turrets/ironjaw-broadside.glb', yaw: -Math.PI / 2, scale: 14, baseScale: 1,
+        enginePorts: [], preload: false, preserveColor: true, authoredPaint: true,
+        collisionSource: 'authoring/models/ironjaw/support/collision.json',
+        placeholderVariant: 'atlas-freighter', placeholderScale: 2,
+    },
     'concord-frigate': {
         path: 'assets/models/capital/concord-frigate.glb', yaw: -Math.PI / 2, scale: 56.5,
         enginePorts: [[0.9975, -0.164375, -0.216875], [0.9975, -0.089375, 0], [0.9975, -0.164375, 0.216875]],
@@ -3533,6 +3547,13 @@ export class SpaceRenderer {
             return;
         const promise = loadGlb(config.path ?? `assets/models/ships/${config.file}`)
             .then(async (model) => {
+                if(config.broadsidePath){
+                    try{
+                        const gun=await loadGlb(config.broadsidePath);
+                        if(this.disposed){this.disposeObject(gun);this.disposeObject(model);return null;}
+                        this.broadsideModel=gun;
+                    }catch(error){this.disposeObject(model);throw error;}
+                }
                 if (config.armamentPaintPath) {
                     try {
                         const paint = await loadGlb(config.armamentPaintPath);
@@ -3646,7 +3667,7 @@ export class SpaceRenderer {
                 emissiveMaterials.push(material);
             }
         });
-        if(!entity.race)applyFleetPaint(group,variant,entity);
+        if(!entity.race&&!config.authoredPaint)applyFleetPaint(group,variant,entity);
         wrapper.userData.livery=group.userData.livery;
         emissiveMaterials.length=0;group.traverse(o=>{if(o.isMesh)for(const m of Array.isArray(o.material)?o.material:[o.material])if(m&&!emissiveMaterials.includes(m)){stabilizeMaterialNormals(m);emissiveMaterials.push(m);}});
         const baseScale = config.baseScale ?? (variant === 'atlas-freighter' ? 0.92 : entity.role === 'miner' ? 1.04 : entity.role === 'bounty' ? 1.02 : 1);
@@ -3674,6 +3695,9 @@ export class SpaceRenderer {
             wrapper.userData.battleshipArmament=createBattleshipArmament(wrapper.userData.battleshipArmorMaterial);
             wrapper.add(wrapper.userData.battleshipArmament);
         }
+        if(config.authoredPaint){
+            wrapper.userData.corvetteParts=capitalHull({variant}).mounts.map(m=>['engine','generator','pod','booster'].includes(m.kind)?group.getObjectByName(m.node):null);
+        }
         if(variant==='concord-carrier')wrapper.userData.carrierArmament=bindCarrierArmament(group);
         if(variant==='mule')wrapper.userData.embeddedTurrets=FLEET_EQUIPMENT.mule.turrets.map(t=>{const gun=group.getObjectByName(t.embedded);gun.userData.yaw=group.getObjectByName(t.embedded.replace('.Root','.Yaw'));gun.userData.pitch=group.getObjectByName(t.embedded.replace('.Root','.Pitch'));gun.userData.inverse=new THREE.Quaternion();gun.userData.local=new THREE.Vector3();return gun;});
         this.tagTargetable(wrapper, 'ship', entity.id);
@@ -3682,7 +3706,7 @@ export class SpaceRenderer {
         wrapper.userData.engineFlares = flares;
         wrapper.userData.emissiveMaterials = emissiveMaterials;
         wrapper.userData.glb = true;
-        if(variant==='concord-cruiser'||variant==='concord-frigate'||variant==='concord-battleship'||variant==='concord-carrier'){wrapper.userData.capitalExhaust=createCapitalEngineExhaust(variant);wrapper.add(wrapper.userData.capitalExhaust);}
+        if(config.authoredPaint||variant==='concord-cruiser'||variant==='concord-frigate'||variant==='concord-battleship'||variant==='concord-carrier'){wrapper.userData.capitalExhaust=createCapitalEngineExhaust(variant);wrapper.add(wrapper.userData.capitalExhaust);}
         // Racing hulls cannot be destroyed: clipping their detailed hull into
         // explosion sections is wasted background work during a timed race.
         if (!entity.race) (this.wreckFactory??=new ShipWreckFactory()).schedule(wrapper);
@@ -3788,6 +3812,14 @@ export class SpaceRenderer {
                 if(!mesh.userData.frigateSystems){mesh.userData.frigateSystems=createFrigateSystems(entity.id);mesh.add(mesh.userData.frigateSystems);}
                 updateFrigateSystems(mesh.userData.frigateSystems,entity);
             }
+            if(mesh.userData.corvetteParts&&entity.capitalMountHull){
+                const parts=mesh.userData.corvetteParts,mounts=capitalHull(entity).mounts;
+                for(let i=0;i<parts.length;i++)if(parts[i]){
+                    const health=entity.capitalMountHull[i];
+                    if(mounts[i].kind==='pod')parts[i].visible=health>0;
+                    else if(!health)setFrigateComponentDamage(parts[i],0,mounts[i].hull);
+                }
+            }
             if(mesh.userData.capitalExhaust)updateCapitalEngineExhaust(mesh.userData.capitalExhaust,entity,exhaustTime);
             const damage = 1 - entity.hull / entity.maxHull;
             const baseScale = Number(mesh.userData.baseScale ?? 1);
@@ -3817,7 +3849,8 @@ export class SpaceRenderer {
                 const baseSize = (flares[0]?.userData.baseSize ?? (variant === 'atlas-freighter' ? ENGINE_FLARE_SIZE_ATLAS : ENGINE_FLARE_SIZE)) * (glow?.flareScale ?? 1);
                 for (let flareIndex=0;flareIndex<flares.length;flareIndex++) {
                     const flare=flares[flareIndex];
-                    const output=entity.capitalClass==='frigate'?frigateEngineFraction(entity,flareIndex):entity.capitalClass==='cruiser'?(entity.capitalMountHull?.[CRUISER_ARMAMENT_COUNT+flareIndex]??300)/300:1;
+                    const engine=entity.capitalClass==='cruiser'?capitalHull(entity).engines[flareIndex]:undefined;
+                    const output=entity.capitalClass==='frigate'?frigateEngineFraction(entity,flareIndex):engine?(entity.capitalMountHull?.[engine.index]??engine.hull)/engine.hull:1;
                     flare.material.opacity = entity.stationDock?.phase === "docked" ? 0 : baseOpacity * boost * output * (entity.crippled ? .24+.22*Math.sin(exhaustTime*31+flareIndex) : 1);
                     flare.scale.setScalar(baseSize * (boost > 1 ? 1.08 : 1));
                 }
@@ -5446,6 +5479,12 @@ export class SpaceRenderer {
         return effect;
     }
 
+    detachCargoPod(ship,mount) {
+        const pod=this.shipMeshes.get(ship.id)?.userData.corvetteParts?.[mount.index];
+        if(!pod?.visible)return;
+        const effect=createDetachedPod(pod,ship,mount.normal[0]);
+        pod.visible=false;this.scene.add(effect.object);this.effects.push(effect);
+    }
     spawnShipWreck(ship, variant, explosionScale) {
         const fragments=createHullDebris(ship.position,Math.max(.5,explosionScale*.65),ship.velocity);
         this.scene.add(fragments.object);this.effects.push(fragments);
@@ -5486,7 +5525,7 @@ export class SpaceRenderer {
         return out.set(local.x*sx,local.y*sy,local.z*sz).applyQuaternion(inverse.invert()).add(center);
     }
     weaponImpact(actor, extents, impact, origin, weapon, color, heavy = false) {
-        const shielded=actor?.shield>0 && (weapon?.shieldBypass ?? 0)<1;
+        const shielded=actor?.shield>0 && shieldBypassFor(weapon ?? {}, actor)<1;
         const point=shielded ? this.shieldImpactPoint(actor,extents,impact,origin) : impact;
         const position=point?.isVector3 ? point.toArray() : point;
         // Surface normal from the hull/shield ellipsoid and the shot direction
@@ -5606,7 +5645,8 @@ export class SpaceRenderer {
         this.laserFx.salvageImpact(position,center);
     }
     showDisabledCapitalMount(id,position,rotation,actor,index) {
-        this.showTurret(id,position,(this.tmpDisabledDirection??=new THREE.Vector3()).set(0,1,0).applyQuaternion(rotation),index<4?'M':'S',index<4?'laser':'pdc',rotation,index===0||index===1||index>5?-1:1,0,index<4?112.9/18:112.9/22,index<4?0:1,actor);
+        const m=capitalHull(actor).mounts[index],direction=(this.tmpDisabledDirection??=new THREE.Vector3()).fromArray(m.normal).applyQuaternion(rotation);
+        this.showTurret(id,position,direction,m.size,m.kind==='battery'?'laser':m.kind,rotation,m.side,0,m.visualScale??112.9/m.hullHalfLength,m.axis,actor,index);
         // Keep the wrecked armored pedestal and yaw housing attached; damage
         // hides barrels and chars its own materials without affecting other guns.
     }
@@ -5624,11 +5664,11 @@ export class SpaceRenderer {
         }
         glow.position.copy(position);glow.scale.setScalar(1.2+amount);glow.material.opacity=.25+amount*.45;glow.userData.life=.12;glow.visible=true;
     }
-    showTurret(id,position,direction,size,kind='laser',rotation,side=1,pedestal=0,hullScale=1,axis=1,actor) {
+    showTurret(id,position,direction,size,kind='laser',rotation,side=1,pedestal=0,hullScale=1,axis=1,actor,mountIndex) {
         // The cockpit camera is at the ship origin and its exterior hull is
         // omitted. Drawing own-ship turrets would expose them through the canopy.
         if(id.startsWith('player-'))return;
-        const mountIndex=Number(id.split('-').at(-1));
+        mountIndex??=Number(id.slice(id.lastIndexOf('-')+1));
         const reviewedMount=TURRET_LAYOUTS[actor?.combatFit?.hullId]?.[mountIndex];
         const footprintScale=reviewedMount?.footprintScale??1;
         const embedded=this.shipMeshes?.get(actor?.id)?.userData.embeddedTurrets?.[mountIndex];
@@ -5644,7 +5684,14 @@ export class SpaceRenderer {
             this.scene.remove(mesh);this.turretMeshes.delete(id);mesh=null;
         }
         if(!mesh) {
-            mesh=kind==='capital'?createCruiserTurret():actor?.capitalClass==='cruiser'&&kind==='pdc'?createCruiserPdc():createTurretModel(kind,size,pedestal,footprintScale);
+            if(kind==='broadside'){
+                if(!this.broadsideModel)return;
+                mesh=this.broadsideModel.clone(true);mesh.name='broadside-S';mesh.userData.pedestal=0;
+                mesh.userData.local=new THREE.Vector3();mesh.userData.inverse=new THREE.Quaternion();
+                mesh.userData.yaw=mesh.getObjectByName('yaw');mesh.userData.pitch=mesh.getObjectByName('pitch');
+                mesh.userData.yaw.matrixAutoUpdate=mesh.userData.pitch.matrixAutoUpdate=true;
+                mesh.traverse(o=>{if(o.isMesh){o.geometry.userData.shared=true;o.material=o.material.clone();o.material.userData.borrowedTextures=true;}});
+            }else mesh=kind==='capital'?createCruiserTurret():actor?.capitalClass==='cruiser'&&kind==='pdc'?createCruiserPdc():createTurretModel(kind,size,pedestal,footprintScale);
             this.scene.add(mesh);this.turretMeshes.set(id,mesh);
         }
         if(actor){
@@ -5672,12 +5719,12 @@ export class SpaceRenderer {
         }
         if(actor?.capitalMountHull){
             mesh.userData.targetKind='ship';mesh.userData.targetId=actor.id;
-            mesh.userData.targetMount=Number(id.split('-').at(-1));
-            const i=mesh.userData.targetMount,m=(actor.capitalClass==='cruiser'?CRUISER_MOUNTS:FRIGATE_MOUNTS)[i];
+            mesh.userData.targetMount=mountIndex;
+            const i=mesh.userData.targetMount,m=capitalHull(actor).mounts[i];
             if(m.normal&&!mesh.userData.surfaceRotation)mesh.userData.surfaceRotation=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3().fromArray(m.normal));
             if(mesh.userData.attachment)mesh.userData.attachment.surfaceRotation=mesh.userData.surfaceRotation;
             paintFrigateTurret(mesh,this.shipMeshes.get(actor.id)?.userData[actor.capitalClass==='cruiser'?'cruiserArmorMaterial':'frigateArmorMaterial']);
-            setFrigateComponentDamage(mesh,actor.capitalMountHull[i],m.hull??(i<4?100:65));
+            setFrigateComponentDamage(mesh,actor.capitalMountHull[i],m.hull);
         }
         mesh.scale.setScalar((size==='M'?1.3:1)*hullScale);
         mesh.position.copy(position);
@@ -6233,6 +6280,10 @@ export class SpaceRenderer {
         }
         const signatures = root.userData.paintWarmupSignatures ??= new Set();
         const geometries = root.userData.trafficWarmupGeometries ??= new Set();
+        if(this.broadsideModel && root.userData.warmedBroadside !== this.broadsideModel){
+            models = [...models, ['ironjaw', this.broadsideModel]];
+            root.userData.warmedBroadside = this.broadsideModel;
+        }
         for (const [variant, model] of models) model?.traverse(object => {
             if (!object.isMesh) return;
             for (const source of Array.isArray(object.material) ? object.material : [object.material]) {
@@ -6271,7 +6322,14 @@ export class SpaceRenderer {
                         stabilizeMaterialNormals(mesh.material);
                         root.add(mesh);signatures.add('base|' + signature);
                     }
-                    if (!source.map) continue;
+                    if(variant==='drover' && !signatures.has('detached-pod|'+signature)){
+                        const mesh=makeMesh(source.clone());
+                        mesh.material.transparent=true;
+                        stabilizeMaterialNormals(mesh.material);
+                        root.add(mesh);
+                        signatures.add('detached-pod|'+signature);
+                    }
+                    if (!source.map || GLB_SHIP_CONFIG[variant]?.authoredPaint) continue;
                     if (variant === 'kestrel' || variant === 'wayfarer') for (const paint of WAYFARER_INDEPENDENT_LIVERIES) {
                         const key = 'wayfarer|' + paint + '|' + signature;
                         if (signatures.has(key)) continue;
@@ -6625,7 +6683,7 @@ export class SpaceRenderer {
         if (kind === 'ship' && Number.isInteger(mount)) {
             const component=this.shipMeshes.get(id)?.userData.frigateSystems?.userData.components.get(mount);
             renderedPosition=this.turretMeshes?.get(`${id}-main-${mount}`)?.position
-                ?? (mount<8?this.turretMeshes?.get(`${id}-${mount}`)?.position:component?.getWorldPosition(this.tmpPosition));
+                ?? this.turretMeshes?.get(`${id}-${mount}`)?.position ?? component?.getWorldPosition(this.tmpPosition);
         } else if (kind === 'ship') {
             renderedPosition = this.shipMeshes.get(id)?.position;
         }
@@ -6746,6 +6804,7 @@ export class SpaceRenderer {
     }
     disposeResources() {
         this.clearEffects();
+        if(this.broadsideModel)this.disposeObject(this.broadsideModel);
         for(const mesh of this.combatLootMeshes?.values()??[]){mesh.userData.derelictVents?.dispose();const effect=mesh.userData.derelictEffect;if(effect){this.scene.remove(effect.object);effect.dispose();}if(mesh.userData.derelictSource)this.disposeObject(mesh.userData.derelictSource);}
         this.derelictCollisionObstacles?.clear();
         this.wreckFactory?.dispose();this.wreckFactory=undefined;

@@ -7,8 +7,7 @@ import {EQUIPMENT_RARITIES,equipmentName,modifiedWeapon,equipmentBaseId,equipmen
 import {RUN_EQUIPMENT_RARITY,RUN_WAVES,DECISION_STAGES,isPendingDecision,waveAct,runScore,runRewardPlan,runHullOffers,runWingmanOffers,WING_ORDERS,WING_ORDER_LABEL,wingmanOrder} from './arenaRun.js';
 import {SHIPS,displaySpeed} from './data.js';
 import {getEffectiveShipStats} from './shipStats.js';
-import {TRACKING_LASER,weaponForOutfit,launcherForOutfit} from './weapons.js';
-import {PDC_TURRET} from './turrets.js';
+import {PDC_TURRET,TRACKING_LASER,weaponForOutfit,launcherForOutfit} from './weapons.js';
 import {equipmentIcon} from './itemIcons.js';
 import {uiIcon} from './uiIcons.js';
 import {DRONE_TYPES} from './droneData.js';

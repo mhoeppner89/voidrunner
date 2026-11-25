@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {session} from '../helpers/session.mjs';
 import {LAUNCHERS,fillLauncherMagazines,launcherMagazineEntries} from '../../src/game/weapons.js';
+import {closestHullPoint} from '../../src/game/weaponFlight.js';
 import {weaponDamage} from '../../src/game/weaponDamage.js';
 import {loadoutFor} from '../../src/game/outfitting.js';
 import {ORDNANCE_MODEL_DATA} from '../../src/game/ordnanceModelData.js';
@@ -119,5 +120,31 @@ test('all in-game rocket and torpedo bodies keep authored size at near and far c
    assert.ok(extent.z>=d.length*.9);
    assert.ok(root.getObjectByName('ordnance-exhaust').scale.x<=1);
   }
+ }
+});
+
+test('stock torpedoes hit small craft for 360 (shields absorb first) with triple blast falloff, and pierce capital shields',()=>{
+ const capital=weaponDamage(500,LAUNCHERS.torpedo.damage,LAUNCHERS.torpedo,{capitalClass:'corvette'});
+ assert.deepEqual(capital,{shield:0,hull:360});
+ assert.deepEqual(weaponDamage(500,LAUNCHERS.torpedo.damage,LAUNCHERS.torpedo,{}),{shield:360,hull:0});
+ const rack=LAUNCHERS.torpedo;
+ for(const hullId of ['talon','atlas']){
+  const s=session();s.save.player.position=[500,500,0];
+  const target=s.spawnShip('patrol',[0,0,0],undefined,'Target',undefined,{hullId});
+  target.rotation=[0,0,0,1];target.hull=target.maxHull=800;target.shield=200;target.noSurrender=true;
+  const slot=s.projStore.alloc();s.projStore.setPos(slot,0,0,-70);s.projStore.setVel(slot,0,0,200);
+  s.projectiles.push({slot,kind:'missile',ownerId:'player',hitWeapon:rack,damage:rack.damage,life:2,
+   acceleration:0,splashMin:rack.splashMin,splashRadius:rack.splashRadius});
+  const splash=s.spawnShip('patrol',[12,0,-25]);splash.rotation=[0,0,0,1];
+  splash.hull=splash.maxHull=800;splash.shield=0;splash.noSurrender=true;
+  const extents=s.npcHullExtents(splash),impact=new THREE.Vector3();
+  splash.position=[extents[0]+8,0,-s.npcHullExtents(target)[2]];
+  s.renderer.weaponImpact=(_actor,_extents,hit)=>impact.copy(hit);
+  s.updateProjectiles(.6);
+  assert.equal(target.hull,640,hullId);assert.equal(target.shield,0);
+  const distance=closestHullPoint(impact,splash,extents,new THREE.Vector3()).distanceTo(impact);
+  assert.ok(distance>0&&distance<20);
+  const oldBlast=16+(120-16)*(1-distance/20);
+  assert.ok(Math.abs((800-splash.hull)-3*oldBlast)<.001,hullId);
  }
 });

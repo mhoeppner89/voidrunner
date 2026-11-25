@@ -1,3 +1,4 @@
+import {CAPITAL_MARKER_COUNT} from './capitalMarkerCount.js';
 import {getCockpitDefinition} from './cockpitDefinitions.js';
 import { CONTROLLER_ACTIONS, CONTROLLER_BUTTON_LABELS, defaultControllerBindings, normalizeControllerBindings, rebindController, requiredMenuBinding } from './controllerBindings.js';
 import {UI_TERMS,socialVenueKey,missionBoardKey} from './interfaceTerms.js';
@@ -7,7 +8,6 @@ import {installRetroDisplay,monitorRasterRatio} from './retroDisplay.js';
 import {RACE_HULLS} from './raceHulls.js';
 import {EQUIPMENT_RARITIES,equipmentName,modifiedWeapon,equipmentBaseId,rarityRank} from './equipmentCatalog.js';
 import {normalizeEquipmentInventory} from './equipmentInventory.js';
-import {PDC_TURRET} from './turrets.js';
 import {renderEquipmentInventory,bindEquipmentInventory} from './equipmentUi.js';
 import {renderArenaRun} from './arenaRunView.js';
 import {FLEET_PAINTS,fleetHullId} from './fleetPaintCatalog.js';
@@ -478,7 +478,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2pq';
+const GAME_VERSION = '0.8.2pr';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -1325,6 +1325,7 @@ export class GameUI {
           </div>
           <div class="hud-wing-tactics" id="hud-wing-tactics"></div>
           <div id="race-flight-vector" class="race-flight-vector is-hidden" aria-hidden="true"><svg viewBox="0 0 32 32"><g class="flight-vector-ring"><circle cx="16" cy="16" r="6"/><path d="M2 16h8M22 16h8M16 2v8"/></g><path class="flight-vector-arrow" d="M8 20l8-10 8 10"/></svg></div>
+          <div id="capital-markers" aria-hidden="true">${'<i hidden></i>'.repeat(CAPITAL_MARKER_COUNT)}</div>
           <div id="target-bracket" class="target-bracket is-hidden" aria-hidden="true"><i></i><i></i><i></i><i></i><b class="lock-chevron"></b><b class="lock-chevron"></b><b class="lock-chevron"></b><b class="lock-chevron"></b></div>
           <div id="speaker-bracket" class="target-bracket speaker-bracket is-hidden" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
           <div id="target-edge-pointer" class="target-edge-pointer is-hidden" aria-hidden="true"><i></i><span></span></div>
@@ -4808,9 +4809,11 @@ export class GameUI {
         if (raceClock) {
             const seconds = Math.floor(model.race.time), delta = model.race.sectorDelta;
             line = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2,'0')}${Number.isFinite(delta) ? ` · Δ ${delta <= 0 ? '−' : '+'}${Math.abs(delta).toFixed(1)}s` : ''}`;
+        } else if (!line && (target?.surrendered || target?.captured)) {
+            line = target.readout;
         } else if (!line && capital) {
             line = target.capitalTorpedoWarning ? t('TORPEDO') : target.capitalDisarmed ? t('DISARMED')
-                : target.capitalAttack === 'CHARGING' ? t('CHARGING') : target.capitalAttack === 'SALVO' ? t('SALVO') : '';
+                : target.capitalAttack === 'CHARGING' ? t('CHARGING') : target.capitalAttack === 'SALVO' ? t('SALVO') : target.capitalClass==='corvette'?target.readout:'';
         } else if (!line) {
             line = target?.readout ?? '—';
             if (target?.kind === 'ship') line = line.replace(/\s*·\s*[\d.,]+\s*\/\s*[\d.,]+\s*km\s*$/i, '');
@@ -4821,19 +4824,18 @@ export class GameUI {
         subtarget?.classList.toggle('is-hidden',!target?.capitalSubtarget);
         this.targetLayout?.classList.toggle('has-capital-target',capital);
         this.targetScreen?.classList.toggle('has-capital-target',capital);
+        this.targetScreen?.classList.toggle('has-corvette-target',target?.capitalClass==='corvette');
         this.targetScreen?.classList.toggle('has-capital-controls',!!target?.capitalSubtarget);
         if(target?.capitalSubtarget){
             const mount=target.capitalMount;
             const label=Number.isInteger(mount)?t(target.capitalSelectedLabel):t('HULL');
-            const compact=target.variant==='concord-cruiser'
-                ? ['BAT 1','BAT 2','BAT 3','BAT 4','PDC 1','PDC 2','PDC 3','PDC 4','PDC 5','PDC 6','ENGINE 1','ENGINE 2','ENGINE 3','ENGINE 4'][mount]??t('HULL')
-                : ['BAT 1','BAT 2','BAT 3','BAT 4','PDC 1','PDC 2','PDC 3','PDC 4','ENGINE 1','SHIELD 1','SHIELD 2','TORPEDO','ENGINE 2','ENGINE 3'][mount]??t('HULL');
+            const compact=target.capitalCompact?t(target.capitalCompact):label;
             const selected=Number.isInteger(mount);
             const health=selected?Math.max(0,Math.min(100,Math.ceil(100*(target.capitalSelected??0)/Math.max(1,target.capitalSelectedMax??1)))):undefined;
             setHudText(this.el('#capital-subtarget-label'), compact);
             setHudText(this.el('#capital-subtarget-health'), selected ? (health === 0 ? t('OFF') : health + '%') : '');
             subtarget.classList.toggle('is-disabled-component',health===0);
-            setHudTitle(subtarget, t('Choose a turret, engine, shield generator or hull'));
+            setHudTitle(subtarget, t('Choose a generator, engine or hull'));
             setHudAttribute(subtarget, 'aria-label', `${subtarget.title}: ${label}${selected?' '+health+'%':''}`);
         }
         const bracket = this.el('#target-bracket');
@@ -4841,6 +4843,7 @@ export class GameUI {
         // Missile lock, old-school: the bracket stays put in its own colour
         // while four chevrons slide in from each side and seat on the box.
         if(bracket){
+            bracket.classList.toggle('subsystem',Number.isInteger(target?.capitalMount));
             const gap=Math.round((1-progress)*28);
             if(this.rackLockGap!==gap){bracket.style.setProperty('--lock-gap',gap+'px');this.rackLockGap=gap;}
             bracket.classList.toggle('rack-locking',progress>0);
@@ -4891,6 +4894,23 @@ export class GameUI {
         }
         else {
             edgePointer?.classList.toggle('is-hidden', true);
+        }
+    }
+    updateCapitalMarkers(entries,count,ship) {
+        const layer=this.capitalMarkerLayer??=this.el('#capital-markers');
+        layer.classList.toggle('is-hostile',!!ship?.hostile);
+        layer.classList.toggle('is-surrendered',!!ship?.surrendered&&!ship?.hostile);
+        for(let i=0;i<layer.children.length;i++){
+            const node=layer.children[i],e=entries[i],visible=i<count&&e.opacity>0;
+            if(node.hidden===visible)node.hidden=!visible;
+            if(!visible)continue;
+            const x=Math.round(e.screen.x),y=Math.round(e.screen.y),opacity=Math.round(e.opacity*1000);
+            if(x!==e.drawnX||y!==e.drawnY||e.diamond!==e.drawnDiamond){
+                e.drawnX=x;e.drawnY=y;e.drawnDiamond=e.diamond;
+                node.classList.toggle('diamond',e.diamond);
+                node.style.transform=`translate(${x}px,${y}px)${e.diamond?' rotate(45deg)':''}`;
+            }
+            if(opacity!==e.drawnOpacity){e.drawnOpacity=opacity;node.style.opacity=opacity/1000;}
         }
     }
     updateDroneTelemetry(model) {
@@ -5061,7 +5081,9 @@ export class GameUI {
         setText('#screen-target-name', target.name.toUpperCase());
         setHudTitle(this.el('#screen-target-name'), target.name);
         setBar('#screen-target-shield', percent(target.shield ?? 0, target.maxShield ?? 0));
-        setBar('#screen-target-hull', percent(target.hull ?? 0, target.maxHull ?? 0));
+        setBar('#screen-target-hull', Number.isInteger(target.capitalMount)
+            ? percent(target.capitalSelected ?? 0, target.capitalSelectedMax ?? 0)
+            : percent(target.hull ?? 0, target.maxHull ?? 0));
         this.targetOutlineBlank=false;
         if (isShip) {
             this.drawHullOutline(this.targetHullCanvas, target.variant ?? 'kestrel', target.heading ?? 0, 'rgba(255, 192, 70, 0.92)', Boolean(target.hostile));

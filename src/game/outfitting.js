@@ -144,7 +144,7 @@ const itemRecords = [
     {
         id: 'torpedo-launcher', name: "Torpedo Launcher", category: 'launcher',
         price: 9800, weaponId: 'torpedo',
-        description: 'A heavy tube for deliberate shots against large, slow or already-disabled targets.', stat: '2 torpedoes · 600 km lock · 115 km/s',
+        description: 'Pierces corvette and capital-ship shields. Locks only onto slow, steady targets such as transports, corvettes and capital ships.', stat: '2 torpedoes · 360 damage each · 600 km lock · 115 km/s',
         effects: { weaponId: 'torpedo', tracking: 'low', splashRadius: 20, ammoId: 'missiles' }, availability: ['rook'],
         art: './art/outfitting/torpedo-launcher.webp',
     },

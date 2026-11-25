@@ -1,6 +1,7 @@
 import {stabilizeMaterialNormals} from './materialNormals.js';
 import * as THREE from 'three';
-import {FRIGATE_MOUNTS,FRIGATE_ENGINE_MOUNTS,FRIGATE_TORPEDO_LAYOUT} from './frigateMounts.js';
+import {CAPITAL_HULLS} from './capitalHulls.js';
+import {FRIGATE_ENGINE_MOUNTS,FRIGATE_TORPEDO_LAYOUT} from './frigateMounts.js';
 // Equipment is built in world-sized ship coordinates, shared by game and review.
 const colors={navy:0x203852,armor:0xa7b4c2,steel:0x495c6e,gold:0xb79956,dark:0x101b26,char:0x543c2a,cyan:0x62d9ff};
 const materials=Object.fromEntries(Object.entries(colors).map(([k,c])=>[k,new THREE.MeshStandardMaterial({color:c,metalness:k==='dark'?.45:.72,roughness:.55,emissive:k==='cyan'?0x20b8ff:0,emissiveIntensity:k==='cyan'?.65:0})]));
@@ -64,9 +65,10 @@ function engine(radius){
 export function orientFrigateComponent(root,m){if(m.normal)root.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3().fromArray(m.normal));else if(m.axis===0)root.rotation.z=-m.side*Math.PI/2;else if(m.axis===2)root.rotation.x=m.side*Math.PI/2;else if(m.side<0)root.rotation.x=Math.PI;}
 export function createFrigateSystems(ownerId){
  const root=new THREE.Group();root.name='frigate-systems';root.userData.components=new Map();
- for(let i=8;i<FRIGATE_MOUNTS.length;i++){
-  const m=FRIGATE_MOUNTS[i],part=m.kind==='generator'?generator():m.kind==='torpedo'?torpedo():engine(m.radius);
-  part.name=m.label;part.position.fromArray(m.position).multiply(new THREE.Vector3(37.46,44.92,112.9));orientFrigateComponent(part,m);
+ for(const m of CAPITAL_HULLS['concord-frigate'].mounts){
+  if(m.kind!=='generator'&&m.kind!=='torpedo'&&m.kind!=='engine')continue;
+  const i=m.index,part=m.kind==='generator'?generator():m.kind==='torpedo'?torpedo():engine(m.radius);
+  part.name=m.label;part.position.fromArray(m.localPosition);orientFrigateComponent(part,m);
   part.userData.targetKind='ship';part.userData.targetId=ownerId;part.userData.targetMount=i;
   root.add(part);root.userData.components.set(i,part);
  }
@@ -89,5 +91,10 @@ export function setFrigateComponentDamage(root,health,maxHealth){
  if(root.userData.soot)root.userData.soot.visible=destroyed;
  if(root.userData.deadCap)root.userData.deadCap.visible=destroyed;
 }
-export function updateFrigateSystems(root,ship){for(const [i,part] of root.userData.components)setFrigateComponentDamage(part,ship.capitalMountHull[i]??FRIGATE_MOUNTS[i].hull,FRIGATE_MOUNTS[i].hull);}
-export function frigateEngineFraction(ship,flareIndex){const i=FRIGATE_ENGINE_MOUNTS[flareIndex];return ship.capitalMountHull?Math.max(0,(ship.capitalMountHull[i]??160)/160):1;}
+export function updateFrigateSystems(root,ship){for(const [i,part] of root.userData.components){const max=CAPITAL_HULLS['concord-frigate'].mounts[i].hull;setFrigateComponentDamage(part,ship.capitalMountHull[i]??max,max);}}
+export function frigateEngineFraction(ship, flareIndex) {
+ const mount = CAPITAL_HULLS['concord-frigate'].mounts[FRIGATE_ENGINE_MOUNTS[flareIndex]];
+ // Voxel placeholders can have additional cosmetic flares until the GLB arrives.
+ if (!mount) return 1;
+ return Math.max(0, (ship.capitalMountHull?.[mount.index] ?? mount.hull) / mount.hull);
+}

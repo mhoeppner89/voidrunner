@@ -214,6 +214,36 @@
       "sha256": "6fea66c835957d84aa5c16ec0f73f16bd4257d80b93b4b69f64940861f3548a5",
       "category": "drone",
       "factions": []
+    },
+    {
+      "id": "drover",
+      "variant": "drover",
+      "path": "assets/models/capital/drover.glb",
+      "sha256": "ecd0730ee21a5fd1eff59b089babd2cf0e8c96e80958b75e5efbf3970a358184",
+      "category": "capital",
+      "factions": [
+        "independents"
+      ]
+    },
+    {
+      "id": "ironjaw",
+      "variant": "ironjaw",
+      "path": "assets/models/capital/ironjaw.glb",
+      "sha256": "d41574df04231c2cd591be93a8c8d22e01d00654eb8fee7e0339804c4bcf4ffa",
+      "category": "capital",
+      "factions": [
+        "pirates"
+      ]
+    },
+    {
+      "id": "ironjaw-broadside",
+      "variant": "ironjaw-broadside",
+      "path": "assets/models/turrets/ironjaw-broadside.glb",
+      "sha256": "6030ec6b49e3583f77892a518a884f1283082c88df2add5079190d7fa933bc32",
+      "category": "turret",
+      "factions": [
+        "pirates"
+      ]
     }
   ]
 }

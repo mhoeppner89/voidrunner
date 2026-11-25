@@ -497,7 +497,8 @@ const actions = {
             if (save) {
                 save.settings.language = language;
                 cachedSave = save;
-                saveGame(save);
+                if (session) session.persistSave();
+                else saveGame(save);
             }
             location.reload();
             return;
@@ -529,7 +530,7 @@ showTitleScreen();
 scheduleLikelyFlightWarmup();
 window.addEventListener('pagehide', () => {
     if (session)
-        saveGame(session.save);
+        session.persistSave();
 });
 const pauseFlightOnFocusLoss = () => {
     if (!session || session.save.player.dockedAt || ui.isModalOpen)
@@ -564,7 +565,7 @@ window.addEventListener('blur', pauseFlightOnFocusLoss);
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden' && session) {
         pauseFlightOnFocusLoss();
-        saveGame(session.save);
+        session.persistSave();
     }
     session?.setPageVisible(document.visibilityState !== 'hidden');
 });
@@ -607,6 +608,7 @@ window.__VOID_PRIVATEER__ = {
     observerClearFormation: () => session?.observerClearFormation(),
     observerRemoveShip: (unitId) => session?.observerRemoveShip(unitId),
     getState: () => session?.save ?? cachedSave,
+    spawnCorvette: variant => session?.spawnCorvette(variant)?.id,
     getRuntime: () => session,
     startPerformanceCapture: async (options = {}) => {
         const { startFlightCapture } = await import('./game/flightDiagnostics.js');

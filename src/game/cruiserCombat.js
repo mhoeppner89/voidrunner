@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import {CRUISER_MOUNTS,CRUISER_ARMAMENT_COUNT} from './cruiserModelData.js';
+import {capitalMountPosition as cruiserMountPosition,CAPITAL_HULLS} from './capitalHulls.js';
+const cruiser=CAPITAL_HULLS['concord-cruiser'];
+const CRUISER_MOUNTS=cruiser.mounts;
 import {CRUISER_COLLISION_TRIANGLES} from './cruiserCollisionData.js';
 import {relativeIntercept} from './weaponFlight.js';
 import {integrateFlightVelocity} from './flightDynamics.js';
@@ -15,7 +17,7 @@ export function equipCruiser(ship){
  ship.combatFit={hullId:'concord-cruiser',stats:{energyCapacity:650},guns:[],weapons:[],turrets:[],missiles:0};
  ship.turnRate=.06;ship.capitalAttack='RECOVERING';
 }
-export function cruiserMountPosition(ship,index,out){return out.fromArray(CRUISER_MOUNTS[index].position).applyQuaternion(state(ship).q.fromArray(ship.rotation)).add(state(ship).scratch.fromArray(ship.position));}
+export {cruiserMountPosition};
 export function cruiserSubsystemLabel(index){return CRUISER_MOUNTS[index]?.label??'HULL';}
 export function cruiserSubsystemExplosionScale(index){const m=CRUISER_MOUNTS[index];return Math.max(1,(m.kind==='engine'?Math.hypot(m.halfLength,m.radius):(m.explosionRadius??m.radius))*1.18/6.5);}
 // The long twin barrels use tight capsules in their current aiming direction.
@@ -55,7 +57,7 @@ export function damageCruiserMount(ship,point,damage){
   if(m.kind==='battery')score=Math.min(score,barrelPointScore(ship,m,s,s.local));
   if(score<best){best=score;index=m.index;}
  }
- if(index>=0){ship.capitalMountHull[index]=Math.max(0,ship.capitalMountHull[index]-damage);let engines=0;for(let i=CRUISER_ARMAMENT_COUNT;i<CRUISER_MOUNTS.length;i++)engines+=ship.capitalMountHull[i]/CRUISER_MOUNTS[i].hull/4;ship.speed=ship.capitalBaseSpeed*(.12+.88*engines);ship.turnRate=.06*(.2+.8*engines);}
+ if(index>=0){ship.capitalMountHull[index]=Math.max(0,ship.capitalMountHull[index]-damage);let engines=0;for(const m of CRUISER_MOUNTS)if(m.kind==='engine')engines+=ship.capitalMountHull[m.index]/m.hull/cruiser.engines.length;ship.speed=ship.capitalBaseSpeed*(.12+.88*engines);ship.turnRate=.06*(.2+.8*engines);}
  return index;
 }
 function localSegment(start,end,ship){const s=state(ship);s.inverse.fromArray(ship.rotation).invert();s.origin.fromArray(ship.position);s.local.copy(start).sub(s.origin).applyQuaternion(s.inverse);s.end.copy(end).sub(s.origin).applyQuaternion(s.inverse);s.direction.copy(s.end).sub(s.local);return s;}
@@ -95,14 +97,14 @@ function arc(ship,m,point,s){
 }
 export function updateCruiserBatteries(session,ship,dt,targetPosition,targetVelocity){
  ship.cruiserBatteriesAt=session.save.world.time;const s=state(ship),now=session.save.world.time;s.q.fromArray(ship.rotation);s.inverse.copy(s.q).invert();
- ship.energy=Math.min(650,ship.energy+dt*32);ship.capitalDisarmed=!(ship.capitalMountHull[0]>0||ship.capitalMountHull[1]>0||ship.capitalMountHull[2]>0||ship.capitalMountHull[3]>0);
+ ship.energy=Math.min(650,ship.energy+dt*32);ship.capitalDisarmed=!cruiser.weapons.some(m=>m.kind==='battery'&&ship.capitalMountHull[m.index]>0);
  let charging=false;
- for(let i=0;i<CRUISER_ARMAMENT_COUNT;i++){
-  const m=CRUISER_MOUNTS[i],gun=s.mounts[i];cruiserMountPosition(ship,i,s.position);s.q.fromArray(ship.rotation);s.inverse.copy(s.q).invert();s.normal.set(0,0,0).setComponent(m.axis,m.side).applyQuaternion(s.q);
-  s.pivot.copy(s.position).addScaledVector(s.normal,m.size*(i<4?.72:.5));
-  if(gun.direction.lengthSq()<.1){gun.direction.copy(forward).applyQuaternion(s.q);if(i>=4)gun.direction.add(s.normal).normalize();}
+ for(const m of cruiser.weapons){
+  const i=m.index,gun=s.mounts[i];cruiserMountPosition(ship,i,s.position);s.q.fromArray(ship.rotation);s.inverse.copy(s.q).invert();s.normal.set(0,0,0).setComponent(m.axis,m.side).applyQuaternion(s.q);
+  s.pivot.copy(s.position).addScaledVector(s.normal,m.size*(m.kind==='battery'?.72:.5));
+  if(gun.direction.lengthSq()<.1){gun.direction.copy(forward).applyQuaternion(s.q);if(m.kind==='pdc')gun.direction.add(s.normal).normalize();}
   const active=ship.capitalMountHull[i]>0;
-  if(i<4&&active&&targetPosition&&ship.targetId&&!ship.holdFire&&!ship.fleeing&&!ship.patrolMemoryActive){
+  if(m.kind==='battery'&&active&&targetPosition&&ship.targetId&&!ship.holdFire&&!ship.fleeing&&!ship.patrolMemoryActive){
    s.target.copy(targetPosition);const distance=s.position.distanceTo(s.target);
    if(distance<=CRUISER_GUN.range&&arc(ship,m,s.target,s)&&!session.lineBlocked(s.position,s.target,ship.id)){
     const target=ship.targetId==='player'?session.save.player:session.ships.find(a=>a.id===ship.targetId);
@@ -121,7 +123,7 @@ export function updateCruiserBatteries(session,ship,dt,targetPosition,targetVelo
     }
    }
   }
-  if(i>=4&&active&&!ship.holdFire){
+  if(m.kind==='pdc'&&active&&!ship.holdFire){
    const channel=getPdcDefenseChannel(session,ship.id),next=channel.readyAt;
    if(now>=next&&ship.energy>=4)for(const missile of session.projectiles){
     if(missile.kind!=='missile'||missile.ownerId===ship.id||missile.targetId!==ship.id||missile.life<=0)continue;
@@ -130,7 +132,7 @@ export function updateCruiserBatteries(session,ship,dt,targetPosition,targetVelo
     ship.energy-=4;channel.readyAt=now+4;break;
    }
   }
-  session.renderer.showTurret?.(`${ship.id}-main-${i}`,s.position,gun.direction,i<4?'M':'S',i<4?'capital':'pdc',s.q,m.side,0,i<4?m.size/1.3:m.size,m.axis,ship);
+  session.renderer.showTurret?.(`${ship.id}-main-${i}`,s.position,gun.direction,m.kind==='battery'?'M':'S',m.kind==='battery'?'capital':'pdc',s.q,m.side,0,m.kind==='battery'?m.size/1.3:m.size,m.axis,ship);
  }
  ship.capitalAttack=charging?'CHARGING':'RECOVERING';ship.capitalAttackRemaining=charging?1.8:0;
 }

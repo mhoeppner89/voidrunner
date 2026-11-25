@@ -5,6 +5,7 @@ export const FLIGHT_CONTROLLER_BINDINGS = Object.freeze({
     "secondary": 2,
     "afterburner": 7,
     "targetNext": 1,
+    "capitalSubtarget": 11,
     "targetNearestHostile": 13,
     "weaponCycle": 6,
     "launcherCycle": 4,
@@ -37,7 +38,7 @@ export const MENU_CONTROLLER_BINDINGS = Object.freeze({
 export const CONTROLLER_ACTIONS = Object.freeze({
     flight: [
         ['fire','Primary fire'],['secondary','Missile / mining drones'],['afterburner','Boost / afterburner'],
-        ['targetNext','Cycle target'],['targetNearestHostile','Nearest hostile'],['weaponCycle','Cycle fire group'],
+        ['targetNext','Cycle target'],['capitalSubtarget','Cycle capital subsystem'],['targetNearestHostile','Nearest hostile'],['weaponCycle','Cycle fire group'],
         ['launcherCycle','Cycle launcher'],['autopilot','Hyperdrive'],['shipMenu','Ship / cargo menu'],
         ['map','Navigation map'],['pause','Pause'],['navNext','Cycle navigation destination'],['wingOrder','Cycle wing order'],
         ['transponder','Toggle transponder'],['rollLeft','Roll left'],['rollRight','Roll right'],['jettison','Drop cargo'],
@@ -60,6 +61,9 @@ export function normalizeControllerBindings(value) {
         for (const action of Object.keys(map)) {
             if (source && Object.hasOwn(source,action) && (validButton(source[action]) || source[action] === null && !requiredMenuBinding(context,action))) map[action]=source[action];
         }
+        // Older layouts may already use R3 for another flight command.
+        if (context==='flight' && source && !Object.hasOwn(source,'capitalSubtarget')
+            && Object.values(source).includes(map.capitalSubtarget)) map.capitalSubtarget=null;
         const used=new Set();
         for (const action of Object.keys(map)) {
             if (map[action] === null) continue;

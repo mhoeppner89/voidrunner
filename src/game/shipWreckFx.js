@@ -73,7 +73,7 @@ function collect(source){
     source.updateWorldMatrix(true,true);
     const inverse=source.matrixWorld.clone().invert(),hull=source.userData.glb?source.children[0]:source,meshes=[],hardware=[],bounds=new THREE.Box3();
     hull.traverseVisible(mesh=>{if(!isSolid(mesh))return;const matrix=new THREE.Matrix4().multiplyMatrices(inverse,mesh.matrixWorld);
-        for(let p=mesh;p&&p!==hull;p=p.parent)if(p.userData.yaw||p.userData.pitch||/(?:[_.](?:yaw|pitch)|armament)$/i.test(p.name)){hardware.push({mesh,matrix});return;}
+        for(let p=mesh;p&&p!==hull;p=p.parent)if(p.userData.yaw||p.userData.pitch||/^pod_[0-5]$/.test(p.name)||/(?:[_.](?:yaw|pitch)|armament)$/i.test(p.name)){hardware.push({mesh,matrix});return;}
         if(!mesh.geometry.boundingBox)mesh.geometry.computeBoundingBox();const box=mesh.geometry.boundingBox.clone().applyMatrix4(matrix);bounds.union(box);
         meshes.push({mesh,matrix});
     });
@@ -253,3 +253,26 @@ export class ShipWreckFactory {
 // Offline graveyard authoring reuses the exact hull clipping and sealed-cut
 // construction used by combat wrecks; this does not add runtime work.
 export {split as splitWreckTriangles, geometryFor as wreckGeometryFor};
+
+// A released cargo assembly keeps its authored transform and parent momentum.
+// The same hull-length falloff as a wreck section keeps a heavy pod tumbling slowly.
+export function createDetachedPod(pod,ship,side){
+    pod.updateWorldMatrix(true,true);
+    const root=new THREE.Group(),model=pod.clone(true),materials=new Map();
+    root.add(model);pod.matrixWorld.decompose(root.position,root.quaternion,root.scale);
+    model.matrixAutoUpdate=true;model.position.set(0,0,0);model.quaternion.identity();model.scale.setScalar(1);
+    model.traverse(mesh=>{
+        if(!mesh.isMesh)return;
+        if(!materials.has(mesh.material)){
+            const m=mesh.material.clone();m.transparent=true;m.depthWrite=true;materials.set(mesh.material,m);
+        }
+        mesh.material=materials.get(mesh.material);mesh.raycast=()=>{};
+    });
+    const heft=blastHeft(56,WRECK_FIGHTER_LENGTH,1.75),q=new THREE.Quaternion().fromArray(ship.rotation);
+    const velocity=new THREE.Vector3(side,.15,.1).normalize().multiplyScalar(56*.45*heft).applyQuaternion(q).add(new THREE.Vector3().fromArray(ship.velocity));
+    const axis=new THREE.Vector3(.3,side,.6).normalize();let age=0;
+    return {object:root,life:12,maxLife:12,update(dt){
+        age+=dt;root.position.addScaledVector(velocity,dt);root.rotateOnAxis(axis,.8*heft*dt);
+        if(age>9)for(const m of materials.values())m.opacity=Math.max(0,(12-age)/3);
+    },dispose(){for(const m of materials.values())m.dispose();}};
+}

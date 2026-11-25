@@ -26,7 +26,14 @@ for(const [variant,config] of Object.entries(GLB_SHIP_CONFIG))test(`${variant}: 
  const root=await buildGlbScene(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength));
  root.rotation.y=config.yaw;root.scale.setScalar(config.scale*(config.baseScale??1));root.updateMatrixWorld(true);
  const vertices=[],indices=[],point=new T.Vector3();
- root.traverse(mesh=>{if(!mesh.isMesh)return;const pos=mesh.geometry.attributes.position,index=mesh.geometry.index,offset=vertices.length/3;
+ if(config.collisionSource){
+  const {groups}=JSON.parse(await readFile(config.collisionSource,'utf8'));
+  for(const group of Object.values(groups)){
+   const offset=vertices.length/3;
+   for(const point of group.vertices)vertices.push(...point.map(n=>n/2));
+   for(const face of group.triangles)indices.push(...face.map(i=>i+offset));
+  }
+ }else root.traverse(mesh=>{if(!mesh.isMesh)return;const pos=mesh.geometry.attributes.position,index=mesh.geometry.index,offset=vertices.length/3;
   for(let i=0;i<pos.count;i++){point.fromBufferAttribute(pos,i).applyMatrix4(mesh.matrixWorld);vertices.push(point.x,point.y,point.z);}
   for(let i=0;i<(index?.count??pos.count);i++)indices.push(offset+(index?index.getX(i):i));
  });

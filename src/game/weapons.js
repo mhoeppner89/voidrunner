@@ -1,3 +1,4 @@
+import {PDC_RECOVERY_SECONDS} from './pdcFireControl.js';
 import {modifiedWeapon,equipmentBaseId} from './equipmentCatalog.js';
 // Weapon registry — the shared source of truth for player and NPC weapons.
 // Each entry describes one weapon's sim personality: projectile speed, fire
@@ -56,6 +57,8 @@ for(const weapon of Object.values(WEAPONS)){
 }
 // Read-only compatibility for old weapon-ID callers; no separate roster entry.
 WEAPONS['pulse-mk2']={...WEAPONS.pulse,id:'pulse',nameKey:'Pulse Laser II',hudNameKey:'PULSE II',damageFlat:WEAPONS.pulse.damageFlat*27/23,energyCost:WEAPONS.pulse.energyCost*1.125,legacyOnly:true};
+export const PDC_TURRET=Object.freeze({...WEAPONS.pdc,damageFlat:2.2*WEAPON_DAMAGE_SCALE,shotInterval:.14,burstPause:2,interceptInterval:PDC_RECOVERY_SECONDS});
+export const CORVETTE_BROADSIDE=Object.freeze({id:'corvette-broadside',kind:'laser',damageFlat:50,cooldown:1.2,range:550,speed:520,life:550/520,energyCost:10});
 export const TRACKING_LASER=Object.freeze({id:'tracking-turret',kind:'beam',range:300,speed:100000,damageFlat:8*WEAPON_DAMAGE_SCALE,energyCost:3,cooldown:.7});
 export const weaponRange=weapon=>weapon?.range??(weapon?.speed??0)*(weapon?.life??0);
 export const weaponShotDamage=weapon=>weapon?.damageFlat??0;
@@ -129,10 +132,15 @@ export const LAUNCHERS = {
         speed: 115,
         homingSpeed: 115,
         homingTurn: 10*Math.PI/180,
-        shieldBypass: 1,
+        // Heavy torpedoes punch through corvette and capital shield bubbles;
+        // small-craft shields absorb them like any other hit.
+        capitalShieldBypass: 1,
         projectileShield: 12,
         acceleration: 140, lockTime: 3, seekerCone: 30, lockRange: 600,
-        damage: 120,
+        damage: 360,
+        // World units/s and radians/s. Both limits use the target's current motion.
+        fullLockSpeed: 40, zeroLockSpeed: 60,
+        fullLockAngularRate: 5*Math.PI/180, zeroLockAngularRate: 15*Math.PI/180,
         life: 10,
         cooldown: 2.6,
         capacity: 2,
@@ -143,7 +151,7 @@ export const LAUNCHERS = {
         volley: 1,
         spreadRad: 0,
         splashRadius: 20,
-        splashMin: 20,
+        splashMin: 60,
         audioKey: 'missile',
     },
 };

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from '../../vendor/three.module.min.js';
 import {equipFrigate,updateFrigateBatteries,updateFrigateAttack,frigateMountPosition,damageFrigateMount,frigateSubsystemExplosionScale,FRIGATE_GUN,FRIGATE_BOSS_GUN,FRIGATE_EXTENTS,visibleFrigateBatteries} from '../../src/game/capitalCombat.js';
 import {cockpitLockState} from '../../src/game/weaponFlight.js';
-import {WEAPON_DAMAGE_SCALE} from '../../src/game/weapons.js';
+import {WEAPON_DAMAGE_SCALE,LAUNCHERS} from '../../src/game/weapons.js';
 import {FRIGATE_MOUNTS,FRIGATE_ENGINE_MOUNTS,FRIGATE_TORPEDO_LAYOUT} from '../../src/game/frigateMounts.js';
 import {clearTurretArc,updateAutomaticTurrets,FRIGATE_PDC_TURRET,PDC_TURRET} from '../../src/game/turrets.js';
 import {cockpitDamageStage} from '../../src/game/cockpitDamage.js';
@@ -76,7 +76,7 @@ test('frigate PDCs keep engaging during main-battery recovery with the heavy shi
  assert.ok(fired.length>0,'PDCs should remain active during main-gun recovery');
  assert.ok(fired.every(weapon=>weapon===FRIGATE_PDC_TURRET));
 });
-test('a real beam hit destroys an exposed assembly only after shields are down and scales its blast to that module',()=>{const {s,ship}=stage(),blasts=[];s.renderer.spawnExplosion=(_position,_hostile,scale)=>blasts.push(scale);const pos=frigateMountPosition(ship,2,new THREE.Vector3()),start=pos.clone().add(new THREE.Vector3(100,0,0)),dir=new THREE.Vector3(-1,0,0),beam={id:'beam',kind:'beam',range:250,damageFlat:110};s.fireBeam('player',beam,start,dir,'test');assert.equal(ship.capitalMountHull[2],100);assert.equal(blasts.length,0);ship.shield=0;s.fireBeam('player',beam,start,dir,'test');assert.equal(ship.capitalMountHull[2],0);assert.ok(ship.hull<1400);assert.deepEqual(blasts,[frigateSubsystemExplosionScale(2)]);});
+test('a real beam hit destroys an exposed assembly only after shields are down and scales its blast to that module',()=>{const {s,ship}=stage(),blasts=[];s.renderer.spawnExplosion=(_position,_hostile,scale)=>blasts.push(scale);const pos=frigateMountPosition(ship,2,new THREE.Vector3()),start=pos.clone().add(new THREE.Vector3(100,0,0)),dir=new THREE.Vector3(-1,0,0),beam={id:'beam',kind:'beam',range:250,damageFlat:110};s.fireBeam('player',beam,start,dir,'test');assert.equal(ship.capitalMountHull[2],100);assert.equal(blasts.length,0);ship.shield=0;s.fireBeam('player',beam,start,dir,'test');assert.equal(ship.capitalMountHull[2],0);assert.ok(ship.hull<ship.maxHull);assert.deepEqual(blasts,[frigateSubsystemExplosionScale(2)]);});
 test('frigate subsystem blast scales follow each module envelope',()=>{
  const scales=FRIGATE_MOUNTS.map((_,index)=>frigateSubsystemExplosionScale(index));
  assert.equal(scales.length,14);assert.ok(scales.every(scale=>scale>=.35&&scale<=2.5));
@@ -151,12 +151,12 @@ test('physical asteroid cover blocks battery fire and breaking cover restarts th
  for(let i=300;i<360;i++){s.save.world.time=i/60;updateFrigateBatteries(s,ship,1/60,new THREE.Vector3(180,0,0),new THREE.Vector3());}assert.equal(shots,0);
  for(let i=360;i<600;i++){s.save.world.time=i/60;updateFrigateBatteries(s,ship,1/60,new THREE.Vector3(180,0,0),new THREE.Vector3());}assert.ok(shots>0);
 });
-test('subtarget cycling reaches every frigate component without visibility or line of sight',()=>{
+test('subtarget cycling reaches only frigate engines and generators without visibility or line of sight',()=>{
  const {s,ship}=stage();s.save.settings.aimAssist=true;s.save.player.currentTargetId=ship.id;
  s.lineBlocked=()=>{throw new Error('subtarget cycling must not check line of sight');};
  const selected=[];
- for(let i=0;i<FRIGATE_MOUNTS.length;i++){s.cycleCapitalSubtarget();selected.push(s.getTargetRef().mount);}
- assert.deepEqual(selected,FRIGATE_MOUNTS.map((_,index)=>index));
+ for(let i=0;i<6;i++){s.cycleCapitalSubtarget();selected.push(s.getTargetRef().mount);}
+ assert.deepEqual(selected,[8,9,10,12,13,undefined]);s.cycleCapitalSubtarget();
  assert.equal(FRIGATE_MOUNTS[9].label,'UPPER SHIELD GENERATOR');assert.equal(FRIGATE_MOUNTS[10].label,'LOWER SHIELD GENERATOR');
  s.lineBlocked=()=>false;
  const target=s.getTargetRef();
@@ -255,14 +255,22 @@ function projectileStage(){
  s.playerCollisionRadius=()=>2;s.playerStats=()=>({radarRange:1000});
  return {s,ship};
 }
-test('rear torpedo impacts bypass shields and progressively cripple the engines',async()=>{
- const {LAUNCHERS}=await import('../../src/game/weapons.js');const {s,ship}=projectileStage();
+test('ordinary seeker hits still deal 60 to frigate shields or 120 to exposed hull',()=>{
+ const {s,ship}=projectileStage(),rack=LAUNCHERS.seeker;
+ s.damageShip(ship,rack.damage,'player',undefined,rack);
+ assert.equal(ship.shield,590);assert.equal(ship.hull,2600);
+ ship.shield=0;s.damageShip(ship,rack.damage,'player',undefined,rack);
+ assert.equal(ship.hull,2480);
+});
+test('a rear torpedo deals 360 through shields and destroys an exposed engine',()=>{
+ const {s,ship}=projectileStage();
  const shield=ship.shield,originalSpeed=ship.speed;
- for(let shot=0;shot<4;shot++){
+ assert.equal(shield,650);assert.equal(ship.hull,2600);
+ {
   const slot=s.projStore.alloc();const enginePoint=frigateMountPosition(ship,8,new THREE.Vector3());s.projStore.setPos(slot,enginePoint.x,enginePoint.y,enginePoint.z+37);s.projStore.setVel(slot,0,0,-115);
-  s.projectiles.push({id:`tor-${shot}`,slot,kind:'missile',ownerId:'player',launcherId:'torpedo',damage:LAUNCHERS.torpedo.damage,life:2,targetId:ship.id,targetMount:8,homingSpeed:115,homingTurn:.28,acceleration:140,shield:12});
+  s.projectiles.push({id:'tor-0',slot,kind:'missile',ownerId:'player',launcherId:'torpedo',damage:LAUNCHERS.torpedo.damage,life:2,targetId:ship.id,targetMount:8,homingSpeed:115,homingTurn:.28,acceleration:140,shield:12});
   s.updateProjectiles(.5);
-  assert.equal(ship.shield,shield);assert.ok(ship.speed<originalSpeed);
+  assert.equal(ship.shield,shield);assert.equal(ship.hull,2240);
  }
  assert.equal(ship.capitalMountHull[8],0);assert.ok(ship.speed<originalSpeed*.8,'one destroyed drive reduces thrust');
  for(const i of FRIGATE_ENGINE_MOUNTS)damageFrigateMount(ship,frigateMountPosition(ship,i,new THREE.Vector3()).toArray(),160);
@@ -309,12 +317,14 @@ test('frigate PDC salvo pressure materially cuts a stationary player shield duri
 });
 test('frigate torpedoes have a finite magazine, warning, cooldown, and cover interruption',()=>{
  const {s,ship}=stage(),point=new THREE.Vector3(0,0,-380);s.spawnGunProjectile=()=>{};
+ s.save.player.shipId='atlas';s.save.player.position=point.toArray();
  assert.equal(ship.capitalTorpedoes,2);
  let warnings=0,launches=[];for(let i=0;i<430*60;i++){s.save.world.time=i/60;const before=s.projectiles.length;updateFrigateBatteries(s,ship,1/60,point,new THREE.Vector3());if(ship.capitalTorpedoWarning)warnings++;if(s.projectiles.length>before)launches.push(s.projectiles.length-before);}
  assert.ok(warnings>0);assert.deepEqual(launches,[2]);assert.equal(ship.capitalTorpedoes,0);assert.equal(s.projectiles.length,2);
  const mount=frigateMountPosition(ship,11,new THREE.Vector3()),l=FRIGATE_TORPEDO_LAYOUT;
  for(let i=0;i<s.projectiles.length;i+=2){const a=s.projStore.getPos(s.projectiles[i].slot,new THREE.Vector3()),b=s.projStore.getPos(s.projectiles[i+1].slot,new THREE.Vector3());assert.ok(Math.abs(a.y-(mount.y+l.muzzleHeight))<1e-6,'salvo starts above the modeled launch cells');assert.equal(a.y,b.y);assert.ok(Math.abs(a.x+l.cellX)<1e-6&&Math.abs(b.x-l.cellX)<1e-6,'paired rounds leave opposite cells of one launcher');assert.ok(Math.abs(a.z-(mount.z+(i/2%2===0?-l.cellZ:l.cellZ)))<2e-6,'salvos alternate cell rows');}
  const other=stage();other.s.lineBlocked=()=>true;
+ other.s.save.player.shipId='atlas';other.s.save.player.position=point.toArray();
  for(let i=0;i<1800;i++){other.s.save.world.time=i/60;updateFrigateBatteries(other.s,other.ship,1/60,point,new THREE.Vector3());}
  assert.equal(other.s.projectiles.length,0);assert.equal(other.ship.capitalTorpedoWarning,false);
 });
@@ -338,16 +348,16 @@ test('a frigate torpedo lock reaches the cockpit until interrupted or launched',
  assert.deepEqual([...states],['acquiring','locked','off']);
  assert.equal(s.projectiles.filter(p=>p.launcherId==='torpedo').length,2);
 });
-test('frigate torpedoes reserve salvos for capital ships and slower hulls',()=>{
- const {s,ship}=stage(),point=new THREE.Vector3(0,0,-380);s.spawnGunProjectile=()=>{};s.save.player.shipId='talon';
+test('frigate tubes use actual fighter and transport velocity and can lock a steady capital ship',()=>{
+ const {s,ship}=stage(),point=new THREE.Vector3(0,0,-380);s.spawnGunProjectile=()=>{};s.save.player.shipId='talon';s.save.player.velocity=[0,0,70];
  for(let i=0;i<45*60;i++){s.save.world.time=i/60;updateFrigateBatteries(s,ship,1/60,point,new THREE.Vector3());}
  assert.equal(s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length,0);assert.equal(ship.capitalTorpedoWarning,false);
- s.save.player.shipId='atlas';ship.capitalTorpedoes=2;ship.capitalRuntime.torpedoReadyAt=0;ship.combatFit.lock=0;
+ s.save.player.shipId='atlas';s.save.player.velocity=[0,0,35];ship.capitalTorpedoes=2;ship.capitalRuntime.torpedoReadyAt=0;ship.combatFit.lock=0;
  for(let i=0;i<35*60&&s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length<2;i++){s.save.world.time=45+i/60;updateFrigateBatteries(s,ship,1/60,point,new THREE.Vector3());}
  assert.equal(s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length,2,'a slow industrial hull should draw a paired salvo');
  const capital=s.spawnCapitalShip('concord-frigate',[0,0,-380],'rook','Capital target');ship.targetId=capital.id;ship.capitalTorpedoes=2;ship.capitalRuntime.torpedoReadyAt=0;ship.combatFit.lock=0;
  for(let i=0;i<35*60&&s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length<4;i++){s.save.world.time=80+i/60;updateFrigateBatteries(s,ship,1/60,new THREE.Vector3(...capital.position),new THREE.Vector3());}
- assert.equal(s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length,4,'capital hulls should draw paired salvos regardless of speed');
+ assert.equal(s.projectiles.filter(projectile=>projectile.launcherId==='torpedo').length,4,'a steady capital hull should draw paired salvos');
 });
 test('stern and generator aim points remain selectable after destruction to show effects',()=>{
  const {s,ship}=stage();s.save.player.currentTargetId=ship.id;s.save.player.position=[0,0,300];
@@ -383,7 +393,7 @@ test('final-wave crown pocket has reachable real rock cover and a pursuing friga
   // ordinary navigation/avoidance. No fixture rock replaces the level data.
   s.save.player.position=origin.toArray();s.save.arenaRun={entry:null};s.runEntryPosition=()=>ship.position;
   s.ui.setRunInbound=()=>{};s.selectTarget=()=>{};
-  assert.equal(s.spawnRunEnemy(['frigate','ace',0,0],0),true);const boss=s.ships.at(-1);boss.holdFire=true;
+  assert.equal(s.spawnRunEnemy({role:'frigate',tier:'ace',delay:0,bearing:0},0),true);const boss=s.ships.at(-1);boss.holdFire=true;
   const initial=target.distanceTo(new THREE.Vector3(...boss.position));
   for(let tick=0;tick<1200;tick++){s.save.world.time+=1/60;updateFrigateAttack(s,boss,target,new THREE.Vector3(),1/60);assert.ok(boss.position.every(Number.isFinite));}
   assert.ok(target.distanceTo(new THREE.Vector3(...boss.position))<initial-100,'frigate follows the lure toward the field');

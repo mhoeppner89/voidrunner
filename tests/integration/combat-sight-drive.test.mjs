@@ -127,7 +127,7 @@ test('dead, dying, docked, modal and hyperdrive states hide the sight',()=>{
  }
 });
 test('shield bypass and shield overflow both confirm hull damage',()=>{
- for(const [weapon,shield] of [[LAUNCHERS.torpedo,60],[WEAPONS.pulse,2]]){
+ for(const [weapon,shield] of [[WEAPONS.gauss,60],[WEAPONS.pulse,2]]){
   const {s,ship}=battle();ship.shield=shield;const sounds=[];s.audio.playCockpit=id=>sounds.push(id);
   s.damageShip(ship,12,'player',ship.position,weapon,[0,0,0],true);
   assert.equal(s.hitTick,'hull');assert.ok(sounds.includes('confirmHull'));

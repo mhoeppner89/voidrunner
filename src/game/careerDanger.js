@@ -22,10 +22,12 @@ export const SYSTEM_SECURITY = Object.freeze(Object.fromEntries(Object.entries(S
 export const LOCATION_SECURITY = Object.freeze(Object.fromEntries(Object.entries(LOCATION_DANGER).map(([id, danger]) => [id, profile(danger)])));
 export const careerRegion = (systemId, locationId) => LOCATION_SECURITY[locationId] ?? SYSTEM_SECURITY[systemId] ?? SYSTEM_SECURITY['helios-verge'];
 export const encounterDelay = (region, rng) => region.encounterMin + rng() * (region.encounterMax - region.encounterMin);
+export const careerRaidTier = region => region.danger < .3 ? 1 : region.danger < .65 ? 2 : 3;
 export function careerGroupSize(region, rng) {
-    if (region.danger < .3) return 1;
+    const tier = careerRaidTier(region);
+    if (tier === 1) return 1;
     const roll = rng();
-    if (region.danger < .65) return roll < region.danger * .65 ? 2 : 1;
+    if (tier === 2) return roll < region.danger * .65 ? 2 : 1;
     return roll < .25 ? 1 : roll < .70 ? 2 : 3;
 }
 export function careerPilotTier(region, rng) {

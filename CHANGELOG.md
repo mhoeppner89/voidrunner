@@ -1,3 +1,10 @@
+## 0.8.2pr — Corvettes and torpedo bombers
+
+- New corvette class. The **Drover** is a Free Merchants bulk hauler with six cargo pods: shoot a pod off and it tumbles away and spills its cargo, and with both engines gone the crew surrenders and can be boarded. The **Ironjaw** is a Red Talon gunboat built from a stolen Drover: welded armour, two broadside guns it turns towards fighters, and a strap-on booster you can shoot off. About one in seven merchant spawns in independent space is now a Drover convoy with escorts, and about one in seven pirate raids from tier 2 up brings an Ironjaw.
+- Big ships are taken apart piece by piece. Every visible part of a corvette or frigate can be destroyed by hitting it, but only shield generators, engines and the whole ship can be selected as a subtarget. While a big ship is targeted, small markers show its intact parts you can see: diamonds for generators and engines, dots for everything else.
+- Torpedoes deal 360 direct damage and have a stronger blast. Direct hits and splash pierce the shields of corvettes and capital ships. The tubes lock readily onto slow, steady targets. Speed and crossing motion slow acquisition and can break a lock. The target monitor shows TOO FAST when motion prevents a lock.
+- NPC bombers prefer a clear torpedo shot on an enemy capital ship or transport. Combat frigates carry 2,600 hull and 650 shields.
+
 ## 0.8.2pq — Gun and missile slots, round hull stats, lost targets come back
 
 - Guns and missiles now have their own slots: guns go only in gun slots, launchers only in missile slots. Bombers carry the most missiles (Thor 2 guns / 3 missiles, Bellona 3 / 3), and every ship has at least two guns. Hestia, Balor, Loki, Morrigan, Mercury, Gaia and Argo keep their layouts; Tyr now has 4 guns, Freya 3, Artemis 3 / 2, Victoria 4 / 2, Odin 3 / 2 and the Atlas Hauler 2 / 2. Fitting screens, the ship sheet and dealer cards show Guns and Missiles separately.

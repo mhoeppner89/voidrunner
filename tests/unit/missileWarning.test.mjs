@@ -90,8 +90,9 @@ test('the cockpit shows the most urgent live lock on the player', async () => {
     assert.equal(state([acquiring, locked]), 'locked');
     assert.equal(state([locked, acquiring]), 'locked');
     assert.equal(state([locked], true), 'missile');
+    assert.equal(state([{...locked, targetId:'escort'}]), 'locked', 'the rack can track the player independently of the guns');
     assert.equal(state([{}, {...locked, hull:0}, {...locked, hostile:false}, {...locked, surrendered:true},
-        {...locked, targetId:'escort'}, {...locked, combatFit:{...locked.combatFit, lockTarget:'escort'}},
+        {...locked, combatFit:{...locked.combatFit, lockTarget:'escort'}},
         {...locked, combatFit:{...locked.combatFit, lockCheckedAt:time-dt}}]), 'off');
 });
 

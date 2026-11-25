@@ -18,8 +18,10 @@ import {mkdir,writeFile} from 'node:fs/promises';
 const seed=Number(process.env.SEED??718);
 if(!Number.isSafeInteger(seed))throw new Error('SEED must be an integer');
 // PILOT=engage pursues and fires. PILOT=defend returns fire from the spawn point.
+// PILOT=bomber WAVE="The line" flies a Thor with three stock tubes and a plasma cannon.
+// It tracks the frigate while also measuring potential torpedo locks on the escorts.
 const pilot=process.env.PILOT??'hold';
-if(!['hold','engage','defend'].includes(pilot))throw new Error('PILOT accepts hold, engage or defend');
+if(!['hold','engage','defend','bomber'].includes(pilot))throw new Error('PILOT accepts hold, engage, defend or bomber');
 const SECONDS=+(process.env.SECONDS??60),OUT=process.env.OUT??'output/arena-combat/benchmark.json';
 await mkdir(OUT.replace(/\/[^/]*$/,''),{recursive:true});
 const chrome=process.env.VR_CHROME??'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -35,12 +37,29 @@ await page.evaluate(async seed=>{
  if(__VOID_PRIVATEER__.getRuntime().save.arenaRun.seed!==seed)throw new Error('Arena seed mismatch');
 },seed);
 await page.evaluate(()=>{const r=__VOID_PRIVATEER__.getRuntime();cancelAnimationFrame(r.frameId);r.arenaRunAction('hull','wayfarer');for(let pick=0;pick<2;pick++){const offers=r.save.arenaRun.offers;r.arenaRunAction('reward',offers.find(x=>x!=='repair')??offers[0]);r.arenaRunAction('accept');}});
-const sites=await page.evaluate(async()=>{const {RUN_WAVES}=await import('/src/game/arenaRun.js');const seen=new Map();RUN_WAVES.forEach((w,i)=>{if(!seen.has(w.site))seen.set(w.site,i);});return [...seen];});
+const sites=await page.evaluate(async name=>{
+ const {RUN_WAVES}=await import('/src/game/arenaRun.js');
+ if(name){
+  const index=RUN_WAVES.findIndex(w=>w.name===name);
+  if(index<0)throw new Error(`Unknown Arena wave: ${name}`);
+  return [[RUN_WAVES[index].site,index]];
+ }
+ const seen=new Map();RUN_WAVES.forEach((w,i)=>{if(!seen.has(w.site))seen.set(w.site,i);});return [...seen];
+},process.env.WAVE??(pilot==='bomber'?'The line':undefined));
 const results=[];
 for(const [site,wave] of (process.env.SITES?sites.filter(([s])=>process.env.SITES.split(',').includes(s)):sites)){
  const result=await page.evaluate(async({wave,seconds,pilot,traceContacts})=>{
   const r=__VOID_PRIVATEER__.getRuntime();cancelAnimationFrame(r.frameId);
   r.clearTransientSpace();r.ships=r.ships.filter(s=>s.arenaRunWingman);const run=r.save.arenaRun;run.wave=wave;run.phase='prepare';run.decisions[wave]=true;run.hullChosen=true;run.rewardChosen=true;run.wingmen=[];
+  const bomber=pilot==='bomber';
+  const {LAUNCHERS,fillLauncherMagazines}=await import('/src/game/weapons.js');
+  const flight=await import('/src/game/weaponFlight.js');
+  if(bomber){
+   const {createOutfittingState}=await import('/src/game/outfitting.js');
+   const p=r.save.player;p.shipId='andromeda';p.ownedShips=[p.shipId];p.outfitting=createOutfittingState(p.ownedShips);
+   const fit=p.outfitting.loadouts[p.shipId];fit.launchers.fill('torpedo-launcher');fit.guns=['mortar',null];fit.fireGroups.activeGroup='ALL';
+   fillLauncherMagazines(p);p.launcherFireMode='together';r._statsDirty=true;r.syncWeaponProjection();
+  }
   r.startRunWave();
   const p=r.save.player,stats=r.playerStats(),hold=[...p.position],per=new Map(),T=await import('/vendor/three.module.min.js'),a=new T.Vector3(),b=new T.Vector3();
   const tactics={cover:0,covered:0,flank:0,flankArrival:0,ambush:0,spring:0};
@@ -135,23 +154,53 @@ for(const [site,wave] of (process.env.SITES?sites.filter(([s])=>process.env.SITE
   r.fireNpcGun=(ship,...rest)=>{const energy=ship.energy,counter=r.projectileCounter;const out=fire(ship,...rest);if((ship.energy<energy||counter!==r.projectileCounter)&&ship.targetId==='player'&&ship.arenaRunEnemy){const m=metric(ship);m.shots++;dry=0;m.firstShot??=r.save.world.time-m.spawned;}return out;};
   let hits=0;r.damagePlayer=(amount,source,...rest)=>{if(['weapons fire','beam fire','missile strike'].includes(source))hits++;return damage(amount,source,...rest);};
   const t0=performance.now();let simMs=0;let hidden=0,maxHidden=0,hiddenSeconds=0;
+  const escortLocks=new Map(),line=new T.Vector3(),escortNose=new T.Vector3(),escortAttitude=new T.Quaternion();
+  let frigate,spawnTime,frigateTTK=null,torpedoHits=0,escortSteps=0,progressSteps=0,lockedSteps=0;
+  const damageShip=r.damageShip;
+  if(bomber)r.damageShip=function(ship,amount,owner,position,weapon,...rest){
+   if(ship===frigate&&owner==='player'&&position&&weapon?.id==='torpedo')torpedoHits++;
+   return damageShip.call(this,ship,amount,owner,position,weapon,...rest);
+  };
   for(let i=0;i<seconds*60;i++){
    step=i;
    const actions={};
-   if(pilot!=='engage'){p.position=[...hold];p.velocity=[0,0,0];p.throttle=0;}
+   if(pilot!=='engage'&&!bomber){p.position=[...hold];p.velocity=[0,0,0];p.throttle=0;}
    if(pilot!=='hold'){
     if(run.phase!=='combat')break;
-    const target=r.ships.find(s=>s.arenaRunEnemy&&s.hull>0&&!r.lineBlocked(a.fromArray(p.position),b.fromArray(s.position)));
+    const target=bomber?frigate:r.ships.find(s=>s.arenaRunEnemy&&s.hull>0&&!r.lineBlocked(a.fromArray(p.position),b.fromArray(s.position)));
     if(pilot==='engage')p.throttle=target ? .5 : .25;
     if(target){
      b.fromArray(target.position).sub(a.fromArray(p.position)).normalize();
      desired.setFromUnitVectors(nose,b);attitude.fromArray(p.rotation).rotateTowards(desired,2/60).toArray(p.rotation);
      actions.fire=attitude.angleTo(desired)<.1;
+     if(bomber){
+      p.throttle=a.distanceTo(line.fromArray(target.position))>250?.85:0;
+      if(p.currentTargetId!==target.id)r.selectTarget('ship',target.id,'automatic');
+      if(p.missiles>0&&r.rackProgress===1)r.fireMissile();
+      actions.fire=actions.fire&&p.missiles===0;
+     }
     }
    }
    p.hull=stats.hull;p.shield=stats.shield;steps++;
    const s0=performance.now();r.updateSimulation(1/60,actions);simMs+=performance.now()-s0;
    const alive=r.ships.filter(ship=>ship.arenaRunEnemy&&ship.hull>0);
+   if(bomber){
+    if(!frigate){frigate=alive.find(s=>s.capitalClass==='frigate');if(frigate)spawnTime=r.save.world.time;}
+    if(frigate?.hull<=0){frigateTTK=+(r.save.world.time-spawnTime).toFixed(2);break;}
+    for(const ship of alive){
+     if(ship.capitalClass)continue;
+     const distance=line.fromArray(ship.position).sub(a.fromArray(p.position)).length();line.normalize();
+     const rack=LAUNCHERS.torpedo;
+     const factor=flight.torpedoMobilityFactor?.(rack,p.velocity,ship.velocity,line,distance)??1;
+     const aspect=escortNose.copy(nose).applyQuaternion(escortAttitude.fromArray(ship.rotation)).dot(line);
+     // Best case for the bomber: keep its sight on each escort independently.
+     const visible=distance<=rack.lockRange&&!r.lineBlocked(a,b.fromArray(ship.position),ship.id);
+     const progress=visible?flight.rackLockProgress(escortLocks.get(ship)??0,rack,null,distance,1,aspect,1/60,factor):0;
+     escortLocks.set(ship,progress);escortSteps++;
+     if(visible&&factor>0)progressSteps++;
+     if(progress===1)lockedSteps++;
+    }
+   }
    for(const ship of active.keys())if(ship.hull<=0||!r.ships.includes(ship))r.onFieldTacticEnd(ship,ship.hull<=0?'killed':'removed');
    enemySteps+=alive.length;dry=alive.length?dry+1/60:0;maxDry=Math.max(maxDry,dry);
    hidden=alive.length&&!alive.some(ship=>r.shipTracksPlayer(ship))?hidden+1/60:0;maxHidden=Math.max(maxHidden,hidden);if(hidden)hiddenSeconds+=1/60;
@@ -168,13 +217,15 @@ for(const [site,wave] of (process.env.SITES?sites.filter(([s])=>process.env.SITE
    }
   }
   for(const ship of active.keys())r.onFieldTacticEnd(ship,'panelEnd');
+  if(bomber)r.damageShip=damageShip;
   r.fireNpcGun=fire;r.damagePlayer=damage;delete r.onFieldTactic;delete r.onFieldTacticEnd;
   if(traceContacts){r.integrateNpcFlight=integrate;r.updateTravelAI=travel;delete r.onNpcThrottle;}
   const ships=[...per.values()].map(m=>{const min=m.steps/3600;return {range:m.range,mergesPerMin:m.merges/Math.max(min,1e-6),fromRange:m.entered==null||m.firstShot==null?null:Math.max(0,m.firstShot-m.entered),hull:m.hull,tier:m.tier,firstShot:m.firstShot==null?null:+m.firstShot.toFixed(1),spm:+(m.shots/Math.max(min,1e-6)).toFixed(1),lofr:+(m.lofr/Math.max(1,m.samples)).toFixed(2),stuck:+(m.stuck/Math.max(1,m.steps)).toFixed(2),limited:+(m.limited/Math.max(1,m.steps)).toFixed(2),search:+(m.search/Math.max(1,m.steps)).toFixed(2),bumps:+(m.bumps/Math.max(min,1e-6)).toFixed(1),meanDist:Math.round(m.dist/Math.max(1,m.samples))};});
-  return {ships,tactics,attempts,contacts,fighterMinutes:enemySteps/3600,maxDry,hiddenSeconds,maxHidden:+maxHidden.toFixed(1),hitsPerMin:+(hits/(steps/3600)).toFixed(1),msPerStep:+(simMs/steps).toFixed(2)};
+  const boss=bomber?{frigateTTK,torpedoHits,remainingHull:frigate?.hull,torpedoesFired:6-p.missiles,escortSteps,progressSteps,lockedSteps}:undefined;
+  return {ships,tactics,attempts,contacts,boss,fighterMinutes:enemySteps/3600,maxDry,hiddenSeconds,maxHidden:+maxHidden.toFixed(1),hitsPerMin:+(hits/(steps/3600)).toFixed(1),msPerStep:+(simMs/steps).toFixed(2)};
  },{wave,seconds:SECONDS,pilot,traceContacts:process.env.TRACE_CONTACTS==='1'});
  const avg=k=>{const v=result.ships.map(s=>s[k]).filter(x=>x!=null);return v.length?+(v.reduce((x,y)=>x+y,0)/v.length).toFixed(2):null;};
- const summary={site,wave,tactics:result.tactics,fighterMinutes:result.fighterMinutes,maxDry:result.maxDry,hiddenSeconds:result.hiddenSeconds,mergesPerMin:avg('mergesPerMin'),fromRange:avg('fromRange'),firstShot:avg('firstShot'),spm:avg('spm'),hitsPerMin:result.hitsPerMin,lofr:avg('lofr'),stuck:avg('stuck'),limited:avg('limited'),search:avg('search'),bumps:avg('bumps'),meanDist:avg('meanDist'),neverFired:result.ships.filter(s=>s.firstShot==null).length,maxHidden:result.maxHidden,msPerStep:result.msPerStep};
+ const summary={site,wave,boss:result.boss,tactics:result.tactics,fighterMinutes:result.fighterMinutes,maxDry:result.maxDry,hiddenSeconds:result.hiddenSeconds,mergesPerMin:avg('mergesPerMin'),fromRange:avg('fromRange'),firstShot:avg('firstShot'),spm:avg('spm'),hitsPerMin:result.hitsPerMin,lofr:avg('lofr'),stuck:avg('stuck'),limited:avg('limited'),search:avg('search'),bumps:avg('bumps'),meanDist:avg('meanDist'),neverFired:result.ships.filter(s=>s.firstShot==null).length,maxHidden:result.maxHidden,msPerStep:result.msPerStep};
  results.push({...summary,ships:result.ships,attempts:result.attempts,...(process.env.TRACE_CONTACTS==='1'?{contacts:result.contacts}:{})});console.log(JSON.stringify(summary));
 }
 const keys=['mergesPerMin','hiddenSeconds','fromRange','firstShot','spm','hitsPerMin','lofr','stuck','limited','search','bumps','maxHidden'];

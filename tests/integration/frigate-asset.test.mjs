@@ -143,4 +143,5 @@ test('complete frigate equipment stays below ten thousand triangles and damage i
  assert.ok(Math.abs(ship.speed-2.7)<1e-6);assert.ok(Math.abs(ship.turnRate-.0144)<1e-6);
  equipFrigate(ship);updateFrigateSystems(systems,ship);assert.equal(ship.speed,18);assert.equal(ship.turnRate,.12);
  for(let i=0;i<3;i++)assert.equal(frigateEngineFraction(ship,i),1);
+ assert.equal(frigateEngineFraction(ship,3),1,'extra placeholder flares stay lit while the GLB loads');
 });

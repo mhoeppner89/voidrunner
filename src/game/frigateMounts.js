@@ -12,6 +12,7 @@ export const FRIGATE_MOUNTS = [
     "axis": 0,
     "side": -1,
     "forwardCone": 0,
+    "kind": "battery",
     "label": "MAIN BATTERY",
     "normal": [
       -0.8310254812240601,
@@ -31,6 +32,7 @@ export const FRIGATE_MOUNTS = [
     "axis": 0,
     "side": -1,
     "forwardCone": 0,
+    "kind": "battery",
     "label": "MAIN BATTERY"
   },
   {
@@ -45,6 +47,7 @@ export const FRIGATE_MOUNTS = [
     "axis": 0,
     "side": 1,
     "forwardCone": 0,
+    "kind": "battery",
     "label": "MAIN BATTERY",
     "normal": [
       0.8310254812240601,
@@ -64,6 +67,7 @@ export const FRIGATE_MOUNTS = [
     "axis": 0,
     "side": 1,
     "forwardCone": 0,
+    "kind": "battery",
     "label": "MAIN BATTERY"
   },
   {
@@ -78,6 +82,7 @@ export const FRIGATE_MOUNTS = [
     "axis": 1,
     "side": 1,
     "forwardCone": 0,
+    "kind": "pdc",
     "label": "PDC",
     "rearBias": true
   },
@@ -93,6 +98,7 @@ export const FRIGATE_MOUNTS = [
     "axis": 1,
     "side": 1,
     "forwardCone": 0,
+    "kind": "pdc",
     "label": "PDC",
     "rearBias": true
   },
@@ -108,6 +114,7 @@ export const FRIGATE_MOUNTS = [
     "axis": 1,
     "side": -1,
     "forwardCone": 0,
+    "kind": "pdc",
     "label": "PDC",
     "rearBias": true
   },
@@ -123,6 +130,7 @@ export const FRIGATE_MOUNTS = [
     "axis": 1,
     "side": -1,
     "forwardCone": 0,
+    "kind": "pdc",
     "label": "PDC",
     "rearBias": true
   }
@@ -140,6 +148,6 @@ FRIGATE_MOUNTS.push(
  Object.assign(system([24.506875,-18.574375,112.7175],2,1,'STARBOARD ENGINE',160,10.45,'engine'),{hitShape:'cylinder',hitRadius:10.45,hitHalfLength:9.57,hitCenterOffset:[0,0,-9.57]})
 );
 export const FRIGATE_ENGINE_MOUNTS=[13,8,12]; // Matches the GLB exhaust order.
-export const FRIGATE_TORPEDO_MOUNTS=[11];
+export const FRIGATE_TORPEDO_MOUNTS=FRIGATE_MOUNTS.flatMap((m,i)=>m.kind==='torpedo'?[i]:[]);
 export const FRIGATE_TORPEDO_LAYOUT=Object.freeze({width:12,depth:16,capHeight:2.25,rimHeight:2.65,cellX:2.65,cellZ:4.1,cellOuter:1.8,cellInner:1.4,muzzleHeight:3.9});
-for(let i=4;i<8;i++)FRIGATE_MOUNTS[i].rearBias=true;
+for(const mount of FRIGATE_MOUNTS)if(mount.kind==='pdc')mount.rearBias=true;

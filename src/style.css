@@ -338,6 +338,15 @@ button.compact {
   box-shadow: 0 0 8px #d2a849;
 }
 
+#capital-markers { position:absolute; inset:0; pointer-events:none; color:#efc56c; }
+#capital-markers.is-hostile { color:#ff5340; }
+#capital-markers.is-surrendered { color:#ffa040; }
+/* Subsystem markers stay small, but a dark rim keeps them legible on pale
+   ivory plating as well as on black space. */
+#capital-markers i { position:absolute; left:-2.5px; top:-2.5px; width:5px; height:5px; border-radius:50%; background:currentColor; box-shadow:0 0 0 1px rgba(4,8,16,.7); }
+#capital-markers i.diamond { box-sizing:border-box; left:-3.5px; top:-3.5px; width:7px; height:7px; border:1.5px solid currentColor; border-radius:0; background:transparent; box-shadow:0 0 0 1px rgba(4,8,16,.7), inset 0 0 0 1px rgba(4,8,16,.7); }
+@media (pointer:coarse) { #capital-markers i.diamond { left:-4px; top:-4px; width:8px; height:8px; } }
+#target-bracket.subsystem { width:22px; height:22px; margin:-11px; }
 .target-bracket {
   position: absolute;
   top: 0;
@@ -8894,14 +8903,16 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 /* Capital locks use the monitor's full width for component selection and
    two aligned gauges. The name no longer competes with the cycling button. */
 #game-shell .cockpit-screen-target.has-capital-target {
-  display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  /* Range sits beside the name; the subsystem readout gets its own full
+     line, so "TURRETS 3/3 · PODS 6/6" fits on phones too. */
+  display:grid; grid-template-columns:minmax(0,1fr) max-content;
   grid-template-rows:minmax(13px,1fr) minmax(12px,.9fr) minmax(22px,1.2fr) minmax(26px,1.9fr);
-  grid-template-areas:"name name" "range warning" "component component" "gauges gauges";
+  grid-template-areas:"name range" "warning warning" "component component" "gauges gauges";
   padding:3px 6px 5px; gap:0;
 }
 #game-shell .cockpit-screen-target.has-capital-target:not(.has-capital-controls) {
   grid-template-rows:minmax(13px,1fr) minmax(12px,.9fr) minmax(26px,2.1fr);
-  grid-template-areas:"name name" "range warning" "gauges gauges";
+  grid-template-areas:"name range" "warning warning" "gauges gauges";
 }
 #game-shell .cockpit-screen-target.has-capital-target .screen-heading {
   grid-area:name; height:auto; min-width:0; display:flex; align-items:center;
@@ -8912,11 +8923,13 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   width:100%; text-align:left; font-size:clamp(10px,.85vw,13px); letter-spacing:.02em;
 }
 #game-shell .cockpit-screen-target.has-capital-target .screen-target-distance {
-  grid-area:range; height:auto; justify-content:flex-start; padding:0;
-  font-size:clamp(10px,.85vw,13px); letter-spacing:0; border:0; text-shadow:none;
+  grid-area:range; height:auto; justify-content:flex-end; padding:0 0 0 6px;
+  border:0; border-bottom:1px solid var(--console-face);
+  font-size:clamp(10px,.85vw,13px); letter-spacing:0; text-shadow:none;
 }
 #game-shell .cockpit-screen-target.has-capital-target .screen-target-readout {
-  grid-area:warning; height:auto; justify-content:flex-end; padding:0;
+  grid-area:warning; height:auto; justify-content:flex-start; padding:0; min-width:0;
+  white-space:nowrap; overflow:hidden;
   font-size:clamp(8px,.72vw,11px); letter-spacing:0; border:0; text-shadow:none;
 }
 #game-shell #capital-subtarget {
@@ -8939,6 +8952,9 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
   grid-area:gauges; display:block; height:auto; min-height:0; padding:4px 0 0;
 }
 #game-shell .screen-target-layout.has-capital-target > .hull-outline { display:none; }
+#game-shell .cockpit-screen-target.has-corvette-target { grid-template-columns:auto minmax(0,1fr); }
+#game-shell .has-corvette-target .screen-target-layout { display:grid; grid-template-columns:minmax(0,.38fr) minmax(0,.62fr); }
+#game-shell .has-corvette-target .screen-target-layout > .hull-outline { display:block; }
 #game-shell .screen-target-layout.has-capital-target > .screen-bars {
   display:grid; grid-template-rows:1fr 1fr; align-content:stretch; align-items:center; height:100%; gap:2px;
 }

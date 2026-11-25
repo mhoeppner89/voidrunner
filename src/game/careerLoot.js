@@ -1,7 +1,6 @@
 import {t} from './i18n.js';
 import {highestLootRarity} from './lootVisuals.js';
-import {FRIGATE_MOUNTS} from './frigateMounts.js';
-import {CRUISER_MOUNTS} from './cruiserModelData.js';
+import {capitalHull} from './capitalHulls.js';
 import {registerInventoryDefinitions,refreshInventoryProjection} from './equipmentInventory.js';
 import {weaponForOutfit} from './weapons.js';
 import {OUTFIT_ITEMS,BASE_OUTFIT_ITEMS,LOADOUT_KEYS} from './outfitting.js';
@@ -45,9 +44,10 @@ export function equipCapitalLoot(session,ship){
  if(session.arena)return;
  for(const {item} of ship.equipmentRecords??[])forgetEquipmentDefinition(item.id);
  ship.equipmentRecords=[];
- const mounts=ship.capitalClass==='frigate'?FRIGATE_MOUNTS:ship.capitalClass==='cruiser'?CRUISER_MOUNTS:[];
+ const mounts=capitalHull(ship)?.mounts??[];
  for(const [index,m] of mounts.entries()){
-  const base=m.kind==='engine'?'engine-mk2':m.kind==='generator'?'capital-shield-generator':m.kind==='torpedo'?'torpedo-launcher':m.label==='PDC'||m.kind==='pdc'?'pdc':ship.capitalClass==='cruiser'?'cruiser-battery':'frigate-battery';
+  if(m.kind==='pod'||m.kind==='booster'||m.kind==='broadside')continue;
+  const base=m.kind==='laser'?'tracking-turret':m.kind==='engine'?'engine-mk2':m.kind==='generator'?'capital-shield-generator':m.kind==='torpedo'?'torpedo-launcher':m.label==='PDC'||m.kind==='pdc'?'pdc':ship.capitalClass==='cruiser'?'cruiser-battery':'frigate-battery';
   const item=createEquipmentRecord(base,{id:`${ship.lootKey}-capital-${index}`,tier:BASE_OUTFIT_ITEMS[base]?.tier??1});
   ship.equipmentRecords.push({item,key:'capital',index});
  }

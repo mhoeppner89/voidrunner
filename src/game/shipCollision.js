@@ -17,13 +17,35 @@ function boxTree(boxes){
         }n.skip=nodes.length;
     }build(0,order.length);return {nodes,order:Uint32Array.from(order)};
 }
-export const SHIP_COLLIDERS=Object.fromEntries(Object.entries(SHIP_COLLISION_DATA).map(([variant,data])=>{
+function decodeProfile(data){
     const meshVerts=decode(data.vertices,Float32Array),meshIndices=decode(data.indices,data.indexBytes===2?Uint16Array:Uint32Array),boxes=decode(data.boxes,Float32Array);
     prepareMeshQueryIndex(meshVerts,meshIndices);
     const tree=boxTree(boxes),root=tree.nodes[0];
     const contactRadius=Math.hypot(Math.max(Math.abs(root.minX),Math.abs(root.maxX)),Math.max(Math.abs(root.minY),Math.abs(root.maxY)),Math.max(Math.abs(root.minZ),Math.abs(root.maxZ)));
-    return [variant,{extent:data.extent,min:data.min,max:data.max,sha256:data.sha256,meshVerts,meshIndices,boxes,...tree,radius:Math.hypot(...data.extent),contactRadius}];
-}));
+    return {extent:data.extent,min:data.min,max:data.max,sha256:data.sha256,meshVerts,meshIndices,boxes,...tree,radius:Math.hypot(...data.extent),contactRadius};
+}
+export const SHIP_COLLIDERS=Object.fromEntries(Object.entries(SHIP_COLLISION_DATA).map(([id,data])=>[id,decodeProfile(data)]));
+// Only a pod loss changes this shape. All ships with the same remaining hold
+// share one prepared collision profile for shots, physical contact and HUD sightlines.
+const cargoParts=new Map();
+export function droverCollisionVariant(missing){
+    if(!missing)return 'drover';
+    const key='drover-pods-'+missing;
+    if(SHIP_COLLIDERS[key])return key;
+    const groups=SHIP_COLLISION_DATA.drover.parts,vertices=[],indices=[],boxes=[];
+    for(const [name,data] of Object.entries(groups)){
+        if(name!=='body'&&(missing&(1<<Number(name.slice(4)))))continue;
+        if(!cargoParts.has(name))cargoParts.set(name,decodeProfile(data));
+        const part=cargoParts.get(name),offset=vertices.length/3;
+        for(const v of part.meshVerts)vertices.push(v);
+        for(const i of part.meshIndices)indices.push(offset+i);
+        for(const v of part.boxes)boxes.push(v);
+    }
+    const meshVerts=new Float32Array(vertices),meshIndices=new Uint16Array(indices),solid=new Float32Array(boxes);
+    prepareMeshQueryIndex(meshVerts,meshIndices);
+    Object.defineProperty(SHIP_COLLIDERS,key,{value:{...SHIP_COLLIDERS.drover,meshVerts,meshIndices,boxes:solid,...boxTree(solid)}});
+    return key;
+}
 // Warm data is numeric and shared. No renderer traversal, arrays, clones or
 // vectors are allocated by the queries below; scratches never alias live state.
 const localStart={x:0,y:0,z:0},localEnd={x:0,y:0,z:0},rotated={x:0,y:0,z:0};

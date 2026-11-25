@@ -1,5 +1,4 @@
-import {PDC_TURRET} from './turrets.js';
-import {TRACKING_LASER,weaponForOutfit,launcherForOutfit} from './weapons.js';
+import {PDC_TURRET,TRACKING_LASER,weaponForOutfit,launcherForOutfit} from './weapons.js';
 import {modifiedWeapon,equipmentName,EQUIPMENT_RARITIES,resolveEquipmentDefinition,registerEquipmentDefinition,equipmentRating,equipmentAffixLines} from './equipmentCatalog.js';
 import {OUTFIT_ITEMS,BASE_OUTFIT_ITEMS,itemAvailable} from './outfitting.js';
 import {inventoryMounts,mountItemId,normalizeEquipmentInventory,shopEquipmentTiers,specialEquipmentOffers,equipmentFitsMount,equipmentInstallMount,equipmentSaleEligibility,equipmentSaleValue} from './equipmentInventory.js';

@@ -1,20 +1,21 @@
+import {segmentShipColliderHit} from './shipCollision.js';
 import {modifiedWeapon} from './equipmentCatalog.js';
 import {FLEET_TURRET_CLEARANCE} from './fleetTurretClearance.js';
 import {FRIGATE_CLEARANCE} from './frigateMounts.js';
-import { combatTargetEligible } from './combatTargeting.js';
+import { combatTargetEligible, tracksActivePlayer } from './combatTargeting.js';
 import { disruptionFactor } from './weaponDamage.js';
 import * as THREE from 'three';
 import {OUTFIT_ITEMS} from './outfitting.js';
 import {TURRET_LAYOUTS} from './turretLayouts.js';
 import {spendEnergy} from './combatResources.js';
-import {WEAPONS,TRACKING_LASER,WEAPON_DAMAGE_SCALE} from './weapons.js';
+import {PDC_TURRET,TRACKING_LASER,WEAPON_DAMAGE_SCALE} from './weapons.js';
 import {relativeIntercept} from './weaponFlight.js';
 import {TURRET_CLEARANCE} from './turretClearance.js';
-import {getPdcDefenseChannel,PDC_RECOVERY_SECONDS} from './pdcFireControl.js';
+import {getPdcDefenseChannel} from './pdcFireControl.js';
 import {npcGunneryProfile,npcAimErrorFactor} from './npcGunnery.js';
 import {npcPlayerAttackWindow} from './combatAwareness.js';
 const laser=TRACKING_LASER;
-export const PDC_TURRET=Object.freeze({...WEAPONS.pdc,damageFlat:2.2*WEAPON_DAMAGE_SCALE,shotInterval:.14,burstPause:2,interceptInterval:PDC_RECOVERY_SECONDS});
+export {PDC_TURRET} from './weapons.js';
 // The Concord frigate is designed to suppress fighters. Its ship-target PDC
 // fire hits much harder, but tracks evasive craft less tightly. Interception
 // rounds still use the standard PDC values so torpedo shields remain useful.
@@ -28,6 +29,11 @@ const rangeEpsilon=0.0001;
 // The forward sector crosses the mounting plane, but never the owner's hull.
 export function clearTurretArc(actor,mount,extents,point,state) {
     const local=state.local.copy(point).sub(state.scratch.fromArray(actor.position)).applyQuaternion(state.inverse);
+    if(actor.capitalClass==='corvette'){
+        const surface=state.scratch.copy(state.position).addScaledVector(state.normal,mount.visualScale*.6);
+        if(state.local.copy(point).sub(surface).dot(state.normal)<0)return false;
+        return segmentShipColliderHit(surface,point,actor.position,actor.rotation,actor.collisionVariant??actor.variant,2)===undefined;
+    }
     if(actor.capitalClass==='frigate'&&mount.label==='MAIN BATTERY') {
         const distance=local.length();
         // The four side-mounted main batteries cover both flanks and forward
@@ -66,10 +72,21 @@ export function shipBlocksRay(session,actor,ownerId,target,point,state) {
     return session.ships.some(other=>other!==actor && other.id!==ownerId && other!==target && other.hull>0 && blocks(other.position,Math.max(...session.npcHullExtents(other))));
 }
 function selectedHostile(session,actor,ownerId,player) {
-    if(actor.fieldTactic?.kind==='ambush' || actor.patrolMemoryActive || actor.recoveryTargetHidden || actor.terrainManeuver?.active&&actor.terrainManeuver.targetHidden || actor.fleeing || actor.holdFire || actor.pursuitHoldFire || actor.combatPlan?.recovery?.active || (player && actor.mode!=='combat'))return;
-    const ref=player?session.getTargetRef():{kind:'ship',id:actor.targetId};
-    if(!player && actor.targetId==='player' && actor.hostile && session.save.player.hull>0)return session.save.player;
-    if(ref?.kind==='ship')return session.ships.find(s=>s.id===ref.id && combatTargetEligible(s) && (player?s.hostile:session.projectileCanHitShip({ownerId,faction:actor.faction,targetId:actor.targetId},s)));
+    if(actor.fieldTactic?.kind==='ambush' || actor.patrolMemoryActive || actor.recoveryTargetHidden || actor.terrainManeuver?.active&&actor.terrainManeuver.targetHidden || (actor.fleeing&&actor.variant!=='drover') || actor.holdFire || actor.pursuitHoldFire || actor.combatPlan?.recovery?.active || (player && actor.mode!=='combat'))return;
+    const selected=player ? session.getTargetRef() : undefined;
+    const targetId=player ? (selected?.kind==='ship' ? selected.id : undefined) : actor.targetId;
+    if(!targetId)return;
+    if (!player && targetId === 'player') {
+        if (actor.capitalClass === 'corvette' && !tracksActivePlayer(session, actor)) return;
+        return actor.hostile && session.save.player.hull > 0 ? session.save.player : undefined;
+    }
+    for(const ship of session.ships){
+        if(ship.id!==targetId || !combatTargetEligible(ship))continue;
+        if(player)return ship.hostile ? ship : undefined;
+        const probe=actor.turretTargetProbe??={ownerId};
+        probe.faction=actor.faction;probe.targetId=targetId;
+        if(session.projectileCanHitShip(probe,ship))return ship;
+    }
 }
 export function updateAutomaticTurrets(session,actor,ownerId,dt) {
     const player=ownerId==='player',fit=player?actor.outfitting?.loadouts?.[actor.shipId]:actor.combatFit;
@@ -81,7 +98,8 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
     const assignments=session.pdcAssignments,defense=getPdcDefenseChannel(session,ownerId);
     if(actor.turretRuntime?.[0] && !(actor.turretRuntime[0].position instanceof THREE.Vector3))actor.turretRuntime=[];
     actor.turretRuntime??=[];
-    for(const [index,mount] of layouts.entries()) {
+    for(let index=0;index<layouts.length;index++) {
+        const mount=layouts[index];
         const item=OUTFIT_ITEMS[items[index]];if(!item || actor.capitalMountHull?.[index]<=0)continue;
         const pdc=item.turretKind==='pdc';
         const interceptWeapon=modifiedWeapon(PDC_TURRET,item),pdcWeapon=modifiedWeapon(frigate?FRIGATE_PDC_TURRET:PDC_TURRET,item),laser=modifiedWeapon(TRACKING_LASER,item);
@@ -92,13 +110,17 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
         state.targetPosition??=[0,0,0];state.targetVelocity??=[0,0,0];
         state.phase??=Array.from(ownerId).reduce((hash,c)=>(hash*31+c.charCodeAt(0))>>>0, index+1)%628/100;
         state.q.fromArray(actor.rotation);state.inverse.copy(state.q).invert();
-        state.position.set(...mount.position).multiply(state.scratch.fromArray(extents)).applyQuaternion(state.q).add(state.scratch.fromArray(actor.position));
+        const modelScale=mount.visualScale??extents[2]/mount.hullHalfLength;
+        state.position.fromArray(mount.position);
+        if(actor.capitalClass!=='corvette')state.position.multiply(state.scratch.fromArray(extents));
+        state.position.applyQuaternion(state.q).add(state.scratch.fromArray(actor.position));
         if(mount.normal)state.normal.fromArray(mount.normal).applyQuaternion(state.q);else state.normal.set(0,0,0).setComponent(mount.axis??1,mount.side).applyQuaternion(state.q);
+        if(actor.capitalClass==='corvette')state.position.addScaledVector(state.normal,.59*modelScale-.045);
         if(state.direction.lengthSq()<0.1) {
             if(mount.restDirection)state.direction.fromArray(mount.restDirection).applyQuaternion(state.q);
             else state.direction.copy(state.normal);
         }
-        const disabled=actor.turretsHeld || actor.dockedAt || (player && session.autopilot);
+        const disabled=actor.turretsHeld || actor.dockedAt || actor.surrendered || actor.poweredDown || actor.captured || (player && session.autopilot);
         state.status=disabled?'TURRETS HOLD FIRE':'TURRETS READY';
         let target,point,intercept=false;
         if(!disabled && pdc && now>=defense.readyAt) {
@@ -152,7 +174,7 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
                 if(actor.energy<reserve+cost)state.status='TURRETS WAITING FOR ENERGY';
                 else if((intercept||now>=state.acquireAt) && state.direction.dot(desired)>Math.cos(0.001) && now>=(intercept?state.interceptAt:state.fireAt) && (intercept||player||target!==session.save.player||npcPlayerAttackWindow(session,actor,'player')) && !session.lineBlocked(state.position,point,ownerId) && !shipBlocksRay(session,actor,ownerId,target,point,state) && spendEnergy(actor,cost)) {
                     const color=player?0xdce9ff:0xff8a5b;
-                    state.muzzle.copy(state.position).addScaledVector(state.direction,(pdc ? .94 : .82)*(mount.size==='M'?1.3:1)*extents[2]/mount.hullHalfLength);
+                    state.muzzle.copy(state.position).addScaledVector(state.direction,(pdc ? .94 : .82)*(mount.size==='M'?1.3:1)*modelScale);
                     if(intercept) {
                         state.interceptAt=now+PDC_TURRET.interceptInterval*disruption;
                         defense.readyAt=state.interceptAt;
@@ -185,8 +207,8 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
         }
         // When banking carries a held barrel into the deck, retract its aim
         // outward. The base remains attached to the hull throughout the turn.
-        state.goal.copy(state.position).addScaledVector(state.direction,1.1*(mount.size==='M'?1.3:1)*extents[2]/mount.hullHalfLength);
+        state.goal.copy(state.position).addScaledVector(state.direction,1.1*(mount.size==='M'?1.3:1)*modelScale);
         if(!clearTurretArc(actor,mount,extents,state.goal,state))state.direction.copy(state.normal);
-        session.renderer.showTurret?.(`${ownerId}-${index}`,state.position,state.direction,mount.size,pdc?'pdc':'laser',state.q,mount.side,mount.pedestal,extents[2]/mount.hullHalfLength,mount.axis??1,actor);
+        session.renderer.showTurret?.((state.meshId??=ownerId+'-'+index),state.position,state.direction,mount.size,pdc?'pdc':'laser',state.q,mount.side,mount.pedestal,modelScale,mount.axis??1,actor,index);
     }
 }
