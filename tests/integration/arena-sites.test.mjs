@@ -31,6 +31,20 @@ test('every Arena site stages a clear start in its own system with front and fla
  }
 });
 
+test('all 25 level groups have a staged opening and reinforcement entry on their authored site',()=>{
+ for(const seed of [175,718,941]){
+  const s=world(seed);
+  for(const wave of RUN_WAVES){
+   s.stageArenaSite(wave.site);
+   assert.equal(s.arenaStage.siteId,wave.site);
+   for(const [i,group] of wave.groups.entries()){
+    assert.ok(group.enemies.length);
+    assert.ok(s.arenaSiteEntry(i,i>0),wave.name+' group '+(i+1));
+   }
+  }
+ }
+});
+
 test('sites use their terrain on purpose',()=>{
  const s=world(718);s.stageArenaSite('shardbelt-heart');
  const bore=SHARDBELT_PASSAGES.find(p=>p.id==='heart'),origin=v(LOCATIONS.shardbelt.position);

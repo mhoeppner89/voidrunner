@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v699-corvette-repairs';
+const CACHE = 'voidrunner-v700-arena-groups';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -26,6 +26,7 @@ const CORE_ASSETS = [
   './src/game/haptics.js',
   './src/game/controllerUi.js',
   './src/game/retroDisplay.js',
+  './src/game/arenaBattle.js',
   './src/game/terrainManeuvers.js',
   './src/game/pilotJudgment.js',
   './src/game/pixelResolve.js',

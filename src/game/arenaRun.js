@@ -14,11 +14,11 @@ export const ARENA_RUN_KEY='voidrunner-arena-run-v1';
 export const ARENA_RECORD_KEY='voidrunner-arena-record-v1';
 // Enemy entries are named opponents, not positional tuples: a hull id, the
 // faction that fields it, the NPC role it flies as, a pilot tier, and an optional
-// arrival delay. Guns, turrets, launchers and equipment default to the hull's
+// arrival group. Guns, turrets, launchers and equipment default to the hull's
 // real stock NPC fit (HULL_NPC_FITS), so an Arena Run opponent flies the same
 // ship the career world would spawn; any of them can be overridden per wave
 // (a lighter first contact, a bigger missile load) without re-authoring the fit.
-const enemy=(hullId,options={})=>({hullId,faction:'pirates',role:'pirate',tier:'novice',delay:0,...options});
+const enemy=(hullId,options={})=>({hullId,...options});
 export const runEnemyFit=(spec)=>{
  const base=HULL_NPC_FITS[spec.hullId]??{};
  const merged={...base};
@@ -26,70 +26,155 @@ export const runEnemyFit=(spec)=>{
   if(spec[key]!==undefined)merged[key]=spec[key];
  return merged;
 };
-// The run is five named acts, one faction and one tier band each, so it walks
-// the whole flyable roster and every faction in the game. Wave names and hints
-// are authored and fixed: the levels are determined, not rolled.
-//
-//   Act I   Red Talons          pirates       scrapper, speedster, demon
-//   Act II  Free Merchants      independents  wayfarer, prospector, mule, torsas
-//   Act III Frontier League     alliance      legionary, andromeda, speedster, astra, lancer
-//   Act IV  Concord Fleet       concord       talon, blade, vanguard, lancer, atlas, mule
-//   Act V   Concord capital     concord       the frigate and its line
+// Groups use the hull's stock fit unless a level names a different rack or gun.
+// Objective clocks start when the primary ship enters.
+const group=(...enemies)=>({enemies});
+const novice=(id,options)=>enemy(id,{tier:'novice',...options});
+const veteran=(id,missiles=0,options)=>enemy(id,{tier:'veteran',missiles,...options});
+const ace=(id,missiles=0,options)=>enemy(id,{tier:'ace',missiles,...options});
+const capital=(id,tier)=>enemy(id,{role:id==='concord-frigate'?'frigate':'capital',capital:true,tier,primary:true});
+const bomber=tier=>enemy('andromeda',{role:'bounty',tier,launchers:['torpedo-launcher','torpedo-launcher','torpedo-launcher'],missiles:3,attackObjective:true});
+const roles={scrapper:'pirate',demon:'pirate',mule:'trader',atlas:'trader',torsas:'trader',prospector:'miner',wayfarer:'escort',speedster:'escort'};
+const level=(name,site,hint,groups,extra={})=>({name,site,hint,groups,...extra});
+const balor=()=>novice('scrapper');
+const ironjaw=()=>capital('ironjaw','veteran');
 export const RUN_ACTS=[
- {
-  id:'talons',name:'Red Talons',faction:'pirates',
-  waves:[
-   {name:'First contact',hint:'Choose your starting hull. One novice.',site:'verge-lanes',enemies:[enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice'})]},
-   {name:'Scavengers',hint:'Two novice scavengers.',site:'acheron-horizon',enemies:[enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice'}),enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice',delay:8})]},
-   {name:'Cut loose',hint:'A veteran runner.',site:'mourning-carrier',enemies:[enemy('demon',{faction:'pirates',role:'pirate',tier:'veteran',guns:['pulse-cannon','pulse-cannon','beam-emitter','beam-emitter'],missiles:1})]},
-   {name:'Hit and run',hint:'Agile escort pair.',site:'shardbelt-heart',enemies:[enemy('speedster',{faction:'pirates',role:'escort',tier:'veteran'}),enemy('speedster',{faction:'pirates',role:'escort',tier:'novice',delay:6})]},
-   {name:'Tier climb',hint:'Upgrade to a tier-2 hull.',site:'redwake-belt',enemies:[enemy('demon',{faction:'pirates',role:'pirate',tier:'veteran',missiles:2}),enemy('scrapper',{faction:'pirates',role:'pirate',tier:'novice',delay:10})]},
-  ],
- },
- {
-  id:'merchants',name:'Free Merchants',faction:'independents',
-  waves:[
-   {name:'Freight lane',hint:'Armed convoy.',site:'foundry-lanes',enemies:[enemy('wayfarer',{faction:'independents',role:'escort',tier:'veteran',missiles:1}),enemy('mule',{faction:'independents',role:'trader',tier:'novice'})]},
-   {name:'Claim jumpers',hint:'Gaia under escort.',site:'shardbelt-chimney',enemies:[enemy('prospector',{faction:'independents',role:'miner',tier:'veteran'}),enemy('wayfarer',{faction:'independents',role:'escort',tier:'novice',delay:8})]},
-   {name:'Haul trouble',hint:'Heavy haulers and escort.',site:'mourning-center',enemies:[enemy('torsas',{faction:'independents',role:'trader',tier:'veteran',missiles:2}),enemy('atlas',{faction:'independents',role:'trader',tier:'veteran',delay:6}),enemy('speedster',{faction:'independents',role:'escort',tier:'novice',delay:12})]},
-   {name:'Crossfire',hint:'Three veterans converge.',site:'verge-lanes',enemies:[enemy('speedster',{faction:'independents',role:'escort',tier:'veteran'}),enemy('scrapper',{faction:'pirates',role:'pirate',tier:'veteran',delay:3,missiles:1}),enemy('demon',{faction:'pirates',role:'pirate',tier:'veteran',delay:6,missiles:1})]},
-   {name:'Rookie wing',hint:'Freighter and two veteran escorts.',site:'pale-rings',enemies:[enemy('mule',{faction:'independents',role:'trader',tier:'veteran',missiles:1}),enemy('wayfarer',{faction:'independents',role:'escort',tier:'veteran',delay:3}),enemy('speedster',{faction:'independents',role:'escort',tier:'veteran',delay:6,missiles:1})]},
-  ],
- },
- {
-  id:'league',name:'Frontier League',faction:'alliance',
-  waves:[
-   {name:'Patrol shift',hint:'League line.',site:'acheron-horizon',enemies:[enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',missiles:1}),enemy('speedster',{faction:'alliance',role:'escort',tier:'veteran',delay:4,missiles:1})]},
-   {name:'Courier run',hint:'Three ships working together.',site:'shardbelt-rim',enemies:[enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',missiles:1}),enemy('speedster',{faction:'alliance',role:'escort',tier:'veteran',delay:3}),enemy('andromeda',{faction:'alliance',role:'escort',tier:'veteran',delay:6,missiles:1})]},
-   {name:'Strike',hint:'Bomber package.',site:'pale-rings',enemies:[enemy('andromeda',{faction:'alliance',role:'bounty',tier:'ace',missiles:2}),enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',delay:3,missiles:1})]},
-   {name:'Honorguard',hint:'Hunter and two escorts.',site:'mourning-battleship',enemies:[enemy('lancer',{faction:'alliance',role:'patrol',tier:'veteran',missiles:2}),enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',delay:3}),enemy('speedster',{faction:'alliance',role:'escort',tier:'veteran',delay:6,missiles:1})]},
-   {name:'Veteran wing',hint:'Ace-led League wing.',site:'shardbelt-chimney',enemies:[enemy('astra',{faction:'alliance',role:'escort',tier:'ace',missiles:1}),enemy('speedster',{faction:'alliance',role:'escort',tier:'veteran',delay:3}),enemy('legionary',{faction:'alliance',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
-  ],
- },
- {
-  id:'concord',name:'Concord Frontier Fleet',faction:'concord',
-  waves:[
-   {name:'Show of force',hint:'Concord interception wing.',site:'verge-lanes',enemies:[enemy('talon',{faction:'concord',role:'patrol',tier:'ace',missiles:1}),enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',delay:4,missiles:1})]},
-   {name:'Victoria dance',hint:'Heavy fighters with a courier.',site:'mourning-carrier',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:3}),enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
-   {name:'Battery test',hint:'Bellona with support.',site:'acheron-horizon',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',delay:3,missiles:1}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
-   {name:'Screened',hint:'Hunter screened by Victoria.',site:'foundry-lanes',enemies:[enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'veteran',delay:3}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
-   {name:'Heavy metal',hint:'Elite Concord strike wing.',site:'pale-rings',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('vanguard',{faction:'concord',role:'patrol',tier:'veteran',delay:3,missiles:1}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
-  ],
- },
- {
-  id:'capital',name:'Concord Capital',faction:'concord',
-  waves:[
-   {name:'Picket',hint:'Two heavies and a courier.',site:'mourning-battleship',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',delay:4,missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:7,missiles:1})]},
-   {name:'Reserves',hint:'Mixed heavy pack.',site:'redwake-belt',enemies:[enemy('blade',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',delay:3,missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'veteran',delay:6,missiles:1})]},
-   {name:'Ace screen',hint:'Three aces.',site:'verge-lanes',enemies:[enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:3,missiles:2}),enemy('talon',{faction:'concord',role:'patrol',tier:'ace',delay:6,missiles:1})]},
-   {name:'Elite guard',hint:'Elite heavy wing.',site:'mourning-center',enemies:[enemy('lancer',{faction:'concord',role:'patrol',tier:'ace',missiles:2}),enemy('vanguard',{faction:'concord',role:'patrol',tier:'ace',delay:3,missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:6,missiles:1})]},
-   {name:'The line',hint:'Choose your second wingman (Tier 3). Frigate with two Victoria escorts, all aces.',site:'shardbelt-rim',enemies:[enemy('concord-frigate',{faction:'concord',role:'frigate',tier:'ace'}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:4,missiles:2}),enemy('blade',{faction:'concord',role:'patrol',tier:'ace',delay:8,missiles:2})]},
-  ],
- },
+ {id:'talons',name:'Red Talons',faction:'pirates',waves:[
+  level("First contact","verge-lanes","Novice Balors patrol the lane entrance.",[
+    group(balor()),
+    group(balor(),balor())]),
+  level("Scavengers","acheron-horizon","Watch the horizon for Balors and flanking Loki fighters.",[
+    group(balor()),
+    group(balor()),
+    group(veteran('speedster'))]),
+  level("Cut loose","mourning-carrier","Clear the scouts, then duel the four-gun Morrigan.",[
+    group(balor()),
+    group(balor()),
+    {...group(veteran('demon',1,{guns:['pulse-cannon','pulse-cannon','beam-emitter','beam-emitter']})),limit:1}]),
+  level("Hit and run","shardbelt-heart","Two Loki fighters guard the bore. Watch the flank.",[
+    group(veteran('speedster'),novice('speedster')),
+    group(veteran('scrapper',1),novice('speedster'))]),
+  level("Ironjaw","redwake-belt","Destroy the Ironjaw before more Balors reach the belt.",[
+    group(veteran('scrapper'),novice('speedster')),
+    group(veteran('demon',1),balor()),
+    group(ironjaw(),balor(),veteran('scrapper'))],{objective:{kind:'destroy',label:'Destroy Ironjaw'},support:{every:45,total:3,fighter:balor()}}),
+ ]},
+ {id:'merchants',name:'Free Merchants',faction:'independents',waves:[
+  level("Freight lane","foundry-lanes","An Argo and its escort lead the merchant patrol.",[
+    group(novice('mule'),veteran('wayfarer',1)),
+    group(novice('wayfarer'),veteran('torsas')),
+    group(novice('mule'),novice('wayfarer')),
+    group(novice('wayfarer'))]),
+  level("Claim jumpers","shardbelt-chimney","The claims crews call for armed escorts from the chimney.",[
+    group(veteran('prospector'),novice('wayfarer')),
+    group(novice('prospector'),veteran('torsas',1)),
+    group(veteran('wayfarer')),
+    group(veteran('prospector'),veteran('wayfarer'))]),
+  level("Convoy","pale-rings","Break through the convoy screen. Destroy the Drover or both engines before it jumps.",[
+    group(veteran('wayfarer'),novice('speedster')),
+    group(veteran('prospector'),veteran('torsas')),
+    group(veteran('mule'),veteran('wayfarer')),
+    group(capital('drover','novice'),veteran('wayfarer'),veteran('speedster')),
+    {...group(veteran('torsas'),novice('wayfarer')),at:40}],{objective:{kind:'stop',label:'Stop the Drover',seconds:150}}),
+  level("Caravan","mourning-center","An Atlas and an Argo cross the wrecks. Intercept the convoy and its escorts.",[
+    group(veteran('atlas'),veteran('mule')),
+    group(veteran('wayfarer'),veteran('wayfarer')),
+    group(veteran('atlas'),veteran('mule'),veteran('wayfarer')),
+    group(veteran('torsas'),veteran('wayfarer'))],{placeholderFor:'caravan'}),
+  level("Rookery","verge-lanes","Fight through the Red Talons. Destroy the Ironjaw and every Balor it calls in.",[
+    group(ace('demon',3),veteran('scrapper',2)),
+    group(veteran('scrapper'),veteran('speedster')),
+    group(veteran('demon',2),veteran('speedster',1)),
+    group(veteran('demon'),veteran('speedster')),
+    group(ironjaw(),veteran('scrapper'),veteran('scrapper'))],{placeholderFor:'rookery',faction:'pirates',objective:{kind:'destroy',label:'Destroy carrier',clearLaunches:true},launch:{every:30,cap:4,fighter:balor()}}),
+ ]},
+ {id:'league',name:'Frontier League',faction:'alliance',waves:[
+  level("Patrol shift","acheron-horizon","Intercept the League patrols above Acheron.",[
+    group(veteran('legionary',1),veteran('speedster')),
+    group(veteran('legionary'),veteran('speedster',1)),
+    group(veteran('legionary'),veteran('speedster')),
+    group(novice('legionary'),novice('speedster'),novice('speedster'))]),
+  level("Courier run","shardbelt-rim","A Thor reinforces the courier screen at the rim.",[
+    group(veteran('legionary',1),veteran('speedster')),
+    group(veteran('andromeda',1),veteran('speedster')),
+    group(veteran('legionary')),
+    group(veteran('andromeda'),veteran('legionary'),veteran('speedster'))]),
+  level("Strike","pale-rings","Protect the Drover until it jumps. Intercept the Thor torpedo bombers.",[
+    group(bomber('veteran'),veteran('legionary'),veteran('speedster',1)),
+    {...group(bomber('ace'),veteran('speedster')),at:40},
+    {...group(bomber('veteran'),veteran('legionary'),veteran('legionary',1)),at:80}],{objective:{kind:'defend',label:'Defend Drover',seconds:150,transport:capital('drover','novice')}}),
+  level("Honorguard","mourning-battleship","Break the guard around the wreck. An Odin ace closes the fight.",[
+    group(veteran('lancer',2),veteran('legionary')),
+    group(veteran('legionary'),veteran('speedster',1)),
+    group(veteran('lancer'),veteran('legionary'),veteran('speedster')),
+    group(ace('astra'))]),
+  level("Veteran wing","shardbelt-chimney","An Odin opens the attack. Save ordnance for the Artemis ace.",[
+    group(ace('astra',1),veteran('speedster')),
+    group(veteran('legionary',1),veteran('andromeda',1)),
+    group(veteran('lancer',1),veteran('speedster')),
+    group(ace('lancer',2))]),
+ ]},
+ {id:'concord',name:'Concord Frontier Fleet',faction:'concord',waves:[
+  level("Show of force","verge-lanes","A Mercury ace leads the first pair onto the lanes.",[
+    group(ace('talon',1),veteran('blade',1)),
+    group(veteran('talon'),veteran('talon')),
+    group(novice('talon'),novice('blade')),
+    group(novice('vanguard'),novice('talon'))]),
+  level("Victoria dance","mourning-carrier","Victoria fighters take turns covering the carrier deck.",[
+    group(ace('blade',2),veteran('talon')),
+    group(veteran('blade',1),veteran('talon'),veteran('blade')),
+    group(veteran('blade')),
+    group(veteran('blade'),veteran('blade'),veteran('talon'))]),
+  level("Battery test","acheron-horizon","Mercuries screen the approach of a second Bellona.",[
+    group(ace('vanguard',2),veteran('blade',1)),
+    group(veteran('talon',1),veteran('talon'),novice('talon')),
+    group(veteran('vanguard',2),veteran('talon')),
+    group(veteran('vanguard'),novice('vanguard'),veteran('talon'))]),
+  level("Screened","foundry-lanes","Artemis patrols screen a Victoria ace.",[
+    group(ace('lancer',2),veteran('blade')),
+    group(veteran('talon',1),veteran('lancer')),
+    group(ace('lancer',2),veteran('blade',2),veteran('blade',1)),
+    group(ace('blade',2),veteran('blade',2),veteran('talon',1))]),
+  level("Heavy metal","pale-rings","Break the fleet screen before the heavy ace pair arrives.",[
+    group(ace('blade',2),veteran('vanguard',1)),
+    group(veteran('talon',1),veteran('lancer',1),novice('vanguard')),
+    group(veteran('vanguard',2),veteran('talon',1),veteran('blade',1)),
+    group(ace('blade'),ace('vanguard',2))]),
+ ]},
+ {id:'capital',name:'Concord Capital',faction:'concord',waves:[
+  level("Picket","mourning-battleship","The capital picket sends its aces in succession.",[
+    group(ace('vanguard',2),veteran('talon')),
+    group(ace('lancer',2),veteran('talon',1)),
+    group(novice('talon'),novice('talon'),novice('vanguard'),novice('vanguard')),
+    group(ace('blade',2),veteran('talon'),novice('blade'),novice('talon'))]),
+  level("Reserves","redwake-belt","Fleet reserves are on station in the belt.",[
+    group(ace('blade',2),veteran('lancer',2)),
+    group(ace('talon',1),veteran('talon'),novice('talon')),
+    group(veteran('vanguard'),novice('vanguard'),novice('blade'),novice('talon')),
+    group(ace('lancer',2),veteran('blade',1),novice('blade'),novice('talon'))]),
+  level("Ace screen","verge-lanes","Pairs of aces hold the Verge lanes.",[
+    group(ace('vanguard',2),veteran('blade',1)),
+    group(ace('talon',1),ace('lancer')),
+    group(veteran('vanguard'),veteran('vanguard'),veteran('talon'),novice('talon')),
+    group(ace('blade',2),ace('vanguard',2),novice('blade'))]),
+  level("Elite guard","mourning-center","A reserve Mercury joins the last pair of aces.",[
+    group(ace('lancer',2),ace('vanguard',2)),
+    group(ace('blade',2),ace('talon',1),novice('vanguard')),
+    group(novice('vanguard'),veteran('blade'),veteran('talon'),novice('talon')),
+    group(ace('lancer',2),veteran('blade',2),veteran('talon',1),veteran('vanguard'))]),
+  level("The line","shardbelt-rim","Destroy the frigate. More escorts answer as its hull gives way.",[
+    group(capital('concord-frigate','ace'),ace('blade',2),ace('blade',2),veteran('vanguard',2),veteran('blade',2)),
+    {...group(ace('talon'),ace('talon')),at:60,hullBelow:.6},
+    {...group(ace('vanguard',2),ace('blade',2)),at:120,hullBelow:.3}],{objective:{kind:'destroy',label:'Destroy frigate'}}),
+ ]},
 ];
-// Each wave names its Arena site; the environment (open / asteroid / debris)
-// follows from the site for the code that still reads it.
-for(const act of RUN_ACTS)act.waves=act.waves.map(wave=>Object.freeze({...wave,environment:arenaSite(wave.site).environment}));
+for(const act of RUN_ACTS)act.waves=act.waves.map(wave=>{
+ const prepare=spec=>({...spec,faction:wave.faction??act.faction,role:spec.role??roles[spec.hullId]??'patrol'});
+ const groups=wave.groups.map(g=>({...g,enemies:g.enemies.map(prepare)}));
+ const launch=wave.launch&&{...wave.launch,fighter:prepare(wave.launch.fighter)};
+ const support=wave.support&&{...wave.support,fighter:prepare(wave.support.fighter)};
+ return Object.freeze({...wave,groups,enemies:groups.flatMap(g=>g.enemies),launch,support,environment:arenaSite(wave.site).environment});
+});
 export const RUN_WAVES=RUN_ACTS.flatMap(act=>act.waves);
 export const waveActIndex=(wave)=>RUN_ACTS.findIndex(act=>act.waves.includes(RUN_WAVES[wave]));
 export const waveAct=(wave)=>RUN_ACTS[waveActIndex(wave)];
@@ -140,7 +225,7 @@ export function readArenaRun(){try{
  if(![1,2,3].includes(r?.version)||!['prepare','combat','won','lost'].includes(r.phase)||!Number.isInteger(r.wave)||r.wave<0||r.wave>=totals[r.version])return null;
  registerInventoryDefinitions({items:r.rewardRecords});
  const save=hydrateSave(raw);
- r=save.arenaRun;save.arena={run:true};normalizeEquipmentInventory(save.player,{disabled:true});
+ r=save.arenaRun;delete r.nextEnemy;delete r.warned;delete r.entry;save.arena={run:true};normalizeEquipmentInventory(save.player,{disabled:true});
  // Finished short runs stay finished with their old totals; an active one moves
  // into the current five-act run at the same fraction of the way through.
  if(r.version<3){
@@ -441,13 +526,13 @@ export function hireRunWingman(save,id){
  const candidate=r.wingmanOffers.find(entry=>entry.id===id);if(!candidate)return null;
  if(stage?.type==='wingman-upgrade' && typeof stage.wingIndex==='number'){
   const upgraded=upgradeRunWingman(save,stage.wingIndex,candidate);
-  if(upgraded){ r.wingmanOffers=[]; markDecision(save); r.offers=runOffers(save); return upgraded; }
+  if(upgraded){ r.wingmanOffers=[]; markDecision(save); r.offers=r.rewardForfeited?[]:runOffers(save); return upgraded; }
   return null;
  }
  if(list.filter(wingman=>wingman.alive!==false).length>=MAX_RUN_WINGMEN)return null;
  const wingman={id:candidate.id,hullId:candidate.hullId,role:'patrol',fit:candidate.fit,name:candidate.name,alive:true,order:normalizeWingOrder(r.wingOrder)};
  list[stage.wingIndex??list.length]=wingman;r.wingmen=list;r.wingmanOffers=[];
- markDecision(save);r.offers=runOffers(save);
+ markDecision(save);r.offers=r.rewardForfeited?[]:runOffers(save);
  return wingman;
 }
 // The standing-order vocabulary and the range gates live in wingOrders.js,
@@ -509,5 +594,5 @@ export function changeRunHull(save,id){
   }
   normalizeLauncherMagazines(p);
  }
- markDecision(save);r.wingmanOffers=[];r.offers=runOffers(save);return true;
+ markDecision(save);r.wingmanOffers=[];r.offers=r.rewardForfeited?[]:runOffers(save);return true;
 }

@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {newArenaRun,runOffers,refreshRunRewardOffers,chooseRunReward,writeArenaRun,readArenaRun,RUN_WAVES} from '../../src/game/arenaRun.js';
+import {newArenaRun,runOffers,refreshRunRewardOffers,chooseRunReward,writeArenaRun,readArenaRun} from '../../src/game/arenaRun.js';
 import {createOutfittingState,OUTFIT_ITEMS,loadoutFor,validateLoadout} from '../../src/game/outfitting.js';
 import {getEffectiveShipStats} from '../../src/game/shipStats.js';
 import {equipmentBaseId,forgetEquipmentDefinition} from '../../src/game/equipmentCatalog.js';
@@ -44,14 +44,6 @@ test('tiers cover guns, launchers, utilities and turrets, and lower-tier install
  }
  for(const category of ['gun','launcher','turret','power','drive','defense'])assert.ok(categories.has(category),category);
  assert.ok(reactors>0,'an installed tier-I reactor does not suppress tier-II/III replacements');
-});
-test('wave 9 onward fields coordinated experienced groups with bounded populations and arrival gaps',()=>{
- for(let wave=8;wave<RUN_WAVES.length-1;wave++){
-  const enemies=RUN_WAVES[wave].enemies;assert.ok(enemies.length>=2&&enemies.length<=3,`wave ${wave+1}`);
-  assert.ok(enemies.every(e=>e.tier!=='novice'));
-  assert.ok(enemies.every((e,i)=>i===0||e.delay-enemies[i-1].delay<=4));
- }
- assert.equal(RUN_WAVES.at(-1).enemies[0].role,'frigate');
 });
 test('announced Arena missile stocks remain finite through the actual rack firing path',()=>{
  for(const missiles of [0,1,2]){

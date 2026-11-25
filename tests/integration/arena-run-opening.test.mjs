@@ -1,3 +1,4 @@
+import {finishArenaLevel} from '../helpers/arena-battle.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {newArenaRun,runHullOffers,changeRunHull,runOffers,chooseRunReward,runWingmanOffers,refreshRunWingmanOffers,hireRunWingman,DECISION_STAGES} from '../../src/game/arenaRun.js';
@@ -75,9 +76,7 @@ test('the complete ladder passes every decision and reward without skipping a st
   }
   while(!r.rewardChosen){assert.equal(r.offers.length,3);assert.ok(chooseRunReward(s.save,r.offers.find(id=>runRewardPlan(s.save,id))));}
   s.startRunWave();assert.equal(r.phase,'combat');
-  s.tickArenaRun(3);s.save.world.time=r.startedAt+40;s.tickArenaRun(40);
-  assert.equal(r.nextEnemy,RUN_WAVES[wave].enemies.length);
-  s.ships.forEach(ship=>ship.hull=0);s.tickArenaRun(0);s.save.world.time+=2;s.tickArenaRun(2);
+  s.tickArenaRun(3);finishArenaLevel(s);
   assert.equal(r.cleared,wave+1);
  }
  assert.equal(s.save.arenaRun.phase,'won');

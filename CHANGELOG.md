@@ -1,3 +1,10 @@
+## 0.8.2ps — Longer Arena fights in waves, objective levels
+
+- Arena levels now come in groups: a new group arrives when only one enemy is left or after a set time, announced by range control and a marker at its entry point. Fights last about two to four times as long as before, but never with more than three enemy fighters at once (four, with at most two aces, in the last act).
+- The difficulty curve is smoother: it rises within each act, eases off after every new hull or wingman, and peaks at the final frigate battle. Level 13 is no longer a pushover, and the last act no longer throws three aces at you at once.
+- Five objective levels: destroy an Ironjaw gunboat, stop a Drover before it jumps out, break a raider attack, defend a merchant Drover from League torpedo bombers, and destroy the Concord frigate while its escorts arrive in waves. Once an objective is decided the remaining enemies jump away. A failed objective costs that level's reward pick, not the run.
+- Levels 9 and 10 use an Atlas convoy and an Ironjaw raid until the new Caravan and Rookery frigates arrive. Saved runs resume at the same level.
+
 ## 0.8.2pr — Corvettes and torpedo bombers
 
 - New corvette class. The **Drover** is a Free Merchants bulk hauler with six cargo pods: shoot a pod off and it tumbles away and spills its cargo, and with both engines gone the crew surrenders and can be boarded. The **Ironjaw** is a Red Talon gunboat built from a stolen Drover: welded armour, two broadside guns it turns towards fighters, and a strap-on booster you can shoot off. About one in seven merchant spawns in independent space is now a Drover convoy with escorts, and about one in seven pirate raids from tier 2 up brings an Ironjaw.

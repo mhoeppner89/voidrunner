@@ -136,6 +136,7 @@ function npcTargetSnapshot(ship, position, velocity) {
 const npcTargetIsValid = (session, ship, entry, observerCombat, retaliation = false) => {
     if (!entry || entry === ship || !combatTargetEligible(entry))
         return false;
+    if (entry.arenaFriendlyObjective && !ship.arenaRunEnemy) return false;
     if (observerCombat)
         return Boolean(entry.observerTeam && entry.observerTeam !== ship.observerTeam);
     const probe=ship.factionProbe??={ownerId:ship.id};
@@ -7637,7 +7638,7 @@ export class GameSession {
             // fire (or they already did if the pilot shot first). A hired
             // wingman's held weapons are a standing order rather than a stale
             // mug flag, so this housekeeping must leave them alone.
-            if (ship.holdFire && !ship.tutorialCompanion && !ship.tutorialPatrol && !ship.arenaRunWingman && this.save.world.time >= (ship.demandUntil ?? 0))
+            if (ship.holdFire && !ship.arenaExit && !ship.tutorialCompanion && !ship.tutorialPatrol && !ship.arenaRunWingman && this.save.world.time >= (ship.demandUntil ?? 0))
                 this.endMugStandoff(ship);
             // The per-ship AI hierarchy — task (what the ship wants) → interaction
             // (tasks colliding) → behavior (how it moves this frame). See shipAI.js:
@@ -7645,7 +7646,22 @@ export class GameSession {
             // travel) now lives there as updateShipAI, with the task layer feeding
             // travel waypoints and the interaction layer running emergent mugs.
             if(ship.variant==='ironjaw'&&ship.convoyLeader?.hull>0&&!ship.targetId)ship.targetId=ship.convoyLeader.targetId;
-            if(ship.engineThrust===0){
+            if(ship.arenaExit){
+                ship.destination=ship.arenaExit;
+                this.updateTravelAI(ship,dt);
+                this.resolveNpcCollisions(ship);
+                continue;
+            }
+            if(ship.arenaJumpPoint){
+                // The transport follows the surveyed jump lane; a single
+                // surviving drive still gets it there at reduced speed.
+                this.tmpD.fromArray(ship.arenaJumpPoint).sub(this.tmpE.fromArray(ship.position));
+                const distance=this.tmpD.length(),speed=ship.arenaCruise*(ship.engineThrust??1);
+                this.tmpD.normalize().multiplyScalar(speed).toArray(ship.velocity);
+                if(speed>0)this.tmpE.addScaledVector(this.tmpD,Math.min(dt,distance/speed)).toArray(ship.position);
+                this.updateSensorAwareness(ship,dt);
+            }
+            else if(ship.engineThrust===0){
                 this.updateSensorAwareness(ship,dt);
                 if(!ship.surrendered&&!ship.captured)this.resolveShipTarget(ship);
                 this.updateTravelAI(ship,dt);
@@ -7673,7 +7689,7 @@ export class GameSession {
             }else if (ship.tutorialCompanion)
                 this.updateTutorialCompanion(ship, dt);
             else if(ship.tutorialPatrol) this.updateTutorialPatrol(ship,dt);
-            else
+            else if (!ship.arenaObjectiveAttacker || !this.flyRunBombingPass(ship,dt))
                 updateShipAI(this, ship, dt);
             if(ship.capitalClass==='corvette'&&ship.capitalBatteriesAt!==this.save.world.time){
                 let enemy;
@@ -7727,6 +7743,7 @@ export class GameSession {
     shipRelation(ship) {
         if(ship.tutorialCompanion||ship.storyPersonId)return 'story-friend';
         if(ship.hostile)return 'hostile';
+        if(ship.arenaFriendlyObjective)return 'ally';
         const reputation=this.save.player.reputation?.[ship.faction]??0;
         return reputation<=-30?'hostile':ship.arenaRunWingman||reputation>=30||this.deferentialPilot(ship)?'ally':'neutral';
     }
@@ -7754,12 +7771,18 @@ export class GameSession {
     // up and the previous line has had its full read time (CHATTER_GAP).
     // Every chatter emitter gates on this, so a 3v1 streams one readable
     // line at a time instead of a wall of overlapping callsigns.
-    chatterOpen() {
-        return !this.missionCommsActive() && this.save.world.time >= (this.nextChatterAt ?? 0);
+    chatterOpen(rangeControl=false) {
+        const waiting=this.arena?.run && this.save.arenaRun?.phase==='combat' && this.runBattle?.warning;
+        return (rangeControl || !waiting || waiting.announced) && !this.missionCommsActive() && this.save.world.time >= (this.nextChatterAt ?? 0);
     }
     missionCommsActive() {
         const message = this.ui?.commsMessage;
         return this.storyLineActive() || message?.reserved || message?.story || message?.pinned;
+    }
+    runRadio(line) {
+        this.nextChatterAt=this.save.world.time+CHATTER_GAP;
+        this.ui.showPilotLine?.(t('Range control'),line,'ally',5000,false,undefined,undefined,undefined,undefined,true);
+        this.audio?.playComms?.('steady');
     }
     tacticalBark(ship, event) {
         const player = this.save.player;
@@ -8945,9 +8968,14 @@ export class GameSession {
         // manoeuvres whatever the weapon state, so an empty lock is what keeps a
         // station-keeping or breaking-off wingman on its travel leg instead of
         // in the fight.
+        if(ship.arenaObjectiveAttacker&&this.runBattle?.target?.hull>0){
+            const transport=this.runBattle.target;
+            ship.targetId=transport.id;ship.npcTargetReason='objective';
+            return npcTargetSnapshot(ship,transport.position,transport.velocity);
+        }
         if (ship.arenaRunWingman) {
             const wingTarget = ship.wingmanTargetId
-                ? this.ships.find((entry) => entry.id === ship.wingmanTargetId && entry.hull > 0)
+                ? this.ships.find((entry) => entry.id === ship.wingmanTargetId && entry.hull > 0 && !entry.arenaFriendlyObjective)
                 : undefined;
             ship.targetId = wingTarget?.id;
             if (!wingTarget)
@@ -10199,7 +10227,7 @@ export class GameSession {
                     if(ship.wingOrder!=='aggressive'||!candidate.hostile||
                         npcDistanceSq(player.position,candidate.position)>WING_ORDER_GATE.aggressive.acquire**2)continue;
                 }else if(ship.arenaRunEnemy){
-                    if(!candidate.arenaRunWingman)continue;
+                    if(!candidate.arenaRunWingman&&!candidate.arenaFriendlyObjective)continue;
                 }else if(!npcTargetIsValid(this,ship,candidate,!!ship.observerTeam,true))continue;
             }
             if(current)point.copy(primaryPoint);else point.fromArray(candidate.position);
@@ -10600,6 +10628,10 @@ export class GameSession {
     }
     projectileCanHitShip(projectile, ship) {
         if(ship.jumpPursuit)return false;
+        if(ship.arenaFriendlyObjective && projectile.ownerId!=='player'){
+            const owner=this.ships.find(actor=>actor.id===projectile.ownerId);
+            if(owner && !owner.arenaRunEnemy)return false;
+        }
         if (projectile.targetId === ship.id)
             return true;
         return factionsOpposed(projectile.faction, ship.faction);
@@ -10688,6 +10720,15 @@ export class GameSession {
             if(attackerId==='player')this.ui.pushEvent(`${t(capitalHull(ship).mounts[disabledMount].labelKey)} · ${t('OFFLINE')}`,'info',3500);
         }
         if (amount > 0) disruptWeapons(ship, weapon, this.save.world.time, shieldBeforeHit);
+        // Range Control owns the escort's allegiance. Damage still wears its
+        // systems and hull, but never starts a career crime or convoy response.
+        if (ship.arenaFriendlyObjective) {
+            ship.shieldDelay = 4.5;
+            if (ship.hull <= 0) this.destroyShip(ship,attackerId,position);
+            else if (this.ships.some(source=>source.id===attackerId && source.arenaRunEnemy))
+                ship.targetId = attackerId;
+            return;
+        }
         // A terrain scrape can damage the fighter while its pilot is already
         // steering out. Only an attacker can interrupt its firing pass or
         // replace the last hostile in the pilot's threat memory.
@@ -11438,7 +11479,7 @@ export class GameSession {
                 if (payment > 0)
                     this.ui.pushEvent(t('Hostile destroyed. You collected a bounty of {credits}.', { credits: formatCredits(payment) }), 'success', 4200, t('Bounty collected'));
             }
-            else if (!ship.captured) {
+            else if (!ship.captured && !ship.arenaFriendlyObjective) {
                 const identified = ship.playerCrimeIdentified || this.crimeIdentified(ship, position);
                 if (identified) {
                     this.save.player.reputation[ship.faction] = clamp(this.save.player.reputation[ship.faction] - 18, -100, 100);
@@ -12421,13 +12462,13 @@ export class GameSession {
         record.poweredDown = ship.poweredDown;
         record.fleeing = ship.fleeing;
     }
-    spawnCorvette(variant,position,traffic=false){
+    spawnCorvette(variant,position,traffic=false,pilotOverride){
         const spec=CORVETTES[variant];if(!spec)return;
         const origin=position??this.tmpD.set(0,0,-800).applyQuaternion(this.tmpQ.fromArray(this.save.player.rotation)).add(this.tmpE.fromArray(this.save.player.position)).toArray();
         const key = !traffic || this.arena ? undefined : [this.save.player.systemId,variant,...origin].join(':');
         const saved = key && this.save.world.capitalTraffic?.[key];
         if (saved?.retired) return;
-        const ship=this.spawnShip(spec.role,origin,undefined,variant==='drover'?'MV Drover':'Ironjaw',undefined,{faction:spec.faction});
+        const ship=this.spawnShip(spec.role,origin,undefined,variant==='drover'?'MV Drover':'Ironjaw',pilotOverride,{faction:spec.faction});
         ship.variant=variant;ship.capitalClass='corvette';ship.velocity.fill(0);ship.dark=false;ship.smuggling=false;
         equipCorvette(ship);equipCapitalLoot(this,ship);
         ship.capitalSpawnKey = key;
@@ -12476,13 +12517,13 @@ export class GameSession {
             if(amount){ship.cargo[commodity]-=amount;this.spawnPickup(commodity,origin,'combat',amount);}
         }
     }
-    spawnCapitalShip(variant, position, homeId, name) {
-        if(CORVETTES[variant])return this.spawnCorvette(variant,position);
+    spawnCapitalShip(variant, position, homeId, name, pilotOverride) {
+        if(CORVETTES[variant])return this.spawnCorvette(variant,position,false,pilotOverride);
         const capitalClass = CAPITAL_CLASS_BY_VARIANT[variant];
         const profile = CAPITAL_SHIP_STATS[capitalClass];
         if (!profile)
             throw new Error(`Unknown Concord capital variant: ${variant}`);
-        const ship = this.spawnShip('patrol', position, undefined, name, { tier: 'ace', temperament: 'steady' });
+        const ship = this.spawnShip('patrol', position, undefined, name, pilotOverride??{ tier: 'ace', temperament: 'steady' });
         const flight = HULL_FLIGHT_STATS[variant];
         ship.variant = variant;
         ship.capitalClass = capitalClass;
@@ -15344,7 +15385,7 @@ export class GameSession {
         return p.visible&&!p.behind&&p.x>=0&&p.x<this.renderer.viewportWidth&&p.y>=0&&p.y<this.renderer.viewportHeight
             &&(throughFrame||(this.ui?.cockpitPointVisible?.(p.x,p.y,this.save.player.shipId)??true));
     }
-    targetEdge(projection, throughFrame = false) {
+    targetEdge(projection, throughFrame = false, out) {
         const width = this.renderer.viewportWidth;
         const height = this.renderer.viewportHeight;
         if(this.markerPointVisible(projection,throughFrame))return undefined;
@@ -15374,7 +15415,9 @@ export class GameSession {
         if (!Number.isFinite(t))
             t = 1;
         const angle = Math.atan2(vy, vx);
-        return { x: cx + vx * t, y: cy + vy * t, angleDeg: (angle * 180) / Math.PI + 90 };
+        const edge=out??{};
+        edge.x=cx+vx*t;edge.y=cy+vy*t;edge.angleDeg=(angle*180)/Math.PI+90;
+        return edge;
     }
     buildHudModel() {
         const stats = this.playerStats();

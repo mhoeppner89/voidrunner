@@ -424,6 +424,7 @@ export const callsignHandle = (callsign) => {
 };
 export const commsSenderLabel = (callsign) => {
     const handles=String(callsign??'').split(/,\s*/).map(callsignHandle);
+    if(handles.length===1 && handles[0]===t('Range control'))return t('RANGE');
     const name=({'Rin Vek':'Rin','Mara Vek':'Mara'})[handles[0]]??handles[0];
     const chars=Array.from(name),short=chars.length>12?chars.slice(0,11).join('')+'…':name;
     return handles.length>1?`${short} +${handles.length-1}`:short;
@@ -478,7 +479,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2pr';
+const GAME_VERSION = '0.8.2ps';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -5813,13 +5814,15 @@ export class GameUI {
         bracket.classList.toggle('is-targeted',Boolean(speaker?.targeted));
         if(speaker)bracket.style.transform=`translate(${speaker.x}px, ${speaker.y}px)`;
     }
+    logCommsLine(callsign,line,relation,story=false) {
+        this.commsLog.push({callsign,line,relation,story});
+        if(this.commsLog.length>40)this.commsLog.shift();
+    }
     showPilotLine(callsign, line, relation = 'neutral', duration = 6000, story = false, faction, portraitIndex, portraitIdentity = callsign, speakerId, chatter = false) {
         relation=commsRelation(portraitIdentity,relation);
         // Append to the comms log (capped) so the chat panel can review the
         // whole conversation — nobody misses a line that faded off the bar.
-        this.commsLog.push({ callsign, line, relation, story });
-        if (this.commsLog.length > 40)
-            this.commsLog.shift();
+        this.logCommsLine(callsign,line,relation,story);
         if (story && this.save) {
             this.save.world.dialogueHistory ??= [];
             this.save.world.dialogueHistory.push({speaker:callsign,text:line});

@@ -91,7 +91,7 @@ test('each wave opponent and wingman has a full set of guns and physical racks f
  };
  for(const hull of Object.keys(fleet))check(hull,createEnemyLoadout({hullId:hull},0,wingmanFitFor(hull)));
  for(const wave of RUN_WAVES)for(const spec of wave.enemies){
-  if(spec.role==='frigate')continue;
+  if(spec.capital)continue;
   const fit=createEnemyLoadout(spec,0,runEnemyFit(spec));check(spec.hullId,fit);
   assert.ok((spec.missiles??0)<=fit.racks.reduce((sum,rack)=>sum+rack.missiles,0));
  }

@@ -97,7 +97,11 @@ export function damageCapitalMount(ship,position,damage){
   if(m.barrels && broadsideBarrelHit(s,m,false,.9)===0)normalized=0;
   if(normalized<nearest){nearest=normalized;index=i;}
  }
- if(index>=0){ship.capitalMountHull[index]=Math.max(0,ship.capitalMountHull[index]-damage);applyCapitalSubsystemEffects(ship);}
+ if(index>=0){
+  const minimum=ship.arenaFriendlyObjective&&capitalHull(ship).mounts[index].kind==='engine'?1:0;
+  ship.capitalMountHull[index]=Math.max(minimum,ship.capitalMountHull[index]-damage);
+  applyCapitalSubsystemEffects(ship);
+ }
  return index;
 }
 export function applyCapitalSubsystemEffects(ship){
@@ -111,6 +115,7 @@ export function applyCapitalSubsystemEffects(ship){
  }
  thrust/=engineCount;
  if(ship.capitalClass==='corvette'){
+  if(ship.arenaJumpPoint&&thrust>0)thrust=Math.max(.5,thrust);
   ship.engineThrust=thrust;ship.speed=(booster?ship.capitalBaseSpeed:25)*thrust;
   ship.turnRate=.25*thrust;ship.maxShield=regen>0?ship.capitalShieldCapacity:0;ship.shieldRegen=10*regen;
  }else{
