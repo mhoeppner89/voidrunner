@@ -1,3 +1,11 @@
+## 0.8.2px — No more fuel; big ships go down slower
+
+- Fuel is gone. The afterburner runs on your ship's energy, the same pool your guns and shield recharge use, so every burn is a choice between speed and firepower. A full capacitor alone feeds about 15 seconds of afterburner; reactor and capacitor upgrades make it last longer, and the Comet Tail engine cuts the cost by 30%. With an empty capacitor the afterburner still doubles your turning, so a missile break always works; you only lose the extra speed. Enemy pilots pay the same price for their burns.
+- No more refuelling at docks: the old fuel desk is now the ordnance desk, which restocks missiles. The cockpit's second readout shows your throttle instead of fuel. Old saves simply drop their fuel.
+- The two fuel-shortage distress calls are now ships with a dead reactor: you jump-start them with a transfer from your capacitor.
+- Races keep their own boost meter and cost no energy; a centred gate refunds a moment of afterburner.
+- Big ships come apart slower: corvettes and frigates burn for several seconds, the hull holds through the first flash and the wreck sections ease apart. In Arena the level keeps running for 6 seconds after a corvette and 8 seconds after a larger ship dies, so you can watch it.
+
 ## 0.8.2pw — Red Njord Barrage, missiles you can dodge, torpedoes you can shoot
 
 - New Red Talon corvette: the **Red Njord Barrage**, a missile barge converted from a Njord. Six launcher racks on its spine, a fire-control dish on the bridge and a cage over the windows make it easy to tell apart from the Red Njord at a glance. It shells slow, steady pilots from up to 1.2 km: its lock builds while you fly slowly or straight, the target monitor shows CHARGING and the LOCK lamp lights three seconds before a salvo of eight swarm warheads, and speeding up or turning hard during the warning breaks the lock. Rushing it is the answer, but a fast approach still draws one snap canister of four warheads that a break on the cue beats. Inside 250 m it cannot fire at all. Each rack can be shot off and makes the salvo smaller; losing the dish halves its range and doubles its lock time.

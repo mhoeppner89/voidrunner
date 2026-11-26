@@ -9,7 +9,7 @@ export const RACE_HULLS=Object.freeze(Object.fromEntries([
 ].map(([id,name,style,acceleration,braking,angularAcceleration,mass,color,afterburnSpeed])=>[id,Object.freeze({
  id,name,style,acceleration,braking,angularAcceleration,mass,color,
  maxSpeed:145,afterburnSpeed,angularDamping:5.5,lateralMultiplier:1,hull:400,shield:400,
- energyCapacity:100,energyRegen:10,reactorOutput:10,shieldRegen:5,shieldRegeneration:5,shieldRechargeMultiplier:1,fuel:200,
+ energyCapacity:100,energyRegen:10,reactorOutput:10,shieldRegen:5,shieldRegeneration:5,shieldRechargeMultiplier:1,
 })])));
 export const raceHull=id=>RACE_HULLS[id]??RACE_HULLS.talon;
 // Race frames use the same assisted turn and velocity solvers as an ordinary
@@ -56,14 +56,14 @@ export function integrateRacePilotVelocity(v,nose,hull,targetSpeed,dt,draft=0,st
 // Save-safe loaner: equipment/cargo stay in the player's own parked ship.
 export function takeRaceHull(player,id){
  if(!player.raceReturn){
-  const saved={};for(const key of ['shipId','hull','shield','energy','fuel','droneFleet','mode','weaponId'])saved[key]=player[key];
+  const saved={};for(const key of ['shipId','hull','shield','energy','droneFleet','mode','weaponId'])saved[key]=player[key];
   for(const key of ['position','rotation'])saved[key]=[...player[key]];
   saved.velocity=[0,0,0];saved.angularVelocity=[0,0,0];saved.throttle=0;
   player.raceReturn=saved;
  }
  const hull=raceHull(id);player.shipId=hull.id;player.mode='combat';
  player.droneFleet={unitsById:{},bays:{}};
- for(const key of ['hull','shield','fuel'])player[key]=hull[key];player.energy=hull.energyCapacity;
+ for(const key of ['hull','shield'])player[key]=hull[key];player.energy=hull.energyCapacity;
  return hull;
 }
 export function returnRaceHull(player){

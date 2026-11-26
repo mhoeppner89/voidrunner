@@ -30,7 +30,7 @@ try{
    s.clearTransientSpace();s.ui.clearComms?.();s.ui.recentEvents.length=0;
    const id=level<5?'wayfarer':level<17?'talon':'blade',wing=level<13?'scrapper':level<21?'talon':'blade';
    p.shipId=id;p.ownedShips=[id];p.outfitting=createOutfittingState([id]);p.outfitting.loadouts[id].guns.fill('pulse-cannon');p.throttle=0;
-   s._statsDirty=true;const stats=s.playerStats();Object.assign(p,{hull:stats.hull,shield:stats.shield,energy:stats.energyCapacity,fuel:stats.fuel});
+   s._statsDirty=true;const stats=s.playerStats();Object.assign(p,{hull:stats.hull,shield:stats.shield,energy:stats.energyCapacity});
    Object.assign(r,{phase:'prepare',wave:level-1,rewardChosen:true,hullChosen:true,decisions:{[level-1]:true},wingmen:Array.from({length:level===25?2:level>=9?1:0},(_,i)=>({id:'wing'+i,name:'Wing '+(i+1),order:'aggressive',hullId:wing,fit:wingmanFitFor(wing),alive:true}))});
    s.ui.setCockpitShip(id);s.startRunWave();s.tickArenaRun(3);s.nextChatterAt=0;
    s.ui.showRunCountdown?.(0,'','');await s.ui.cockpitArtwork?.ready;

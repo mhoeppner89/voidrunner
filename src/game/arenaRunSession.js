@@ -120,7 +120,7 @@ export const ArenaRunMethods={
   }
   if(action==='fit')this.ui.runFitNotice=fitRunItem(this.save,key,Number(index),value)?'':t('That fitting exceeds the limits or leaves no forward gun.');
   if(action==='group'&&r.rewardChosen){const fit=this.save.player.outfitting.loadouts[this.save.player.shipId];if(Object.hasOwn(fit.fireGroups.assignments,value))fit.fireGroups.assignments[value]=fit.fireGroups.assignments[value]==='A'?'B':'A';}
-  this._statsDirty=true;const p=this.save.player,stats=this.playerStats();p.shield=Math.min(p.shield,stats.shield);p.hull=Math.min(p.hull,stats.hull);p.energy=Math.min(p.energy,stats.energyCapacity);p.fuel=Math.min(p.fuel,stats.fuel);p.turretRuntime=[];
+  this._statsDirty=true;const p=this.save.player,stats=this.playerStats();p.shield=Math.min(p.shield,stats.shield);p.hull=Math.min(p.hull,stats.hull);p.energy=Math.min(p.energy,stats.energyCapacity);p.turretRuntime=[];
   this.syncWeaponProjection();writeArenaRun(this.save);if(action==='equip')this.ui.runFitOpen=true;
   if(action==='accept'&&r.rewardChosen){this.ui.runFitOpen=false;this.startRunWave();}else this.showRunPreparation();
  },
@@ -180,7 +180,7 @@ export const ArenaRunMethods={
   ship.maxHull=ship.combatFit.stats.hull;
   ship.hull=Math.max(1,Math.round(ship.maxHull*Math.max(0,Math.min(1,wingman.hullFraction??1))));
   ship.combatFit.resources.shield=ship.maxShield;
-  ship.energy=ship.combatFit.stats.energyCapacity;ship.fuel=ship.combatFit.stats.fuel;
+  ship.energy=ship.combatFit.stats.energyCapacity;
   ship.speed=ship.combatFit.stats.maxSpeed;ship.afterburnSpeed=ship.combatFit.stats.afterburnSpeed;
   ship.velocity[0]=0;ship.velocity[1]=0;ship.velocity[2]=0;
  ship.targetId=undefined;ship.wingmanTargetId=undefined;
@@ -449,7 +449,8 @@ export const ArenaRunMethods={
    // death check earlier in the tick still ends the run during the grace.
    // An objective level times its own play-out (thanks, jumps, one second).
    r.clearAt??=elapsed+(this.runBattle?.outcome?0:2);
-   if(elapsed<r.clearAt)return;
+   // A big ship's death plays out before the round flips (CAPITAL_BLAST_HOLD).
+   if(elapsed<r.clearAt||this.save.world.time<(this.capitalBlastUntil??0))return;
    r.missiles+=Math.max(0,r.waveMissiles-(this.save.player.missiles??0));
    r.cleared=r.wave+1;
    const rewardForfeited=this.runBattle.outcome==='failed';

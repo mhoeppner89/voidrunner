@@ -45,8 +45,8 @@ export const DISTRESS_INTERCEPTS = Object.freeze([
         'We have been drifting out here for hours. Does anyone have us on scope?'],
     ['Mayday. Die Brücke ist dicht, der Rest ist Schrott. Holt uns hier raus.',
         'Mayday. The bridge is sealed, the rest is scrap. Get us out of here.'],
-    ['An jeden in Reichweite: Wir zahlen für Treibstoff, Teile oder einen Schlepp. Alles, was ihr habt.',
-        'To anyone in range: we pay for fuel, parts or a tow. Whatever you have.'],
+    ['An jeden in Reichweite: Wir zahlen für Energie, Teile oder einen Schlepp. Alles, was ihr habt.',
+        'To anyone in range: we pay for power, parts or a tow. Whatever you have.'],
     ['Notruf, zivile Kennung. Unser Reaktor läuft heiß, und wir wissen nicht, wie lange noch.',
         'Distress call, civilian ident. Our reactor is running hot and we do not know for how long.'],
     ['Notruf. Wir haben alles abgeschaltet, was Strom zieht. Bitte, wir brauchen jemanden.',
@@ -253,55 +253,56 @@ const VARIANTS = [
         ],
     },
     {
-        id: 'fuel',
-        title: ['Treibstoffnot', 'Fuel shortage'],
+        // A dead reactor: the pilot jump-starts it from their own capacitor.
+        id: 'power',
+        title: ['Reaktor tot', 'Dead reactor'],
         genuine: true,
         weight: 12,
         family: ['Versorgung', 'Supply'],
         setups: [
             {
                 caller: 'MV Tallow', vessel: ['Frachter Tallow', 'freighter Tallow'],
-                signal: ['Tallow an alle. Uns geht der Sprit aus. Acht Einheiten, sonst treiben wir hier ab. Ich zahle zwölfhundert.',
-                    'Tallow to all. We are dry. Eight units of fuel or we drift. Paying twelve hundred.'],
-                context: ['Ein Frachter hat noch Luft, aber keinen Sprit.', 'A freighter still has air, but no fuel.'],
+                signal: ['Tallow an alle. Unser Reaktor ist aus. Ein Starthilfestoß aus eurem Kondensator, sonst treiben wir hier ab. Ich zahle zwölfhundert.',
+                    'Tallow to all. Our reactor is dead. A jump-start from your capacitor or we drift. Paying twelve hundred.'],
+                context: ['Ein Frachter hat noch Luft, aber keinen Strom.', 'A freighter still has air, but no power.'],
                 actors: [v('tallow', 'Tallow', 'mule', 'trader', [0, 0, 0])],
-                fuel: 8, payment: 1200,
+                energy: 40, payment: 1200,
                 labels: {
-                    give: ['{fuel} Einheiten rüber · {payment} cr.', '{fuel} units across · {payment} cr.'],
+                    give: ['{energy} Energie rüber · {payment} cr.', '{energy} energy across · {payment} cr.'],
                     donate: ['Ohne Bezahlung — Hauptsache raus hier.', 'No payment — just get them clear of here.'],
-                    decline: ['Mein Tank ist auch nicht voll, Tallow.', 'My tank is not full either, Tallow.'],
+                    decline: ['Ich brauche meine Ladung selbst, Tallow.', 'I need my charge myself, Tallow.'],
                 },
                 endings: {
                     supplied: {
-                        message: ['Tallow läuft wieder · {fuel} Einheiten gegen {reward}', 'Tallow is running again · {fuel} units for {reward}'],
+                        message: ['Tallow läuft wieder · {energy} Energie gegen {reward}', 'Tallow is running again · {energy} energy for {reward}'],
                         farewell: ['Zwölfhundert sind raus. Wenn du je in Rook landest, geht der Kaffee auf mich.', 'Twelve hundred is on its way. If you ever dock in Rook, the coffee is on me.'],
                     },
                     suppliedGift: {
-                        message: ['{fuel} Einheiten geschenkt · Tallow läuft wieder', '{fuel} units given away · Tallow is running again'],
+                        message: ['{energy} Energie geschenkt · Tallow läuft wieder', '{energy} energy given away · Tallow is running again'],
                         farewell: ['Du hast nichts verlangt. Das erzähle ich in jeder Bar von Rook.', 'You asked for nothing. I will tell that in every bar in Rook.'],
                     },
                 },
             },
             {
                 caller: 'Prospektor Nettle', vessel: ['Prospektor Nettle', 'prospector Nettle'],
-                signal: ['Nettle hier. Sechs Einheiten Sprit, und ich schaffe es zurück nach Rook. Ich zahle, was ich habe.',
-                    'Nettle here. Six units of fuel and I can make it back to Rook. Paying what I have.'],
+                signal: ['Nettle hier. Mein Reaktor springt nicht an. Ein Stoß Energie, und ich schaffe es zurück nach Rook. Ich zahle, was ich habe.',
+                    'Nettle here. My reactor will not restart. One jolt of power and I can make it back to Rook. Paying what I have.'],
                 context: ['Ein Prospektor ohne Reserve, weit draußen.', 'A prospector with no reserve, far out.'],
                 actors: [v('nettle', 'Nettle', 'prospector', 'miner', [0, 0, 0])],
-                fuel: 6, payment: 900,
+                energy: 30, payment: 900,
                 labels: {
-                    give: ['{fuel} Einheiten abzweigen · {payment} cr.', '{fuel} units tapped off · {payment} cr.'],
+                    give: ['{energy} Energie abzweigen · {payment} cr.', '{energy} energy tapped off · {payment} cr.'],
                     donate: ['Umsonst. Du bist weit genug draußen.', 'Free of charge. You are far enough out as it is.'],
                     decline: ['Tut mir leid, Nettle.', 'Sorry, Nettle.'],
                 },
                 endings: {
                     supplied: {
-                        message: ['Nettle läuft wieder · {fuel} Einheiten gegen {reward}', 'Nettle is running again · {fuel} units for {reward}'],
+                        message: ['Nettle läuft wieder · {energy} Energie gegen {reward}', 'Nettle is running again · {energy} energy for {reward}'],
                         farewell: ['Neunhundert, wie versprochen. Jetzt schaffe ich es zurück nach Rook.', 'Nine hundred, as promised. I can make it back to Rook now.'],
                     },
                     suppliedGift: {
-                        message: ['{fuel} Einheiten geschenkt · Nettle fliegt nach Rook', '{fuel} units given away · Nettle is heading for Rook'],
-                        farewell: ['Sechs Einheiten und keine Rechnung. Ich schulde dir was, Pilot.', 'Six units and no bill. I owe you one, pilot.'],
+                        message: ['{energy} Energie geschenkt · Nettle fliegt nach Rook', '{energy} energy given away · Nettle is heading for Rook'],
+                        farewell: ['Ein Stoß Energie und keine Rechnung. Ich schulde dir was, Pilot.', 'One jolt of power and no bill. I owe you one, pilot.'],
                     },
                 },
             },
@@ -565,7 +566,7 @@ export const distressRoster = (variant, setup = 0) => (distressSetup(variant, se
 
 // ------------------------------------------------------------- caller voice
 // The decision labels and the closing words belong to the caller, not to the
-// category: two fuel rescues must not open and close with the same sentences
+// category: two power rescues must not open and close with the same sentences
 // just because they are the same kind of rescue. Every setup therefore carries
 // its own `labels` and `endings`. Values that only exist at runtime (payout,
 // hull percentage, the crew that ends up holding the wreck) are `{tokens}`
@@ -788,6 +789,11 @@ function migrateLantern(result, world) {
 
 export function normalizeDistress(world) {
     const raw = world?.distress && typeof world.distress === 'object' && !Array.isArray(world.distress) ? world.distress : {};
+    // The fuel rescue became a dead-reactor jump-start when fuel was removed.
+    const renamed = entry => entry && typeof entry === 'object' && entry.variant === 'fuel' ? {...entry, variant: 'power', setup: entry.setup} : entry;
+    raw.active = renamed(raw.active);
+    if (Array.isArray(raw.history)) raw.history = raw.history.map(renamed);
+    if (Array.isArray(raw.lastVariants)) raw.lastVariants = raw.lastVariants.map(v => v === 'fuel' ? 'power' : v);
     const result = {
         active: normalizeActive(raw.active),
         history: normalizeHistory(raw.history),
@@ -816,7 +822,7 @@ const normalizeIntercept = (value, seed, createdAt) => Number.isFinite(Number(va
 export const distressIntercept = active => distressText(DISTRESS_INTERCEPTS[normalizeIntercept(active?.intercept, active?.seed, active?.createdAt)] ?? DISTRESS_INTERCEPTS[0]);
 // Only a trap hides behind the shared mayday pool, because a baited call never
 // says what is actually wrong. Every genuine call speaks with its own words: a
-// crew that is out of fuel says they are out of fuel.
+// crew whose reactor is dead says their reactor is dead.
 export const distressPickupLine = active => active?.variant === 'trap'
     ? distressIntercept(active)
     : distressText(distressSetup(active?.variant, active?.setup)?.signal ?? '');
@@ -905,9 +911,9 @@ export function distressObjective(active, save) {
             return active.progress?.exposed
                 ? ['Falle offen · kämpfen oder abdrehen', 'Trap sprung · fight or break off']
                 : ['Funk prüfen · Signatur passt nicht zur Fracht', 'Check the call · signature does not match the manifest'];
-        case 'fuel': {
-            const reserve = Math.floor(Number(save?.player?.fuel) || 0);
-            return [`Treibstoff ${data.fuel} · an Bord ${reserve}`, `Fuel ${data.fuel} · aboard ${reserve}`];
+        case 'power': {
+            const charge = Math.floor(Number(save?.player?.energy) || 0);
+            return [`Energie ${data.energy} · Kondensator ${charge}`, `Energy ${data.energy} · capacitor ${charge}`];
         }
         case 'disabled': {
             const target = Math.round((data.repairTarget ?? .6) * 100);
@@ -994,11 +1000,11 @@ const ARRIVAL_LINES = Object.freeze({
         ['{caller}: „Na endlich. Ich dachte schon, ich muss das allein hinbekommen.“',
             '{caller}: “There you are. I was starting to think I would have to manage this alone.”'],
     ],
-    fuel: [
+    power: [
         ['{caller}: „Da bist du ja. Ich dachte schon, hier hört uns keiner.“',
             '{caller}: “There you are. I was starting to think no one was listening.”'],
-        ['{caller}: „Du hast mich gefunden. Ich zeig dir den Tank, dann kannst du selbst nachzählen.“',
-            '{caller}: “You found me. I will show you the tank, then you can count for yourself.”'],
+        ['{caller}: „Du hast mich gefunden. Bei uns ist alles dunkel, bis auf die Notbeleuchtung.“',
+            '{caller}: “You found me. Everything is dark in here except the emergency lights.”'],
     ],
     disabled: [
         ['{caller}: „Du hast angehalten. Gut. Allein bekommen wir die Maschine nicht mehr an.“',
@@ -1036,7 +1042,7 @@ function arrivalLine(active) {
 // What the scene says after the opener. A followed call pairs this with the
 // arrival line; a call answered straight from the journal pairs it with the
 // transmission, so the same card reads correctly either way. Variants whose
-// branch writes its own second paragraph (fuel, disabled) return nothing here.
+// branch writes its own second paragraph (power, disabled) return nothing here.
 function sceneTail(active) {
     switch (active.variant) {
         case 'wreck':
@@ -1131,7 +1137,7 @@ export function distressDialogue(conversationId, save) {
     const blocked = resourceBlocked(save, active);
 
     const player = save.player;
-    const fuel = Math.floor(Number(player.fuel) || 0);
+    const charge = Math.floor(Number(player.energy) || 0);
     const cargo = player.cargo ?? {};
     // A pilot who followed the bearing on a hyperdrive leg has already read the
     // transmission; every "discovered" card below opens with the arrival beat
@@ -1237,21 +1243,21 @@ export function distressDialogue(conversationId, save) {
             }
             break;
         }
-        case 'fuel': {
-            const enough = fuel >= data.fuel;
-            const tokens = {fuel: data.fuel, payment: data.payment.toLocaleString(getLanguage() === 'de' ? 'de-DE' : 'en-US')};
-            // The crew reads the pilot's tank off the transponder; saying it in
-            // their own voice keeps the card a conversation instead of a status
-            // readout.
+        case 'power': {
+            const enough = charge >= data.energy;
+            const tokens = {energy: data.energy, payment: data.payment.toLocaleString(getLanguage() === 'de' ? 'de-DE' : 'en-US')};
+            // The crew reads the pilot's capacitor off the transponder; saying
+            // it in their own voice keeps the card a conversation instead of a
+            // status readout. A capacitor recharges, so a low one only waits.
             node.text = enough
-                ? [`${opener}\n\nDu hast ${fuel} im Tank — ${data.fuel} davon tun dir nicht weh. Gib sie mir, und ich bin hier raus.`,
-                    `${opener}\n\nYou are carrying ${fuel} — ${data.fuel} of them will not hurt you. Hand them over and I am out of here.`]
-                : [`${opener}\n\nDu hast selbst nur ${fuel}. Behalte sie — ich will nicht, dass du auch hier festsitzt.`,
-                    `${opener}\n\nYou are running on ${fuel} yourself. Keep them — I do not want you stuck out here too.`];
+                ? [`${opener}\n\nDein Kondensator zeigt ${charge}. ${data.energy} davon bringen unseren Reaktor wieder in Gang.`,
+                    `${opener}\n\nYour capacitor reads ${charge}. ${data.energy} of that gets our reactor going again.`]
+                : [`${opener}\n\nDein Kondensator zeigt nur ${charge}. Das reicht nicht für unseren Reaktor.`,
+                    `${opener}\n\nYour capacitor only reads ${charge}. That will not restart our reactor.`];
             node.choices = enough ? [
-                choice(distressChoiceLabel(active, 'give', ['{fuel} Einheiten abgeben · {payment} cr.', 'Hand over {fuel} units · {payment} cr.'], tokens), 'transfer'),
+                choice(distressChoiceLabel(active, 'give', ['{energy} Energie abgeben · {payment} cr.', 'Hand over {energy} energy · {payment} cr.'], tokens), 'transfer'),
                 choice(distressChoiceLabel(active, 'donate', ['Ohne Bezahlung — schenken.','No payment — make it a gift.']), 'donate'),
-                choice(distressChoiceLabel(active, 'decline', ['Ich brauche den Sprit selbst.','I need the fuel myself.']), 'decline'),
+                choice(distressChoiceLabel(active, 'decline', ['Ich brauche meine Ladung selbst.','I need my charge myself.']), 'decline'),
             ] : [choice(distressChoiceLabel(active, 'decline', ['Ich kann nicht helfen.','I cannot help.']), 'decline')];
             break;
         }

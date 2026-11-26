@@ -84,27 +84,31 @@ export function holdingFiringWindow(ship,now) {
  return ship.pilot?.tier!=='novice'&&now<(ship.fireCommitUntil??0)&&pressure-prior<(ship.fireCommitDamageLimit??0)&&ship.energy>3;
 }
 
+// NPC burns draw energy (stats.burnEnergy). A long closing or route burn
+// keeps 35% of the capacitor for the fight; evasive burns need a tenth.
+export const BURN_RESERVE=.35,BURN_MINIMUM=.1;
 export function combatThrottle(ship,now,distance,closing,targetRadial,noseDot,preferred,canBoost,turnAngle=0,firingPass=false) {
  const crossfire=ship.combatPlan?.crossfire;
- const fuelReserve=(ship.combatFit?.stats?.fuel??0)*.35;
+ const capacity=ship.combatFit?.stats?.energyCapacity??0,energy=ship.energy??0;
+ const reserve=energy>capacity*BURN_RESERVE,spare=energy>capacity*BURN_MINIMUM;
  // Flying a route round terrain: cruise, and burn the long clear legs.
  const route=ship.combatRoute;
  if(route?.active&&!ship.fleeing&&!ship.combatPlan?.recovery?.active){
-  ship.burning=Boolean(canBoost&&ship.fuel>fuelReserve&&route.leg>320&&noseDot>.3);
+  ship.burning=Boolean(canBoost&&reserve&&route.leg>320&&noseDot>.3);
   return ship.burning?ship.afterburnSpeed:ship.speed;
  }
  const recovery=ship.combatPlan?.recovery;
  if(recovery?.active){
   const extend=recovery.mode==='range'?(distance<recovery.safeRange+80||distance<recovery.safeRange+200&&closing>5):recovery.coverDistance>100;
-  ship.burning=Boolean(canBoost&&ship.fuel>2&&extend);
+  ship.burning=Boolean(canBoost&&spare&&extend);
   if(recovery.mode==='cover'&&recovery.coverDistance<100)return ship.speed*.25;
   return ship.burning?ship.afterburnSpeed:ship.speed;
  }
  const main=ship.combatFit.weapons?.at(-1);
  const artillery=main==='gauss'||main==='mortar';
  if((!artillery||firingPass)&&ship.combatIntent==='hunt'&&!ship.fleeing&&!ship.covering&&ship.combatPlan?.finishing&&distance<220){ship.burning=false;return clamp(targetRadial+(distance-75)*.5,ship.speed*.25,ship.speed);}
- if(!ship.fleeing&&!ship.covering&&ship.pilot?.tier==='ace'&&crossfire?.outnumbered&&distance<600){ship.burning=Boolean(canBoost&&ship.fuel>2);return ship.burning?ship.afterburnSpeed:ship.speed;}
- if(crossfire?.active){ship.burning=Boolean(canBoost&&ship.fuel>2);return ship.burning?ship.afterburnSpeed:ship.speed;}
+ if(!ship.fleeing&&!ship.covering&&ship.pilot?.tier==='ace'&&crossfire?.outnumbered&&distance<600){ship.burning=Boolean(canBoost&&spare);return ship.burning?ship.afterburnSpeed:ship.speed;}
+ if(crossfire?.active){ship.burning=Boolean(canBoost&&spare);return ship.burning?ship.afterburnSpeed:ship.speed;}
  const hunting=ship.combatIntent==='hunt';
  preferred=ship.combatPlan?.preferredRange??preferred;
  const pressure=(ship.combatPressure??0)*Math.exp(-Math.max(0,now-(ship.combatPressureAt??now))/1.5);
@@ -114,7 +118,7 @@ export function combatThrottle(ship,now,distance,closing,targetRadial,noseDot,pr
  const overshoot=hunting&&ship.combatPlan?.overshoot;
  canBoost=canBoost&&!overshoot;
  const request=threatened || !hunting || (noseDot>.65 && distance>preferred*1.2 && closing<ship.speed*.5);
- if(canBoost&&request&&ship.fuel>1&&now>=(ship.combatBoostReadyAt??0)){
+ if(canBoost&&request&&spare&&now>=(ship.combatBoostReadyAt??0)){
   const novice=ship.pilot?.tier==='novice';
   const stats=ship.combatFit.stats,speed=Math.hypot(...ship.velocity);
   const accelerate=Math.max(0,ship.afterburnSpeed-speed)/stats.acceleration;
@@ -125,8 +129,8 @@ export function combatThrottle(ship,now,distance,closing,targetRadial,noseDot,pr
  }
  // Closing burn: a long, clear approach is flown on the afterburner instead
  // of crawling in at cruise; the reserve stays for the fight itself.
- if(hunting&&!threatened&&canBoost&&noseDot>.8&&distance>Math.max(preferred*2.6,650)&&ship.fuel>fuelReserve){ship.burning=true;return ship.afterburnSpeed;}
- ship.burning=Boolean(canBoost&&ship.fuel>.5&&now<(ship.combatBoostUntil??0));
+ if(hunting&&!threatened&&canBoost&&noseDot>.8&&distance>Math.max(preferred*2.6,650)&&reserve){ship.burning=true;return ship.afterburnSpeed;}
+ ship.burning=Boolean(canBoost&&energy>0&&now<(ship.combatBoostUntil??0));
  if(ship.burning)return ship.afterburnSpeed;
  const turningShot=hunting&&ship.combatPlan?.aimingRun&&ship.combatPlan.angularRate>.15&&!threatened;
  let speed=(matching||turningShot&&(!artillery||firingPass))?clamp(targetRadial+(distance-preferred)*.6,speedFloor,ship.speed):ship.speed;

@@ -14,7 +14,7 @@ const scenes=[
  ['distress-convoy-arrival','Notruf · Konvoi-Ankunft','Sprung bei 500 km: Der Kanal öffnet sich mit Lage und der Wahl „Ich gehe rein / Nicht meine Schlacht“.'],
  ['distress-wreck-offer','Notruf · Wrack-Ankunft','Sprung bei 500 km: Das Wrack meldet sich, dann die Wahl über Fracht und Rettungskapsel.'],
  ['distress-trap-arrival','Notruf · Täuschung-Ankunft','Sprung bei 500 km: Ein sauberer Notruf. Scannen, anfliegen oder weiterfliegen — die Raider warten auf die Antwort.'],
- ['distress-fuel-arrival','Notruf · Treibstoff-Ankunft','Sprung bei 500 km: Transferbetrag und Restreserve stehen vor der Entscheidung, 8 Einheiten gegen 1.200 cr.'],
+ ['distress-fuel-arrival','Notruf · Reaktor-Ankunft','Sprung bei 500 km: Transferbetrag und Restladung stehen vor der Entscheidung, 8 Einheiten gegen 1.200 cr.'],
  ['distress-disabled-arrival','Notruf · Havarie-Ankunft','Sprung bei 500 km: Ersatzteile, Drohne oder selbst rüber — die Wahl steht im Funk.'],
  ['distress-debris-offer','Notruf · Geleit-Ankunft','Sprung bei 500 km: Aufgabe, Sturmfenster, Risiko und Bezahlung — annehmen oder ablehnen.'],
  ['distress-jettison-arrival','Notruf · Fracht-Ankunft','Sprung bei 500 km: Drei Container treiben im Feld, zurückgeben oder behalten.'],
@@ -35,7 +35,7 @@ const scenes=[
  ['distress-voice-d','Funkaufnahme · echter Streit','Eigener Text: zwei Bergungscrews am selben Wrack, jede mit ihrer Version.'],
  ['distress-convoy-signal','Notruf · Konvoi · Funkaufnahme','Im Hyperdrive aufgefangen: Karte hält den Flug an. Signal verfolgen oder weiterfliegen — danach der Konvoi unter Beschuss.'],
  ['distress-convoy-alt-signal','Notruf · Konvoi · zweiter Anrufer','Ash Gambit statt Lantern: eigener Ruf, eigene Ankunft. Dieselbe Kategorie, ein anderer Sprecher.'],
- ['distress-fuel-alt-signal','Notruf · Treibstoff · zweiter Anrufer','Nettle statt Tallow. Der Ruf gehört zum Schiff, nicht zur Kategorie.'],
+ ['distress-fuel-alt-signal','Notruf · Reaktor · zweiter Anrufer','Nettle statt Tallow. Der Ruf gehört zum Schiff, nicht zur Kategorie.'],
  ['distress-trap-alt-signal','Notruf · Täuschung · zweiter Anrufer','Vela statt Bright Mercy: ein getarnter Prospektor, wieder mit geliehenen Worten.'],
  ['distress-convoy-alt-arrival','Notruf · Konvoi-Ankunft · zweiter Anrufer','Ash Gambit empfängt dich mit seinem eigenen Satz — nicht mit Lanterns.'],
  ['distress-trap-alt-arrival','Notruf · Täuschung-Ankunft · zweiter Anrufer','Vela, der getarnte Prospektor: anderer Anrufer, dieselbe kalte Begrüßung.'],
@@ -49,9 +49,9 @@ const scenes=[
  ['distress-trap-signal','Notruf · Täuschung · Funkaufnahme','Im Hyperdrive aufgefangen: ein sauberer Notruf. Verfolgen, anfliegen — und die Signatur prüfen.'],
  ['distress-trap','Notruf · Täuschung (Nahaufnahme)','Nach dem Sprung: Scan oder Annäherung deckt die Falle auf.'],
  ['distress-trap-exposed','Notruf · Falle offen','Die Raider sind enttarnt und greifen an.'],
- ['distress-fuel-signal','Notruf · Treibstoff · Funkaufnahme','Im Hyperdrive aufgefangen: Treibstoffnot. Verfolgen und die Reserve prüfen.'],
- ['distress-fuel-prepared','Notruf · Treibstoff (Nahaufnahme)','Nach dem Sprung: Genug Reserve für den Transfer. Betrag und Rest werden vorher angezeigt.'],
- ['distress-fuel-unprepared','Notruf · Ohne Reserve (Nahaufnahme)','Zu wenig Treibstoff: die Alternative wird klar erklärt.'],
+ ['distress-fuel-signal','Notruf · Reaktor · Funkaufnahme','Im Hyperdrive aufgefangen: Reaktor tot. Verfolgen und die Reserve prüfen.'],
+ ['distress-fuel-prepared','Notruf · Reaktor tot (Nahaufnahme)','Nach dem Sprung: Genug Ladung für den Transfer. Betrag und Rest werden vorher angezeigt.'],
+ ['distress-fuel-unprepared','Notruf · Zu wenig Ladung (Nahaufnahme)','Zu wenig Ladung: die Alternative wird klar erklärt.'],
  ['distress-disabled-signal','Notruf · Havarie · Funkaufnahme','Im Hyperdrive aufgefangen: Havarie. Verfolgen, dann mit Ersatzteilen helfen.'],
  ['distress-disabled-parts','Notruf · Ersatzteile (Nahaufnahme)','Nach dem Sprung: Zwei Maschinenteile an Bord. Übergabe prüfen.'],
  ['distress-disabled-crew','Notruf · Crew-Hilfe (Nahaufnahme)','Keine Teile und keine Drohne: langsame Crew-Reparatur anbieten.'],
@@ -73,7 +73,7 @@ const scenes=[
  ['distress-wreck-delivered','Notruf · Überlebende bezahlt','Kapsel abgeliefert und Wrack geschlossen. Auszahlung prüfen.'],
  ['distress-trap-scanned','Notruf · Falle gescannt','Scan-Hinweis sichtbar, die Raider bleiben noch getarnt.'],
  ['distress-trap-cleared','Notruf · Falle geklärt','Raider ausgeschaltet. Folgen und Beute prüfen.'],
- ['distress-fuel-supplied','Notruf · Treibstoff geliefert','Transfer abgeschlossen. Resttreibstoff und Zahlung prüfen.'],
+ ['distress-fuel-supplied','Notruf · Energie geliefert','Transfer abgeschlossen. Restladung und Zahlung prüfen.'],
  ['distress-disabled-repaired','Notruf · Havarie repariert','Zielhülle wiederhergestellt. Abschluss und Zahlung prüfen.'],
  ['distress-debris-enroute','Notruf · Kurs gesetzt','Der Frachter folgt dem freigegebenen Fluchtvektor.'],
  ['distress-debris-escaped','Notruf · Entkommen','Der Frachter hat das Feld verlassen. Abschluss prüfen.'],
@@ -82,7 +82,7 @@ const scenes=[
  ['distress-jettison-kept','Notruf · Fracht behalten','Behalten gewählt. Bergungsrecht und Folgen prüfen.'],
  ['distress-dispute-negotiated','Notruf · Verhandelt','Split vereinbart. Zahlung und Wrackfreigabe prüfen.'],
  ['distress-convoy-rescued-alt','Notruf · Konvoi gerettet · zweiter Anrufer','Ash Gambit allein: Rettung, Zahlung und Abspann aus seinem Funk.'],
- ['distress-fuel-supplied-alt','Notruf · Treibstoff geliefert · zweiter Anrufer','Nettle statt Tallow: eigener Abschluss, eigene Dankesworte.'],
+ ['distress-fuel-supplied-alt','Notruf · Energie geliefert · zweiter Anrufer','Nettle statt Tallow: eigener Abschluss, eigene Dankesworte.'],
  ['distress-disabled-repaired-alt','Notruf · Havarie repariert · zweiter Anrufer','Calder statt Orchard Star: der Abschluss gehört dem Anrufer.'],
  ['distress-jettison-returned-alt','Notruf · Fracht zurück · zweiter Anrufer','Ember bekommt ihre zwei Kisten: andere Fracht, andere Worte.'],
  ['distress-dispute-negotiated-alt','Notruf · Verhandelt · zweiter Anrufer','Blue Hour und Rook einigen sich: eigener Split, eigener Abgang.'],
@@ -115,7 +115,7 @@ function reset(){
  rt.explorationSupplied=false;rt.explorationTickAt=0;rt.explorationOfferAt=0;rt.convoyOfferAt=0;rt.freighterModelWarmed=false;rt.lootRetryAt=new WeakMap();
  rt.deathTimer=0;rt.autopilot=false;rt.galaxyJump=null;rt.hyperdriveWaypoint=undefined;rt.hyperdriveFx='none';rt.pendingDroneDeparture=null;rt.playerDocking=undefined;rt.departureClearance=undefined;rt.armedJumpPointId=null;rt.afterburning=false;rt.playerShieldDelay=0;rt.shieldBreakFeedbackAt=undefined;rt.targetShieldFeedbackAt=undefined;
  rt.mountFireAt={};rt.groupFireAt=undefined;rt.groupFireHull=undefined;rt.gunCooldown=0;rt.launcherReadyAt={};rt.capacitorFeedbackAt=undefined;rt.ownMonitorStatus=undefined;rt.monitorStatus=undefined;rt.ownMonitorStatusUntil=rt.monitorStatusUntil=0;
- rt._statsDirty=true;rt.save.player.dockedAt=undefined;rt.save.player.cargo={};rt.save.player.credits=20000;rt.save.player.fuel=100;rt.save.player.throttle=0;rt.save.player.currentTargetId=undefined;rt.save.player.navTargetId='shardbelt';rt.save.player.mode='combat';
+ rt._statsDirty=true;rt.save.player.dockedAt=undefined;rt.save.player.cargo={};rt.save.player.credits=20000;rt.save.player.throttle=0;rt.save.player.currentTargetId=undefined;rt.save.player.navTargetId='shardbelt';rt.save.player.mode='combat';
  rt.save.player.velocity.fill(0);rt.save.player.angularVelocity.fill(0);const stats=rt.playerStats();rt.save.player.hull=stats.hull;rt.save.player.shield=stats.shield;rt.save.player.energy=stats.energyCapacity;
  rt.nextEncounterAt=Infinity;rt.obstacleGridBuiltAt=-Infinity;rt.simAccumulator=0;
 }
@@ -150,17 +150,17 @@ function fail(error){busy=false;status.textContent=error.message;for(const b of 
 const distressScenes={
  'distress-convoy-arrival':['convoy',0,{phase:'discovered',distance:500}],
  'distress-trap-arrival':['trap',0,{phase:'discovered',distance:500}],
- 'distress-fuel-arrival':['fuel',0,{phase:'discovered',distance:500,fuel:80}],
+ 'distress-fuel-arrival':['power',0,{phase:'discovered',distance:500,energy:60}],
  'distress-disabled-arrival':['disabled',0,{phase:'discovered',distance:500,parts:2}],
  'distress-jettison-arrival':['jettison',0,{phase:'discovered',distance:500}],
  'distress-dispute-arrival':['dispute',0,{phase:'discovered',distance:500}],
  'distress-voice-a':['convoy',0,{phase:'signal',distance:6800,pickup:true,intercept:7}],
  'distress-voice-b':['trap',0,{phase:'signal',distance:6800,pickup:true,intercept:7}],
- 'distress-voice-c':['fuel',0,{phase:'signal',distance:6800,pickup:true,intercept:7}],
+ 'distress-voice-c':['power',0,{phase:'signal',distance:6800,pickup:true,intercept:7}],
  'distress-voice-d':['dispute',0,{phase:'signal',distance:6800,pickup:true,intercept:12}],
  'distress-convoy-signal':['convoy',0,{phase:'signal',distance:6800,pickup:true,intercept:0}],
  'distress-convoy-alt-signal':['convoy',1,{phase:'signal',distance:6800,pickup:true,intercept:0}],
- 'distress-fuel-alt-signal':['fuel',1,{phase:'signal',distance:6800,pickup:true,intercept:3}],
+ 'distress-fuel-alt-signal':['power',1,{phase:'signal',distance:6800,pickup:true,intercept:3}],
  'distress-trap-alt-signal':['trap',1,{phase:'signal',distance:6800,pickup:true,intercept:3}],
  'distress-convoy-alt-arrival':['convoy',1,{phase:'discovered',distance:500}],
  'distress-trap-alt-arrival':['trap',1,{phase:'discovered',distance:500}],
@@ -181,11 +181,11 @@ const distressScenes={
  'distress-trap-scanned':['trap',0,{phase:'discovered',distance:420}],
  'distress-trap-exposed':['trap',0,{phase:'discovered',distance:420,exposed:true}],
  'distress-trap-cleared':['trap',0,{phase:'discovered',distance:420,exposed:true}],
- 'distress-fuel-signal':['fuel',0,{phase:'signal',distance:6800,pickup:true,intercept:10}],
- 'distress-fuel-prepared':['fuel',0,{phase:'discovered',distance:320,fuel:80}],
- 'distress-fuel-unprepared':['fuel',0,{phase:'discovered',distance:320,fuel:5}],
- 'distress-fuel-supplied':['fuel',0,{phase:'discovered',distance:320,fuel:80}],
- 'distress-fuel-supplied-alt':['fuel',1,{phase:'discovered',distance:320,fuel:80}],
+ 'distress-fuel-signal':['power',0,{phase:'signal',distance:6800,pickup:true,intercept:10}],
+ 'distress-fuel-prepared':['power',0,{phase:'discovered',distance:320,energy:60}],
+ 'distress-fuel-unprepared':['power',0,{phase:'discovered',distance:320,energy:5}],
+ 'distress-fuel-supplied':['power',0,{phase:'discovered',distance:320,energy:60}],
+ 'distress-fuel-supplied-alt':['power',1,{phase:'discovered',distance:320,energy:60}],
  'distress-disabled-signal':['disabled',0,{phase:'signal',distance:6800,pickup:true,intercept:12}],
  'distress-disabled-parts':['disabled',0,{phase:'discovered',distance:320,parts:2}],
  'distress-disabled-crew':['disabled',0,{phase:'discovered',distance:320,parts:0}],
@@ -262,7 +262,7 @@ function prepareDistressScene(id){
    {id:'review-convoy',variant:'convoy',setup:0,outcome:'rescued',at:now-90,reward:4000},
    {id:'review-trap',variant:'trap',setup:0,outcome:'fought-off',at:now-210,reward:0},
    {id:'review-wreck',variant:'wreck',setup:1,outcome:'salvaged',at:now-330,reward:0},
-   {id:'review-fuel',variant:'fuel',setup:0,outcome:'supplied',at:now-450,reward:900},
+   {id:'review-fuel',variant:'power',setup:0,outcome:'supplied',at:now-450,reward:900},
   ];
   rt.ui.shipMenuTab='journal';rt.ui.showShipMenu();
   return 'history';
@@ -270,7 +270,7 @@ function prepareDistressScene(id){
  if(id==='distress-declined'||id==='distress-abandoned'){
   rt.save.world.distress.active=null;
   rt.save.world.distress.nextAt=rt.save.world.time+420;
-  rt.save.world.distress.history=[{id:'distress-review-history',variant:id==='distress-declined'?'fuel':'debris',setup:0,outcome:id==='distress-declined'?'declined':'withdrawn',at:rt.save.world.time-120,reward:0}];
+  rt.save.world.distress.history=[{id:'distress-review-history',variant:id==='distress-declined'?'power':'debris',setup:0,outcome:id==='distress-declined'?'declined':'withdrawn',at:rt.save.world.time-120,reward:0}];
   rt.ui.shipMenuTab='journal';rt.ui.showShipMenu();
   return 'open';
  }
@@ -527,7 +527,7 @@ function reviewState(){
   caller:active?.caller??null,
   objective,
   credits:Math.round(p.credits??0),
-  fuel:Math.round((p.fuel??0)*10)/10,
+  energy:Math.round((p.energy??0)*10)/10,
   hold:cargoFree(p),
   cargo:{...(p.cargo??{})},
   sealed:(p.sealedCargo??[]).map(item=>({label:item.label,units:item.units})),
@@ -576,7 +576,7 @@ const visibleScenes=mode==='distress'?scenes.filter(([id])=>id.startsWith('distr
 const sceneGroups={
  pickup:'Funkaufnahme im Hyperdrive',
  arrival:'Ankunft & Briefing',
- convoy:'Konvoi unter Beschuss',wreck:'Zerstörter Frachter',trap:'Getarnte Raider',fuel:'Treibstoffnot',
+ convoy:'Konvoi unter Beschuss',wreck:'Zerstörter Frachter',trap:'Getarnte Raider',power:'Reaktor tot',
  disabled:'Havarie',debris:'Trümmerfeld',jettison:'Ausgesetzte Fracht',dispute:'Streit um Bergung',history:'Folgen & Journal',
 };
 const sceneGroup=id=>/-signal$|-voice-/.test(id)?sceneGroups.pickup:/-arrival$|-offer$/.test(id)?sceneGroups.arrival:sceneGroups[id.split('-')[1]]??sceneGroups.history;

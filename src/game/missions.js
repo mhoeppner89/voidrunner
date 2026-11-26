@@ -215,7 +215,7 @@ export const generateMissionOffers = (locationId, save, count = 7) => {
             targetTimeSeconds: raceCourse.targetTimeSeconds,
             recommendedShip: raceCourse.recommendedShip,
             recommendedShipText: raceCourse.recommendedShipText,
-            centerFuelReward: raceCourse.centerFuelReward,
+            centerBoostReward: raceCourse.centerBoostReward,
             record,
             bestTime: record.bestTime,
             bestRank: record.bestRank,

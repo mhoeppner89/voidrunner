@@ -20,7 +20,7 @@ const PATHS = Object.freeze({
     plus: '<path d="M12 6v12M6 12h12"/>',
     story: '<path d="M4 5h7a2 2 0 012 2v12a2 2 0 00-2-2H4zM20 5h-7a2 2 0 00-2 2v12a2 2 0 012-2h7z"/>',
     repair: '<path d="M14 6a4 4 0 00-5 5l-5 5 3 3 5-5a4 4 0 005-5l-2 2-3-3z"/>',
-    fuel: '<path d="M6 21V5a2 2 0 012-2h6a2 2 0 012 2v16M4 21h14M16 9h2a2 2 0 012 2v6a1 1 0 01-2 0v-4"/><path d="M9 7h4"/>',
+    energy: '<path d="M13 3L5 14h6l-1 7 8-11h-6z"/>',
     paint: '<path d="M4 20c2 0 4-1 4-4l9-9-3-3-9 9c-1 1-1 3-1 4M14 4l6 6"/>',
     flight: '<path d="M12 3l2 7 7 2-7 2-2 7-2-7-7-2 7-2z"/>',
     missile: '<path d="M7 10h9l5 2-5 2H7z"/><path d="M7 10L4 6h3l3 4M7 14l-3 4h3l3-4"/>',

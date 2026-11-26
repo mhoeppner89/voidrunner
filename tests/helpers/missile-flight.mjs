@@ -28,7 +28,8 @@ export function npcFixture(hullId='speedster'){
  return {game,ship,hullId};
 }
 export function missileTrial(id,range,lead,lane,roll,padding,aspect=Math.PI,options={}){
- const {npc,circle,coast,rollInput=0,phase=0,bearing=0,rack=LAUNCHERS[id]}=options;
+ // unpowered: the afterburner's turn boost without its speed (an empty capacitor).
+ const {npc,circle,coast,rollInput=0,phase=0,bearing=0,rack=LAUNCHERS[id],unpowered}=options;
  const hull=SHIPS[npc?.hullId??options.hullId??'speedster'],stats=npc?npc.game.npcFlightStats(npc.ship):hull;
  const scale=npc?npcShipScaleForVariant(npc.ship.variant):1;
  const origin=new Vector3(range*Math.sin(bearing),0,-range*Math.cos(bearing));
@@ -43,7 +44,7 @@ export function missileTrial(id,range,lead,lane,roll,padding,aspect=Math.PI,opti
  const position=new Vector3(),end=new Vector3(),angle=2*Math.PI*(lane+.5)/rack.volley;
  const shot=new Vector3(rack.spreadRad*Math.cos(angle),rack.spreadRad*Math.sin(angle),-1).normalize().multiplyScalar(rack.speed);
  const missile={...rack,hitWeapon:rack},start=circle?-phase:lead>0?range/(rack.speed+velocity.z)-lead:Infinity;
- if(npc){npc.ship.flightAngularVelocity=spin;npc.ship.fuel=100;}
+ if(npc){npc.ship.flightAngularVelocity=spin;npc.ship.energy=npc.ship.combatFit?.stats?.energyCapacity??100;}
  for(let tick=Math.min(0,Math.floor(start/dt));tick<rack.life*60;tick++){
   const age=tick*dt-start,active=age>=0&&(circle||age<1);
   const yaw=active?(circle||age<.5?1:-1):0,burn=active&&circle!=='unboosted';
@@ -56,7 +57,7 @@ export function missileTrial(id,range,lead,lane,roll,padding,aspect=Math.PI,opti
   }else{
    integrateFlightTurn(attitude,spin,breakAxis.x*yaw,breakAxis.y*yaw,rollInput,stats.angularAcceleration,stats.angularDamping,!coast,burn,dt);
    forward.set(0,0,-1).applyQuaternion(attitude);
-   const ceiling=burn&&velocity.length()>=.9*stats.maxSpeed?stats.afterburnSpeed:stats.maxSpeed;
+   const ceiling=burn&&!unpowered&&velocity.length()>=.9*stats.maxSpeed?stats.afterburnSpeed:stats.maxSpeed;
    integrateFlightVelocity(velocity,forward,coast?0:ceiling,ceiling,stats.acceleration,!coast,burn,coast?0:1,dt);
    if(tick>=0)target.addScaledVector(velocity,dt);
   }
@@ -68,13 +69,13 @@ export function missileTrial(id,range,lead,lane,roll,padding,aspect=Math.PI,opti
  }
  return false;
 }
-export function missileCells(id,{npc,hullId,lead=0,circle,aspect=Math.PI,coast,rollInput,fixedBreakPlane=false,rack=LAUNCHERS[id],padding=MISSILE_PADDING}={}){
+export function missileCells(id,{npc,hullId,lead=0,circle,aspect=Math.PI,coast,rollInput,fixedBreakPlane=false,rack=LAUNCHERS[id],padding=MISSILE_PADDING,unpowered=false}={}){
  const phases=circle?[.5,1,1.5,2,2.5,3,3.5,4]:[0];
  return [400,500,600].map(range=>{
   let hits=0,total=0;
   const byRoll=Array(8).fill(0),lanesByRoll=byRoll.map(()=>Array(rack.volley).fill(0));
   for(const phase of phases)for(let lane=0;lane<rack.volley;lane++)for(let roll=0;roll<8;roll++){
-   const hit=Number(missileTrial(id,range,lead,lane,roll*Math.PI/4,padding,aspect,{npc,hullId,coast,rollInput,circle,phase,rack,fixedBreakPlane}));
+   const hit=Number(missileTrial(id,range,lead,lane,roll*Math.PI/4,padding,aspect,{npc,hullId,coast,rollInput,circle,phase,rack,fixedBreakPlane,unpowered}));
    byRoll[roll]+=hit;lanesByRoll[roll][lane]+=hit;hits+=hit;total++;
   }
   return {range,hits,total,byRoll,lanesByRoll};

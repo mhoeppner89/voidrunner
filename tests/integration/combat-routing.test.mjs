@@ -61,11 +61,11 @@ test('wreck sections are measured by their mesh, so a hangar deck is open',()=>{
  assert.ok(fieldClearDistance(state,inside,bay.axis.clone(),18,200)>150,'down the deck is open');
 });
 
-test('a long clear approach is flown on the afterburner, keeping a fuel reserve',()=>{
- const ship={combatIntent:'hunt',combatFit:{stats:{fuel:20,acceleration:30,angularDamping:2,angularAcceleration:4,energyCapacity:60},weapons:[]},fuel:20,speed:80,afterburnSpeed:130,velocity:[0,0,-80],pilot:{tier:'veteran'},shield:100,hull:100};
+test('a long clear approach is flown on the afterburner, keeping an energy reserve',()=>{
+ const ship={combatIntent:'hunt',combatFit:{stats:{acceleration:30,angularDamping:2,angularAcceleration:4,energyCapacity:60},weapons:[]},energy:60,speed:80,afterburnSpeed:130,velocity:[0,0,-80],pilot:{tier:'veteran'},shield:100,hull:100};
  assert.equal(combatThrottle(ship,0,1000,60,0,.95,235,true),130);assert.equal(ship.burning,true);
- ship.fuel=5;assert.notEqual(combatThrottle(ship,0,1000,60,0,.95,235,true),130,'the reserve stays for the fight');
- ship.fuel=20;assert.notEqual(combatThrottle(ship,0,400,60,0,.95,235,true),130,'no closing burn inside the fight');
+ ship.energy=20;assert.notEqual(combatThrottle(ship,0,1000,60,0,.95,235,true),130,'the reserve stays for the fight');
+ ship.energy=60;assert.notEqual(combatThrottle(ship,0,400,60,0,.95,235,true),130,'no closing burn inside the fight');
 });
 
 test('a fighter threads an offset opening at speed and still brakes for a closed face',()=>{
@@ -200,7 +200,7 @@ test('the rim, chimney and Heart bore approaches leave room around both wings',(
 
 test('a magrail pilot matches a ready shot and resumes pursuit outside the firing window',()=>{
  const s=session(),ship=s.spawnShip('patrol',[0,0,175],undefined,undefined,{tier:'veteran',temperament:'steady'},{hullId:'blade'});
- ship.targetId='player';ship.hostile=true;ship.fuel=0;s.tmpEuler=new THREE.Euler();
+ ship.targetId='player';ship.hostile=true;ship.energy=0;s.tmpEuler=new THREE.Euler();
  const target=v([0,0,0]),velocity=v([]);
  s.fireNpcGun=()=>{};ship.combatFit.turrets=[];
  const integrate=s.integrateNpcFlight.bind(s);
@@ -229,7 +229,7 @@ test('a magrail pilot matches a ready shot and resumes pursuit outside the firin
 
 test('a finishing artillery pilot keeps pursuit speed while its gun is cooling',()=>{
  for(const weapon of ['gauss','mortar']){
-  const ship={combatIntent:'hunt',speed:80,fuel:0,combatFit:{stats:{fuel:20},weapons:[weapon]},
+  const ship={combatIntent:'hunt',speed:80,energy:0,combatFit:{stats:{energyCapacity:20},weapons:[weapon]},
    combatPlan:{finishing:true,aimingRun:true},velocity:[0,0,-60]};
   assert.equal(combatThrottle(ship,1,90,0,0,1,300,false,0,false),80);
   assert.ok(combatThrottle(ship,1,90,0,0,1,300,false,0,true)<40);

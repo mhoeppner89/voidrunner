@@ -21,7 +21,7 @@ export function blastHeft(size, reference, power) {
 }
 // Fighter explosions run at scale 1.6 (NPC_FIGHTER_SCALE).
 const FIGHTER_BLAST = 1.6, FIGHTER_SHARDS = FIGHTER_BLAST * .65;
-export function createShipExplosion(position, scale = 1, { velocity, variant, seed } = {}) {
+export function createShipExplosion(position, scale = 1, { velocity, variant, seed, capital: capitalPace = 0 } = {}) {
     const random = seededRandom(seed ?? position.join(':') + ':blast');
     const kind = EXPLOSION_VARIANTS.includes(variant) ? variant : EXPLOSION_VARIANTS[Math.floor(random() * EXPLOSION_VARIANTS.length)];
     const root = new THREE.Group();
@@ -30,7 +30,8 @@ export function createShipExplosion(position, scale = 1, { velocity, variant, se
     const time = { value: 0 };
     // Capital destruction takes longer, with secondary hull sections igniting
     // after the first flash. Small ship timing stays unchanged.
-    const capital = Math.max(0, Math.min(1, (scale - 3) / 9));
+    // Big ships pass their own pace (corvette .5, frigate .75, larger 1).
+    const capital = Math.max(capitalPace, Math.min(1, (scale - 3) / 9), 0);
     const pace = { value: 1 + capital * 1.8 };
     const delay = capital * 3;
     // Blast centres: [x, y, z, start]. Secondaries scale with the hull.
@@ -144,7 +145,8 @@ export function createShipExplosion(position, scale = 1, { velocity, variant, se
 }
 
 // Actual opaque armor shards, separate from the short-lived glowing trails.
-export function createHullDebris(position, scale = 1, velocity = [0,0,0]) {
+// calm (0–1): big ships shed their plates more slowly (user request).
+export function createHullDebris(position, scale = 1, velocity = [0,0,0], calm = 0) {
     const random=seededRandom(position.join(':')+':hull-shards');
     const root=new THREE.Group();root.position.fromArray(position);
     const inheritedVelocity=new THREE.Vector3().fromArray(velocity);
@@ -165,7 +167,7 @@ export function createHullDebris(position, scale = 1, velocity = [0,0,0]) {
     chunks.raycast=()=>undefined;root.add(chunks);
     const parts=[],matrix=new THREE.Object3D(),color=new THREE.Color();
     // Heavier hulls throw their plates out slower and tumble them less.
-    const heft=blastHeft(scale,FIGHTER_SHARDS,1.25),turn=Math.sqrt(heft);
+    const heft=blastHeft(scale,FIGHTER_SHARDS,1.25)*(1-.45*calm),turn=Math.sqrt(heft);
     for(let i=0;i<COUNT;i++) {
         const z=random()*2-1,a=random()*Math.PI*2,r=Math.sqrt(1-z*z),mass=.22+random()**2.4*.9;
         const speed=(4+random()*5)*Math.min(5,(.7/mass)**1.25)*scale*heft,tumble=Math.min(6,.8/mass)*(1+random()*1.5)*turn;

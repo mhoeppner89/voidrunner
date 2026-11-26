@@ -7,6 +7,8 @@ import { AMMO_CAPACITY, AMMO_UNIT_COST, WEAPON_ORDER, WEAPONS, launcherMagazineE
 // Strongest bonus first, then half effectiveness for each additional module.
 // Benefits and drawbacks stack separately, so slot order cannot change a fit.
 // The total contribution stays below twice the strongest individual effect.
+// Seconds of afterburner a full capacitor feeds when nothing else draws on it.
+export const BURN_SECONDS = 15;
 export const stackedBonus = values => values.filter(v=>v>0).sort((a,b)=>b-a).reduce((sum,v,i)=>sum+v*2**-i,0);
 export const stackedMultiplier = values => Math.max(.2,1+stackedBonus(values.map(v=>v-1))-stackedBonus(values.map(v=>1-v)));
 export function higherTierLoadFraction(itemTier,hullTier){
@@ -68,7 +70,11 @@ export const getEffectiveShipStats = (player) => {
         reactorOutput,
         overTierLoad, overTierLevels,
         energyCapacity: base.energyCapacity * product('capacityMultiplier'),
-        burnFuelMultiplier:product('burnFuelMultiplier'),lateralMultiplier:(base.lateralMultiplier??1)*product('lateralMultiplier'),shieldRechargeMultiplier:product('rechargeMultiplier'),
+        // The afterburner draws energy: the hull's base reactor output plus
+        // 1/BURN_SECONDS of its base capacity, so on its own a full capacitor
+        // feeds about 15 s of burn. Reactor and capacitor upgrades lengthen it.
+        burnEnergy:(base.reactorOutput+base.energyCapacity/BURN_SECONDS)*product('burnEnergyMultiplier'),
+        burnEnergyMultiplier:product('burnEnergyMultiplier'),lateralMultiplier:(base.lateralMultiplier??1)*product('lateralMultiplier'),shieldRechargeMultiplier:product('rechargeMultiplier'),
         shieldRegeneration:(base.shieldRegen??5)*product('rechargeMultiplier'),
         cargo: base.cargo + cargoBonus,
         // Pulse Mk II's multiplier lives on its projectile definition. Keeping
@@ -102,7 +108,6 @@ export const droneServiceCost = (player, options) => {
 };
 export const refillCost = (player) => {
     const stats = getEffectiveShipStats(player);
-    const fuel = Math.max(0, stats.fuel - player.fuel) * 6;
     const missiles = launcherMagazineEntries(player).reduce((total, entry) => (
         total + Math.max(0, entry.capacity - entry.rounds) * (entry.launcher.unitCost ?? 240)
     ), 0);
@@ -133,7 +138,7 @@ export const refillCost = (player) => {
         const capacity = AMMO_CAPACITY[ammoId] ?? 0;
         ammo += Math.max(0, capacity - (pools[ammoId] ?? 0)) * (AMMO_UNIT_COST[ammoId] ?? 0);
     }
-    return Math.ceil(fuel + missiles + ammo);
+    return Math.ceil(missiles + ammo);
 };
 export const equipmentUnlocked = (player, equipmentId) => {
     const equipment = OUTFIT_ITEMS[equipmentId] ?? EQUIPMENT[equipmentId];

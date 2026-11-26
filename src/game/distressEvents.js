@@ -541,7 +541,7 @@ export const DistressMethods = {
             if (!snapshot && entry.neutral) {
                 const hullFraction = active.variant === 'disabled' ? Math.max(.12, (setup?.repairTarget ?? .6) - .22)
                     : active.variant === 'debris' ? .55
-                        : active.variant === 'fuel' ? .7
+                        : active.variant === 'power' ? .7
                             : active.variant === 'jettison' ? .82
                                 : 1;
                 if (hullFraction < 1) ship.hull = Math.max(1, Math.round(ship.maxHull * hullFraction));
@@ -1083,7 +1083,7 @@ export const DistressMethods = {
             if (now - active.createdAt > 600) this.abandonDistress(active, 'withdrawn');
             return;
         }
-        if (active.variant === 'fuel') {
+        if (active.variant === 'power') {
             if (now - active.createdAt > 900) this.abandonDistress(active, 'declined');
             return;
         }
@@ -1232,7 +1232,7 @@ export const DistressMethods = {
     // Every distress event introduces itself before it starts: once the pilot
     // flies into comms range the channel opens with the scenario card and its
     // choices — accept the escort, answer the wreck, scan the trap, agree a
-    // fuel transfer. One auto-hail per event; closing the panel without
+    // power transfer. One auto-hail per event; closing the panel without
     // deciding leaves the journal action live for a pilot who wants it back.
     // A panel already open, a docked hull or an unrelated firefight defers the
     // hail to a later tick instead of burning it.
@@ -1241,10 +1241,10 @@ export const DistressMethods = {
         if (active.progress?.briefedAt) return;
         if (this.ui?.adventure) return;
         if (this.save.player.dockedAt || this.playerDocking || this.galaxyJump || this.autopilot) return;
-        // Fuel and repair handovers only work inside their own envelope, so the
+        // Power and repair handovers only work inside their own envelope, so the
         // card waits until the pilot is close enough to act on it. This is the
         // cheapest gate, so it runs before the roster and ship scans.
-        const range = active.variant === 'fuel' ? DISTRESS_TRANSFER_RANGE
+        const range = active.variant === 'power' ? DISTRESS_TRANSFER_RANGE
             : active.variant === 'disabled' ? DISTRESS_REPAIR_RANGE
                 : DISTRESS_ANSWER_RANGE;
         if (distance(active.position, this.save.player.position) > range) return;
@@ -1330,21 +1330,21 @@ export const DistressMethods = {
             }
             case 'transfer':
             case 'donate': {
-                if (active.variant !== 'fuel') return {ok: false};
+                if (active.variant !== 'power') return {ok: false};
                 const speed = Math.hypot(...(this.save.player.velocity ?? [0, 0, 0]));
                 if (gap > DISTRESS_TRANSFER_RANGE || speed > DISTRESS_TRANSFER_SPEED) {
                     this.setMonitorStatus?.(distressText(['Zu weit oder zu schnell · komm ran und drossel.', 'Too far or too fast · close in and slow down.']), 4600);
                     return {ok: false};
                 }
-                if ((this.save.player.fuel ?? 0) < setup.fuel) {
-                    this.setMonitorStatus?.(distressText(['Nicht genug Treibstoff für den Transfer.', 'Not enough fuel for the transfer.']), 4200);
+                if ((this.save.player.energy ?? 0) < setup.energy) {
+                    this.setMonitorStatus?.(distressText(['Nicht genug Energie für den Transfer.', 'Not enough energy for the transfer.']), 4200);
                     return {ok: false};
                 }
-                this.save.player.fuel = Math.max(0, this.save.player.fuel - setup.fuel);
+                this.save.player.energy = Math.max(0, this.save.player.energy - setup.energy);
                 const reward = choice === 'donate' ? 0 : setup.payment;
                 finish('supplied', {
                     reward,
-                    ...distressEnding(active, choice === 'donate' ? 'suppliedGift' : 'supplied', {fuel: setup.fuel, reward: formatCredits(reward)}),
+                    ...distressEnding(active, choice === 'donate' ? 'suppliedGift' : 'supplied', {energy: setup.energy, reward: formatCredits(reward)}),
                 });
                 return {ok: true};
             }
@@ -1978,7 +1978,7 @@ export const DistressMethods = {
             }
             this.retargetDistress(active);
         }
-        if (options.fuel !== undefined) this.save.player.fuel = options.fuel;
+        if (options.energy !== undefined) this.save.player.energy = options.energy;
         if (options.cargo) this.save.player.cargo = {...options.cargo};
         if (options.parts !== undefined) this.save.player.cargo = {...(this.save.player.cargo ?? {}), machinery: options.parts};
         if (options.looted && active.variant === 'wreck') {

@@ -206,7 +206,11 @@ export class ShipWreckFactory {
         this.texture??=interiorTexture();const interior=new THREE.MeshStandardMaterial({color:0xaaa69a,map:this.texture,roughness:.94,metalness:.58,emissive:0x8e3211,emissiveIntensity:.25,flatShading:true,side:THREE.DoubleSide});
         const structureMaterial=new THREE.MeshStandardMaterial({color:0x727d85,roughness:.76,metalness:.62,side:THREE.DoubleSide});
         const length=template.size.length(),worldLength=length*Math.max(root.scale.x,root.scale.y,root.scale.z),
-            heft=blastHeft(worldLength,WRECK_FIGHTER_LENGTH,1.75),spinScale=worldLength<=WRECK_FIGHTER_LENGTH?Math.min(1.4,Math.sqrt(WRECK_FIGHTER_LENGTH/Math.max(worldLength,1))):heft,centre=data.bounds.getCenter(new THREE.Vector3()),parts=[],momentum=new THREE.Vector3();let mass=0;
+            heft=blastHeft(worldLength,WRECK_FIGHTER_LENGTH,1.75),
+            // Big hulls hold together a moment, then ease apart (user: capital
+            // break-ups looked too sudden). 0 for fighters, 1 from ~76 units.
+            settle=Math.max(0,Math.min(1,(worldLength-WRECK_FIGHTER_LENGTH)/40)),hold=.16+.5*settle,ramp=1.4*settle,
+            eased=t=>ramp>0?t-ramp*(1-Math.exp(-t/ramp)):t,spinScale=worldLength<=WRECK_FIGHTER_LENGTH?Math.min(1.4,Math.sqrt(WRECK_FIGHTER_LENGTH/Math.max(worldLength,1))):heft,centre=data.bounds.getCenter(new THREE.Vector3()),parts=[],momentum=new THREE.Vector3();let mass=0;
         for(const section of template.sections){
             const group=new THREE.Group();group.position.copy(section.origin);root.add(group);
             for(const p of section.parts){const slot=template.materials[p.slot],original=slot?(Array.isArray(data.meshes[slot.mesh].mesh.material)?data.meshes[slot.mesh].mesh.material[slot.slot]:data.meshes[slot.mesh].mesh.material):null;
@@ -218,7 +222,7 @@ export class ShipWreckFactory {
             // Heft: fighters (up to 36 units across) keep the violent break-up;
             // heavier hulls slow steeply with size, so a frigate drifts apart.
             const smallness=Math.sqrt(length/Math.max(section.radius,1e-3));
-            const speed=length*(.45+random()*.55)*Math.min(2.6,smallness*.6)*heft,velocity=direction.multiplyScalar(speed);
+            const speed=length*(.45+random()*.55)*Math.min(2.6,smallness*.6)*heft*(1-.4*settle),velocity=direction.multiplyScalar(speed);
             const spinAxis=new THREE.Vector3(random()-.5,random()-.5,random()-.5).normalize(),spinRate=(.4+random()**2*2.2)*Math.min(3,smallness*.6)*spinScale;
             const part={group,origin:section.origin,velocity,spinAxis,spinRate,mass:section.mass};parts.push(part);momentum.addScaledVector(velocity,part.mass);mass+=part.mass;
         }
@@ -236,7 +240,7 @@ export class ShipWreckFactory {
         for(const extra of externalHardware){extra.updateWorldMatrix(true,true);extra.traverseVisible(child=>{if(isSolid(child))attach(child,new THREE.Matrix4().multiplyMatrices(inverse,child.matrixWorld));});}
         root.name=`wreck-${ship.id}`;root.userData.wreckSections=parts;const drift=new THREE.Vector3().fromArray(ship.velocity??[0,0,0]),q=new THREE.Quaternion(),colors=[...materials.values()].filter(m=>m.color).map(m=>[m,m.color.clone()]);let age=0,disposed=false;
         const effect={object:root,combatWreck:true,life:180,maxLife:180,sections:parts,update(dt){
-            age+=dt;root.position.addScaledVector(drift,dt);const elapsed=Math.max(0,age-.16);
+            age+=dt;root.position.addScaledVector(drift,dt);const elapsed=eased(Math.max(0,age-hold));
             for(const p of parts){p.group.position.copy(p.origin).addScaledVector(p.velocity,elapsed);q.setFromAxisAngle(p.spinAxis,p.spinRate*elapsed);p.group.quaternion.copy(q);p.group.scale.setScalar(Math.min(1,Math.max(0,(180-age)/8)));}
             const cooling=Math.exp(-age*.65);interior.emissiveIntensity=Math.exp(-age*1.5)*.25;
             for(const [m,color]of colors)m.color.copy(color).multiplyScalar(.64+cooling*.18);

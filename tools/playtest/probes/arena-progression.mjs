@@ -73,7 +73,7 @@ try {
     p.shipId=['wayfarer','talon','blade'][tier-1];p.ownedShips=[p.shipId];p.outfitting=createOutfittingState(p.ownedShips);
     const fit=p.outfitting.loadouts[p.shipId];fit.guns.fill(['pulse-cannon','pulse-cannon-t2','pulse-cannon-t3'][tier-1]);
     fit.fireGroups.activeGroup='ALL';s._statsDirty=true;s.syncWeaponProjection();
-    const stats=s.playerStats();Object.assign(p,{hull:stats.hull,shield:stats.shield,energy:stats.energyCapacity,fuel:stats.fuel});
+    const stats=s.playerStats();Object.assign(p,{hull:stats.hull,shield:stats.shield,energy:stats.energyCapacity});
     const originalRandom=Math.random;Math.random=seededRandom(seed+level*997);
     try{
      s.startRunWave();

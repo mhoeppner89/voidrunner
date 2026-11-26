@@ -340,7 +340,9 @@ export function runOffers(save){
  // A long run can own every upgrade a hull can take, leaving nothing eligible.
  // The stage must never be empty: startRunWave needs a chosen reward, so offer a
  // three service choices instead of stranding the sortie.
- for(const id of ['repair','rearm','resupply'])if(offers.length<3&&!offers.includes(id))offers.push(id);
+ // Energy refills between levels, so the old resupply service is no longer offered;
+ // a saved offer still resolves below.
+ for(const id of ['repair','rearm'])if(offers.length<3&&!offers.includes(id))offers.push(id);
  return offers;
 }
 // Preserve the two already-offered items when an old checkpoint has an unnecessary repair.
@@ -358,7 +360,7 @@ export function refreshRunRewardOffers(save){
 }
 export function recoverRun(save,extra=false){const p=save.player,stats=getEffectiveShipStats(p),r=save.arenaRun,repair=extra?.5:r.hard?.1:.3;p.hull=Math.min(stats.hull,p.hull+stats.hull*repair);
  // Wingmen share the pilot's repair rule, including a wingman disabled last level.
- for(const wingman of r?.wingmen??[])if(wingman.alive!==false&&wingman.hullFraction!==undefined)wingman.hullFraction=Math.min(1,wingman.hullFraction+repair);p.shield=stats.shield;p.energy=stats.energyCapacity;p.fuel=stats.fuel;
+ for(const wingman of r?.wingmen??[])if(wingman.alive!==false&&wingman.hullFraction!==undefined)wingman.hullFraction=Math.min(1,wingman.hullFraction+repair);p.shield=stats.shield;p.energy=stats.energyCapacity;
  if(extra)fillLauncherMagazines(p);else {for(const entry of normalizeLauncherMagazines(p))if(entry.rounds<entry.capacity)p.launcherMagazines[entry.mount.id].rounds++;normalizeLauncherMagazines(p);}
 }
 // A reward is a complete, mount-checked replacement plan, not a loose gun.
@@ -392,7 +394,7 @@ export function chooseRunReward(save,id){
  const plan=runRewardPlan(save,id);if(!plan)return false;
  if(id==='repair')recoverRun(save,true);
  else if(id==='rearm')fillLauncherMagazines(save.player);
- else if(id==='resupply'){const stats=getEffectiveShipStats(save.player);save.player.fuel=stats.fuel;save.player.energy=stats.energyCapacity;}
+ else if(id==='resupply'){const stats=getEffectiveShipStats(save.player);save.player.energy=stats.energyCapacity;}
  else if(OUTFIT_ITEMS[id]?.category==='drone'){
   // loadoutFor returns a copy: write the live loadout.
   const p=save.player,fleet=p.droneFleet,live=p.outfitting.loadouts[p.shipId];live.droneBays=loadoutFor(p).droneBays;

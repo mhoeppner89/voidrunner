@@ -34,7 +34,6 @@ const playerWith = (equipment, overrides = {}) => ({
     hull: 190,
     shield: 95,
     energy: 72,
-    fuel: 100,
     missiles: 4,
     guildRank: { merchant: 0, bounty: 0, mining: 0, salvage: 0, syndicate: 0 },
     ...overrides,
@@ -47,7 +46,9 @@ check('wayfarer base hull integrity', base.hull, 200);
 check('wayfarer base reactor output', base.reactorOutput, 10);
 check('wayfarer base energy capacity', base.energyCapacity, 60);
 check('wayfarer base cargo', base.cargo, 30);
-check('wayfarer base fuel', base.fuel, 100);
+check('wayfarer has no fuel stat', base.fuel, undefined);
+// The burn draws reactor output plus 1/15 of the capacitor: 15 s from full.
+check('wayfarer burn energy', base.burnEnergy, 10 + 60 / 15);
 check('wayfarer base gun damage', base.gunDamage, 10);
 check('unfitted player has no missile capacity', base.missileCapacity, 0);
 check('wayfarer base max speed', base.maxSpeed, 50);
@@ -181,7 +182,7 @@ const migrated = hydrateSave({
         hull: 100,
         shield: 90,
         armor: 85,
-        fuel: 100,
+        fuel: 100, // legacy field: dropped on load
         missiles: 4,
         credits: 3200,
         equipment: ['shield-mk2', 'pulse-mk2', 'cargo-pods', 'engine-mk2'],
@@ -197,12 +198,13 @@ check('migrated cargo resolves', getEffectiveShipStats(migrated.player).cargo, 5
 check('migrated equipment preserves the full speed booster', getEffectiveShipStats(migrated.player).maxSpeed, 50 * 1.2);
 check('legacy armor and hull combine', migrated.player.hull, 185);
 check('legacy armor field is removed', Object.hasOwn(migrated.player, 'armor'), false);
+check('legacy fuel field is removed', Object.hasOwn(migrated.player, 'fuel'), false);
 check('legacy save receives the current full capacitor', migrated.player.energy, 60);
 
 // Repair and refill costs scale with what is actually missing.
 const serviceFit = createOutfittingState(['wayfarer']);
 const serviced = playerWith([], { outfitting: serviceFit });
-const banged = playerWith([], { outfitting: serviceFit, hull: 70, fuel: 30, missiles: 0 });
+const banged = playerWith([], { outfitting: serviceFit, hull: 70, missiles: 0 });
 checkTrue('damaged hull costs more to repair', repairCost(banged) > repairCost(serviced));
 checkTrue('empty missiles cost more to refill', refillCost(banged) > refillCost(serviced));
 check('refill cost is whole credits', Number.isInteger(refillCost(banged)), true);

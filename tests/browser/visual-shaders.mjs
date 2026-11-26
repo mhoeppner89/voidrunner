@@ -54,7 +54,7 @@ for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heig
     }return result;
    },shot.toString('base64'));assert.ok(Object.values(visible).every(count=>count>10),JSON.stringify({name,visible}));
   }
-  hulls.push(await page.locator('#screen-own-fuel').evaluate(e=>({text:e.textContent,width:e.clientWidth,scrollWidth:e.scrollWidth})));assert.ok(hulls.at(-1).scrollWidth<=hulls.at(-1).width+1,JSON.stringify({name,hull,...hulls.at(-1)}));
+  hulls.push(await page.locator('#screen-own-drive').evaluate(e=>({text:e.textContent,width:e.clientWidth,scrollWidth:e.scrollWidth})));assert.ok(hulls.at(-1).scrollWidth<=hulls.at(-1).width+1,JSON.stringify({name,hull,...hulls.at(-1)}));
  }
  await page.locator('.cockpit-screen-own').click({position:{x:10,y:10}});await page.locator('[data-ship-section="equipment"]').click();await page.screenshot({path:`${out}/${name}-console.png`});await page.locator('[data-ui-command="close-ship"]').click();
  assert.equal(await page.locator('#void-pixel-finish').count(),0,'no monitor colour filter is installed');

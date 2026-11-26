@@ -6,7 +6,7 @@ The Frontier League is a regular frontier polity opposed to Concord rule. It is 
 
 Acheron branches from Pale Ring through a free, bidirectional jump route. Existing route endpoint IDs remain intact.
 
-- **Haven Freeport:** civilian trade, repairs, fuel, outfitting and civilian hulls.
+- **Haven Freeport:** civilian trade, repairs, ordnance, outfitting and civilian hulls.
 - **Unity Shipworks:** all five League hulls, including reputation-gated military ships.
 - **Cinderfall Habitat:** industrial trade and civilian services.
 - **The Shattered Crown:** mining belt; existing mining restrictions still apply.

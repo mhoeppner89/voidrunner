@@ -111,7 +111,7 @@ const sortieImpactMarkup = (item, before = {}, after = {}) => {
         'recovery-shield': t('Shorter recovery windows: shield capacity {before} → {after}; recharge {multiplier}×.', { before: previous('shield'), after: value('shield'), multiplier: (after.shieldRechargeMultiplier ?? 1).toFixed(2) }),
         'shield-mk2': t('More damage buffered before a repair: shield {before} → {after}.', { before: previous('shield'), after: value('shield') }),
         'armor-mk2': t('More damage survives after shields fail: hull {before} → {after}.', { before: previous('hull'), after: value('hull') }),
-        'engine-mk2': t('Longer attack passes: speed {before} → {after}; boost fuel {fuel}×.', { before: previous('maxSpeed'), after: value('maxSpeed'), fuel: (after.burnFuelMultiplier ?? 1).toFixed(2) }),
+        'engine-mk2': t('Longer attack passes: speed {before} → {after}; boost energy {energy}×.', { before: previous('maxSpeed'), after: value('maxSpeed'), energy: (after.burnEnergyMultiplier ?? 1).toFixed(2) }),
         'thrusters-mk2': t('Tighter evasion: turning {before} → {after}; speed {speed} km/s.', { before: previous('angularAcceleration', 2), after: value('angularAcceleration', 2), speed: value('maxSpeed') }),
         'radar-mk2': t('Earlier contact and safer scans: radar {before} → {after} km; scan {scanBefore} → {scanAfter} km.', { before: previous('radarRange'), after: value('radarRange'), scanBefore: previous('scanRange'), scanAfter: value('scanRange') }),
         'cargo-pods': t('More earning capacity per run: cargo {before} → {after} mass.', { before: previous('cargo'), after: value('cargo') }),
@@ -277,7 +277,7 @@ const ENCOUNTER_PORTRAITS_BY_FACTION = Object.freeze(Object.fromEntries(
             `./art/portraits/simplified/encounters/${faction}/pilot-${String(index + 1).padStart(2, '0')}.webp`)),
     ]),
 ));
-const FULL_DOCK_SERVICES = Object.freeze({ fuel: true, repair: true, market: true, bar: true, shipyard: true, outfitting: true, missions: true });
+const FULL_DOCK_SERVICES = Object.freeze({ ordnance: true, repair: true, market: true, bar: true, shipyard: true, outfitting: true, missions: true });
 const locationServices = (locationId) => LOCATIONS[locationId]?.services ?? FULL_DOCK_SERVICES;
 const hasLocationService = (locationId, service) => Boolean(locationServices(locationId)?.[service]);
 const hasAnyLocationService = (locationId, services) => services.some((service) => hasLocationService(locationId, service));
@@ -480,7 +480,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2pw';
+const GAME_VERSION = '0.8.2px';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -1310,7 +1310,7 @@ export class GameUI {
           <div class="cockpit-screen cockpit-screen-own" role="button" tabindex="0" aria-label="${t('Own ship status display; tap to open ship menu')}">
             <div class="monitor-damage" aria-hidden="true"></div><div id="break-cue" class="screen-break" aria-hidden="true"><b>${t('BREAK')}</b></div><div class="screen-standoff" id="screen-standoff" data-tone="danger"><span>${t('STANDOFF')}</span><b id="screen-standoff-demand"></b><em id="screen-standoff-timer">9</em></div>
             <div class="screen-race-strip" id="screen-race-strip"><span id="screen-race-label"></span><b id="screen-race-value"></b></div>
-            <div class="screen-ship-layout"><div class="screen-flight"><div><span data-short="SPD">${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span id="screen-own-fuel-label" data-short="FUEL">${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Switch fire group — press X or tap')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em><small id="screen-own-launcher"></small><small id="screen-own-drone-pdc" class="is-hidden"></small></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span data-short="S">${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i></div><div><span data-short="E">${t('ENERGY')}</span><i><b id="screen-own-energy"></b></i></div><div><span data-short="H">${t('HULL')}</span><i><b id="screen-own-hull"></b></i></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
+            <div class="screen-ship-layout"><div class="screen-flight"><div><span data-short="SPD">${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span id="screen-own-drive-label" data-short="THR">${t('THR')}</span><b id="screen-own-drive">0</b><small>%</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Switch fire group — press X or tap')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em><small id="screen-own-launcher"></small><small id="screen-own-drone-pdc" class="is-hidden"></small></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span data-short="S">${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i></div><div><span data-short="E">${t('ENERGY')}</span><i><b id="screen-own-energy"></b></i></div><div><span data-short="H">${t('HULL')}</span><i><b id="screen-own-hull"></b></i></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
           </div>
           <div class="cockpit-screen cockpit-screen-radar" aria-label="${t('Radar display; tap to open navigation map')}">
             <div class="monitor-damage" aria-hidden="true"></div><div class="radar-screen-wrap"><canvas id="radar" width="220" height="220" role="button" tabindex="0" aria-label="${t('Open navigation map')}"></canvas></div>
@@ -2047,15 +2047,15 @@ export class GameUI {
                 this.actions?.repair();
                 break;
             case 'service-all':
-                // Repair first: a short purse goes to the hull before the tanks.
+                // Repair first: a short purse goes to the hull before the magazines.
                 if (dockServiceQuote(this.save.player, 'repair').total > 0) this.actions?.repair();
-                if (dockServiceQuote(this.save.player, 'refill').total > 0) this.actions?.refuel();
+                if (dockServiceQuote(this.save.player, 'refill').total > 0) this.actions?.refill();
                 break;
             case 'sell-cargo':
                 this.actions?.sellAllCargo?.(element?.dataset.den === 'true');
                 break;
-            case 'refuel':
-                this.actions?.refuel();
+            case 'refill':
+                this.actions?.refill();
                 break;
             case 'drone-stock-buy':
             case 'drone-stock-sell':
@@ -2417,13 +2417,13 @@ export class GameUI {
         const { offers } = this.missionBoardCounts();
         const player = this.save.player;
         const needsService = (hasLocationService(loc, 'repair') && dockServiceQuote(player, 'repair').total > 0)
-            || (hasLocationService(loc, 'fuel') && dockServiceQuote(player, 'refill').total > 0);
+            || (hasLocationService(loc, 'ordnance') && dockServiceQuote(player, 'refill').total > 0);
         const tabs = [
             hasLocationService(loc, 'market') ? tab('market:commodities', market === 'commodities', UI_TERMS.trade, 'trade') : '',
             hasLocationService(loc, 'outfitting') ? tab('market:equipment', market === 'equipment', UI_TERMS.equipment, 'equipment') : '',
             hasLocationService(loc, 'shipyard') ? tab('market:shipyard', market === 'shipyard', UI_TERMS.shipyard, 'shipyard') : '',
             this.denUnlockedAt(loc) ? tab('market:den', market === 'den', "SMUGGLER'S DEN", 'den') : '',
-            hasAnyLocationService(loc, ['repair', 'fuel']) ? tab('services', this.dockTerminal === 'services', 'SERVICES', 'repair', needsService ? '!' : undefined) : '',
+            hasAnyLocationService(loc, ['repair', 'ordnance']) ? tab('services', this.dockTerminal === 'services', 'SERVICES', 'repair', needsService ? '!' : undefined) : '',
             hasLocationService(loc, 'bar') ? tab('bar:people', bar === 'people', socialVenueKey(venue), 'bar') : '',
             hasAnyLocationService(loc, ['missions', 'race']) ? tab('bar:missions', bar === 'missions', missionBoardKey(venue), 'contracts', offers.length || undefined) : '',
             this.localGuildIds().length ? tab('bar:guilds', bar === 'guilds', 'GUILDS', 'guilds') : '',
@@ -2795,7 +2795,7 @@ export class GameUI {
     renderDockTab(tab) {
         if (!this.save || !this.dockLocation)
             return '';
-        if (tab === 'services' && hasAnyLocationService(this.dockLocation, ['repair', 'fuel']))
+        if (tab === 'services' && hasAnyLocationService(this.dockLocation, ['repair', 'ordnance']))
             return this.renderServices();
         switch (tab) {
             case 'bar':
@@ -2825,7 +2825,7 @@ export class GameUI {
         const profile = this.getVesperShipProfile();
         const selectedShipId = this.getVesperShipId();
         const launchLabel = t('Launch the docked {ship}', { ship: profile.name });
-        const serviceDesk = hasAnyLocationService(this.dockLocation, ['repair', 'fuel']);
+        const serviceDesk = hasAnyLocationService(this.dockLocation, ['repair', 'ordnance']);
         const market = hasAnyLocationService(this.dockLocation, ['market', 'outfitting', 'shipyard']);
         const bar = hasAnyLocationService(this.dockLocation, ['bar', 'missions', 'race']);
         const rinAtBerth = false;
@@ -2850,7 +2850,7 @@ export class GameUI {
         </div>` : ''}
         <div class="scene-pointers" aria-label="${t('Concourse actions')}">
           ${showShipPreview ? '' : `<div class="scene-pointer concourse-pointer-ship" data-ui-command="launch" role="button" tabindex="0" aria-label="${t('Launch the docked ship')}"><i>↗</i><b>${t('YOUR SHIP')}</b><small>${t('Launch')}</small></div>`}
-          ${serviceDesk ? `<div class="scene-pointer concourse-pointer-services" data-dock-hotspot="services" role="button" tabindex="0" aria-label="${t('Open services')}"><i>⚙</i><b>${t('SERVICES')}</b><small>${hasLocationService(this.dockLocation, 'repair') && hasLocationService(this.dockLocation, 'fuel') ? t('Repair and refuel') : hasLocationService(this.dockLocation, 'repair') ? t('Repair bay') : t('Fuel and ordnance')}</small></div>` : ''}
+          ${serviceDesk ? `<div class="scene-pointer concourse-pointer-services" data-dock-hotspot="services" role="button" tabindex="0" aria-label="${t('Open services')}"><i>⚙</i><b>${t('SERVICES')}</b><small>${hasLocationService(this.dockLocation, 'repair') && hasLocationService(this.dockLocation, 'ordnance') ? t('Repair and refill') : hasLocationService(this.dockLocation, 'repair') ? t('Repair bay') : t('Ordnance')}</small></div>` : ''}
           ${market ? `<div class="scene-pointer concourse-pointer-market" data-dock-hotspot="market" role="button" tabindex="0" aria-label="${t('Enter the market')}"><i>▣</i><b>${t('MARKET')}</b><small>${hasLocationService(this.dockLocation, 'market') ? t('Trade and fit out') : t('Ship services')}</small></div>` : ''}
           ${rinAtBerth ? `<div class="scene-pointer concourse-pointer-bar" data-tutorial-action="talk-rin" role="button" tabindex="0" aria-label="${t('Talk to Rin')}"><i>✦</i><b>RIN VEK</b><small>${t('Your sister')}</small></div>` : bar ? `<div class="scene-pointer concourse-pointer-bar" data-dock-hotspot="bar" role="button" tabindex="0" aria-label="${escapeHtml(deskLabel)}"><i>✦</i><b>${deskLabel}</b><small>${deskDetail}</small></div>` : ''}
           ${this.denUnlockedAt(this.dockLocation) ? `<div class="scene-pointer concourse-pointer-den" data-market-point="den" role="button" tabindex="0" aria-label="${t('Enter the smuggler\'s den')}"><i>☣</i><b>${t('SMUGGLER\'S DEN')}</b><small>${t('Black-market prices')}</small></div>` : ''}
@@ -3871,7 +3871,7 @@ export class GameUI {
         const player = this.save.player, stats = getEffectiveShipStats(player);
         const repairs = dockServiceQuote(player, 'repair'), refill = dockServiceQuote(player, 'refill');
         const repairBay = hasLocationService(this.dockLocation, 'repair');
-        const fuelDepot = hasLocationService(this.dockLocation, 'fuel');
+        const ordnanceDepot = hasLocationService(this.dockLocation, 'ordnance');
         const fit = loadoutFor(player), fleet = player.droneFleet;
         const ids = new Set([...(fit.droneBays ?? []).flatMap(b => b.unitIds).filter(Boolean), ...(fleet?.lockerIds ?? [])]);
         const units = [...ids].map(id => fleet?.unitsById[id]).filter(Boolean);
@@ -3883,12 +3883,12 @@ export class GameUI {
         const bar = (label, value, max) => `<label><span>${t(label)}</span><em>${Math.ceil(value)}/${max}</em><i><b style="width:${percent(value,max)}%"></b></i></label>`;
         const action = (command, label, quote) => `<button type="button" class="primary sx-btn sx-btn-primary" data-ui-command="${command}" ${!quote.ok || quote.total <= 0 || quote.total > player.credits ? 'disabled' : ''}>${t(label)} · ${Number.isFinite(quote.total) ? formatCredits(quote.total) : '—'}</button>`;
         // Both desks needed: one key settles the whole bill.
-        const fullService = repairBay && fuelDepot && repairs.ok && refill.ok && repairs.total > 0 && refill.total > 0;
+        const fullService = repairBay && ordnanceDepot && repairs.ok && refill.ok && repairs.total > 0 && refill.total > 0;
         const fullTotal = fullService ? repairs.total + refill.total : 0;
         return `<div class="service-grid service-grid-simple">
-          ${fullService ? `<div class="service-quick sx-panel"><span class="service-quick-copy"><b>${t('Full service')}</b><small>${t('Hull, fuel and ordnance in one go')}</small></span><button type="button" class="sx-btn sx-btn-primary" data-ui-command="service-all" ${fullTotal > player.credits ? 'disabled' : ''}><span>${t('Repair & refill')}</span><small>${formatCredits(fullTotal)}</small></button></div>` : ''}
+          ${fullService ? `<div class="service-quick sx-panel"><span class="service-quick-copy"><b>${t('Full service')}</b><small>${t('Hull and ordnance in one go')}</small></span><button type="button" class="sx-btn sx-btn-primary" data-ui-command="service-all" ${fullTotal > player.credits ? 'disabled' : ''}><span>${t('Repair & refill')}</span><small>${formatCredits(fullTotal)}</small></button></div>` : ''}
           ${repairBay ? `<article class="service-card sx-panel"><h3>${uiIcon('repair', 18)}${t('Ship & drone repair')}</h3><div class="service-emblem" aria-hidden="true"><svg viewBox="0 0 100 64"><path d="M50 4 63 31 84 47 64 47 60 59 40 59 36 47 16 47 37 31Z"/><path class="service-emblem-accent" d="M76 8v20M66 18h20"/></svg></div><div class="service-bars">${bar('Hull',player.hull,stats.hull)}${droneMax ? bar('Drones',droneHull,droneMax) : ''}</div>${action('repair','REPAIR',repairs)}</article>` : ''}
-          ${fuelDepot ? `<article class="service-card sx-panel"><h3>${uiIcon('fuel', 18)}${t('Fuel and ordnance')}</h3><div class="service-emblem" aria-hidden="true"><svg viewBox="0 0 100 64"><path d="M27 13h30v46H27ZM33 5h18v8M57 21h9l9 11v17q0 8-8 8t-8-8V36M65 15l10 12"/><path class="service-emblem-accent" d="m43 24-7 13h10l-7 13"/></svg></div><div class="service-bars">${bar('FUEL',player.fuel,stats.fuel)}${ammoMax ? bar('Ammunition',ammo,ammoMax) : ''}</div>${action('refuel','REFILL',refill)}</article>` : ''}
+          ${ordnanceDepot ? `<article class="service-card sx-panel"><h3>${uiIcon('missile', 18)}${t('Ordnance')}</h3><div class="service-emblem" aria-hidden="true"><svg viewBox="0 0 100 64"><path d="M12 26h50l16 6-16 6H12l-6 8V18Z"/><path class="service-emblem-accent" d="M30 20v24M44 22v20"/></svg></div><div class="service-bars">${ammoMax ? bar('Missiles and ammunition',ammo,ammoMax) : `<label><span>${t('Missiles and ammunition')}</span><em>—</em><i><b style="width:0%"></b></i></label>`}</div>${action('refill','REFILL',refill)}</article>` : ''}
           ${repairBay ? `<article class="service-card sx-panel service-paint-card"><h3>${uiIcon('paint', 18)}${t('Hull paint')}</h3><div class="ship-silhouette service-paint-preview" data-variant="${escapeHtml(SHIPS[player.shipId].variant)}" data-current-paint role="img" aria-label="${escapeHtml(t('Hull paint'))}"></div><button type="button" class="primary sx-btn sx-btn-secondary" data-ui-command="paint-open">${t('Customize paint')}</button></article>` : ''}
         </div>`;
     }
@@ -4369,7 +4369,6 @@ export class GameUI {
             ['HULL INTEGRITY', ship.hull, ship.hull - current.hull, 0, best((entry) => entry.hull)],
             ['CARGO', capacity, capacity - current.cargo, 0, best((entry) => entry.cargo)],
             ['AFTERBURNER', displaySpeed(ship.afterburnSpeed), displaySpeed(ship.afterburnSpeed) - displaySpeed(current.afterburnSpeed), 0, best((entry) => displaySpeed(entry.afterburnSpeed))],
-            ['FUEL', ship.fuel, ship.fuel - current.fuel, 0, best((entry) => entry.fuel)],
         ];
         const specLabel=label=>t({'CRUISE SPEED':'Speed','ACCELERATION':'Accel.','TURN RATE':'Turning','SHIELD':'Shield','HULL INTEGRITY':'Hull','CARGO':'Cargo'}[label]??label);
         const missingCredits = Math.max(0, amountDue - Number(this.save.player.credits ?? 0));
@@ -4751,10 +4750,11 @@ export class GameUI {
         const raceDriveLive=model.race?.phase==='running'&&Number.isFinite(model.race.boost);
         const stabilizer=raceDriveLive&&model.race.stabilizerTime>0;
         const driveLabel=stabilizer?t('STABILIZER'):t(model.race?.racingHull?'THRUST':'BOOST');
-        setText('#screen-own-fuel-label',raceDriveLive?driveLabel:t('FUEL'));
-        setHudAttribute(this.el('#screen-own-fuel-label'), 'data-short', raceDriveLive ? (stabilizer ? 'STAB' : driveLabel) : 'FUEL');
-        setText('#screen-own-fuel',stabilizer?`${Math.ceil(model.race.stabilizerTime)}s`:Math.round(raceDriveLive?model.race.boost*100:(model.fuel/model.maxFuel)*100).toString());
-        const boostValue=this.el('#screen-own-fuel');
+        // Outside a race the cell shows the throttle; races reuse it for the drive charge.
+        setText('#screen-own-drive-label',raceDriveLive?driveLabel:t('THR'));
+        setHudAttribute(this.el('#screen-own-drive-label'), 'data-short', raceDriveLive ? (stabilizer ? 'STAB' : driveLabel) : 'THR');
+        setText('#screen-own-drive',stabilizer?`${Math.ceil(model.race.stabilizerTime)}s`:Math.round(raceDriveLive?model.race.boost*100:(model.throttle??0)*100).toString());
+        const boostValue=this.el('#screen-own-drive');
         if (boostValue) {
             setHudAttribute(boostValue, 'data-boost', stabilizer ? 'stabilizer' : raceDriveLive && model.race.boostLocked ? 'recovering' : '');
             setHudText(boostValue.nextElementSibling, stabilizer ? '' : '%');

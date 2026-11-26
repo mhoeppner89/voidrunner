@@ -26,10 +26,10 @@ function step(s,ship){
 }
 test('a faster fighter reaches boost speed, recovers partially and returns to firing without endless resets',()=>{
  for(const tier of ['novice','veteran','ace']){
-  const {s,ship}=setup(tier);s.damagePlayer=()=>{};const fuel=ship.fuel;let maxSpeed=0,attempts=0,recoveryTime=0,lastShot=0;
+  const {s,ship}=setup(tier);s.damagePlayer=()=>{};let burned=false,maxSpeed=0,attempts=0,recoveryTime=0,lastShot=0;
   const fire=s.fireNpcGun;s.fireNpcGun=function(...args){lastShot=this.save.world.time;return fire.apply(this,args);};
   for(let i=0;i<2400;i++){
-   step(s,ship);const r=ship.combatPlan.recovery;attempts=Math.max(attempts,r.attempts);
+   step(s,ship);burned||=Boolean(ship.burning);const r=ship.combatPlan.recovery;attempts=Math.max(attempts,r.attempts);
    if(r.active){recoveryTime+=1/60;assert.equal(ship.combatIntent,'disengage');assert.equal(ship.aceMove,undefined);}
    maxSpeed=Math.max(maxSpeed,Math.hypot(...ship.velocity));
    if(s.save.world.time<4.5)assert.equal(ship.shield,8,'ordinary post-hit delay must apply');
@@ -37,7 +37,7 @@ test('a faster fighter reaches boost speed, recovers partially and returns to fi
   const r=ship.combatPlan.recovery;
   assert.ok(maxSpeed>ship.afterburnSpeed*.9,`${tier} speed ${maxSpeed}`);
   assert.equal(attempts,1);assert.ok(recoveryTime>4.5&&recoveryTime<=14.4);assert.ok(['recovered','ended'].includes(r.lastResult),'recovery or bounded expiry both return to the fight');
-  assert.ok(ship.shield>8,'low shield regeneration still restores some capacity');assert.ok(lastShot>r.finishedAt,'must resume attacking');assert.ok(ship.fuel<fuel);
+  assert.ok(ship.shield>8,'low shield regeneration still restores some capacity');assert.ok(lastShot>r.finishedAt,'must resume attacking');assert.ok(burned,'the recovery burns');
  }
 });
 test('hull speed advantage, a winnable finish and finite attempt limits govern withdrawal',()=>{
@@ -76,13 +76,13 @@ test('a slower hull can seek real cover; losing sight does not cancel recovery o
  updateShipAI(s,ship,1/60);assert.equal(calls,1);assert.equal(searched,false);assert.equal(ship.recoveryTargetHidden,false);
  ship.holdFire=true;assert.equal(continueShieldRecovery(s,ship,1/60),false);assert.equal(r.active,false);
 });
-test('boost allows acceleration and a turn, but obstacles and empty fuel still veto it',()=>{
+test('boost allows acceleration and a turn, but obstacles and an empty capacitor still veto it',()=>{
  const {s,ship}=setup();ship.shield=ship.maxShield;ship.combatIntent='evade';
  combatThrottle(ship,0,180,0,0,-1,240,true,Math.PI);
  assert.ok(ship.combatBoostUntil>=2.5);assert.equal(ship.burning,true);
  combatThrottle(ship,1,180,0,0,-1,240,false,Math.PI);assert.equal(ship.burning,false);
  ship.shield=8;plan(s,ship);combatThrottle(ship,2,180,0,0,-1,240,false);assert.equal(ship.burning,false);
- ship.fuel=.4;combatThrottle(ship,3,180,0,0,-1,240,true);assert.equal(ship.burning,false);
+ ship.energy=0;combatThrottle(ship,3,180,0,0,-1,240,true);assert.equal(ship.burning,false);
 });
 test('under fire, slow coasting is rejected and a shield withdrawal cancels a drift',()=>{
  const {ship}=setup('ace');ship.combatIntent='evade';ship.velocity=[45,0,0];

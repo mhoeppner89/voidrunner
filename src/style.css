@@ -2642,7 +2642,7 @@ html[lang="de"] .comms-bar.story::after {
   height: 57%;
 }
 
-/* Own-ship monitor stacks the flight strip on top (SPD/FUEL above the hull),
+/* Own-ship monitor stacks the flight strip on top (SPD/THR above the hull),
    with the outline filling the middle, the status bars below it, and the
    flight-recorder ticker as a thin bottom row. The heading row was removed
    (user offer) so the layout claims the monitor's full height and the bars
@@ -2862,7 +2862,7 @@ html[lang="de"] .comms-bar.story::after {
 
 /* Flight telemetry strip at the top of the own-ship monitor: the old floating
    bottom-left/right HUD cards are scrapped, and the strip is kept to the two
-   pilot-critical readouts (SPD/FUEL) above the hull — missiles render as a
+   pilot-critical readouts (SPD/THR) above the hull — missiles render as a
    rack under the hull outline, and throttle/cargo/load/handling/credits live
    on the docked screens, not the cockpit glass. */
 .screen-flight {
@@ -8018,7 +8018,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 .screen-own-weapon em { flex-shrink: 0; letter-spacing: 0; text-overflow: clip; }
 #screen-event-ticker .ticker-line { letter-spacing: 0; text-overflow: clip; }
 
-/* Own instruments: speed/fuel, weapon, survival bars, one short notice.
+/* Own instruments: speed/throttle, weapon, survival bars, one short notice.
    Cargo details remain in the paused ship menu. */
 .cockpit-screen-own .screen-flight { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .cockpit-screen-own .screen-ship-layout { padding-bottom: 4px; }
@@ -8925,7 +8925,7 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
    numeric readout: the exact numbers stay on the docked screens, while the
    cockpit monitor reads like a gauge cluster (letter + bar + ticks). The
    full word stays in the DOM (font-size:0 + a generated initial), so the row
-   is still announced as SHIELDS / ENERGY / HULL, exactly like SPD and FUEL.
+   is still announced as SHIELDS / ENERGY / HULL, exactly like SPD and THR.
    The bars sit BESIDE the hull schematic as one row on both monitors — the
    outline is the pilot's shape reference, the bars its status — which frees
    the vertical room the old stacked layout spent on the outline row. */
@@ -9697,9 +9697,9 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 }
 @media (max-width:600px) { .ship-weapon-columns { grid-template-columns:1fr; } }
 
-/* Racing reuses the fuel cell: charge, recovery, or pickup seconds. */
-#screen-own-fuel[data-boost="stabilizer"] { color:var(--void-cyan); }
-#screen-own-fuel[data-boost="recovering"] { color:var(--retro-amber); }
+/* Racing reuses the throttle cell: charge, recovery, or pickup seconds. */
+#screen-own-drive[data-boost="stabilizer"] { color:var(--void-cyan); }
+#screen-own-drive[data-boost="recovering"] { color:var(--retro-amber); }
 
 /* A race has no combat: leave the right thumb area for the boost control. */
 #game-shell.is-racing .touch-secondary-row { display:none; }

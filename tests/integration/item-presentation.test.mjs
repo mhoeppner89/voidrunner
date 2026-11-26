@@ -110,15 +110,15 @@ test('icons keep their family silhouette, change hardware by tier and take the s
  assert.notDeepEqual(fills(siphon),fills(plain),'the accent light takes the signature colour');assert.equal(shapes(siphon),shapes(plain),'without changing the silhouette');
 });
 
-test('unmounted Comet Tail marks reduced boost fuel use as an improvement',async()=>{
+test('unmounted Comet Tail marks reduced boost energy use as an improvement',async()=>{
  const {createEquipmentRecord}=await import('../../src/game/equipmentInventory.js');
  const {renderEquipmentInventory}=await import('../../src/game/equipmentUi.js');
  const s=createNewSave(99,{tutorial:false});
  const comet=createEquipmentRecord('engine-mk2',{tier:2,rarity:'named',location:{kind:'station',stationId:'vesper'}});
  s.player.inventory.items[comet.id]=comet;
  const rows=equipmentEffectStats(resolveEquipmentDefinition(BASE_OUTFIT_ITEMS['engine-mk2'],comet));
- const fuel=rows.find(r=>r.key==='burnFuelMultiplier');
- assert.equal(fuel?.lowerBetter,true);assert.ok(fuel.value<0);
+ const burn=rows.find(r=>r.key==='burnEnergyMultiplier');
+ assert.equal(burn?.lowerBetter,true);assert.ok(burn.value<0);
  const html=renderEquipmentInventory({save:s,inventoryTab:'remote',inventoryItemId:comet.id});
- assert.match(html,/class="inventory-stat is-better" data-stat="burnFuelMultiplier"/);
+ assert.match(html,/class="inventory-stat is-better" data-stat="burnEnergyMultiplier"/);
 });

@@ -185,10 +185,10 @@ export function renderArenaRun(ui,save){
    const plan=runRewardPlan(save,id);if(!plan)return '';
    const selected=r.selectedReward===id,mark='<span class="run-selected-mark" aria-hidden="true">✓</span>';
    if(SERVICES.includes(id)){
-    const title=id==='resupply'?t('Refuel and recharge'):id==='rearm'?t('Reload missiles'):t('Field repairs');
-    const blurb=t(id==='repair'?'Patch up half the hull damage and reload every launcher.':id==='rearm'?'Reload every launcher to full.':'Top up energy and fuel before the next wave.');
-    const lines=id==='repair'?[['HULL','+50%'],['MISSILES','100%']]:id==='rearm'?[['MISSILES','100%']]:[['ENERGY','100%'],['FUEL','100%']];
-    return command('reward',id,`<span class="run-offer-head"><span class="run-art-plate is-service">${uiIcon(id==='repair'?'repair':id==='rearm'?'weapons':'fuel',30)}</span><span class="run-offer-title"><b class="run-item-label">${esc(title)}</b></span></span><p class="run-service-blurb">${esc(blurb)}</p><span class="run-stats">${lines.map(([label,value])=>tile(label,value)).join('')}</span>${mark}`,`class="run-offer is-service ${selected?'is-selected':''}" data-service="true" title="${esc(title)}" aria-label="${esc(title)}" aria-pressed="${selected}"`);
+    const title=id==='resupply'?t('Recharge'):id==='rearm'?t('Reload missiles'):t('Field repairs');
+    const blurb=t(id==='repair'?'Patch up half the hull damage and reload every launcher.':id==='rearm'?'Reload every launcher to full.':'Top up energy before the next wave.');
+    const lines=id==='repair'?[['HULL','+50%'],['MISSILES','100%']]:id==='rearm'?[['MISSILES','100%']]:[['ENERGY','100%']];
+    return command('reward',id,`<span class="run-offer-head"><span class="run-art-plate is-service">${uiIcon(id==='repair'?'repair':id==='rearm'?'weapons':'energy',30)}</span><span class="run-offer-title"><b class="run-item-label">${esc(title)}</b></span></span><p class="run-service-blurb">${esc(blurb)}</p><span class="run-stats">${lines.map(([label,value])=>tile(label,value)).join('')}</span>${mark}`,`class="run-offer is-service ${selected?'is-selected':''}" data-service="true" title="${esc(title)}" aria-label="${esc(title)}" aria-pressed="${selected}"`);
    }
    const replaced=[...new Set(plan.replaced)],first=replaced[0],against=first&&equipmentBaseId(first)===equipmentBaseId(id)?equipmentRating(item(first)):undefined;
    const swap=`<span class="run-replacement"><small>${esc(t(replaced.length?'Replaces':'Empty mount'))}</small>${replaced.length?replaced.map(old=>`<span class="run-swap-item" ${paint(old)}>${icon(old)}<span>${esc(name(old))}</span></span>`).join(''):'<span class="run-empty-mount">+</span>'}${plan.count>1?`<em class="run-quantity">×${plan.count}</em>`:''}</span>`;

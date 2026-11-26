@@ -18,11 +18,11 @@ test('career paths, industrial bays and physical ports agree',()=>{
  assert.equal(createEnemyLoadout({hullId:'vanguard',role:'patrol'},0).racks.length,3);
 });
 test('keep, reload and switch preserve hull, ammunition and equipment without free repairs',()=>{
- let save=career(),p=save.player;p.hull=77;p.fuel=43;p.ammo.gauss=3;
+ let save=career(),p=save.player;p.hull=77;p.energy=43;p.ammo.gauss=3;
  const fit=structuredClone(p.outfitting.loadouts.wayfarer),q=quoteShipTrade(p,'talon',{keepCurrent:true});assert.ok(q.ok);assert.equal(q.tradeIn,0);assert.ok(commitShipTrade(p,q).ok);
  assert.deepEqual(p.outfitting.loadouts.wayfarer,fit);assert.equal(p.storedShips.wayfarer.resources.hull,77);
  save=hydrateSave(JSON.parse(JSON.stringify(save)));p=save.player;assert.deepEqual(new Set(p.ownedShips),new Set(['wayfarer','talon']));assert.equal(p.credits,500000-SHIPS.talon.price);
- const credits=p.credits;assert.ok(commitShipTrade(p,quoteShipTrade(p,'wayfarer')).ok);assert.equal(p.hull,77);assert.equal(p.fuel,43);assert.equal(p.ammo.gauss,3);assert.equal(p.credits,credits);
+ const credits=p.credits;assert.ok(commitShipTrade(p,quoteShipTrade(p,'wayfarer')).ok);assert.equal(p.hull,77);assert.equal(p.energy,43);assert.equal(p.ammo.gauss,3);assert.equal(p.credits,credits);
  save=hydrateSave(JSON.parse(JSON.stringify(save)));assert.equal(save.player.credits,credits);assert.ok(save.player.storedShips.talon);
 });
 test('switching is local, cargo-safe, and stale quotes do not mutate resources',()=>{

@@ -90,10 +90,9 @@ test('shortest paths follow the Helios–Meridian–Pale Ring–Redwake corridor
 
 test('remote route plans report jump points and zero travel cost', () => {
     const route = routeBetweenSystems('helios-verge', 'meridian');
-    assert.equal(route.fuelCost, 0);
     assert.equal(route.creditCost, 0);
-    assert.deepEqual(route.cost, { fuel: 0, credits: 0 });
-    assert.deepEqual(route.jumpCost, { fuel: 0, credits: 0 });
+    assert.deepEqual(route.cost, { credits: 0 });
+    assert.deepEqual(route.jumpCost, { credits: 0 });
 
     const plan = planRoute('helix', 'argent');
     assert.equal(plan.ok, true);
@@ -103,8 +102,7 @@ test('remote route plans report jump points and zero travel cost', () => {
     assert.equal(plan.jumpArrivalLocationId, 'meridian-verge-point');
     assert.equal(plan.destinationLocationId, 'argent');
     assert.equal(plan.requiresLocalTransfer, true);
-    assert.deepEqual(plan.cost, { fuel: 0, credits: 0 });
-    assert.equal(plan.fuelCost, 0);
+    assert.deepEqual(plan.cost, { credits: 0 });
     assert.equal(plan.creditCost, 0);
 
     const endToEnd = planRoute('helios-verge', 'redwake');
@@ -112,14 +110,14 @@ test('remote route plans report jump points and zero travel cost', () => {
     assert.deepEqual(endToEnd.systemPath, ['helios-verge', 'meridian', 'pale-ring', 'redwake']);
     assert.deepEqual(endToEnd.routeIds, ['verge-meridian', 'meridian-pale', 'pale-redwake']);
     assert.equal(endToEnd.nextJumpPointId, 'verge-meridian-point');
-    assert.deepEqual(endToEnd.cost, { fuel: 0, credits: 0 });
+    assert.deepEqual(endToEnd.cost, { credits: 0 });
 
     const local = planRoute('helix', 'cairn');
     assert.equal(local.ok, true);
     assert.equal(local.hops, 0);
     assert.deepEqual(local.systemPath, ['helios-verge']);
     assert.equal(local.arrivalLocationId, 'cairn');
-    assert.deepEqual(local.cost, { fuel: 0, credits: 0 });
+    assert.deepEqual(local.cost, { credits: 0 });
 });
 
 test('jump piracy pressure rises with cargo value and is greater on Redwake', () => {

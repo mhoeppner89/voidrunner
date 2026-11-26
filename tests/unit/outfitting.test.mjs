@@ -571,7 +571,8 @@ const malformedResources = hydrateSave({
     },
     world: { seed: 93 },
 });
-for (const key of ['fuel', 'shield', 'hull', 'energy', 'missiles'])
+assert.equal(Object.hasOwn(malformedResources.player, 'fuel'), false, 'fuel is gone');
+for (const key of ['shield', 'hull', 'energy', 'missiles'])
     assert.equal(Number.isFinite(malformedResources.player[key]), true, `${key} is repaired to a finite current resource`);
 assert.equal(malformedResources.player.hull, 200);
 assert.equal(malformedResources.player.energy, 60);

@@ -23,7 +23,7 @@ export function mountInstruments(host,definition,shell,toggleTransponder){
     function update(state){
         artwork.setHardware('off',state.transponder,true,!state.paused);
         const text=(id,value)=>{const e=root.querySelector(id);if(e.textContent!==String(value))e.textContent=value;};
-        text('#screen-own-speed',Math.round(state.speed));text('#screen-own-max-speed','/260');text('#screen-own-fuel','100');
+        text('#screen-own-speed',Math.round(state.speed));text('#screen-own-max-speed','/260');text('#screen-own-drive','100');
         text('#screen-own-weapon-name',state.weapon?'PULSE ×2':'ALL WEAPONS · BEAM');text('#screen-own-weapon-ammo','ϟ');text('#screen-own-launcher',`SKR ${state.missiles}/4`);
         root.querySelector('#screen-own-weapon').classList.add('is-visible');
         root.querySelector('#screen-own-shield').style.width='100%';root.querySelector('#screen-own-hull').style.width='100%';root.querySelector('#screen-own-energy').style.width=`${state.energy}%`;

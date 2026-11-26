@@ -9,7 +9,7 @@ import {regenerateCombatResources} from '../../src/game/combatResources.js';
 const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z),styles=['timid','steady','aggressive','flamboyant'];
 function pilot(temperament,tier='veteran'){
  const stats=SHIPS.talon;
- return {targetId:'player',pilot:{tier,temperament},combatFit:{stats},speed:stats.maxSpeed,velocity:[0,0,-stats.maxSpeed],fuel:50,aiRng:()=>.3,combatIntent:'hunt',
+ return {targetId:'player',pilot:{tier,temperament},combatFit:{stats},speed:stats.maxSpeed,velocity:[0,0,-stats.maxSpeed],energy:stats.energyCapacity,aiRng:()=>.3,combatIntent:'hunt',
   combatPlan:{visible:true,right:V(1),up:V(0,1),escape:V(1,.2,.2).normalize(),offset:V(),clearance:45,targetVelocity:V(0,0,-70)},
   gunAim:{visible:true,targetId:'player',acceleration:V(15)}};
 }

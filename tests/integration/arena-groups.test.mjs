@@ -5,6 +5,7 @@ import {fixture} from '../helpers/session.mjs';
 import {newArenaRun,RUN_WAVES,readArenaRun,writeArenaRun} from '../../src/game/arenaRun.js';
 import {CAPITAL_HULLS} from '../../src/game/capitalHulls.js';
 import {tickBattle} from '../../src/game/arenaBattle.js';
+import {CAPITAL_BLAST_HOLD} from '../../src/game/game.js';
 
 function stage(level,hard=false) {
  const store=new Map();
@@ -127,6 +128,17 @@ test('destroy objectives resolve on the primary; the carrier also requires all l
   const s=stage(level);s.loseArenaRun();assert.equal(s.save.arenaRun.phase,'lost');
   const complete=reachPrimary(stage(level));complete.runBattle.target.hull=0;advance(complete,1);assert.equal(complete.runBattle.outcome,'success');
  }
+});
+test('a destroyed big ship keeps the level running until its explosion has played out',()=>{
+ const s=reachPrimary(stage(4)),b=s.runBattle,run=s.save.arenaRun;
+ assert.equal(b.target.variant,'barge');
+ Object.assign(s.renderer,{spawnExplosion(){},spawnImpact(){}});s.audio.playAtDirection=()=>{};s.audio.play=()=>{};s.hyperdriveInterceptIds=new Set();s.tmpAudioLocal=new THREE.Vector3();s.tmpAudioOrientation=new THREE.Quaternion();
+ for(const ship of opponents(s))if(ship!==b.target)ship.hull=0;
+ b.target.shield=0;s.damageShip(b.target,1e6,'player',b.target.position);
+ const killed=s.save.world.time;assert.ok(s.capitalBlastUntil>=killed+CAPITAL_BLAST_HOLD.corvette);
+ const before=run.cleared;
+ for(let t=0;t<CAPITAL_BLAST_HOLD.corvette-.5;t+=.5){advance(s,.5);assert.equal(run.cleared,before,'still watching at '+t);}
+ advance(s,1);advance(s,.5);assert.equal(run.cleared,4);
 });
 test('old level-start combat checkpoints restore the same level with a fresh opening group',()=>{
  const s=stage(8),run=s.save.arenaRun;

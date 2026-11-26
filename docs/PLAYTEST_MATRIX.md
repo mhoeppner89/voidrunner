@@ -8,7 +8,7 @@ Last updated: 2026-08-31, build 0.7.31.
 | --- | --- | --- | --- |
 | New game, save, resume, migration, delete | Green | `save.test.mjs`; lifecycle 52/52; true first-run preferences; corrupt/non-finite state rejection; arena isolation | Recheck title/resume controls after the next menu change |
 | Keyboard, touch, gamepad, tilt, focus loss | Green | `input.test.mjs`; tilt 14/14; lifecycle 52/52; blur/hidden-tab pause and deliberate resume | Manual physical-device feel remains subjective |
-| Basic flight, throttle, afterburner, fuel, autopilot | Green | flight regression 15/15; fixed-step 26/26 | Add a long free-flight soak when performance work resumes |
+| Basic flight, throttle, afterburner energy, autopilot | Green | flight regression 15/15; fixed-step 26/26 | Add a long free-flight soak when performance work resumes |
 | Galaxy routes and gate travel | Green | galaxy 54/54; both-direction automatic gate crossing; free jumps; cargo-scaled piracy | None in the current four-system network |
 | Sector and galaxy maps | Green | desktop and 844×390 captures; route, orbit, sun, and label checks | Recheck after any location-count increase |
 | Docking, landing, repair, refill | Green | career services 7/7; exact cost, state, persistence, refusal; flight regression docking | Add insurance recovery UI to the next lifecycle browser pass |

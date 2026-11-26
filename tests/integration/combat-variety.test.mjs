@@ -20,7 +20,7 @@ function spawn(s,role='pirate',tier='ace',pos=[0,0,180],hullId='talon'){
     ship.rotation=[0,0,0,1];ship.velocity=[0,0,-ship.speed];ship.targetId='player';ship.fireCooldown=0;return ship;
 }
 function step(s,ship,dt=1/60){s.save.world.time+=dt;ship.fireCooldown-=dt;regenerateCombatResources(ship,ship.combatFit.resources,dt,100);s.updateAttackAI(ship,new THREE.Vector3().fromArray(s.save.player.position),new THREE.Vector3().fromArray(s.save.player.velocity),dt);}
-test('shared flight preserves coasting, bounds thrust, and gives NPCs hull speed and finite afterburn fuel',()=>{
+test('shared flight preserves coasting, bounds thrust, and gives NPC burns an energy cost',()=>{
     const forward=new THREE.Vector3(0,0,-1),v=new THREE.Vector3(30,0,-20);
     integrateFlightVelocity(v,forward,0,50,21,false,false,0,1/60);
     assert.deepEqual(v.toArray(),[30,0,-20]);
@@ -29,11 +29,13 @@ test('shared flight preserves coasting, bounds thrust, and gives NPCs hull speed
     const s=fixture(),ship=spawn(s),stats=s.npcFlightStats(ship);
     assert.equal(ship.speed,stats.maxSpeed);assert.equal(ship.afterburnSpeed,stats.afterburnSpeed);assert.ok(stats.maxSpeed<=SHIPS.talon.maxSpeed);
     const p=new THREE.Vector3(),velocity=new THREE.Vector3(0,0,-stats.maxSpeed),q=new THREE.Quaternion(),goal=new THREE.Quaternion();
-    const fuel=ship.fuel;
+    ship.energy=stats.energyCapacity;const energy=ship.energy;assert.ok(stats.burnEnergy>0);
     for(let i=0;i<120;i++)s.integrateNpcFlight(ship,p,velocity,q,goal,stats.afterburnSpeed,true,true,1/60);
     assert.ok(velocity.length()>stats.maxSpeed);assert.ok(velocity.length()<=stats.afterburnSpeed+1e-8);
-    assert.ok(Math.abs(ship.fuel-(fuel-2.05))<1e-8);
-    ship.fuel=0;s.integrateNpcFlight(ship,p,velocity,q,goal,stats.afterburnSpeed,true,true,1/60);assert.equal(ship.burning,false);
+    assert.ok(Math.abs(ship.energy-Math.max(0,energy-2*stats.burnEnergy))<1e-6);
+    // An empty capacitor keeps the turn boost but drops back to cruise speed.
+    ship.energy=0;for(let i=0;i<600;i++)s.integrateNpcFlight(ship,p,velocity,q,goal,stats.afterburnSpeed,true,true,1/60);
+    assert.equal(ship.burning,true);assert.ok(velocity.length()<=stats.maxSpeed+.5,`${velocity.length()}`);
     const baseQ=new THREE.Quaternion(),burnQ=new THREE.Quaternion(),baseW=new THREE.Vector3(),burnW=new THREE.Vector3();
     integrateFlightTurn(baseQ,baseW,1,0,0,stats.angularAcceleration,stats.angularDamping,true,false,1/60);
     integrateFlightTurn(burnQ,burnW,1,0,0,stats.angularAcceleration,stats.angularDamping,true,true,1/60);
@@ -101,7 +103,9 @@ test('one hull supports distinct equipment roles and each shot uses its equipped
         ranges.push(Math.round(distance/1800));assert.ok(s.projectiles.length>0,`fit ${fitIndex} must find a firing opportunity`);
         for(const shot of s.projectiles){const weapon=WEAPONS[shot.weaponId];assert.ok(ship.combatFit.weapons.includes(weapon.id));assert.equal(shot.life,weapon.life);}
     }
-    assert.ok(ranges[1]<ranges[0]*.92,`scatter/ion must close at least 8% further than long-range gauss: ${ranges}`);
+    // Burns draw the same energy as the guns (0.8.2px), so the energy-hungry
+    // scatter/ion fit boosts a little less on approach: 10% closer became 8%.
+    assert.ok(ranges[1]<ranges[0]*.93,`scatter/ion must close at least 7% further than long-range gauss: ${ranges}`);
     console.log('Same hull, three equipment fits: mean ranges',ranges);
 });
 test('a faster ship commits to shield recovery and leaves it on a bounded cooldown',()=>{

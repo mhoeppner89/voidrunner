@@ -292,7 +292,7 @@ const HELIOS_LOCATIONS = {
 };
 
 const FULL_DOCK_SERVICES = Object.freeze({
-    fuel: true,
+    ordnance: true,
     repair: true,
     market: true,
     bar: true,
@@ -302,7 +302,7 @@ const FULL_DOCK_SERVICES = Object.freeze({
     race: false,
 });
 const ACTIVITY_SERVICES = Object.freeze({
-    fuel: false,
+    ordnance: false,
     repair: false,
     market: false,
     bar: false,
@@ -542,7 +542,6 @@ export const SHIPS = {
         reactorOutput: 10,
         energyCapacity: 60,
         cargo: 30,
-        fuel: 100,
         gunDamage: 10,
         shieldRegen: 5,
     },
@@ -566,7 +565,6 @@ export const SHIPS = {
         reactorOutput: 30,
         energyCapacity: 120,
         cargo: 40,
-        fuel: 130,
         gunDamage: 15,
         shieldRegen: 7,
     },
@@ -577,7 +575,7 @@ export const SHIPS = {
         description: 'A patched charcoal-and-red fighter with four wingtip cannons and twin engine booms.',
         maxSpeed: 60, afterburnSpeed: 95, acceleration: 30,
         angularAcceleration: 3.5, angularDamping: 3.1, lateralMultiplier: 1.1,
-        shield: 180, hull: 180, reactorOutput: 15, energyCapacity: 60, cargo: 10, fuel: 90, gunDamage: 10,
+        shield: 180, hull: 180, reactorOutput: 15, energyCapacity: 60, cargo: 10, gunDamage: 10,
         shieldRegen: 5,
     },
     demon: {
@@ -586,7 +584,7 @@ export const SHIPS = {
         personality:'Fast close-range interceptor',
         description:'A compact twin-hull interceptor with four forward guns, seeker missiles and powerful paired engines.',
         maxSpeed:75, afterburnSpeed:125, acceleration:45, angularAcceleration:4.2, angularDamping:3.1, lateralMultiplier:1.2,
-        shield:260, hull:220, reactorOutput:20, energyCapacity:80, cargo:15, fuel:100, gunDamage:12,
+        shield:260, hull:220, reactorOutput:20, energyCapacity:80, cargo:15, gunDamage:12,
         shieldRegen: 6,
     },
     mule: {
@@ -595,7 +593,7 @@ export const SHIPS = {
         personality:'Protected convoy freighter',
         description:'An armored transport with a substantial hold, three drives and two defensive PDC positions. Less cargo and industry capacity than Atlas.',
         maxSpeed:40, afterburnSpeed:60, acceleration:15, angularAcceleration:1.1, angularDamping:2.6,
-        shield:250, hull:350, reactorOutput:20, energyCapacity:90, cargo:130, fuel:180, gunDamage:8,
+        shield:250, hull:350, reactorOutput:20, energyCapacity:90, cargo:130, gunDamage:8,
         shieldRegen: 6,
     },
     talon: {
@@ -620,7 +618,6 @@ export const SHIPS = {
         reactorOutput: 20,
         energyCapacity: 80,
         cargo: 15,
-        fuel: 90,
         gunDamage: 12,
         shieldRegen: 6,
     },
@@ -645,7 +642,6 @@ export const SHIPS = {
         reactorOutput: 15,
         energyCapacity: 80,
         cargo: 100,
-        fuel: 150,
         gunDamage: 8,
         shieldRegen: 5,
     },
@@ -670,7 +666,6 @@ export const SHIPS = {
         reactorOutput: 30,
         energyCapacity: 100,
         cargo: 30,
-        fuel: 120,
         gunDamage: 19,
         shieldRegen: 7,
     },
@@ -694,7 +689,6 @@ export const SHIPS = {
         reactorOutput: 25,
         energyCapacity: 120,
         cargo: 180,
-        fuel: 200,
         gunDamage: 9,
         shieldRegen: 7,
     },
@@ -718,7 +712,6 @@ export const SHIPS = {
         "reactorOutput": 35,
         "energyCapacity": 140,
         "cargo": 20,
-        "fuel": 130,
         "gunDamage": 12,
         shieldRegen: 8,
 },

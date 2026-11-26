@@ -17,7 +17,7 @@ for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heig
    const actions={afterburner:true,throttleDelta:0,pitch:0,yaw:0,roll:0};
    for(let i=0;i<240;i++)r.updateSimulation(1/60,actions);
    r.syncRender(0,performance.now());r.renderer.render();
-   return {charge:r.activeRace.drive.charge,speed:Math.hypot(...r.save.player.velocity),fov:r.renderer.fovTarget,lines:r.renderer.raceSpeedLines?.visible,modal:r.ui.isModalOpen,moved:Math.hypot(...r.save.player.position.map((v,j)=>v-start[j])),fuelLabel:document.querySelector('#screen-own-fuel-label').textContent};
+   return {charge:r.activeRace.drive.charge,speed:Math.hypot(...r.save.player.velocity),fov:r.renderer.fovTarget,lines:r.renderer.raceSpeedLines?.visible,modal:r.ui.isModalOpen,moved:Math.hypot(...r.save.player.position.map((v,j)=>v-start[j])),fuelLabel:document.querySelector('#screen-own-drive-label').textContent};
   });console.log(name,'drive',JSON.stringify(drive));assert.equal(drive.charge,3.2);assert.ok(drive.speed>60&&drive.moved>50);assert.ok(!drive.modal);assert.ok(drive.lines&&drive.fov>80&&drive.fov<=83);assert.equal(drive.fuelLabel,'SCHUB');
   const pickups=await page.evaluate(()=>{
    const r=__VOID_PRIVATEER__.getRuntime(),race=r.activeRace,records=[];
@@ -37,8 +37,8 @@ for(const [name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heig
    r.save.player.position.splice(0,3,...pickup.approach);r.save.player.velocity.splice(0,3,...pickup.direction.map(v=>v*320));
    const q=new T.Quaternion().setFromUnitVectors(new T.Vector3(0,0,-1),new T.Vector3(...pickup.position).sub(new T.Vector3(...pickup.approach)).normalize());r.save.player.rotation.splice(0,4,...q.toArray());r.resetPlayerInterpolation(true);
    r.syncRaceCourse(race);r.updateRace(0);r.save.player.throttle=1;for(let i=0;i<30;i++)r.updateSimulation(1/60,{afterburner:true,throttleDelta:0,pitch:0,yaw:0,roll:0});r.syncRender(.016,performance.now());r.renderer.render();r.ui.updateHud(r.buildHudModel());
-   const fuel=document.querySelector('#screen-own-fuel'),strip=document.querySelector('#screen-race-strip'),target=document.querySelector('#screen-target-readout');
-   const label=document.querySelector('#screen-own-fuel-label');
+   const fuel=document.querySelector('#screen-own-drive'),strip=document.querySelector('#screen-race-strip'),target=document.querySelector('#screen-target-readout');
+   const label=document.querySelector('#screen-own-drive-label');
    return {raceClass:r.ui.root.classList.contains('is-racing'),fireDisplay:getComputedStyle(document.querySelector('#touch-fire')).display,shipSpeed:Math.hypot(...r.save.player.velocity),afterburnLimit:r.playerStats().afterburnSpeed,target:r.save.player.currentTargetId,expectedTarget:race.course.gates[r.save.player.raceGateIndex].id,stabilizer:race.drive.stabilizerTime,fuel: fuel.textContent,label:label.textContent,shortLabel:label.dataset.short,effect:fuel.dataset.boost,gap:r.raceHud().gap,stripFits:strip.scrollWidth<=strip.clientWidth+1,targetFits:target.scrollWidth<=target.clientWidth+1,visible:r.renderer.raceBoostMeshes.filter(m=>m.visible).length};
   });assert.ok(picture.raceClass);if(name==='iphone')assert.notEqual(picture.fireDisplay,'none');assert.ok(picture.shipSpeed<picture.afterburnLimit*1.05,'pickup must not raise top speed');assert.ok(picture.stabilizer>0);assert.equal(picture.fuel,'5s');assert.ok(['STABILISATOR','STABILIZER'].includes(picture.label));assert.equal(picture.shortLabel,'STAB');assert.equal(picture.effect,'stabilizer');assert.ok(Number.isFinite(picture.gap));assert.ok(picture.stripFits&&picture.targetFits);assert.ok(picture.visible>=1);assert.equal(picture.target,picture.expectedTarget);
   await page.screenshot({path:`${out}/boost-${name}.png`});

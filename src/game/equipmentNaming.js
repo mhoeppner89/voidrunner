@@ -165,9 +165,9 @@ export const EQUIPMENT_NAMING = {
     },
     "Drone recovery range": {"en":"Drone recovery range","de":"Drohnen-Bergungsreichweite"},
     "Salvage impact": {"en":"Salvage impact","de":"Bergungswirkung"},
-    "Boost fuel use": {
-      "en": "Boost fuel use",
-      "de": "Boost-Verbrauch"
+    "Boost energy use": {
+      "en": "Boost energy use",
+      "de": "Boost-Energieverbrauch"
     },
     "Drift correction": {
       "en": "Drift correction",

@@ -88,7 +88,7 @@ export const TUTORIAL_TRANSLATIONS = {
     "Drag the thrust slider on the left upward.": "Ziehe den Schubregler links nach oben.",
     "Turn the ship.": "Wende das Schiff.",
     "Try the afterburner.": "Probier den Nachbrenner aus.",
-    "Set full thrust, then hold the gold afterburner button for two seconds. Afterburner uses fuel.": "Stelle vollen Schub ein und halte die goldene Nachbrennertaste zwei Sekunden gedrückt. Der Nachbrenner verbraucht Treibstoff.",
+    "Set full thrust, then hold the gold afterburner button for two seconds. Afterburner uses energy.": "Stelle vollen Schub ein und halte die goldene Nachbrennertaste zwei Sekunden gedrückt. Der Nachbrenner verbraucht Energie.",
     "Try the target monitor.": "Probier den Zielmonitor aus.",
     "Tap the right monitor to cycle contacts. It shows your target and its distance.": "Tippe den rechten Monitor an, um Kontakte zu wechseln. Er zeigt Ziel und Entfernung.",
     "Open your ship monitor.": "Öffne den Schiffsmonitor.",
@@ -134,7 +134,7 @@ Object.assign(TUTORIAL_TRANSLATIONS,{'Finish this training contract with Rin fir
 
 Object.assign(TUTORIAL_TRANSLATIONS,{'Talk to Rin, then accept the mining contract.':'Sprich mit Rin und nimm dann den Abbauvertrag an.','Talk to Rin first.':'Sprich zuerst mit Rin.','Vesper Mining Cooperative':'Vesper-Bergbaukooperative','APPROACH SLOWLY':'LANGSAM NÄHERN'});
 
-Object.assign(TUTORIAL_TRANSLATIONS,{'Desktop: WASD or arrow keys. Phone: use the joystick. The edge marker points to your selected target.':'Desktop: WASD oder Pfeiltasten. Handy: Steuere mit dem Joystick. Der Randmarker zeigt zum gewählten Ziel.','Set full thrust, then hold Shift (desktop) or the gold afterburner button (phone) for two seconds. Afterburner uses fuel.':'Stelle vollen Schub ein. Halte dann Shift (Desktop) oder die goldene Nachbrennertaste (Handy) zwei Sekunden gedrückt. Der Nachbrenner verbraucht Treibstoff.','{name} is disabled until the fighting ends.':'{name} ist bis zum Kampfende außer Gefecht.'});
+Object.assign(TUTORIAL_TRANSLATIONS,{'Desktop: WASD or arrow keys. Phone: use the joystick. The edge marker points to your selected target.':'Desktop: WASD oder Pfeiltasten. Handy: Steuere mit dem Joystick. Der Randmarker zeigt zum gewählten Ziel.','Set full thrust, then hold Shift (desktop) or the gold afterburner button (phone) for two seconds. Afterburner uses energy.':'Stelle vollen Schub ein. Halte dann Shift (Desktop) oder die goldene Nachbrennertaste (Handy) zwei Sekunden gedrückt. Der Nachbrenner verbraucht Energie.','{name} is disabled until the fighting ends.':'{name} ist bis zum Kampfende außer Gefecht.'});
 
 // Contextual flight coaching and equipment guidance.
 Object.assign(TUTORIAL_TRANSLATIONS, {

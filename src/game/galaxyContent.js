@@ -24,7 +24,7 @@ export const GALAXY_LOCATIONS = {
         "secondary": "#173b4a",
         "description": "A civilian freeport built from repaired modules and shared work. Its open markets face Acheron’s distant black hole, and its people keep the Alliance supplied without asking who you used to be.",
         "services": {
-            "fuel": true,
+            "ordnance": true,
             "repair": true,
             "market": true,
             "bar": true,
@@ -69,7 +69,7 @@ export const GALAXY_LOCATIONS = {
         "secondary": "#1c2d41",
         "description": "The Alliance’s disciplined shipworks: a ring of drydocks, test bays and supply halls where the frontier hulls are assembled and refitted beneath Acheron’s distant shadow.",
         "services": {
-            "fuel": true,
+            "ordnance": true,
             "repair": true,
             "market": true,
             "bar": true,
@@ -116,7 +116,7 @@ export const GALAXY_LOCATIONS = {
         "secondary": "#3e251e",
         "description": "A shielded foundry habitat beyond Acheron’s dangerous inner region. Ore comes in hot, food keeps the shifts moving, and every useful part leaves with a little furnace dust on it.",
         "services": {
-            "fuel": true,
+            "ordnance": true,
             "repair": true,
             "market": true,
             "bar": true,
@@ -158,7 +158,7 @@ export const GALAXY_LOCATIONS = {
         "secondary": "#2a2331",
         "description": "The Shattered Crown is a mineral-rich belt of broken rock and old machinery. Alliance scouts mark safe lanes while Cinderfall crews take the risks that keep its furnaces fed.",
         "services": {
-            "fuel": false,
+            "ordnance": false,
             "repair": false,
             "market": false,
             "bar": false,
@@ -185,7 +185,7 @@ export const GALAXY_LOCATIONS = {
         secondary: '#3d2e2b',
         description: 'A small fuel and repair depot beside the Mourning Line, and the home of Helios Verge’s informal racing scene.',
         services: {
-            fuel: true,
+            ordnance: true,
             repair: true,
             market: false,
             bar: true,
@@ -213,7 +213,7 @@ export const GALAXY_LOCATIONS = {
         secondary: '#233a53',
         description: 'A crowded core world wrapped in orbital infrastructure, consuming raw materials and exporting manufactured goods.',
         services: {
-            fuel: true,
+            ordnance: true,
             repair: true,
             market: true,
             bar: true,
@@ -266,7 +266,7 @@ export const GALAXY_LOCATIONS = {
         secondary: '#30424d',
         description: 'A vast orbital construction complex where civilian and military hulls are assembled, repaired, and refitted.',
         services: {
-            fuel: true,
+            ordnance: true,
             repair: true,
             market: true,
             bar: true,
@@ -319,7 +319,7 @@ export const GALAXY_LOCATIONS = {
         secondary: '#293b4a',
         description: 'A compact Concord checkpoint on one of Meridian’s primary jump approaches.',
         services: {
-            fuel: true,
+            ordnance: true,
             repair: true,
             market: false,
             bar: false,
@@ -361,7 +361,7 @@ export const GALAXY_LOCATIONS = {
         secondary: '#4c2025',
         description: 'A sprawling freeport cut into a dark moon, held together by uneasy bargains between crews, merchants, and syndicates.',
         services: {
-            fuel: true,
+            ordnance: true,
             repair: true,
             market: true,
             bar: true,
@@ -414,7 +414,7 @@ export const GALAXY_LOCATIONS = {
         secondary: '#473338',
         description: 'An aging independent industrial station kept alive by refining, freight work, and stubborn local crews.',
         services: {
-            fuel: true,
+            ordnance: true,
             repair: true,
             market: true,
             bar: true,
@@ -467,7 +467,7 @@ export const GALAXY_LOCATIONS = {
         secondary: '#492b2b',
         description: 'A lonely outer-route refinery offering fuel, basic repairs, and little else.',
         services: {
-            fuel: true,
+            ordnance: true,
             repair: true,
             market: false,
             bar: false,
@@ -509,7 +509,7 @@ export const GALAXY_LOCATIONS = {
         secondary: '#3b5965',
         description: 'A scientific habitat supporting planetary research, medical laboratories, and long-range survey work.',
         services: {
-            fuel: true,
+            ordnance: true,
             repair: true,
             market: true,
             bar: true,
@@ -562,7 +562,7 @@ export const GALAXY_LOCATIONS = {
         secondary: '#314b5b',
         description: 'An ice-covered moon with deep fractures, dark excavations, and settlements built around long supply lines.',
         services: {
-            fuel: true,
+            ordnance: true,
             repair: true,
             market: true,
             bar: true,
@@ -615,7 +615,7 @@ export const GALAXY_LOCATIONS = {
         secondary: '#3f5c68',
         description: 'A tiny navigation relay in a clear gap in the rings, important because it is the last quiet stop before the dense bands.',
         services: {
-            fuel: true,
+            ordnance: true,
             repair: true,
             market: false,
             bar: false,

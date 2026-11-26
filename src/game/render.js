@@ -5508,8 +5508,8 @@ export class SpaceRenderer {
         this.utilityBeamMaterial.opacity = 0.54 + Math.sin(performance.now() * 0.03) * 0.18;
         this.utilityBeam.visible = true;
     }
-    spawnExplosion(position, hostile = true, scale = 1, velocity) {
-        const effect = createShipExplosion(position, scale, { velocity });
+    spawnExplosion(position, hostile = true, scale = 1, velocity, { capital } = {}) {
+        const effect = createShipExplosion(position, scale, { velocity, capital });
         this.scene.add(effect.object);
         this.effects.push(effect);
         return effect;
@@ -5522,7 +5522,7 @@ export class SpaceRenderer {
         pod.visible=false;this.scene.add(effect.object);this.effects.push(effect);
     }
     spawnShipWreck(ship, variant, explosionScale) {
-        const fragments=createHullDebris(ship.position,Math.max(.5,explosionScale*.65),ship.velocity);
+        const fragments=createHullDebris(ship.position,Math.max(.5,explosionScale*.65),ship.velocity,ship.capitalClass?1:0);
         this.scene.add(fragments.object);this.effects.push(fragments);
         // Retire older cosmetic wrecks before debris-heavy battles accumulate
         // draw calls. Stationary salvage nodes remain entirely separate.

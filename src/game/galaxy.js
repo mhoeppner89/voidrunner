@@ -103,30 +103,30 @@ const SYSTEM_DEFINITIONS = {
 // the galaxy migration is complete.
 const LOCATION_DEFINITIONS = {
     "acheron-belt": {"id": "acheron-belt", "name": "The Shattered Crown", "kind": "field", "systemId": "acheron", "major": false, "services": ["mining"]},
-    "cinderfall": {"id": "cinderfall", "name": "Cinderfall Habitat", "kind": "station", "systemId": "acheron", "major": true, "services": ["market", "missions", "repairs", "fuel", "ships", "outfitting"]},
-    "league-yard": {"id": "league-yard", "name": "Unity Shipworks", "kind": "station", "systemId": "acheron", "major": true, "services": ["market", "missions", "repairs", "fuel", "ships", "outfitting"]},
-    "haven": {"id": "haven", "name": "Haven Freeport", "kind": "station", "systemId": "acheron", "major": true, "services": ["market", "missions", "repairs", "fuel", "ships", "outfitting"]},
-    helix: { id: 'helix', name: 'Helix Freeport', kind: 'station', systemId: 'helios-verge', major: true, services: ['market', 'missions', 'repairs', 'fuel', 'ships', 'outfitting'] },
-    rook: { id: 'rook', name: 'Rookhaven Bastion', kind: 'station', systemId: 'helios-verge', major: true, services: ['market', 'missions', 'repairs', 'fuel', 'ships', 'bounties'] },
-    vesper: { id: 'vesper', name: 'Vesper Colony', kind: 'planet', systemId: 'helios-verge', major: true, services: ['market', 'missions', 'repairs', 'fuel'] },
-    azure: { id: 'azure', name: 'Azure Reach', kind: 'planet', systemId: 'helios-verge', major: true, services: ['market', 'missions', 'repairs', 'fuel'] },
+    "cinderfall": {"id": "cinderfall", "name": "Cinderfall Habitat", "kind": "station", "systemId": "acheron", "major": true, "services": ["market", "missions", "repairs", "ordnance", "ships", "outfitting"]},
+    "league-yard": {"id": "league-yard", "name": "Unity Shipworks", "kind": "station", "systemId": "acheron", "major": true, "services": ["market", "missions", "repairs", "ordnance", "ships", "outfitting"]},
+    "haven": {"id": "haven", "name": "Haven Freeport", "kind": "station", "systemId": "acheron", "major": true, "services": ["market", "missions", "repairs", "ordnance", "ships", "outfitting"]},
+    helix: { id: 'helix', name: 'Helix Freeport', kind: 'station', systemId: 'helios-verge', major: true, services: ['market', 'missions', 'repairs', 'ordnance', 'ships', 'outfitting'] },
+    rook: { id: 'rook', name: 'Rookhaven Bastion', kind: 'station', systemId: 'helios-verge', major: true, services: ['market', 'missions', 'repairs', 'ordnance', 'ships', 'bounties'] },
+    vesper: { id: 'vesper', name: 'Vesper Colony', kind: 'planet', systemId: 'helios-verge', major: true, services: ['market', 'missions', 'repairs', 'ordnance'] },
+    azure: { id: 'azure', name: 'Azure Reach', kind: 'planet', systemId: 'helios-verge', major: true, services: ['market', 'missions', 'repairs', 'ordnance'] },
     shardbelt: { id: 'shardbelt', name: 'The Shattered Crown', kind: 'field', systemId: 'helios-verge', major: false, services: ['mining', 'missions'] },
     'mourning-line': { id: 'mourning-line', name: 'Mourning Line', kind: 'graveyard', systemId: 'helios-verge', major: false, services: ['salvage', 'missions', 'racing'] },
-    cairn: { id: 'cairn', name: 'Cairn Yard', kind: 'station', systemId: 'helios-verge', major: false, services: ['fuel', 'repairs', 'racing'] },
+    cairn: { id: 'cairn', name: 'Cairn Yard', kind: 'station', systemId: 'helios-verge', major: false, services: ['ordnance', 'repairs', 'racing'] },
 
-    'meridian-prime': { id: 'meridian-prime', name: 'Meridian Prime', kind: 'planet', systemId: 'meridian', major: true, services: ['market', 'missions', 'repairs', 'fuel'] },
-    argent: { id: 'argent', name: 'Argent Shipworks', kind: 'station', systemId: 'meridian', major: true, services: ['market', 'missions', 'repairs', 'fuel', 'ships', 'outfitting'] },
-    'gatehouse-twelve': { id: 'gatehouse-twelve', name: 'Gatehouse Twelve', kind: 'station', systemId: 'meridian', major: false, services: ['fuel', 'repairs', 'customs'] },
+    'meridian-prime': { id: 'meridian-prime', name: 'Meridian Prime', kind: 'planet', systemId: 'meridian', major: true, services: ['market', 'missions', 'repairs', 'ordnance'] },
+    argent: { id: 'argent', name: 'Argent Shipworks', kind: 'station', systemId: 'meridian', major: true, services: ['market', 'missions', 'repairs', 'ordnance', 'ships', 'outfitting'] },
+    'gatehouse-twelve': { id: 'gatehouse-twelve', name: 'Gatehouse Twelve', kind: 'station', systemId: 'meridian', major: false, services: ['ordnance', 'repairs', 'customs'] },
     'foundry-lanes': { id: 'foundry-lanes', name: 'The Foundry Lanes', kind: 'field', systemId: 'meridian', major: false, services: ['missions'] },
 
-    blackglass: { id: 'blackglass', name: 'Blackglass', kind: 'settlement', systemId: 'redwake', major: true, services: ['market', 'missions', 'repairs', 'fuel', 'bounties'] },
-    cinder: { id: 'cinder', name: 'Cinder Station', kind: 'station', systemId: 'redwake', major: true, services: ['market', 'missions', 'repairs', 'fuel'] },
-    torchwell: { id: 'torchwell', name: 'Torchwell', kind: 'station', systemId: 'redwake', major: false, services: ['fuel', 'repairs'] },
+    blackglass: { id: 'blackglass', name: 'Blackglass', kind: 'settlement', systemId: 'redwake', major: true, services: ['market', 'missions', 'repairs', 'ordnance', 'bounties'] },
+    cinder: { id: 'cinder', name: 'Cinder Station', kind: 'station', systemId: 'redwake', major: true, services: ['market', 'missions', 'repairs', 'ordnance'] },
+    torchwell: { id: 'torchwell', name: 'Torchwell', kind: 'station', systemId: 'redwake', major: false, services: ['ordnance', 'repairs'] },
     'redwake-belt': { id: 'redwake-belt', name: 'Redwake Belt', kind: 'field', systemId: 'redwake', major: false, services: ['missions', 'bounties'] },
 
-    nacre: { id: 'nacre', name: 'Nacre Station', kind: 'station', systemId: 'pale-ring', major: true, services: ['market', 'missions', 'repairs', 'fuel', 'research'] },
-    boreal: { id: 'boreal', name: 'Boreal', kind: 'planet', systemId: 'pale-ring', major: true, services: ['market', 'missions', 'repairs', 'fuel'] },
-    shepherd: { id: 'shepherd', name: 'Shepherd Relay', kind: 'station', systemId: 'pale-ring', major: false, services: ['fuel', 'repairs', 'navigation'] },
+    nacre: { id: 'nacre', name: 'Nacre Station', kind: 'station', systemId: 'pale-ring', major: true, services: ['market', 'missions', 'repairs', 'ordnance', 'research'] },
+    boreal: { id: 'boreal', name: 'Boreal', kind: 'planet', systemId: 'pale-ring', major: true, services: ['market', 'missions', 'repairs', 'ordnance'] },
+    shepherd: { id: 'shepherd', name: 'Shepherd Relay', kind: 'station', systemId: 'pale-ring', major: false, services: ['ordnance', 'repairs', 'navigation'] },
     'pale-rings': { id: 'pale-rings', name: 'The Pale Rings', kind: 'field', systemId: 'pale-ring', major: false, services: ['missions', 'research'] },
 };
 
@@ -146,14 +146,13 @@ const routeDefinition = (id, fromSystemId, toSystemId, fromLocationId, toLocatio
         [fromSystemId]: fromLocationId,
         [toSystemId]: toLocationId,
     },
-    // Inter-system jumps consume no fuel and buy no credits.  These flat
-    // fields make the zero-cost rule easy for callers to inspect, while the
-    // nested form is convenient when summing a multi-jump plan.
-    fuelCost: 0,
+    // Inter-system jumps are free. These flat fields make the zero-cost rule
+    // easy for callers to inspect, while the nested form is convenient when
+    // summing a multi-jump plan.
     creditCost: 0,
     creditsCost: 0,
-    cost: { fuel: 0, credits: 0 },
-    jumpCost: { fuel: 0, credits: 0 },
+    cost: { credits: 0 },
+    jumpCost: { credits: 0 },
     pirateMultiplier,
 });
 
@@ -434,7 +433,7 @@ export const shortestSystemHops = systemHops;
 export const hopsBetweenSystems = systemHops;
 export const shortestHops = systemHops;
 
-const zeroCost = () => ({ fuel: 0, credits: 0 });
+const zeroCost = () => ({ credits: 0 });
 
 const planFailure = (reason, origin, destination) => ({
     ok: false,
@@ -450,7 +449,6 @@ const planFailure = (reason, origin, destination) => ({
     hopCount: null,
     hops: null,
     cost: zeroCost(),
-    fuelCost: 0,
     creditCost: 0,
 });
 
@@ -507,7 +505,6 @@ export const planRemoteDestination = (origin, destination, options = {}) => {
             : (useDestinationLocation && localDestinationId ? localDestinationId : jumpArrivalLocationId),
         requiresLocalTransfer: Boolean(localDestinationId && localDestinationId !== jumpArrivalLocationId),
         cost: zeroCost(),
-        fuelCost: 0,
         creditCost: 0,
     };
 };

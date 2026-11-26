@@ -70,7 +70,7 @@ export const NAMED_EQUIPMENT = Object.freeze({
  'shield-mk2': {signature: 0x6fc4ff, name: 'Bastion', trait: 'Also regenerates shields 25% faster.', mods: {effect: 1.18}, effects: {rechargeMultiplier: 1.25}},
  'armor-mk2': {signature: 0xffb35c, name: 'Ironclad', trait: 'Also adds 30 shield capacity.', effects: {shieldCapacity: 30}},
  'sustained-reactor': {signature: 0xff6a3d, name: 'Heartfire', trait: 'Also stores 20% more energy.', effects: {capacityMultiplier: 1.2}},
- 'engine-mk2': {signature: 0x9fe8ff, name: 'Comet Tail', trait: 'Boost burns 30% less fuel.', mods: {effect: 1.15}, effects: {burnFuelMultiplier: .7}},
+ 'engine-mk2': {signature: 0x9fe8ff, name: 'Comet Tail', trait: 'Boost costs 30% less energy.', mods: {effect: 1.15}, effects: {burnEnergyMultiplier: .7}},
  'thrusters-mk2': {signature: 0x7cffc8, name: 'Dervish', trait: 'Also adds 10% top speed.', effects: {speedMultiplier: 1.1}},
 });
 // Technology tier is independent of rarity and of the hardware model name.

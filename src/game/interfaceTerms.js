@@ -2,7 +2,7 @@
 // languages use the same translated labels as the actual controls.
 export const UI_TERMS=Object.freeze({
  market:'MARKET',trade:'Trade',equipment:'Equipment',shipyard:'Shipyard',
- storage:'STORAGE',cargo:'CARGO',services:'SERVICES',refill:'REFILL',fuel:'Fuel and ordnance',
+ storage:'STORAGE',cargo:'CARGO',services:'SERVICES',refill:'REFILL',ordnance:'Ordnance',
  missionBoard:'MISSION BOARD',raceBoard:'RACE BOARD',raceDesk:'RACE DESK',contracts:'CONTRACTS',bar:'BAR',
  buyMax:'BUY MAX',sellAll:'SELL ALL',install:'INSTALL',accept:'ACCEPT',
  flight:'Flight',transponderOn:'TRANSPONDER ON',transponderOff:'TRANSPONDER OFF',

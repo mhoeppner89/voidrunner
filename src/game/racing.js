@@ -60,7 +60,7 @@ export const RACE_COURSES = Object.freeze({
         targetText: 'Rival times: ~29 / 37 / 42 seconds',
         recommendedShip: 'R-class loaner',
         recommendedShipText: 'Choose a race hull',
-        centerFuelReward: .5,
+        centerBoostReward: .5,
         rivalPaces: [42, 44, 46],
         racerSpeed: 44,
         localPoints: SHARD_RACE_LAYOUTS['shard-gauntlet'].points,
@@ -89,7 +89,7 @@ export const RACE_COURSES = Object.freeze({
         targetText: 'Rival times: ~36 / 45 / 55 seconds',
         recommendedShip: 'R-class loaner',
         recommendedShipText: 'Choose a race hull',
-        centerFuelReward: .5,
+        centerBoostReward: .5,
         rivalPaces: [48, 50, 52],
         racerSpeed: 50,
         localPoints: SHARD_RACE_LAYOUTS['shard-switchback'].points,
@@ -118,7 +118,7 @@ export const RACE_COURSES = Object.freeze({
         targetText: 'Rival times: ~58 / 74 / 90 seconds',
         recommendedShip: 'R-class loaner',
         recommendedShipText: 'Choose a race hull',
-        centerFuelReward: .3,
+        centerBoostReward: .3,
         rivalPaces: [56, 58, 60],
         racerSpeed: 58,
         localPoints: SHARD_RACE_LAYOUTS['shard-miners-knife'].points,
@@ -146,7 +146,7 @@ export const RACE_COURSES = Object.freeze({
         targetText: 'Rival times: ~39 / 48 / 61 seconds',
         recommendedShip: 'R-class loaner',
         recommendedShipText: 'Choose a race hull',
-        centerFuelReward: .65,
+        centerBoostReward: .65,
         rivalPaces: [80, 83, 86],
         racerSpeed: 83,
         localPoints: carrier.points,
@@ -174,7 +174,7 @@ export const RACE_COURSES = Object.freeze({
         targetText: 'Rival times: ~47 / 55 / 68 seconds',
         recommendedShip: 'R-class loaner',
         recommendedShipText: 'Choose a race hull',
-        centerFuelReward: .65,
+        centerBoostReward: .65,
         rivalPaces: [86, 90, 94],
         racerSpeed: 90,
         localPoints: breach.points,
@@ -202,7 +202,7 @@ export const RACE_COURSES = Object.freeze({
         targetText: 'Rival times: ~106 / 118 / 129 seconds',
         recommendedShip: 'R-class loaner',
         recommendedShipText: 'Choose a race hull',
-        centerFuelReward: .4,
+        centerBoostReward: .4,
         rivalPaces: [92, 97, 101],
         racerSpeed: 97,
         localPoints: gauntlet.points,
@@ -663,7 +663,6 @@ export const stageRaceRacers = (racers, course) => {
         ship.racePreviousPosition??=[0,0,0];
         arrayRead3(ship.position,ship.racePreviousPosition);
         ship.raceTactics=undefined;ship.raceContactUntil=0;ship.raceRecoverUntil=0;ship.raceGateRecovery=false;ship.raceGateReentry=false;
-        ship.raceFuel=100;
         ship.raceDrive=createRaceDrive();ship.raceAngularVelocity=[0,0,0];
         ship.raceLane=ship.laneOffset;
         ship.raceSplits=[];
@@ -1063,9 +1062,8 @@ export const updateRaceRacer = (ship, course, dt, worldTime = 0, steering) => {
             const ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2],vx=c[0]-b[0],vy=c[1]-b[1],vz=c[2]-b[2];
             bend=Math.min(bend,(ux*vx+uy*vy+uz*vz)/(Math.hypot(ux,uy,uz)*Math.hypot(vx,vy,vz)));
         }
-        const burning=stepRaceDrive(drive,worldTime>=(ship.raceContactUntil??0)&&(ship.raceFuel??100)>.5&&brake<.08&&bend>.975&&alignment>.99,dt,draft);
+        const burning=stepRaceDrive(drive,worldTime>=(ship.raceContactUntil??0)&&brake<.08&&bend>.975&&alignment>.99,dt,draft);
         ship.burning=burning;
-        if(burning)ship.raceFuel=Math.max(0,(ship.raceFuel??100)-dt*1.025*(1-.38*draft));
         const ceiling=burning?ship.afterburnSpeed:pace;
         desiredSpeed=ceiling*(1+draft*.14)*(1-brake*.7)*Math.max(.65,1-(1-bend)*6);
         acceleration*= (burning?1.65:1)*(1+draft*.18);

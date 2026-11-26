@@ -108,7 +108,7 @@ export function aceManeuver(ship,time,distance,noseDot,travelDot,range,safe,inFi
     if(plan?.teamRole==='flank'&&!underFire&&distance>range*1.05&&noseDot>.25&&plan.offset?.lengthSq()>.01&&canRepeat(ship,'oblique-intercept',time))
         return begin(ship,'oblique-intercept',time,agile?1.8:2.2,speed,agile);
     if(distance>=Math.max(range*1.35,300))return;
-    if(!timid&&ace&&agile&&noseDot<-.2&&ship.fuel>5&&speed>ship.speed*.45){
+    if(!timid&&ace&&agile&&noseDot<-.2&&(ship.energy??0)>(ship.combatFit?.stats?.energyCapacity??0)*.25&&speed>ship.speed*.45){
         // In a field, a powered rolling return keeps more control than a
         // coasting reversal. Both the drift corridor and exit must be clear.
         if(inField&&canRepeat(ship,'rolling-break',time))return begin(ship,'rolling-break',time,2,speed,agile);

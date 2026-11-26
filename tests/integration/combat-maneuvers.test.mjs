@@ -8,7 +8,7 @@ import {regenerateCombatResources} from '../../src/game/combatResources.js';
 
 function pilot(tier='veteran',hull='talon') {
  const stats=SHIPS[hull];
- return {id:'pilot',targetId:'target',pilot:{tier},combatFit:{stats},speed:stats.maxSpeed,fuel:40,velocity:[0,0,-stats.maxSpeed],combatIntent:'hunt',aiRng:()=>.3,
+ return {id:'pilot',targetId:'target',pilot:{tier},combatFit:{stats},speed:stats.maxSpeed,energy:stats.energyCapacity,velocity:[0,0,-stats.maxSpeed],combatIntent:'hunt',aiRng:()=>.3,
   combatPlan:{visible:true,right:new THREE.Vector3(1,0,0),up:new THREE.Vector3(0,1,0),escape:new THREE.Vector3(.9,.3,.1).normalize(),offset:new THREE.Vector3(),overshoot:false}};
 }
 function choose(ship,{time=1,distance=160,nose=1,travel=1,range=235,safe=true,closing=0}={}) {

@@ -23,7 +23,7 @@ const actualCargoMass = (player = {}) => {
     return Math.max(mass,inventoryCargoMass(player), Math.max(0, finite(player.cargoMass)));
 };
 const resolvedCargoMass = (player, requested) => Math.max(actualCargoMass(player), Math.max(0, finite(requested)));
-export const shipResources = player => Object.fromEntries(['shield','hull','energy','fuel','ammo','missiles','launcherMagazines','activeLauncherMountId','launcherFireMode'].filter(k=>player[k]!==undefined).map(k=>[k,clone(player[k])]));
+export const shipResources = player => Object.fromEntries(['shield','hull','energy','ammo','missiles','launcherMagazines','activeLauncherMountId','launcherFireMode'].filter(k=>player[k]!==undefined).map(k=>[k,clone(player[k])]));
 const context = (player, cargoMass) => ({
     credits: finite(player?.credits),
     shipId: player?.shipId ?? null,

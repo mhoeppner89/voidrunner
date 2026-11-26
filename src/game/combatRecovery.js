@@ -15,7 +15,7 @@ export function planShieldRecovery(session,ship,plan,target,now,distance){
  if(plan.visible){r.threat.copy(plan.threatPosition);r.targetPosition.copy(plan.position).add(plan.relative);r.targetVelocity.copy(plan.targetVelocity);}
  const hull=SHIPS[target?.shipId??target?.combatFit?.hullId],observed=plan.targetVelocity.length();
  const targetCruise=hull?.maxSpeed??Math.max(40,observed),targetBurn=Math.max(hull?.afterburnSpeed??observed,observed);
- r.speedAdvantage=!ship.crippled&&stats.maxSpeed>targetCruise+5&&(ship.fuel>4?stats.afterburnSpeed>targetBurn+8:stats.maxSpeed>observed+8);
+ r.speedAdvantage=!ship.crippled&&stats.maxSpeed>targetCruise+5&&((ship.energy??0)>stats.energyCapacity*.2?stats.afterburnSpeed>targetBurn+8:stats.maxSpeed>observed+8);
  if(r.active){
   const age=now-r.started;
   const recovered=age>4.5&&ship.shield>=r.shieldGoal&&ship.shieldDelay<=0;

@@ -33,7 +33,7 @@ for(const[name,engine,device]of [['desktop',chromium,{viewport:{width:1440,heigh
    });
    await page.waitForFunction(()=>!document.querySelector('#comms-bar').classList.contains('active'));
    await page.waitForFunction(()=>!__VOID_PRIVATEER__.getRuntime().ui.commsFitFrame);
-   const stats=await page.evaluate(()=>['#screen-own-speed','#screen-own-fuel'].map(selector=>{const e=document.querySelector(selector),b=e.getBoundingClientRect(),panel=e.closest('.cockpit-screen').getBoundingClientRect();return{selector,font:getComputedStyle(e).fontFamily,w:e.clientWidth,sw:e.scrollWidth,inside:b.left>=panel.left&&b.right<=panel.right+1&&b.bottom<=panel.bottom+1};}));
+   const stats=await page.evaluate(()=>['#screen-own-speed','#screen-own-drive'].map(selector=>{const e=document.querySelector(selector),b=e.getBoundingClientRect(),panel=e.closest('.cockpit-screen').getBoundingClientRect();return{selector,font:getComputedStyle(e).fontFamily,w:e.clientWidth,sw:e.scrollWidth,inside:b.left>=panel.left&&b.right<=panel.right+1&&b.bottom<=panel.bottom+1};}));
    for(const stat of stats){assert.ok(stat.font.includes('Courier'));assert.ok(stat.sw<=stat.w+1&&stat.inside,`${name}/${ship} ${JSON.stringify(stat)}`);}
    const idle=await measure();await page.screenshot({path:`${out}/${name}-${ship}-idle.png`});assert.ok(idle.bar.right<=idle.w&&idle.bar.top>=0&&(idle.bar.top<idle.h*.15||idle.bar.right<=idle.w*.45),`${name}/${ship} idle edge`);
    assert.deepEqual(idle.overlaps,[],`${name}/${ship} idle overlaps ${JSON.stringify(idle)}`);

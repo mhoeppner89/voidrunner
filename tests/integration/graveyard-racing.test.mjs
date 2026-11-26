@@ -81,7 +81,7 @@ test('Mourning routes retain the requested lengths and flowing bends',()=>{
    const b=new T.Vector3(...c.localPoints[j+1]).sub(new T.Vector3(...c.localPoints[j]));
    assert.ok(a.angleTo(b)<21*Math.PI/180,`${c.id}: abrupt bend at checkpoint ${j}`);
   }
-  assert.ok(c.gates.length*c.centerFuelReward<=35,'extra curve checkpoints do not inflate fuel rewards');
+  assert.ok(c.gates.length*c.centerBoostReward<=35,'extra curve checkpoints do not inflate boost rewards');
  }
 });
 

@@ -88,7 +88,6 @@ export const createNewSave = (seed = (Date.now() ^ Math.floor(Math.random() * 0x
             angularVelocity: [0, 0, 0],
             throttle: 0,
             credits: STARTING_CREDITS,
-            fuel: 100,
             // Identity transponder only. Turning it off hides the callsign, not
             // the hull: drive heat, weapons, damage, and utility emissions still
             // create a physical sensor contact in flight.
@@ -909,7 +908,8 @@ export const hydrateSave = (candidate) => {
     const currentResource = (value, fallbackValue) => value !== null && value !== '' && Number.isFinite(Number(value))
         ? Number(value)
         : fallbackValue;
-    save.player.fuel = clamp(currentResource(save.player.fuel, stats.fuel), 0, stats.fuel);
+    // Fuel was removed (0.8.2px): the afterburner draws energy instead.
+    delete save.player.fuel;
     save.player.shield = clamp(currentResource(save.player.shield, stats.shield), 0, stats.shield);
     save.player.hull = clamp(currentResource(save.player.hull, stats.hull), 1, stats.hull);
     save.player.energy = normalizeEnergy(save.player.energy, stats.energyCapacity);

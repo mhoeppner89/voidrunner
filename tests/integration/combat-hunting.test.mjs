@@ -8,7 +8,7 @@ import {observeIncomingFire,updateCombatIntent,combatThrottle,combatTrackingRate
 import {SHIPS} from '../../src/game/data.js';
 import {WEAPONS} from '../../src/game/weapons.js';
 import {loadoutFor} from '../../src/game/outfitting.js';
-function pilot(tier){return {pilot:{tier},shield:75,maxShield:75,hull:138,energy:58,combatFit:{stats:SHIPS.talon},speed:76,afterburnSpeed:128,fuel:40,velocity:[0,0,50],aiRng:()=>.5};}
+function pilot(tier){return {pilot:{tier},shield:75,maxShield:75,hull:138,energy:58,combatFit:{stats:SHIPS.talon},speed:76,afterburnSpeed:128,velocity:[0,0,50],aiRng:()=>.5};}
 
 test('novices break on grazing PDC fire; trained pilots tolerate it but react to a dangerous burst',()=>{
  for(const tier of ['novice','veteran','ace']){

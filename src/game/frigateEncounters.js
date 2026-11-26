@@ -9,7 +9,7 @@ import {TRAFFIC_HULLS} from './corvetteMounts.js';
 
 const fields = [
     'id','name','role','variant','hullId','faction','guild','livery','instanceId','pilot','task','destination',
-    'position','rotation','velocity','portraitIndex','recognitionName','fuel','lastResolvedPlayer','playerIntelPosition','hull','maxHull','shield','maxShield','energy','shieldDelay','combatFit',
+    'position','rotation','velocity','portraitIndex','recognitionName','lastResolvedPlayer','playerIntelPosition','hull','maxHull','shield','maxShield','energy','shieldDelay','combatFit',
     'capitalClass','capitalSpawnKey','capitalMountHull','missingPods','collisionVariant','lostDroneBays',
     'cargo','equipmentRecords','lootKey','repairDronesHeld','hostile','targetId','combatThreatId','combatThreatUntil',
     'frigateEncounterId','launchOwner','formationSlot','formationPoint','formationTrail','convoyEscape','convoyPort',

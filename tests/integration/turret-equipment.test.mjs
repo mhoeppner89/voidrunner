@@ -53,7 +53,7 @@ test('power, shield and engine alternatives keep their roles without crippling p
  const p=createNewSave(8).player,fit=p.outfitting.loadouts.wayfarer;fit.guns.fill(null);fit.launchers.fill(null);const base=getEffectiveShipStats(p);
  fit.utility[0]='capacitor-bank';let stats=getEffectiveShipStats(p);assert.ok(stats.energyCapacity>base.energyCapacity&&stats.reactorOutput===base.reactorOutput);
  fit.utility[0]='sustained-reactor';stats=getEffectiveShipStats(p);assert.equal(stats.energyCapacity,base.energyCapacity);assert.ok(stats.reactorOutput>base.reactorOutput);
- fit.utility[1]='engine-mk2';stats=getEffectiveShipStats(p);assert.ok(stats.maxSpeed>base.maxSpeed&&stats.angularAcceleration===base.angularAcceleration&&stats.burnFuelMultiplier===1);
+ fit.utility[1]='engine-mk2';stats=getEffectiveShipStats(p);assert.ok(stats.maxSpeed>base.maxSpeed&&stats.angularAcceleration===base.angularAcceleration&&stats.burnEnergyMultiplier===1);
  fit.utility[1]='thrusters-mk2';stats=getEffectiveShipStats(p);assert.ok(stats.maxSpeed===base.maxSpeed&&stats.angularAcceleration>base.angularAcceleration&&stats.lateralMultiplier>1);
  fit.utility[2]='recovery-shield';stats=getEffectiveShipStats(p);assert.ok(stats.shield===base.shield&&stats.shieldRechargeMultiplier>1);
 });

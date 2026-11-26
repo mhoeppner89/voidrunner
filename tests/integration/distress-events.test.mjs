@@ -102,7 +102,7 @@ test('an old tow save clears a stranded call without erasing later calls',()=>{
 
 test('eight authored variants, two setups each, and an 85/15 genuine/trap split', () => {
     assert.equal(DISTRESS_VARIANTS.length, 8);
-    assert.deepEqual([...DISTRESS_VARIANT_IDS], ['convoy', 'wreck', 'trap', 'fuel', 'disabled', 'debris', 'jettison', 'dispute']);
+    assert.deepEqual([...DISTRESS_VARIANT_IDS], ['convoy', 'wreck', 'trap', 'power', 'disabled', 'debris', 'jettison', 'dispute']);
     for (const variant of DISTRESS_VARIANTS) {
         assert.equal(variant.setups.length, 2, variant.id);
         assert.equal(new Set(variant.setups.map(setup => setup.caller)).size, 2, variant.id);
@@ -130,12 +130,12 @@ test('calls are owed only after the first window, avoid the last two variants an
     data().nextAt = 0;
     assert.equal(s.distressPickupDue(), false, 'a live call blocks the next one');
     assert.equal(s.beginDistressPickup(), false, 'an unresolved event must not be replaced');
-    data().lastVariants = ['trap', 'wreck', 'fuel'];
+    data().lastVariants = ['trap', 'wreck', 'power'];
     let sawOlder = false;
     for (let i = 0; i < 200; i++) {
         const picked = s.pickDistressVariant(() => i / 200);
         assert.ok(!['trap', 'wreck'].includes(picked), 'the two newest variants are not repeated');
-        if (picked === 'fuel') sawOlder = true;
+        if (picked === 'power') sawOlder = true;
     }
     assert.ok(sawOlder, 'a variant older than the two newest stays eligible');
 });
@@ -303,15 +303,15 @@ test('a category alternates its callers instead of drawing the same setup twice'
     assert.ok(seen.size > 2, 'the sample covers more than two categories');
 });
 
-// A fuel call is a fuel call: it may be dull, but it must never read as a ship
+// A power call is a power call: it may be dull, but it must never read as a ship
 // already in a fight, and it must not borrow the trap's vagueness either.
-test('a fuel pickup says fuel, and the bait pool never claims an attacker', () => {
+test('a power pickup says power, and the bait pool never claims an attacker', () => {
     const s = make();
     s.autopilot = true;
-    s.debugStartDistress('fuel', 0, {phase: 'signal', distance: 6800, pickup: true});
+    s.debugStartDistress('power', 0, {phase: 'signal', distance: 6800, pickup: true});
     const active = s.save.world.distress.active;
     const text = dialogueText(distressDialogue(active.id, s.save).nodes.main.text, 'de');
-    assert.match(text, /Sprit|Treibstoff/, 'the call names what is missing');
+    assert.match(text, /Reaktor|Energie|Strom/, 'the call names what is missing');
     assert.doesNotMatch(text, /Pirat|Angriff|greifen an|beschossen/i, 'and no one is shooting at them');
 
     // The trap's pool is civilian trouble only: a baited mayday cannot announce
@@ -648,19 +648,19 @@ test('declining and attacking a neutral leave the rescue unpaid', () => {
     assert.equal(betrayed.save.world.distress.history[0].outcome, 'betrayed');
 });
 
-test('fuel transfers deduct the stated reserve once and insufficient tanks are explained', () => {
+test('power transfers deduct the stated charge once and a low capacitor is explained', () => {
     const s = make();
-    s.debugStartDistress('fuel', 0, {phase: 'discovered', fuel: 40});
+    s.debugStartDistress('power', 0, {phase: 'discovered', energy: 60});
     atEvent(s);
     const before = s.save.player.credits;
     assert.deepEqual(s.chooseDistress('transfer'), {ok: true});
-    assert.equal(s.save.player.fuel, 32);
+    assert.equal(s.save.player.energy, 20);
     assert.equal(s.save.player.credits - before, 1200);
     assert.equal(s.save.world.distress.active, null);
     assert.equal(s.save.world.distress.history[0].outcome, 'supplied');
 
     const short = make();
-    short.debugStartDistress('fuel', 0, {phase: 'discovered', fuel: 5});
+    short.debugStartDistress('power', 0, {phase: 'discovered', energy: 5});
     atEvent(short);
     const oldLanguage = getLanguage();
     setLanguage('en');
@@ -669,7 +669,7 @@ test('fuel transfers deduct the stated reserve once and insufficient tanks are e
     let script;
     try {
         script = distressDialogue(short.save.world.distress.active.id, short.save);
-        assert.match(script.nodes.main.text, /running on 5 yourself/);
+        assert.match(script.nodes.main.text, /capacitor only reads 5/);
     } finally {
         setLanguage(oldLanguage);
     }
@@ -678,10 +678,10 @@ test('fuel transfers deduct the stated reserve once and insufficient tanks are e
     assert.ok(short.save.world.distress.active);
 
     const far = make();
-    far.debugStartDistress('fuel', 0, {phase: 'discovered', fuel: 40});
+    far.debugStartDistress('power', 0, {phase: 'discovered', energy: 40});
     far.save.player.position = [5000, 0, 0];
     assert.deepEqual(far.chooseDistress('transfer'), {ok: false});
-    assert.equal(far.save.player.fuel, 40);
+    assert.equal(far.save.player.energy, 40);
 });
 
 test('parts repairs consume normal cargo; a drone repair resolves when the hull target is met', () => {
@@ -885,7 +885,7 @@ test('reload restores damaged actors and never returns destroyed ones', () => {
 
 test('repeated encounters leave no actors, props or unbounded history behind', () => {
     const s = make();
-    for (const variant of ['convoy', 'wreck', 'jettison', 'dispute', 'fuel']) {
+    for (const variant of ['convoy', 'wreck', 'jettison', 'dispute', 'power']) {
         s.debugStartDistress(variant, 0, {phase: 'discovered'});
         atEvent(s);
         s.chooseDistress('decline');
@@ -912,10 +912,10 @@ test('normalization bounds history and rejects malformed active records', () => 
     const data = normalizeDistress(world);
     assert.equal(data.active, null);
     assert.equal(data.history.length, 8);
-    assert.ok(data.history.every(entry => entry.variant === 'fuel' && entry.reward <= 20000));
+    assert.ok(data.history.every(entry => entry.variant === 'power' && entry.reward <= 20000), 'old fuel calls load as power calls');
     assert.equal(data.nextAt, 0);
     assert.equal(data.counter, 0);
-    assert.deepEqual(data.lastVariants, ['fuel', 'trap', 'wreck']);
+    assert.deepEqual(data.lastVariants, ['power', 'trap', 'wreck']);
 });
 
 test('repair drones accept neutral event ships but not hostile raiders', () => {
@@ -1312,13 +1312,13 @@ test('the briefing names the contact and the situation without spoiling a trap',
     assert.doesNotMatch(trapNode.mission.title, /Falscher Notruf/);
 });
 
-test('a fuel briefing waits for transfer range', () => {
+test('a power briefing waits for transfer range', () => {
     const s = make();
     const offered = [];
     s.ui = {...s.ui, showStoryLine: (...args) => offered.push(args)};
-    s.debugStartDistress('fuel', 0, {phase: 'discovered', distance: 1200});
+    s.debugStartDistress('power', 0, {phase: 'discovered', distance: 1200});
     tick(s);
-    assert.equal(offered.length, 0, 'too far to hand over fuel: the card waits');
+    assert.equal(offered.length, 0, 'too far to hand over power: the card waits');
     atEvent(s);
     tick(s);
     assert.equal(offered.length, 1, 'inside transfer range the card opens');
@@ -1368,7 +1368,7 @@ const VOICE_LABEL_KEYS = {
     convoy: ['help', 'decline'],
     wreck: ['accept', 'decline'],
     trap: ['scan', 'expose', 'decline'],
-    fuel: ['give', 'donate', 'decline'],
+    power: ['give', 'donate', 'decline'],
     disabled: ['parts', 'crew', 'decline'],
     debris: ['accept', 'decline'],
     jettison: ['recover', 'keep', 'decline'],
@@ -1378,7 +1378,7 @@ const VOICE_ENDING_KEYS = {
     convoy: ['rescued'],
     wreck: ['salvaged'],
     trap: ['foughtOff'],
-    fuel: ['supplied', 'suppliedGift'],
+    power: ['supplied', 'suppliedGift'],
     disabled: ['repaired'],
     debris: ['escapedClean', 'escapedRough', 'lost'],
     jettison: ['returned', 'kept'],
@@ -1400,7 +1400,7 @@ test('every caller owns a full set of labels and closing lines', () => {
 });
 
 test('two callers of one category never share a label, a payout line or a farewell', () => {
-    const values = {fuel: 8, parts: 2, payment: '1.200', reward: '4.000 cr', hull: 88};
+    const values = {energy: 40, parts: 2, payment: '1.200', reward: '4.000 cr', hull: 88};
     for (const variant of DISTRESS_VARIANTS) {
         const seen = new Map();
         variant.setups.forEach((setup, index) => {
@@ -1429,12 +1429,12 @@ test('the ending fills in the payout it actually paid', () => {
     const closed = [];
     s.ui.pushEvent = (message, tone, duration, title) => closed.push({message, tone, title});
     s.playStoryLine = (speaker, text) => closed.push({speaker, text});
-    s.debugStartDistress('fuel', 1, {phase: 'discovered', fuel: 40});
+    s.debugStartDistress('power', 1, {phase: 'discovered', energy: 60});
     s.chooseDistress('transfer');
     const text = closed.map(entry => entry.message ?? entry.text).join('\n');
-    // Nettle called, so Nettle closes the call — not Tallow, the other fuel
-    // hauler of the same category.
-    assert.match(text, /Nettle läuft wieder · 6 Einheiten gegen 900 cr/);
+    // Nettle called, so Nettle closes the call — not Tallow, the other dead
+    // reactor of the same category.
+    assert.match(text, /Nettle läuft wieder · 30 Energie gegen 900 cr/);
     assert.match(text, /Neunhundert, wie versprochen/);
     assert.doesNotMatch(text, /Tallow|Zwölfhundert/);
 });

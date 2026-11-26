@@ -7,7 +7,7 @@ import {fixture} from '../helpers/session.mjs';
 import {regenerateCombatResources} from '../../src/game/combatResources.js';
 
 function setup(kind,hull='talon',tier='ace') {
- const stats=SHIPS[hull],s={targetId:'foe',pilot:{tier},combatFit:{stats},speed:stats.maxSpeed,fuel:50,velocity:[0,0,-stats.maxSpeed],combatIntent:'hunt',aiRng:()=>.3,
+ const stats=SHIPS[hull],s={targetId:'foe',pilot:{tier},combatFit:{stats},speed:stats.maxSpeed,energy:stats.energyCapacity,velocity:[0,0,-stats.maxSpeed],combatIntent:'hunt',aiRng:()=>.3,
   combatPlan:{visible:true,right:new THREE.Vector3(1,0,0),up:new THREE.Vector3(0,1,0),escape:new THREE.Vector3(1,0,0),offset:new THREE.Vector3(),targetVelocity:new THREE.Vector3(0,0,-70),clearance:50},
   gunAim:{visible:true,targetId:'foe',acceleration:new THREE.Vector3(15,0,0)}};
  const a={time:1,distance:160,nose:.8,travel:.8,closing:25};

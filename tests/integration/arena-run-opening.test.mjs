@@ -35,7 +35,7 @@ test('equipment offers remain three even after the ordinary upgrade pool is exha
 });
 test('accepting the first opening reward stays in preparation; the second can launch',()=>{
  const save=newArenaRun(false,7),r=save.arenaRun;r.hullOffers=runHullOffers(save);changeRunHull(save,'scrapper');
- let launched=0,shown=0;const session={save,ui:{runFitNotice:'',setCockpitShip(){}},playerStats:()=>({shield:1000,hull:1000,energyCapacity:1000,fuel:1000}),syncWeaponProjection(){},showRunPreparation(){shown++},startRunWave(){launched++}};
+ let launched=0,shown=0;const session={save,ui:{runFitNotice:'',setCockpitShip(){}},playerStats:()=>({shield:1000,hull:1000,energyCapacity:1000}),syncWeaponProjection(){},showRunPreparation(){shown++},startRunWave(){launched++}};
  session.arenaRunAction=ArenaRunMethods.arenaRunAction;
  r.selectedReward=r.offers[0];session.arenaRunAction('accept');assert.equal(launched,0);assert.equal(shown,1);
  r.selectedReward=r.offers[0];session.arenaRunAction('accept');assert.equal(launched,1);

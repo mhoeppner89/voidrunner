@@ -90,3 +90,17 @@ test('all current GLB hulls fracture into finite, bounded, textured sections',as
   e.update(120);for(const p of e.sections)assert.ok(p.group.position.toArray().every(Number.isFinite));report.push({variant,sections:e.sections.length,triangles:tris,draws,buildMs:+build.toFixed(2),spawnMs:+spawn.toFixed(2)});e.dispose();dispose(root);
  }console.log(JSON.stringify({wreckAudit:report}));}finally{factory.dispose();globalThis.createImageBitmap=previous;}
 });
+test('big hulls hold together a moment, then ease apart; their blast burns longer and sheds plates slower',async()=>{
+ const {createShipExplosion}=await import('../../src/game/explosionFx.js');
+ const root=source(),factory=new ShipWreckFactory();root.scale.setScalar(5);
+ const e=factory.create(root,{...actor,velocity:[0,0,0]}),start=e.sections.map(p=>p.group.position.clone());
+ e.update(.6);assert.ok(e.sections.every((p,i)=>p.group.position.distanceTo(start[i])<1e-9),'the hull holds through the first flash');
+ const step=t=>{const before=e.sections[0].group.position.clone();e.update(t);return e.sections[0].group.position.distanceTo(before)/t;};
+ const early=step(.5),late=(e.update(6),step(1)),v=e.sections[0].velocity.length();
+ assert.ok(early<v*.5,'sections start slowly');assert.ok(Math.abs(late-v)<v*.05,'and reach their drift speed');
+ e.dispose();factory.dispose();
+ const fighter=createShipExplosion([0,0,0],3),corvette=createShipExplosion([0,0,0],3,{capital:.5});
+ assert.ok(corvette.life>fighter.life*1.6,`${corvette.life} vs ${fighter.life}`);
+ const spread=calm=>{const d=createHullDebris([0,0,0],2,[0,0,0],calm),m=d.object.children[0],matrix=new T.Matrix4(),p=new T.Vector3();d.update(1);let sum=0;for(let i=0;i<m.count;i++){m.getMatrixAt(i,matrix);sum+=p.setFromMatrixPosition(matrix).length();}return sum;};
+ assert.ok(spread(1)<spread(0)*.6);
+});

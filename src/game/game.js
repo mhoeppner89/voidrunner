@@ -38,7 +38,7 @@ import {createMiningContacts,updateMiningContacts} from './miningSurface.js';
 import { DRONE_PORTS } from './droneFlight.js';
 import {updateNpcDrones,droneUnits,damageNpcDrone} from './npcDrones.js';
 import {equipCorvette,applyCapitalSubsystemEffects,updateCorvetteWeapons,capitalSubsystemExplosionScale,frigateHullDamageScale,FRIGATE_HULL,equipFrigate,frigateTorpedoLaneClear,updateCapitalBroadsideAttack,updateFrigateBatteries,damageCapitalMount,segmentCapitalMountHit} from './capitalCombat.js';
-import {observeIncomingFire, updateCombatIntent, combatThrottle, combatTrackingRate, holdingFiringWindow} from './combatPiloting.js';
+import {observeIncomingFire, updateCombatIntent, combatThrottle, combatTrackingRate, holdingFiringWindow, BURN_RESERVE} from './combatPiloting.js';
 import {planCombatFlight, combatPursuitDirection, friendlyFiringLaneBlocked} from './combatPlanning.js';
 import { combatTargetEligible, tracksActivePlayer } from './combatTargeting.js';
 import {getPdcDefenseChannel} from './pdcFireControl.js';
@@ -795,6 +795,9 @@ const CAPITAL_CLASS_BY_VARIANT = Object.freeze({
     'concord-carrier': 'carrier',
     'concord-battleship': 'battleship',
 });
+// Seconds an Arena level keeps running after a big ship dies, so the pilot
+// sees the explosion and the hull drifting apart (user request).
+export const CAPITAL_BLAST_HOLD = Object.freeze({corvette: 6, large: 8});
 const CAPITAL_SHIP_STATS = Object.freeze({
     corvette: Object.freeze({explosionScale:1.5}),
     frigate: Object.freeze({
@@ -1382,7 +1385,7 @@ export class GameSession {
     // Race slipstream assist is computed before updatePlayer and consumed by
     // that controller without changing the player's ship-class statistics.
     raceDraftStrength = 0;
-    raceDraftFuelMultiplier = 1;
+    raceDraftBurnMultiplier = 1;
     // Emergent interactions (mid-flight mugs, smuggler flags) only run in the
     // live game — headless combat probes build sessions via Object.create and
     // never set this, so their pirates always fight straight (see shipAI.js).
@@ -1564,7 +1567,6 @@ export class GameSession {
         player.shield = stats.shield;
         player.hull = stats.hull;
         player.energy = stats.energyCapacity;
-        player.fuel = stats.fuel;
         fillLauncherMagazines(player);
         player.ammo = Object.fromEntries(Object.entries(AMMO_CAPACITY).map(([ammoId, capacity]) => [ammoId, capacity]));
     }
@@ -1861,7 +1863,6 @@ export class GameSession {
         player.shield = stats.shield;
         player.hull = stats.hull;
         player.energy = stats.energyCapacity;
-        player.fuel = stats.fuel;
         player.currentTargetId = undefined;
         player.navTargetId = 'helix';
         this.audio.setStationMode(false);
@@ -1979,7 +1980,6 @@ export class GameSession {
             ship.maxHull = ship.hull = ship.combatFit.stats.hull;
             ship.combatFit.resources.shield = ship.maxShield;
             ship.energy = ship.combatFit.stats.energyCapacity;
-            ship.fuel = ship.combatFit.stats.fuel;
         }
         this.applyObserverShipState(ship, entry);
         this.relabelObserverShips();
@@ -2426,8 +2426,7 @@ export class GameSession {
         player.velocity = [0, 0, 0];
         player.angularVelocity = [0, 0, 0];
         if(!config.run)player.throttle = debrisCollisionTest ? 0 : 0.35;
-        if(!config.run){player.fuel = stats.fuel;
-        player.shield = stats.shield;
+        if(!config.run){player.shield = stats.shield;
         player.hull = stats.hull;
         player.energy = stats.energyCapacity;
         fillLauncherMagazines(player);}
@@ -3189,7 +3188,7 @@ export class GameSession {
         }
         // Drafting is a race-only assist and must be sampled from the previous
         // racer positions before the player's movement for this step. It feeds
-        // updatePlayer's acceleration/speed/fuel terms without changing the
+        // updatePlayer's acceleration/speed/burn-energy terms without changing the
         // ship-class stats returned by playerStats().
         this.updateRaceSlipstreamState(dt);
         if (this.pendingDroneDeparture) {
@@ -3319,7 +3318,7 @@ export class GameSession {
         const race = this.activeRace;
         const previousStrength = this.raceDraftStrength ?? 0;
         this.raceDraftStrength = 0;
-        this.raceDraftFuelMultiplier = 1;
+        this.raceDraftBurnMultiplier = 1;
         if (!race || race.state !== 'running') {
             const draft = race?.draft;
             if (draft?.active) {
@@ -3355,10 +3354,10 @@ export class GameSession {
         draft.strength = active ? strength : 0;
         // A perfect wake saves 38% (inside the requested 35–40% band); a weak
         // edge wake scales up smoothly instead of granting the full benefit.
-        // The multiplier is consumed only by afterburning fuel.
+        // The multiplier is consumed only by the afterburner's energy draw.
         draft.savePercent = active ? Math.round(38 * strength) : 0;
         this.raceDraftStrength = active ? strength : 0;
-        this.raceDraftFuelMultiplier = active ? 1 - 0.38 * strength : 1;
+        this.raceDraftBurnMultiplier = active ? 1 - 0.38 * strength : 1;
         const now = this.save.world.time;
         if (active && (!wasActive || sourceChanged || strength - (draft.lastStrength ?? previousStrength) >= 0.28)) {
             if (now >= (draft.audioCooldownUntil ?? 0)) {
@@ -3444,7 +3443,7 @@ export class GameSession {
             drive:createRaceDrive(),
             boostCollected:new Set(),
             playerSplits: [],
-            centerFuelRewarded: new Set(),
+            centerBoostRewarded: new Set(),
             shortcut: undefined,
             draft,
             slipstream: draft,
@@ -3581,12 +3580,13 @@ export class GameSession {
         const centered = this.raceGateClosestDistanceSq(previous, current, gate) <= centerRadius * centerRadius;
         if (centeredOnly && !centered)
             return false;
-        race.centerFuelRewarded ??= new Set();
-        if (centered && !race.centerFuelRewarded.has(gate.id)) {
+        race.centerBoostRewarded ??= new Set();
+        if (centered && !race.centerBoostRewarded.has(gate.id)) {
+            // A centred gate refunds that many seconds of afterburner energy.
             const stats = this.playerStats();
-            const reward = gate.centerFuelReward ?? race.course.centerFuelReward ?? 2.5;
-            this.save.player.fuel = Math.min(stats.fuel, (this.save.player.fuel ?? 0) + reward);
-            race.centerFuelRewarded.add(gate.id);
+            const reward = gate.centerBoostReward ?? race.course.centerBoostReward ?? 2.5;
+            this.save.player.energy = Math.min(stats.energyCapacity, (this.save.player.energy ?? 0) + reward * stats.burnEnergy);
+            race.centerBoostRewarded.add(gate.id);
         }
         return centered;
     }
@@ -3941,7 +3941,7 @@ export class GameSession {
         delete this.save.player.raceFinishTime;
         delete this.save.player.raceContactUntil;delete this.save.player.raceTouchedAt;delete this.save.player.raceRecoverUntil;delete this.save.player.raceEscapeSign;
         this.raceDraftStrength = 0;
-        this.raceDraftFuelMultiplier = 1;
+        this.raceDraftBurnMultiplier = 1;
     }
     // A paid-but-unraced entry survives a reload: rebuild the travel leg from
     // the persisted quest flags. Mid-race reloads downgrade to travel — grid,
@@ -4237,13 +4237,16 @@ export class GameSession {
             this.setHyperdriveStatus(t('DISENGAGED · MANUAL INPUT'));
             this.audio.play('hyperDrop');
         }
-        // Afterburner: the burn is live whenever the button is held with fuel
-        // (never in autopilot), at ANY throttle and ANY speed — turn authority
-        // doubles and the burn visuals (FOV, cockpit zoom, engine audio) play
-        // the whole time. Only the speed ceiling is gated: it rises to
-        // afterburnSpeed once the ship is moving at >= 90% of max speed, so
-        // below that the burn holds the current speed instead of adding to it.
-        this.afterburning = !this.autopilot && actions.afterburner && this.save.player.fuel > 0.5;
+        // Afterburner: the burn is live whenever the button is held (never in
+        // autopilot), at ANY throttle and ANY speed — turn authority doubles
+        // and the burn visuals (FOV, cockpit zoom, engine audio) play the
+        // whole time. It draws energy (stats.burnEnergy per second). With an
+        // empty capacitor the burn keeps its turn boost, so a missile break
+        // always works, but loses the extra speed. The speed ceiling also
+        // waits for >= 90% of max speed, so below that the burn holds the
+        // current speed instead of adding to it.
+        this.afterburning = !this.autopilot && actions.afterburner;
+        const burnPowered = this.afterburning && this.save.player.energy > 0;
         const raceDrive=this.activeRace?.state==='running'&&this.activeRace.course.racingLine ? (this.activeRace.drive??=createRaceDrive()) : undefined;
         if(this.save.player.raceReturn){this.save.player.throttle=actions.afterburner&&!actions.fire&&this.save.world.time>=(this.save.player.raceContactUntil??0)?1:0;this.afterburning=this.save.player.throttle>0;if(raceDrive){raceDrive.stabilizerTime=Math.max(0,raceDrive.stabilizerTime-dt);raceDrive.burning=this.afterburning;}}
         else if(raceDrive)this.afterburning=stepRaceDrive(raceDrive,this.afterburning&&this.save.world.time>=(this.save.player.raceContactUntil??0),dt,draftStrength);
@@ -4276,7 +4279,7 @@ export class GameSession {
         // Speed gate: below 90% of max speed the burn holds the current cruise
         // ceiling (turn move); past it the ceiling rises to afterburnSpeed and
         // the damped acceleration below ramps the boost in smoothly.
-        if (this.afterburning && (raceDrive || velocity.length() >= 0.9 * stats.maxSpeed)) {
+        if (this.afterburning && (raceDrive || burnPowered && velocity.length() >= 0.9 * stats.maxSpeed)) {
             speedCeiling = stats.afterburnSpeed;
             if(raceDrive)acceleration*=1.65;
             targetSpeed = this.save.player.throttle * speedCeiling;
@@ -4299,12 +4302,10 @@ export class GameSession {
         else if(this.save.player.raceReturn) integrateRaceVelocity(velocity,forward,raceHull(this.save.player.shipId),this.save.player.throttle,actions.fire?1:0,this.afterburning,dt,draftStrength,raceDrive?.stabilizerTime>0,this.save.settings.flightAssist);
         else integrateFlightVelocity(velocity, forward, targetSpeed, speedCeiling, acceleration,
             this.save.settings.flightAssist, this.afterburning, this.save.player.throttle, dt, stats.lateralMultiplier??1);
-        // Fuel is afterburner propellant and nothing else: normal flight and
-        // the hyperdrive cruise never touch it. Running dry only kills the burn.
-        if (this.afterburning&&!this.save.player.raceReturn)
-            this.save.player.fuel = Math.max(0, this.save.player.fuel - dt * 1.025 * (stats.burnFuelMultiplier ?? 1) * (this.raceDraftFuelMultiplier ?? 1));
-        if (this.save.player.fuel <= 0)
-            this.afterburning = false;
+        // The burn draws energy; normal flight and the hyperdrive cruise never
+        // do. A race drive meters its own charge, so it costs no energy.
+        if (this.afterburning&&!this.save.player.raceReturn&&!raceDrive)
+            this.save.player.energy = Math.max(0, this.save.player.energy - dt * (stats.burnEnergy ?? 0) * (this.raceDraftBurnMultiplier ?? 1));
         let hyperdriveDropped = false;
         let hyperdriveArrived = false;
         if (this.autopilot && this.hyperdriveFx !== 'spooling') {
@@ -9208,7 +9209,8 @@ export class GameSession {
         if (!ship.combatFit || (ship.tutorialEnemy || ship.tutorialCompanion) && !ship.campaignCombat || ship.capitalClass || ship.race) return;
         const stats=ship.combatFit.stats;
         ship.speed=stats.maxSpeed;ship.afterburnSpeed=stats.afterburnSpeed;
-        ship.fuel ??= stats.fuel;
+        // A ship without a charge yet (fixtures, restored actors) starts full.
+        if(!Number.isFinite(ship.energy))ship.energy=stats.energyCapacity;
         return stats;
     }
     // The centre ray misses a wing or tail swinging into a nearby surface.
@@ -9281,7 +9283,8 @@ export class GameSession {
     integrateNpcFlight(ship, position, velocity, orientation, desiredOrientation, targetSpeed, burnWanted, assisted, dt, trackTarget=false) {
         const stats=this.npcFlightStats(ship);
         const angular=ship.flightAngularVelocity ??= new THREE.Vector3();
-        ship.burning=Boolean(!ship.crippled && burnWanted && ship.fuel>0.5);
+        // An NPC burn draws energy like the pilot's; empty, it keeps the turn boost only.
+        ship.burning=Boolean(!ship.crippled && burnWanted);
         const nav = ship.fieldNav;
         const escape = nav && this.npcSurfaceEscape(ship, nav, position, velocity, orientation, desiredOrientation,
             targetSpeed, assisted, ship.burning, stats);
@@ -9296,13 +9299,13 @@ export class GameSession {
             ship.burning = false;
             assisted = true;
         }
-        const ceiling=ship.burning && velocity.length()>=stats.maxSpeed*0.9 ? stats.afterburnSpeed : stats.maxSpeed;
+        const ceiling=ship.burning && (ship.energy??0)>0 && velocity.length()>=stats.maxSpeed*0.9 ? stats.afterburnSpeed : stats.maxSpeed;
         const tracking=trackTarget?combatTrackingRate(ship,orientation,desiredOrientation,dt):undefined;
         if(!trackTarget&&ship.flightTracking){ship.flightTracking.previous.copy(desiredOrientation);ship.flightTracking.world.set(0,0,0);}
         steerFlightTurn(orientation,angular,desiredOrientation,stats,assisted,ship.burning,dt,tracking,ship.pilot?.tier==='ace'?3.6:1);
         const forward=(this.tmpNpcFlightForward ??= new THREE.Vector3()).copy(FORWARD).applyQuaternion(orientation).normalize();
         integrateFlightVelocity(velocity,forward,Math.min(targetSpeed,ceiling),ceiling,stats.acceleration,assisted,ship.burning,targetSpeed>0?1:0,dt,stats.lateralMultiplier??1);
-        if(ship.burning)ship.fuel=Math.max(0,ship.fuel-dt*1.025*(stats.burnFuelMultiplier??1));
+        if(ship.burning&&Number.isFinite(ship.energy))ship.energy=Math.max(0,ship.energy-dt*(stats.burnEnergy??0));
         position.addScaledVector(velocity,dt);
     }
     updateAttackAI(ship, targetPosition, targetVelocity, dt) {
@@ -10000,11 +10003,11 @@ export class GameSession {
             travelSpeed = ship.speed * PATROL_SEARCH_SPEED_MUL;
         travelSpeed *= 1 - brake;
         // A search seeded by fresh intel (Arena range control, a teammate's
-        // callout: arenaSweep.js) burns long, clear, nose-on legs, keeping the
-        // same 35 % fuel reserve as the closing burn.
+        // callout: arenaSweep.js) burns long, clear, nose-on legs while the
+        // capacitor stays above the closing burn's reserve (BURN_RESERVE).
         const urgentBurn = Boolean(!waypoint && flightStats && ship.search?.urgent && ship.search.phase === 'approach' && !brake
             && position.distanceTo(destination) > 650 && forward.dot(goalDirection) > .8
-            && fieldNav.canBoost && ship.fuel > flightStats.fuel * .35);
+            && fieldNav.canBoost && (ship.energy ?? 0) > flightStats.energyCapacity * BURN_RESERVE);
         if (urgentBurn) travelSpeed = ship.afterburnSpeed;
         if (waypoint) travelSpeed = tacticLegSpeed(tacticSpeed, forward.dot(goalDirection),
             flightStats.acceleration, position.distanceTo(destination));
@@ -11530,7 +11533,11 @@ export class GameSession {
         }
         this.resolveHyperdriveIntercept(ship);
         const explosionScale = (CAPITAL_SHIP_STATS[ship.capitalClass]?.explosionScale ?? (ship.role === 'trader' ? 1.5 : 1)) * npcShipScaleForVariant(npcFlightVariant(ship));
-        const explosion = this.renderer.spawnExplosion(ship.position, ship.hostile, explosionScale, ship.velocity);
+        // Big ships burn slower (user: capital deaths read too sudden). Arena
+        // holds the field until the blast has played out (capitalBlastUntil).
+        const blastPace = ship.capitalClass ? (ship.capitalClass === 'corvette' ? .5 : ship.capitalClass === 'frigate' ? .75 : 1) : 0;
+        if (ship.capitalClass) this.capitalBlastUntil = Math.max(this.capitalBlastUntil ?? 0, this.save.world.time + (ship.capitalClass === 'corvette' ? CAPITAL_BLAST_HOLD.corvette : CAPITAL_BLAST_HOLD.large));
+        const explosion = this.renderer.spawnExplosion(ship.position, ship.hostile, explosionScale, ship.velocity, {capital: blastPace});
         const wreckAnchor = this.renderer.spawnShipWreck?.(ship, npcFlightVariant(ship), explosionScale);
         if (explosion && wreckAnchor)
             explosion.followObject = wreckAnchor;
@@ -11700,7 +11707,6 @@ export class GameSession {
             this.save.player.shield = stats.shield;
             this.save.player.hull = stats.hull;
             this.save.player.energy = stats.energyCapacity;
-            this.save.player.fuel = stats.fuel;
             fillLauncherMagazines(this.save.player);
             this.save.player.currentTargetId = undefined;
             this.lostTargetId = undefined;
@@ -11739,7 +11745,6 @@ export class GameSession {
         this.save.player.shield = 0;
         this.save.player.hull = stats.hull * 0.35;
         this.save.player.energy = stats.energyCapacity * 0.35;
-        this.save.player.fuel = stats.fuel * 0.35;
         clearLauncherMagazines(this.save.player);
         this.save.player.dockedAt = dock;
         this.lostTargetId = undefined;
@@ -14734,9 +14739,10 @@ export class GameSession {
         this.ui.refreshDock(this.save);
         this.persistSave();
     }
-    refuel() {
-        if (!this.dockHasService('fuel')) {
-            this.ui.showToast(t('Fuel service is not available at this dock.'), 'warning');
+    // Restock launcher magazines and ammo-fed guns at the ordnance desk.
+    refill() {
+        if (!this.dockHasService('ordnance')) {
+            this.ui.showToast(t('No ordnance desk at this dock.'), 'warning');
             return;
         }
         const quote = dockServiceQuote(this.save.player, 'refill');
@@ -14748,10 +14754,8 @@ export class GameSession {
             this.ui.showToast(t('Insufficient credits for full refill.'), 'warning');
             return;
         }
-        const stats = this.playerStats();
         this.save.player.credits -= quote.shipCost;
         recordSortieCredit(this.save, -cost, 'refill');
-        this.save.player.fuel = stats.fuel;
         fillLauncherMagazines(this.save.player);
         // Weapon ammo pools top up with the ordnance (pricing in shipStats.refillCost).
         // Only ammo-fed guns installed on this hull get refilled; locker stock
@@ -14768,7 +14772,7 @@ export class GameSession {
                     this.save.player.ammo[ammoId] = AMMO_CAPACITY[ammoId];
             }
         }
-        this.ui.pushEvent(t('Fuel and ordnance loaded. {credits} charged.', { credits: formatCredits(cost) }), 'success');
+        this.ui.pushEvent(t('Ordnance loaded. {credits} charged.', { credits: formatCredits(cost) }), 'success');
         this.audio.play('purchase');
         this.ui.refreshDock(this.save);
         this.persistSave();
@@ -14777,7 +14781,7 @@ export class GameSession {
         if (!this.save.player.dockedAt) return { ok: false, code: 'not-docked' };
         if (!droneBayLayoutFor(this.save.player.shipId).length) return { ok: false, code: 'no-bay' };
         if (!this.save.player.droneFleet?.controller) return { ok: false, code: 'invalid-fleet' };
-        if (!this.dockHasService('repair') && !this.dockHasService('fuel'))
+        if (!this.dockHasService('repair') && !this.dockHasService('ordnance'))
             return { ok: false, code: 'service-unavailable' };
         const quote = quoteDroneService(this.save.player, options);
         if (!quote.ok) return quote;
@@ -15835,8 +15839,6 @@ export class GameSession {
             afterburner: this.afterburning,
             raceVector,
             raceControl:this.save.player.raceReturn?(this.raceBraking?'BRAKE':this.afterburning?'THRUST':'COAST'):undefined,
-            fuel: this.save.player.fuel,
-            maxFuel: stats.fuel,
             shield: this.save.player.shield,
             maxShield: stats.shield,
             hull: this.save.player.hull,

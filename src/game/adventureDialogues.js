@@ -23,7 +23,7 @@ export const ADVENTURE_DIALOGUES={
         bar:{text:pair("Der Reaktor läuft, gut gemacht. Komm zu mir in die Bar; ich habe einen Auftrag für uns.","The reactor is running. Well done. Come meet me in the bar; I have a job for us."),choices:[end('Bis gleich.','See you there.')]},
     }},
     'mining-return':{start:'bar',nodes:{
-        bar:{text:pair("Gut geflogen. Der Auftrag ist ausbezahlt. Füll vor dem nächsten Start deinen Tank: Öffne {ui.services} und wähle bei „{ui.fuel}“ {ui.refill}. Danach komm zu mir in die Bar; ich habe noch etwas für dich.","Good flying. The contract has paid out. Fill your tank before the next flight: open {ui.services} and choose {ui.refill} under {ui.fuel}. Then come meet me in the bar; I have something else for you."),choices:[end("Alles klar, bis gleich.","All right, see you in a bit.")]},
+        bar:{text:pair("Gut geflogen. Der Auftrag ist ausbezahlt. Komm zu mir in die Bar; ich habe noch etwas für dich.","Good flying. The contract has paid out. Come meet me in the bar; I have something else for you."),choices:[end("Alles klar, bis gleich.","All right, see you in a bit.")]},
     }},
     'mara-cairn':{start:'call',nodes:{
         call:{text:pair('Rin ist zurück und hat eine Spur zu euren Eltern. Sie wartet im {ui.raceDesk} auf Cairn Yard. Flieg hin und sprich mit ihr.','Rin is back with a lead on your parents. She is waiting at the {ui.raceDesk} on Cairn Yard. Fly there and speak with her.'),choices:[end('Ich fliege nach Cairn.','I will head to Cairn.')]},

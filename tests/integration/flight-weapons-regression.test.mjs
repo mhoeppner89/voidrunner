@@ -6,6 +6,7 @@ const {GameSession}=await import('../../src/game/game.js');
 const {generateGraveyardPieces}=await import('../../src/game/worldData.js');
 const {loadoutFor}=await import('../../src/game/outfitting.js');
 const {steerToward}=await import('../../src/game/npcNav.js');
+const {regenerateCombatResources}=await import('../../src/game/combatResources.js');
 
 test('debris route rebuilds preserve attitude and obey the per-frame turn limit',()=>{
  const s=session();s.activeInstanceId='mourning-line';s.tmpEuler=new THREE.Euler();s.graveyard=[generateGraveyardPieces(718).find(p=>p.collidable!==false)];s.graveyard[0].rotation=[0,Math.PI,0];s.wreckNodes=[];
@@ -42,6 +43,8 @@ for(const kind of ['sphere','box'])for(const tier of ['novice','veteran','ace'])
  let maxTurn=0,minZ=0,maxStill=0,still=0;
  for(let i=0;i<1800;i++){
   s.save.world.time=i/60;const q=new THREE.Quaternion().fromArray(ship.rotation);
+  // The live ship step recharges the capacitor that the afterburner draws on.
+  regenerateCombatResources(ship,ship.combatFit.resources??ship.combatFit.stats,1/60,0);
   s.updateAttackAI(ship,new THREE.Vector3(...s.save.player.position),new THREE.Vector3(),1/60);s.resolveNpcCollisions(ship);
   maxTurn=Math.max(maxTurn,q.angleTo(new THREE.Quaternion().fromArray(ship.rotation)));minZ=Math.min(minZ,ship.position[2]);
   still=new THREE.Vector3(...ship.velocity).length()<1?still+1:0;maxStill=Math.max(maxStill,still);

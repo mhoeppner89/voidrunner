@@ -18,7 +18,7 @@ export const EQUIPMENT_STAT_FIELDS=[
  {key:'lootRange',label:'Loot collection range',unit:'km',effects:['lootRange']},
  {key:'salvageRange',label:'Drone recovery range',unit:'km',effects:['salvageRange']},
  {key:'salvageRate',label:'Salvage impact',unit:'×',effects:['salvageRate']},
- {key:'burnFuelMultiplier',label:'Boost fuel use',unit:'%',scale:100,lowerBetter:true,effects:['burnFuelMultiplier']},
+ {key:'burnEnergyMultiplier',label:'Boost energy use',unit:'%',scale:100,lowerBetter:true,effects:['burnEnergyMultiplier']},
  {key:'lateralMultiplier',label:'Drift correction',unit:'%',scale:100,effects:['lateralMultiplier']},
 ];
 export function equipmentStatChanges(before,after,item,includeUnchanged=false){
