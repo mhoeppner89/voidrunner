@@ -1,3 +1,10 @@
+## 0.8.2pv — Objectives you can read, played out to the end; Njord and Brigid
+
+- Objective levels announce themselves: a title card names the job when it starts ("Escort · Defend Njord") and its outcome when it is decided. A slim strip beside the pause buttons shows the ship to protect or destroy, its shield and hull, and the jump clock or bays left; it steps below the comms bar while someone is talking.
+- Every objective plays out: once all waves are beaten the escorted Njord thanks you and jumps, and the level ends a second later. Retreating enemies jump out before a level closes.
+- Boarding a surrendered ship in career gets the same treatment: an announcement, a progress strip, and "Prize captured" when the crew is in custody.
+- The new ships take mythological names like the rest of the roster: the Free Merchants hauler is now **Njord** and the convoy tender **Brigid**; their Red Talon conversions are **Red Njord** and **Red Brigid**.
+
 ## 0.8.2pu — See what a reward does to your ship, wingmen survive, a heavier scatter cannon
 
 - Arena reward cards and spare parts now show what they do to the whole ship: firepower, the sustained fire your reactor can keep up, weapon energy draw, turret fire, missile load, shield, hull, recharge, energy, speed and turning, old → new with the difference. A budget line shows the guns' energy draw against the reactor and turns amber when the guns draw more than it supplies.

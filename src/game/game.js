@@ -6520,7 +6520,9 @@ export class GameSession {
     // otherwise the nearest prize in range; flying off pauses the progress.
     updateBoarding(dt) {
         const player = this.save.player;
-        if (this.arena || player.dockedAt || player.raceReturn || !(player.hull > 0) || !this.ships?.length) { this.boardingShipId = undefined; return; }
+        // Leaving range (or boarding ending any other way) clears the strip once.
+        const stopBoarding = () => { if (this.boardingShipId) this.ui.setObjectiveStrip?.(null); this.boardingShipId = undefined; };
+        if (this.arena || player.dockedAt || player.raceReturn || !(player.hull > 0) || !this.ships?.length) { stopBoarding(); return; }
         const range = this.playerStats().scanRange, position = vec(player.position, this.tmpP0);
         let prize, nearest = Infinity;
         for (const ship of this.ships) {
@@ -6530,15 +6532,19 @@ export class GameSession {
             const rank = ship.id === player.currentTargetId ? -1 : distance;
             if (rank < nearest) { nearest = rank; prize = ship; }
         }
-        if (!prize) { this.boardingShipId = undefined; return; }
+        if (!prize) { stopBoarding(); return; }
         if (this.boardingShipId !== prize.id) {
             this.boardingShipId = prize.id;
             this.audio?.play?.('ui', 0.5);
+            this.ui.showObjectiveBanner?.({ kicker: t('Boarding'), title: prize.name, line: t('Hold within scan range until the boarding party is aboard.') });
         }
         prize.boardingProgress = Math.min(1, (prize.boardingProgress ?? 0) + dt / BOARDING_SECONDS);
-        this.setMonitorStatus(t('BOARDING {percent}%', { percent: Math.round(prize.boardingProgress * 100) }), 400);
+        const percent = Math.round(prize.boardingProgress * 100);
+        this.setMonitorStatus(t('BOARDING {percent}%', { percent }), 400);
+        this.ui.setObjectiveStrip?.({ name: prize.name, status: t('Boarding {percent}%', { percent }), progress: prize.boardingProgress, tone: 'friendly' });
         if (prize.boardingProgress >= 1) {
-            this.boardingShipId = undefined;
+            stopBoarding();
+            this.ui.showObjectiveBanner?.({ kicker: t('Prize captured'), title: prize.name, line: t('The crew is in custody.'), tone: 'success', ms: 4000 });
             this.claimSurrendered(prize);
         }
     }
@@ -7708,7 +7714,7 @@ export class GameSession {
                     ship.task.kind='trade';ship.task.port=ship.convoyPort;ship.task.phase='leg';
                     ship.targetId=ship.convoyEscape=undefined;ship.stationDockCompleted=ship.convoyPort;
                 }else this.updateTravelAI(ship,dt);
-                if(ship.convoyDistress&&this.chatterOpen()&&this.sayPilotLine(ship,t(ship.variant==='caravan'?'Caravan taking heavy fire. Escorts, cover our turn!':'Convoy under attack. All escorts engage!')))ship.convoyDistress=false;
+                if(ship.convoyDistress&&this.chatterOpen()&&this.sayPilotLine(ship,t(ship.variant==='caravan'?'Brigid taking heavy fire. Escorts, cover our turn!':'Convoy under attack. All escorts engage!')))ship.convoyDistress=false;
             }else if(ship.convoyLeader&&!ship.targetId&&ship.convoyLeader.hull>0&&!ship.surrendered&&!ship.captured
                 &&!(ship.combatThreatUntil>this.save.world.time)){
                 this.updateSensorAwareness(ship,dt);

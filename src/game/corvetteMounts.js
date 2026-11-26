@@ -25,9 +25,9 @@ const broadsides=[-1,1].map(side=>({...seat(side<0?'mount_heavy_port':'mount_hea
 const booster={node:'booster_port',kind:'booster',label:'PORT BOOSTER',hull:120,normal:aft,
     position:[-10.1,-.62,28.88772],hitCenterOffset:[.42,-.31,-7.63],hitHalfExtents:[2.35,2.15,7.64],hitShape:'box',exhaustRadius:1.3};
 export const CORVETTES={
-    drover:{name:'MV Drover',cargoHolds:6,shield:300,hull:900,speed:25,role:'trader',faction:'independents',mounts:[bridge,dorsal,seat('mount_laser_ventral','laser','VENTRAL LASER',[0,-3.36,-2.45614],down),generator,...engines,...pods],
+    drover:{name:'MV Njord',cargoHolds:6,shield:300,hull:900,speed:25,role:'trader',faction:'independents',mounts:[bridge,dorsal,seat('mount_laser_ventral','laser','VENTRAL LASER',[0,-3.36,-2.45614],down),generator,...engines,...pods],
         readout:'TURRETS {turrets}/3 · PODS {pods}/6'},
-    ironjaw:{name:'Ironjaw',shield:200,hull:1200,speed:30,role:'escort',faction:'pirates',mounts:[bridge,dorsal,...broadsides,generator,...engines,booster],
+    ironjaw:{name:'Red Njord',shield:200,hull:1200,speed:30,role:'escort',faction:'pirates',mounts:[bridge,dorsal,...broadsides,generator,...engines,booster],
         readout:'GUNS {guns}/2 · TURRETS {turrets}/2'}
 };
 
@@ -47,13 +47,13 @@ export const ROOKERY_LAUNCH={
         game_position:[side*11.6578,-.07,-27.14],direction_game:[side*.26066583,0,-.96542901]}])),
 };
 export const TRAFFIC_HULLS={...CORVETTES,
-    caravan:{name:'Caravan',capitalClass:'frigate',shield:500,hull:2000,speed:20,turn:.15,regen:10,cargoHolds:4,
+    caravan:{name:'Brigid',capitalClass:'frigate',shield:500,hull:2000,speed:20,turn:.15,regen:10,cargoHolds:4,
         role:'trader',faction:'independents',dronePort:[0,7.81,-3.9],readout:'TURRETS {turrets}/4 · STACKS {stacks}/4',
         mounts:[...frigateSystems,seat('mount_laser_ventral','laser','VENTRAL LASER',[0,-5.85,-22],down),
             {node:'drone_hangar',kind:'hangar',label:'DRONE HANGAR',hull:160,normal:up,position:[0,7.81,-3.9],hitShape:'box',hitHalfExtents:[4.6,2.2,6.1],hitCenterOffset:[0,-2.7,1.9]},
             ...Array.from({length:4},(_,i)=>{const side=i%2?1:-1;return {node:'stack_'+i,kind:'stack',label:'CARGO STACK '+(i+1),hull:150,normal:[side,0,0],
                 position:[side*15.85,0,i<2?-16:12],hitShape:'box',hitHalfExtents:[5.35,5.1,10.92],hitCenterOffset:[-side*5.35,-.18,0],partBit:1<<i};})]},
-    rookery:{name:'Rookery',capitalClass:'frigate',shield:500,hull:2400,speed:20,turn:.15,regen:10,preferredRange:1200,launch:ROOKERY_LAUNCH,
+    rookery:{name:'Red Brigid',capitalClass:'frigate',shield:500,hull:2400,speed:20,turn:.15,regen:10,preferredRange:1200,launch:ROOKERY_LAUNCH,
         role:'escort',faction:'pirates',readout:'GUNS {guns}/2 · BAYS {bays}/2',mounts:[...frigateSystems,
             ...[-1,1].map((side,i)=>({...broadsides[i],node:'mount_broadside_'+(side<0?'port':'starboard'),position:[side*17.88,4.03,-2]})),
             {node:'mast',kind:'mast',label:'FLIGHT CONTROL',hull:120,normal:up,position:[0,13.36,-2],hitShape:'box',hitHalfExtents:[4.4,5.2,5.9],hitCenterOffset:[0,-5.2,0]},

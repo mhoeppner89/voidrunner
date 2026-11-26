@@ -8273,6 +8273,50 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 .run-inbound.is-edge b{left:-4px;top:12px}
 
 .arena-card:not(.run-card){display:flex;flex-direction:column;max-height:94dvh;height:auto;overflow:hidden}.arena-menu-scroll{overflow-y:auto;min-height:0;overscroll-behavior:contain}.arena-card:not(.run-card)>header,.arena-card:not(.run-card)>footer{flex:none}
+/* Objective title card: kicker, title and one brief line, centred over the
+   canopy when an Arena objective (or a career boarding) starts and when it
+   is decided. Transient text, no panel: it never hides a contact for long. */
+.objective-banner{position:fixed;left:50%;top:22%;z-index:40;width:min(640px,86vw);transform:translateX(-50%);pointer-events:none;text-align:center;
+  color:var(--void-cream,#f4ead0);text-shadow:0 2px 6px #000,0 0 2px #000;transition:opacity .35s ease;opacity:1}
+.objective-banner.is-hidden{opacity:0;visibility:hidden;transition:opacity .6s ease,visibility 0s linear .6s}
+.objective-banner small{display:block;font:700 13px/1.2 var(--pixel-font);letter-spacing:.24em;text-transform:uppercase;color:#ffd05c}
+.objective-banner b{display:block;margin:6px 0 4px;padding:4px 0 6px;font:700 clamp(24px,3.4vw,38px)/1.1 var(--pixel-font);letter-spacing:.06em;text-transform:uppercase;
+  border-top:1px solid rgba(255,208,92,.55);border-bottom:1px solid rgba(255,208,92,.55)}
+.objective-banner span{display:block;font:15px/1.35 var(--pixel-font);color:#bfe9ff}
+.objective-banner[data-tone="success"] small{color:#74e0a2}
+.objective-banner[data-tone="success"] b{border-color:rgba(116,224,162,.55)}
+.objective-banner[data-tone="failed"] small{color:#ff7d60}
+.objective-banner[data-tone="failed"] b{border-color:rgba(255,125,96,.55)}
+/* Objective strip: beside the pause/fullscreen keys, clear of the throttle,
+   the comms bar and the aiming lane. Friendly targets read cyan, hostile red. */
+.objective-strip{position:absolute;top:var(--safe-top);left:calc(var(--safe-left) + 104px);z-index:16;width:min(300px,30vw);box-sizing:border-box;padding:5px 8px 6px;pointer-events:none;
+  color:#d7f6ff;background:rgba(2,8,14,.74);border:1px solid rgba(105,228,242,.4);border-left:3px solid #69e4f2;box-shadow:0 2px 10px rgba(0,0,0,.45)}
+.objective-strip.is-hidden{display:none}
+/* A live transmission takes the top edge; the strip steps down below it. */
+.objective-strip{transition:top .2s ease}
+#hud:has(#comms-bar.active) .objective-strip{top:calc(var(--safe-top) + 60px)}
+.objective-strip[data-tone="hostile"]{border-color:rgba(255,125,96,.4);border-left-color:#ff7d60}
+.objective-strip[data-tone="done"]{border-color:rgba(116,224,162,.45);border-left-color:#74e0a2}
+.objective-strip-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font:700 12px/1.2 var(--pixel-font);letter-spacing:.04em;text-transform:uppercase}
+.objective-strip-head b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.objective-strip-head span{flex:none;color:#ffd05c;font-variant-numeric:tabular-nums}
+.objective-strip-bars{display:grid;gap:3px;margin-top:5px}
+.objective-strip-bars i{display:block;height:5px;background:rgba(255,255,255,.1)}
+.objective-strip-bars i[hidden]{display:none}
+.objective-strip-bars em{display:block;height:100%;transition:width .2s linear}
+.objective-strip-bars .is-shield em{background:#62d7ee}
+.objective-strip-bars .is-hull em{background:#e8644c}
+.objective-strip-bars .is-progress em{background:#ffd05c}
+@media (max-height:520px) and (orientation:landscape){
+  .objective-strip{left:calc(var(--safe-left) + 96px);width:min(240px,30vw);padding:4px 6px 5px}
+  .objective-strip-head{font-size:10px}
+  .objective-strip-bars{gap:2px;margin-top:3px}
+  .objective-strip-bars i{height:4px}
+  .objective-banner{top:30%}
+  .objective-banner small{font-size:10px}
+  .objective-banner b{font-size:22px;margin:4px 0 3px;padding:3px 0 4px}
+  .objective-banner span{font-size:12px}
+}
 #run-countdown{position:fixed;left:50%;top:30%;transform:translateX(-50%);pointer-events:none;text-align:center;z-index:40;color:#f7dea5;text-shadow:0 2px 8px #000}
 #run-countdown span{display:block;font-size:18px}#run-countdown small{display:block;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#bfe9ff;margin-top:2px}#run-countdown b{display:block;font-size:56px}#run-countdown[hidden]{display:none}
 

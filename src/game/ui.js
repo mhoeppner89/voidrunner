@@ -479,7 +479,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2pu';
+const GAME_VERSION = '0.8.2pv';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -2175,6 +2175,7 @@ export class GameUI {
         this.hideArena();
         this.hideObserverView();
         this.root.querySelector('#run-inbound')?.classList.add('is-hidden');
+        this.setObjectiveStrip(null);this.hideObjectiveBanner();
         const resume = this.root.querySelector('[data-ui-command="resume"]');
         if (resume) {
             resume.disabled = !hasSave;
@@ -6365,6 +6366,38 @@ export class GameUI {
         marker.style.transform=`translate(${x}px,${y}px)`;
         marker.style.setProperty('--inbound-angle',`${angle}deg`);
         marker.lastElementChild.textContent=String(point.seconds);
+    }
+    // Objective announcement: a centred title card that names the job when it
+    // starts and its outcome when it is decided. It fades on its own.
+    showObjectiveBanner({kicker='',title='',line='',tone='info',ms=4500}={}){
+        let el=this.root.querySelector('#objective-banner');
+        if(!el){(this.root.querySelector('#hud')??this.root).insertAdjacentHTML('beforeend','<div id="objective-banner" class="objective-banner is-hidden" role="status" aria-live="polite"><small></small><b></b><span></span></div>');el=this.root.querySelector('#objective-banner');}
+        el.children[0].textContent=kicker;el.children[1].textContent=title;el.children[2].textContent=line;
+        el.dataset.tone=tone;el.classList.remove('is-hidden');
+        clearTimeout(this.objectiveBannerTimer);
+        this.objectiveBannerTimer=setTimeout(()=>el.classList.add('is-hidden'),ms);
+    }
+    hideObjectiveBanner(){clearTimeout(this.objectiveBannerTimer);this.root.querySelector('#objective-banner')?.classList.add('is-hidden');}
+    // Objective strip: the ship to protect, stop or destroy, with its shield
+    // and hull (or a progress bar) and one status word, kept beside the pause
+    // keys while the job lasts. Repainted only when a shown value changes.
+    setObjectiveStrip(model){
+        let el=this.root.querySelector('#objective-strip');
+        if(!model){if(el){el.classList.add('is-hidden');el.dataset.key='';}return;}
+        if(!el){(this.root.querySelector('#hud')??this.root).insertAdjacentHTML('beforeend','<div id="objective-strip" class="objective-strip is-hidden" role="status"><div class="objective-strip-head"><b></b><span></span></div><div class="objective-strip-bars"><i class="is-shield"><em></em></i><i class="is-hull"><em></em></i><i class="is-progress"><em></em></i></div></div>');el=this.root.querySelector('#objective-strip');}
+        const pct=v=>v==null?-1:Math.round(Math.max(0,Math.min(1,v))*100);
+        const shield=pct(model.shield),hull=pct(model.hull),progress=pct(model.progress);
+        const key=`${model.name}|${model.status}|${model.tone}|${shield}|${hull}|${progress}`;
+        el.classList.remove('is-hidden');
+        if(el.dataset.key===key)return;
+        el.dataset.key=key;el.dataset.tone=model.tone??'friendly';
+        const [name,status]=el.firstElementChild.children;name.textContent=model.name;status.textContent=model.status??'';
+        const [shieldBar,hullBar,progressBar]=el.lastElementChild.children;
+        shieldBar.hidden=shield<0;hullBar.hidden=hull<0;progressBar.hidden=progress<0;
+        if(shield>=0)shieldBar.firstElementChild.style.width=`${shield}%`;
+        if(hull>=0)hullBar.firstElementChild.style.width=`${hull}%`;
+        if(progress>=0)progressBar.firstElementChild.style.width=`${progress}%`;
+        el.setAttribute('aria-label',[model.name,model.status,shield>=0?`${t('SHIELD')} ${shield}%`:'',hull>=0?`${t('HULL')} ${hull}%`:''].filter(Boolean).join(' · '));
     }
     showRunCountdown(seconds,name,site='') {
         let el=this.root.querySelector('#run-countdown');

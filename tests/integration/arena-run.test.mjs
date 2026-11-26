@@ -397,8 +397,8 @@ test('preparation screens render in both languages and every wave briefing is tr
  stageUi.root=stageRoot;stageUi.updateOrientationNotice=()=>{};stageUi.save=stage;
  stage.arenaRun.wave=8;stage.arenaRun.decisions[8]=false;stage.arenaRun.hullChosen=false;stage.arenaRun.hullOffers=runHullOffers(stage);stage.arenaRun.wingmanOffers=runWingmanOffers(stage);stageUi.showArenaRun(stage);
  assert.match(stagePanel().innerHTML,/FLÜGELMANN AUSWÄHLEN/,'the current wingman stage has localized copy');
- assert.match(stagePanel().innerHTML,/Caravan/,'the next wave briefing is localized');
- assert.match(stagePanel().innerHTML,/Freie Händler · Fange die Caravan/,'the faction and encounter description is localized');
+ assert.match(stagePanel().innerHTML,/Brigid/,'the next wave briefing is localized');
+ assert.match(stagePanel().innerHTML,/Freie Händler · Fange die Brigid/,'the faction and encounter description is localized');
  for(const order of WING_ORDERS){assert.ok(DE_CATALOG[WING_ORDER_LABEL[order]],WING_ORDER_LABEL[order]);assert.ok(DE_CATALOG[WING_ORDER_HINT[order]],WING_ORDER_HINT[order]);}
  // The roster is a real choice: one button per named veteran, each with a hull.
  const roster=runWingmanOffers(stage);

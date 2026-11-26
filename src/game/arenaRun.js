@@ -55,10 +55,10 @@ export const RUN_ACTS=[
   level("Hit and run","shardbelt-heart","Two Loki fighters guard the bore. Watch the flank.",[
     group(veteran('speedster'),novice('speedster')),
     group(veteran('scrapper',1),novice('speedster'))]),
-  level("Ironjaw","redwake-belt","Destroy the Ironjaw before more Balors reach the belt.",[
+  level("Red Njord","redwake-belt","Destroy the Red Njord before more Balors reach the belt.",[
     group(veteran('scrapper'),novice('speedster')),
     group(veteran('demon',1),balor()),
-    group(ironjaw(),balor(),veteran('scrapper'))],{objective:{kind:'destroy',label:'Destroy Ironjaw'},support:{every:45,total:3,fighter:balor()}}),
+    group(ironjaw(),balor(),veteran('scrapper'))],{objective:{kind:'destroy',label:'Destroy Red Njord',done:'Red Njord destroyed',failed:'Red Njord escaped'},support:{every:45,total:3,fighter:balor()}}),
  ]},
  {id:'merchants',name:'Free Merchants',faction:'independents',waves:[
   level("Freight lane","foundry-lanes","An Argo and its escort lead the merchant patrol.",[
@@ -71,21 +71,21 @@ export const RUN_ACTS=[
     group(novice('prospector'),veteran('torsas',1)),
     group(veteran('wayfarer')),
     group(veteran('prospector'),veteran('wayfarer'))]),
-  level("Convoy","pale-rings","Break through the convoy screen. Destroy the Drover or both engines before it jumps.",[
+  level("Convoy","pale-rings","Break through the convoy screen. Destroy the Njord or both engines before it jumps.",[
     group(veteran('wayfarer'),novice('speedster')),
     group(veteran('prospector'),veteran('torsas')),
     group(veteran('mule'),veteran('wayfarer')),
     group(capital('drover','novice'),veteran('wayfarer'),veteran('speedster')),
-    {...group(veteran('torsas'),novice('wayfarer')),at:40}],{objective:{kind:'stop',label:'Stop the Drover',seconds:150}}),
-  level("Caravan","mourning-center","Intercept the Caravan and its escorts. Its drone hangar supplies repairs.",[
+    {...group(veteran('torsas'),novice('wayfarer')),at:40}],{objective:{kind:'stop',label:'Stop the Njord',done:'Njord stopped',failed:'Njord escaped',seconds:150}}),
+  level("Brigid","mourning-center","Intercept the Brigid and its escorts. Its drone hangar supplies repairs.",[
     group(capital('caravan','veteran')),
     group(veteran('torsas'),veteran('mule',1)),
     group(veteran('wayfarer'),veteran('wayfarer')),
     group(veteran('atlas'),veteran('wayfarer',1))]),
-  level("Rookery","verge-lanes","Destroy the Rookery and its launched Balors. Each intact bay launches fighters.",[
+  level("Red Brigid","verge-lanes","Destroy the Red Brigid and its launched Balors. Each intact bay launches fighters.",[
     group(veteran('demon')),
     group(novice('speedster'),novice('speedster')),
-    group(capital('rookery','veteran'),veteran('scrapper'),novice('scrapper'))],{faction:'pirates',objective:{kind:'destroy',label:'Destroy carrier',clearLaunches:true},launch:{...ROOKERY_LAUNCH,fighter:veteran(ROOKERY_LAUNCH.fighter)}}),
+    group(capital('rookery','veteran'),veteran('scrapper'),novice('scrapper'))],{faction:'pirates',objective:{kind:'destroy',label:'Destroy carrier',done:'Carrier destroyed',failed:'Carrier escaped',clearLaunches:true},launch:{...ROOKERY_LAUNCH,fighter:veteran(ROOKERY_LAUNCH.fighter)}}),
  ]},
  {id:'league',name:'Frontier League',faction:'alliance',waves:[
   level("Patrol shift","acheron-horizon","Intercept the League patrols above Acheron.",[
@@ -98,10 +98,10 @@ export const RUN_ACTS=[
     group(veteran('andromeda',1),veteran('speedster')),
     group(veteran('legionary')),
     group(veteran('andromeda'),veteran('legionary'),veteran('speedster'))]),
-  level("Strike","pale-rings","Protect the Drover until it jumps. Intercept the Thor torpedo bombers.",[
+  level("Strike","pale-rings","Protect the Njord until it jumps. Intercept the Thor torpedo bombers.",[
     group(bomber('veteran'),veteran('legionary'),veteran('speedster',1)),
     {...group(bomber('ace'),veteran('speedster')),at:40},
-    {...group(bomber('veteran'),veteran('legionary'),veteran('legionary',1)),at:80}],{objective:{kind:'defend',label:'Defend Drover',seconds:150,transport:capital('drover','novice')}}),
+    {...group(bomber('veteran'),veteran('legionary'),veteran('legionary',1)),at:80}],{objective:{kind:'defend',label:'Defend Njord',done:'Njord safe',failed:'Njord lost',seconds:150,transport:capital('drover','novice')}}),
   level("Honorguard","mourning-battleship","Break the guard around the wreck. An Odin ace closes the fight.",[
     group(veteran('lancer',2),veteran('legionary')),
     group(veteran('legionary'),veteran('speedster',1)),
@@ -164,7 +164,7 @@ export const RUN_ACTS=[
   level("The line","shardbelt-rim","Destroy the frigate. More escorts answer as its hull gives way.",[
     group(capital('concord-frigate','ace'),ace('blade',2),ace('blade',2),veteran('vanguard',2),veteran('blade',2)),
     {...group(ace('talon'),ace('talon')),at:60,hullBelow:.6},
-    {...group(ace('vanguard',2),ace('blade',2)),at:120,hullBelow:.3}],{objective:{kind:'destroy',label:'Destroy frigate'}}),
+    {...group(ace('vanguard',2),ace('blade',2)),at:120,hullBelow:.3}],{objective:{kind:'destroy',label:'Destroy frigate',done:'Frigate destroyed',failed:'Frigate escaped'}}),
  ]},
 ];
 for(const act of RUN_ACTS)act.waves=act.waves.map(wave=>{

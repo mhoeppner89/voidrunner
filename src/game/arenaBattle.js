@@ -55,9 +55,16 @@ function jump(session,ship) {
     session.renderer.spawnHyperdriveStreak?.(ship.position,direction.toArray());
     ship.arenaJumped=true;ship.hull=-1;
 }
-function decide(session,battle,outcome,elapsed) {
-    battle.outcome=outcome;battle.warning=null;
+const KICKER={destroy:'Primary target',stop:'Intercept',defend:'Escort'};
+function decide(session,battle,outcome,elapsed,wave) {
+    battle.outcome=outcome;battle.warning=null;battle.endAt=undefined;
     session.ui.setRunInbound?.(null);
+    const objective=wave?.objective;
+    if(objective)session.ui.showObjectiveBanner?.({kicker:t(outcome==='success'?'Objective complete':'Objective failed'),
+        title:t(outcome==='success'?objective.done??objective.label:objective.failed??objective.label),
+        line:outcome!=='success'?t('No equipment reward this level.')
+            :session.ships.some(s=>s.arenaRunEnemy&&alive(s))?t('Remaining hostiles are breaking off.')
+            :objective.kind==='defend'?t('The Njord is jumping out.'):'',tone:outcome==='success'?'success':'failed',ms:4000});
     logObjective(session,t(outcome==='success'?'Objective complete.':'Objective failed. No equipment reward.'),outcome==='success'?'success':'warning',t(outcome==='success'?'Objective complete.':'Objective failed'));
     let count=0;
     for(const ship of session.ships)if(ship.arenaRunEnemy&&alive(ship)){
@@ -91,7 +98,7 @@ function objectiveTick(session,wave,battle,elapsed) {
             if(!battle.carrierDown)logObjective(session,t('Carrier down. Destroy the launched fighters.'),'warning',t('Clear fighters'));
             battle.carrierDown=true;return;
         }
-        decide(session,battle,target.arenaJumped?'failed':'success',elapsed);return;
+        decide(session,battle,target.arenaJumped?'failed':'success',elapsed,wave);return;
     }
     const intercept=objective.kind==='stop';
     const drivesDead=intercept&&capitalHull(target).engines.every(m=>target.capitalMountHull[m.index]<=0);
@@ -101,15 +108,53 @@ function objectiveTick(session,wave,battle,elapsed) {
             target.holdFire=true;target.pursuitHoldFire=true;
             target.velocity.fill(0);target.engineThrust=0;
         }
-        decide(session,battle,intercept?'success':'failed',elapsed);return;
+        decide(session,battle,intercept?'success':'failed',elapsed,wave);return;
     }
     const goal=target.arenaJumpPoint,pos=target.position;
     const remaining=Math.hypot(goal[0]-pos[0],goal[1]-pos[1],goal[2]-pos[2])/(target.arenaCruise*target.engineThrust);
-    if(remaining<=1/30){jump(session,target);decide(session,battle,intercept?'failed':'success',elapsed);return;}
+    battle.remaining=remaining;
+    if(remaining<=1/30){
+        if(!intercept)thank(session,target);
+        jump(session,target);decide(session,battle,intercept?'failed':'success',elapsed,wave);return;
+    }
+    // An escort that has beaten every wave is done: the Drover thanks the
+    // pilot and jumps a moment later instead of flying out its clock.
+    if(!intercept&&battle.group===battle.groups.length&&!battle.warning&&!session.ships.some(s=>s.arenaRunEnemy&&alive(s))){
+        thank(session,target);battle.outro={jumpAt:elapsed+2.5};
+        decide(session,battle,'success',elapsed,wave);return;
+    }
     if(battle.thresholds.length&&remaining<=battle.thresholds[0]){
         const seconds=battle.thresholds.shift();
-        logObjective(session,t('Drover jumps in {seconds} s.',{seconds}),'warning',t('Drover · {seconds} s',{seconds}));
+        logObjective(session,t('Njord jumps in {seconds} s.',{seconds}),'warning',t('Njord · {seconds} s',{seconds}));
     }
+}
+function thank(session,ship) {
+    const line=t('All clear! Thank you, pilot. Jumping out.');
+    session.ui.showPilotLine?.(ship.name,line,'ally',6000);
+    session.ui.logCommsLine?.(ship.name,line,'ally');
+}
+const clock=seconds=>{const s=Math.max(0,Math.ceil(seconds));return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;};
+// The objective strip: name, shield and hull of the ship the level is about,
+// and one status word. Published at 10 Hz; the UI repaints only on change.
+function publishObjective(session,wave,battle,elapsed) {
+    const objective=wave.objective,target=battle.target;
+    if(!objective||!target||!session.ui.setObjectiveStrip)return;
+    if(!battle.bannered){
+        battle.bannered=true;
+        session.ui.showObjectiveBanner?.({kicker:t(objective.clearLaunches?'Carrier strike':KICKER[objective.kind]??'Objective'),title:t(objective.label),line:t(wave.hint)});
+    }
+    if(elapsed<(battle.stripAt??0))return;
+    battle.stripAt=elapsed+.1;
+    const live=alive(target)&&!target.arenaJumped,decided=battle.outcome;
+    let status;
+    if(decided)status=t(decided==='success'?objective.done??'Complete':objective.failed??'Failed');
+    else if(objective.kind!=='destroy')status=t('Jump {time}',{time:clock(battle.remaining??objective.seconds)});
+    else if(battle.carrierDown){let n=0;for(const ship of session.ships)if(ship.arenaLaunched&&alive(ship))n++;status=t('Fighters {count}',{count:n});}
+    else if(objective.clearLaunches){const bays=capitalHull(target).mounts.filter(m=>m.kind==='bay');status=t('Bays {left}/{total}',{left:bays.filter(m=>target.capitalMountHull[m.index]>0).length,total:bays.length});}
+    else status=t('Destroy');
+    session.ui.setObjectiveStrip({name:target.name,status,
+        shield:live&&target.maxShield?target.shield/target.maxShield:0,hull:live?target.hull/target.maxHull:0,
+        tone:decided?(decided==='success'?'done':'hostile'):objective.kind==='defend'?'friendly':'hostile'});
 }
 function announce(session,warning,elapsed) {
     if(!warning.announced){
@@ -328,9 +373,15 @@ export function tickBattle(session,wave,elapsed,dt) {
     const battle=session.runBattle;
     if(!battle.group){opening(session,wave,battle,elapsed);return false;}
     if(!battle.outcome)objectiveTick(session,wave,battle,elapsed);
+    publishObjective(session,wave,battle,elapsed);
     if(battle.outcome){
         for(const ship of session.ships)if(alive(ship)&&elapsed>=ship.arenaRetreatAt)jump(session,ship);
-        return !session.ships.some(s=>s.arenaRunEnemy&&alive(s));
+        const outro=battle.outro;
+        if(outro&&!outro.jumped&&elapsed>=outro.jumpAt){if(alive(battle.target))jump(session,battle.target);outro.jumped=true;}
+        // Let the last jump read before the level ends: one more second.
+        if(session.ships.some(s=>s.arenaRunEnemy&&alive(s))||outro&&!outro.jumped){battle.endAt=undefined;return false;}
+        battle.endAt??=elapsed+1;
+        return elapsed>=battle.endAt;
     }
     let survivors=0,launched=0;
     for(const ship of session.ships)if(ship.arenaRunEnemy&&alive(ship)){

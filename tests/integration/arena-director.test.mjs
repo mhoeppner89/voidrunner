@@ -138,3 +138,31 @@ test('moving socket warning reuses its pose and its Three.js scratch objects',()
  assert.equal(b.warning.entry,original);assert.equal(b.warning.entry.position,position);assert.ok(Math.abs(position[0]-before-60)<.01);
  assert.ok(vectors.size<=3&&rotations.size<=2);assert.equal(markers.size,1);
 });
+test('a defended Drover thanks the pilot after the last wave, jumps 2.5 s later and the level ends a second after',()=>{
+ const s=stage(13),r=s.save.arenaRun,d=s.runBattle.target,b=s.runBattle;
+ s.banners=[];s.strips=[];s.ui.showObjectiveBanner=x=>s.banners.push(x);s.ui.setObjectiveStrip=m=>s.strips.push(m);
+ tick(s,.2);
+ assert.equal(s.banners.length,1,'the escort is announced once');assert.ok(s.banners[0].kicker&&s.banners[0].title&&s.banners[0].line);
+ const live=s.strips.at(-1);
+ assert.equal(live.tone,'friendly');assert.ok(live.shield>0&&live.hull>0,'the strip shows the Drover\'s shield and hull');
+ assert.match(live.status,/\d+:\d\d/,'the strip counts down to the jump');
+ for(let i=0;i<600&&!b.outcome;i++){opp(s).forEach(x=>x.hull=0);d.hull=Math.max(d.hull,1);tick(s,.5);}
+ assert.equal(b.outcome,'success','beating every wave completes the escort');
+ assert.equal(s.radio.length>0,true,'the Drover thanks the pilot');
+ assert.ok(s.banners.some(x=>x.tone==='success'),'the outcome is announced');
+ assert.ok(!d.arenaJumped,'it does not jump at once');
+ for(let i=0;i<23;i++)tick(s,.1);assert.ok(!d.arenaJumped,'still waiting at 2.3 s');
+ for(let i=0;i<4;i++)tick(s,.1);assert.ok(d.arenaJumped,'it jumps after 2.5 s');assert.equal(r.phase,'combat');
+ for(let i=0;i<7;i++)tick(s,.1);assert.equal(r.phase,'combat','the level holds for a second after the jump');
+ for(let i=0;i<6;i++)tick(s,.1);assert.notEqual(r.phase,'combat','then it ends');
+});
+test('a failed intercept is announced, its escorts jump out and the level ends a second after the last jump',()=>{
+ const s=stage(8),r=s.save.arenaRun;
+ s.banners=[];s.ui.showObjectiveBanner=x=>s.banners.push(x);s.ui.setObjectiveStrip=()=>{};
+ const d=reach(s),b=s.runBattle;
+ d.position=[...d.arenaJumpPoint];tick(s,.1);
+ assert.equal(b.outcome,'failed','the Drover escaped');assert.ok(d.arenaJumped);assert.ok(s.banners.some(x=>x.tone==='failed'),'the failure is announced');
+ for(let i=0;i<200&&r.phase==='combat'&&opp(s).length;i++)tick(s,.1);
+ assert.equal(opp(s).length,0,'every hostile has jumped out');
+ assert.equal(r.phase,'combat');for(let i=0;i<12;i++)tick(s,.1);assert.notEqual(r.phase,'combat');
+});

@@ -138,7 +138,7 @@ export const ArenaRunMethods={
   r.phase='combat';r.checkpointStoredRounds=clone(r.storedRounds??{});r.checkpoint=clone(this.save.player);delete r.checkpoint.turretRuntime;delete r.checkpoint.prevPosition;delete r.checkpoint.prevRotation;
   r.checkpointStats={elapsed:r.elapsed,damage:r.damage,missiles:r.missiles};
   r.checkpointWingmen=clone(r.wingmen??[]);
-  r.countdown=3;r.startedAt=this.save.world.time;this.runBattle=battleState(wave,r.wave,r.hard);r.waveMissiles=this.save.player.missiles??0;delete r.clearAt;
+  this.ui.setObjectiveStrip?.(null);this.ui.hideObjectiveBanner?.();r.countdown=3;r.startedAt=this.save.world.time;this.runBattle=battleState(wave,r.wave,r.hard);r.waveMissiles=this.save.player.missiles??0;delete r.clearAt;
   writeArenaRun(this.save);this.ui.hideArena();this.ui.hidePause();this.ui.showHud();
   this.audio.freshFight?.();
   const site=arenaSite(wave.site);
@@ -447,12 +447,13 @@ export const ArenaRunMethods={
    // seconds so the death bloom plays out before the round flips to prepare.
    // Pending reinforcements still gate the clear above, and the pilot's own
    // death check earlier in the tick still ends the run during the grace.
-   r.clearAt??=elapsed+2;
+   // An objective level times its own play-out (thanks, jumps, one second).
+   r.clearAt??=elapsed+(this.runBattle?.outcome?0:2);
    if(elapsed<r.clearAt)return;
    r.missiles+=Math.max(0,r.waveMissiles-(this.save.player.missiles??0));
    r.cleared=r.wave+1;
    const rewardForfeited=this.runBattle.outcome==='failed';
-   this.recordRunWingmanHulls();
+   this.recordRunWingmanHulls();this.ui.setObjectiveStrip?.(null);
    this.clearTransientSpace();this.save.player.velocity=[0,0,0];
    if(r.cleared===RUN_WAVES.length){
     r.phase='won';recordArenaRun(this.save);
@@ -473,5 +474,5 @@ export const ArenaRunMethods={
    delete r.checkpoint;delete r.checkpointStoredRounds;delete r.checkpointWingmen;writeArenaRun(this.save);this.showRunPreparation();
   }
  },
- loseArenaRun(){const r=this.save.arenaRun;if(!r||r.phase!=='combat')return;r.phase='lost';r.missiles+=Math.max(0,r.waveMissiles-(this.save.player.missiles??0));delete r.checkpoint;delete r.checkpointStoredRounds;delete r.checkpointWingmen;this.deathTimer=0;this.clearTransientSpace();this.ui.setRunInbound?.(null);recordArenaRun(this.save);writeArenaRun(this.save);this.showRunPreparation();},
+ loseArenaRun(){const r=this.save.arenaRun;if(!r||r.phase!=='combat')return;this.ui.setObjectiveStrip?.(null);r.phase='lost';r.missiles+=Math.max(0,r.waveMissiles-(this.save.player.missiles??0));delete r.checkpoint;delete r.checkpointStoredRounds;delete r.checkpointWingmen;this.deathTimer=0;this.clearTransientSpace();this.ui.setRunInbound?.(null);recordArenaRun(this.save);writeArenaRun(this.save);this.showRunPreparation();},
 };
