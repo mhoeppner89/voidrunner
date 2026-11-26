@@ -177,7 +177,8 @@ export const ArenaRunMethods={
   ship.noSurrender=true;ship.holdFire=false;ship.pursuitHoldFire=false;
   ship.combatFit=createEnemyLoadout(ship,this.ships.length,wingman.fit);
   ship.maxShield=ship.shield=ship.combatFit.stats.shield;
-  ship.maxHull=ship.hull=ship.combatFit.stats.hull;
+  ship.maxHull=ship.combatFit.stats.hull;
+  ship.hull=Math.max(1,Math.round(ship.maxHull*Math.max(0,Math.min(1,wingman.hullFraction??1))));
   ship.combatFit.resources.shield=ship.maxShield;
   ship.energy=ship.combatFit.stats.energyCapacity;ship.fuel=ship.combatFit.stats.fuel;
   ship.speed=ship.combatFit.stats.maxSpeed;ship.afterburnSpeed=ship.combatFit.stats.afterburnSpeed;
@@ -206,13 +207,36 @@ export const ArenaRunMethods={
    this.ui.pushEvent(t('Wingman lost: {ship} · {name}',{ship:t(SHIPS[wingman.hullId]?.name??wingman.hullId),name:wingman.name}),'danger',5200);
   }
  },
- livingWingmanId(id){return Boolean(id)&&this.ships.some(ship=>ship.id===id&&ship.arenaRunWingman&&ship.hull>0);},
+ livingWingmanId(id){return Boolean(id)&&this.ships.some(ship=>ship.id===id&&ship.arenaRunWingman&&ship.hull>0&&!ship.poweredDown);},
+ // A wingman's hull floors at one point (damageShip); reaching it powers the
+ // ship down for the rest of the level: dark, unarmed and no longer a target.
+ powerDownRunWingman(ship){
+  if(!ship||ship.poweredDown)return false;
+  ship.poweredDown=true;ship.burning=false;ship.energy=0;ship.shield=0;
+  ship.holdFire=true;ship.pursuitHoldFire=true;
+  ship.targetId=undefined;ship.wingmanTargetId=undefined;ship.wingTargetId=undefined;
+  ship.combatThreatId=undefined;ship.combatThreatUntil=0;ship.fieldTactic=undefined;
+  ship.destination=[...ship.position];
+  this.ui.showPilotLine?.(ship.name,t('Hull breach. I am out of this fight.'),'ally',8000);
+  this.ui.pushEvent(t('{name} is disabled for the rest of this level.',{name:ship.name}),'danger',6000);
+  return true;
+ },
+ // Called before the level is cleared away: the run record keeps each
+ // wingman's hull so the next level starts from it (recoverRun repairs it).
+ recordRunWingmanHulls(){
+  const r=this.save.arenaRun;
+  for(const wingman of r?.wingmen??[]){
+   if(wingman.alive===false)continue;
+   const ship=this.ships.find(entry=>entry.arenaRunWingmanId===wingman.id);
+   if(ship&&ship.maxHull>0)wingman.hullFraction=ship.poweredDown?0:Math.max(0,Math.min(1,ship.hull/ship.maxHull));
+  }
+ },
  // The nearest legal mark for a wave opponent: the pilot, or a living wingman
  // that has closed closer. Squared distances only — this runs per enemy per tick.
  arenaThreatTarget(ship){
   const p=this.save.player;let best='player',bestDistance=(ship.position[0]-p.position[0])**2+(ship.position[1]-p.position[1])**2+(ship.position[2]-p.position[2])**2;
   for(const wing of this.ships){
-   if(!wing.arenaRunWingman||wing.hull<=0)continue;
+   if(!wing.arenaRunWingman||wing.hull<=0||wing.poweredDown)continue;
    const distance=(ship.position[0]-wing.position[0])**2+(ship.position[1]-wing.position[1])**2+(ship.position[2]-wing.position[2])**2;
    if(distance<bestDistance){bestDistance=distance;best=wing.id;}
   }
@@ -233,12 +257,12 @@ export const ArenaRunMethods={
    // run's default, so an old save reads as one uniform wing instead of losing
    // the order entirely.
    wingman.order=wingmanOrder(wingman,r);
-   if(ship)this.applyWingmanOrder(ship,index);
+   if(ship&&!ship.poweredDown)this.applyWingmanOrder(ship,index);
    // Live hull and shield when the wingman is flying, so the HUD card's fills
    // read the fight; a docked crew publishes its stance only.
    crew.push({index,order:wingman.order,name:wingman.name,hullId:wingman.hullId,
     hull:ship?ship.hull:0,maxHull:ship?(ship.maxHull??1):0,
-    shield:ship?ship.shield:0,maxShield:ship?(ship.maxShield??1):0});
+    shield:ship?ship.shield:0,maxShield:ship?(ship.maxShield??1):0,poweredDown:Boolean(ship?.poweredDown)});
    index+=1;
   }
   // The run default follows the lead wingman: the Y key, the save migration
@@ -428,6 +452,7 @@ export const ArenaRunMethods={
    r.missiles+=Math.max(0,r.waveMissiles-(this.save.player.missiles??0));
    r.cleared=r.wave+1;
    const rewardForfeited=this.runBattle.outcome==='failed';
+   this.recordRunWingmanHulls();
    this.clearTransientSpace();this.save.player.velocity=[0,0,0];
    if(r.cleared===RUN_WAVES.length){
     r.phase='won';recordArenaRun(this.save);
@@ -435,6 +460,7 @@ export const ArenaRunMethods={
     recoverRun(this.save);r.wave++;
     if(r.wave===RUN_WAVES.length-1){
      const p=this.save.player;p.hull=getEffectiveShipStats(p).hull;recoverRun(this.save,true);
+     for(const wingman of r.wingmen??[])wingman.hullFraction=1;
     }
     r.phase='prepare';
     r.rewardForfeited=rewardForfeited;r.rewardChosen=rewardForfeited;r.selectedReward=null;

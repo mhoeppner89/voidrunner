@@ -44,6 +44,24 @@ const sustainedDps=w=>{
  return (w.damageFlat??w.damage??0)*(w.pellets??1)*rate*crit;
 };
 
+// Whole-ship totals for one fitting state, so a reward can be read by what it
+// does to the ship rather than only by its own card stats.
+const shotsPerSecond=w=>w.burstSize?w.burstSize/((w.shotInterval??w.cooldown)*w.burstSize+(w.burstPause??0)):1/(w.cooldown||1);
+export function runShipTotals(player,outfitting=player.outfitting){
+ const ship={...player,outfitting},stats=getEffectiveShipStats(ship),fit=loadoutFor(ship);
+ let burst=0,draw=0,turret=0,missile=0;
+ for(const id of fit.guns??[]){const w=id&&weaponForOutfit(id);if(!w)continue;burst+=sustainedDps(w)??0;draw+=(w.energyCost??0)*shotsPerSecond(w);}
+ for(const id of fit.turrets??[]){const d=id&&OUTFIT_ITEMS[id];if(!d)continue;turret+=sustainedDps(modifiedWeapon(d.turretKind==='pdc'?PDC_TURRET:TRACKING_LASER,d))??0;}
+ for(const id of fit.launchers??[]){const w=id&&launcherForOutfit(id);if(w)missile+=(w.damage??0)*(w.volley??1)*(w.capacity??1);}
+ const regen=stats.reactorOutput??0;
+ return {firepower:burst,sustained:draw>0?burst*Math.min(1,regen/draw):burst,draw,regen,turret,missile,
+  shield:stats.shield,hull:stats.hull,recharge:stats.shieldRegeneration??0,energy:stats.energyCapacity,
+  speed:displaySpeed(stats.maxSpeed),turn:stats.angularAcceleration};
+}
+// Rows in reading order: offence, energy, defence, handling.
+const TOTAL_ROWS=[['firepower','Firepower','/s'],['sustained','Sustained fire','/s'],['draw','Weapon draw','/s',true],['turret','Turret fire','/s'],['missile','Missile load',''],
+ ['shield','SHIELD',''],['hull','HULL',''],['recharge','Shield recharge','/s'],['energy','Energy capacity',''],['regen','Energy regeneration','/s'],['speed','Speed',''],['turn','Turning','']];
+
 export function renderArenaRun(ui,save){
  const r=save.arenaRun,p=save.player,stats=getEffectiveShipStats(p),wave=RUN_WAVES[r.wave],fit=loadoutFor(p),spec=HARDPOINT_SPECS[p.shipId];
  const done=r.phase==='won'||r.phase==='lost',pending=!done&&isPendingDecision(save);
@@ -122,6 +140,21 @@ export function renderArenaRun(ui,save){
   return (primary.length?`<span class="run-stats">${primary.map(row=>tile(row.label,row.after,unit(row),row.after-row.before,row.lowerBetter,row.key)).join('')}</span>`:'')+chips;
  };
 
+ // The ship's totals before and after a plan, showing only what changes.
+ const totalsNow=runShipTotals(p);
+ const shipAfter=(changes,id,heading='Ship after')=>{
+  const outfitting=JSON.parse(JSON.stringify(p.outfitting)),afterFit=outfitting.loadouts[p.shipId];
+  if(!afterFit)return '';
+  for(const c of changes){if(!afterFit[c.key])continue;afterFit[c.key][c.index]=id;if(c.otherKey)afterFit[c.otherKey][c.index]=null;}
+  const after=runShipTotals(p,outfitting);
+  const rows=TOTAL_ROWS.filter(([k])=>Math.abs((after[k]??0)-(totalsNow[k]??0))>.05).slice(0,5);
+  const body=rows.length?rows.map(([k,label,unit,lowerBetter])=>{const before=totalsNow[k]??0,value=after[k]??0,delta=value-before,good=lowerBetter?delta<0:delta>0;
+   return `<span class="run-ship-row" data-total="${k}"><span>${esc(t(label))}</span><b><span class="run-ship-was">${num(before)}<i aria-hidden="true">→</i></span>${num(value)}${unit?`<small>${esc(unit)}</small>`:''}</b><em class="${good?'up':'down'}">${delta>0?'+':'−'}${num(Math.abs(delta))}</em></span>`;}).join(''):`<span class="run-ship-row is-quiet"><span>${esc(t('No change to ship totals'))}</span></span>`;
+  // Energy budget: the one number that decides whether more guns help.
+  const budget=after.draw>0?`<span class="run-ship-budget${after.draw>after.regen?' is-over':''}">${esc(t('Guns draw {draw}/s · reactor {regen}/s',{draw:num(after.draw),regen:num(after.regen)}))}</span>`:'';
+  return `<span class="run-ship-after"><small>${esc(t(heading))}</small><span class="run-ship-rows">${body}</span>${budget}</span>`;
+ };
+
  const leave=key('sx-btn-ghost run-leave',uiIcon('back',18),`data-ui-command="quit-title" aria-label="${esc(t('Save and leave'))}" title="${esc(t('Save and leave'))}"`);
  let body='',footer='',view=done?'result':pending?'hulls':!r.rewardChosen?'rewards':ui.runFitOpen?'fitting':'ready';
 
@@ -160,7 +193,7 @@ export function renderArenaRun(ui,save){
    const replaced=[...new Set(plan.replaced)],first=replaced[0],against=first&&equipmentBaseId(first)===equipmentBaseId(id)?equipmentRating(item(first)):undefined;
    const swap=`<span class="run-replacement"><small>${esc(t(replaced.length?'Replaces':'Empty mount'))}</small>${replaced.length?replaced.map(old=>`<span class="run-swap-item" ${paint(old)}>${icon(old)}<span>${esc(name(old))}</span></span>`).join(''):'<span class="run-empty-mount">+</span>'}${plan.count>1?`<em class="run-quantity">×${plan.count}</em>`:''}</span>`;
    const label=`${plan.count}× ${name(id)} · ${t(EQUIPMENT_RARITIES[quality(id)].name)}`;
-   return command('reward',id,`<span class="run-offer-head">${artPlate(id)}${titleBlock(id)}${ratingBadge(id,against)}</span>${statTiles(id,first)}<span class="run-offer-mods">${modifiers(id)}</span>${swap}${mark}`,`class="run-offer ${selected?'is-selected':''}" ${paint(id)} title="${esc([equipmentName(item(id)),summary(id,true)].filter(Boolean).join(' — '))}" aria-label="${esc(label)}" aria-pressed="${selected}"`);
+   return command('reward',id,`<span class="run-offer-head">${artPlate(id)}${titleBlock(id)}${ratingBadge(id,against)}</span>${statTiles(id,first)}<span class="run-offer-mods">${modifiers(id)}</span>${shipAfter(plan.changes,id)}${swap}${mark}`,`class="run-offer ${selected?'is-selected':''}" ${paint(id)} title="${esc([equipmentName(item(id)),summary(id,true)].filter(Boolean).join(' — '))}" aria-label="${esc(label)}" aria-pressed="${selected}"`);
   }).join('')}</div>`;
   const armed=fit.guns.some(Boolean),chosen=r.offers.includes(r.selectedReward)&&runRewardPlan(save,r.selectedReward);
   footer=`${leave}${armed?command('skip','',`${esc(t('Skip draw'))}<small>${esc(t('+50% hull · rarity +1'))}</small>`,`class="sx-btn sx-btn-secondary" title="${esc(t('Repair 50% hull, refill missiles; next round rewards are one rarity higher.'))}"`):''}<span class="run-spacer"></span>${opening?'':command('equip','',esc(t('Fitting')),`class="sx-btn sx-btn-secondary" ${chosen?'':'disabled'}`)}${command('accept','',esc(t(opening?'NEXT':'LAUNCH')),`class="sx-btn sx-btn-primary" ${chosen?'':'disabled'}`)}`;
@@ -174,7 +207,8 @@ export function renderArenaRun(ui,save){
    const current=selected.id?equipmentRating(item(selected.id)):undefined;
    const mountList=slots.map(s=>`<button type="button" class="run-mount" data-ui-command="run-mount" data-run-value="${s.mount.id}" aria-pressed="${s.mount.id===selected.mount.id}" ${s.id?paint(s.id):''}>${s.id?artPlate(s.id,false):'<span class="run-art-plate is-small is-empty"><span class="run-empty-mount">+</span></span>'}<span class="run-mount-copy"><small>${s.key==='guns'?uiIcon('equipment',12):s.key==='launchers'?uiIcon('missile',12):''}${esc(slotLabel(s))}</small>${s.id?`<b class="run-item-label" ${paint(s.id)}>${esc(name(s.id))}</b>`:`<b>${esc(t('EMPTY'))}</b>`}</span></button>`).join('');
    const detail=selected.id?`<div class="run-fit-detail" ${paint(selected.id)}><span class="run-offer-head">${artPlate(selected.id)}${titleBlock(selected.id)}${ratingBadge(selected.id,null)}</span>${statTiles(selected.id)}<span class="run-offer-mods">${modifiers(selected.id)}</span></div>`:`<p class="run-empty-stock">${esc(t('EMPTY'))}</p>`;
-   const spares=locker.map(([id,n])=>command('fit',id,`${artPlate(id,false)}<span class="run-mount-copy"><b class="run-item-label" ${paint(id)}>${esc(name(id))}</b><small>${esc(summary(id)||t(EQUIPMENT_RARITIES.common.name))}</small></span>${ratingBadge(id,selected.id&&equipmentBaseId(selected.id)===equipmentBaseId(id)?current:null)}${n>1?`<em class="run-quantity">×${n}</em>`:''}`,`class="run-spare" ${attrs} ${paint(id)} title="${esc([equipmentName(item(id)),summary(id,true)].filter(Boolean).join(' — '))}"`)).join('');
+   const spareChange=id=>{const c=[{key:selected.key,index:selected.index}];return shipAfter(c,id,selected.id?'If swapped in':'If fitted');};
+   const spares=locker.map(([id,n])=>command('fit',id,`${artPlate(id,false)}<span class="run-mount-copy"><b class="run-item-label" ${paint(id)}>${esc(name(id))}</b><small>${esc(summary(id)||t(EQUIPMENT_RARITIES.common.name))}</small></span>${ratingBadge(id,selected.id&&equipmentBaseId(selected.id)===equipmentBaseId(id)?current:null)}${n>1?`<em class="run-quantity">×${n}</em>`:''}${spareChange(id)}`,`class="run-spare" ${attrs} ${paint(id)} title="${esc([equipmentName(item(id)),summary(id,true)].filter(Boolean).join(' — '))}"`)).join('');
    const tools=`${selected.key==='guns'&&fit.guns[selected.index]?command('group',selected.mount.id,`${esc(t('FIRE GROUP'))} <b>${fit.fireGroups.assignments[selected.mount.id]}</b>`,`class="sx-btn sx-btn-ghost run-group" title="${esc(t('FIRE GROUP'))}"`):''}${command('fit','',esc(t('REMOVE')),`class="sx-btn sx-btn-ghost run-remove" ${attrs} ${selected.id?'':'disabled'}`)}`;
    body=`<div class="run-fit-layout"><nav class="run-mount-list" aria-label="${esc(t('INSTALLED EQUIPMENT'))}">${mountList}</nav><section class="run-fit-stock"><header class="run-section-head"><span>${esc(slotLabel(selected))}</span><span class="run-spacer"></span>${tools}</header>${detail}<header class="run-section-head"><span>${esc(t('Spare parts'))}</span></header><div class="run-locker-list">${spares||`<span class="run-empty-stock">${esc(t('No equipment here.'))}</span>`}</div></section></div>`;
   }else{
@@ -183,7 +217,7 @@ export function renderArenaRun(ui,save){
    const loadout=`<section class="run-loadout"><header class="run-section-head"><span>${esc(t('Loadout'))}</span></header>${groups.map(([label,list])=>`<div class="run-loadout-group"><small class="run-group-label">${label==='Guns'?uiIcon('equipment',12):label==='Missiles'?uiIcon('missile',12):''}${esc(t(label))} · ${list.length}</small>${list.map(row).join('')}</div>`).join('')}</section>`;
    const readout=`<dl class="run-readout">${[['SHIELD',num(stats.shield)],['HULL',`${num(Math.max(0,p.hull))}/${num(stats.hull)}`],['Energy capacity',num(stats.energyCapacity)],['Energy regeneration',`${num(stats.reactorOutput)}/s`,stats.overTierLoad>0],['Speed',num(displaySpeed(stats.maxSpeed))],stats.missileCapacity>0?['MISSILES',`${num(p.missiles??0)}/${num(stats.missileCapacity)}`]:['Turn accel.',`${num((stats.angularAcceleration??0)*180/Math.PI)}°/s²`]].map(([label,value,warn])=>`<div${warn?' class="is-warn"':''}><dt>${esc(t(label))}</dt><dd>${value}</dd></div>`).join('')}</dl>${stats.overTierLoad>0?`<p class="run-warning">${esc(t('Higher-tier load: up to −{amount}/s.',{amount:num(stats.overTierLoad)}))}</p>`:''}`;
    const wingCrew=(Array.isArray(r.wingmen)?r.wingmen:[]).filter(w=>w.alive!==false);
-   const crew=wingCrew.length?`<details class="run-crew" open><summary>${esc(t('WING'))} · ${wingCrew.length}</summary>${wingCrew.map((w,i)=>{const current=wingmanOrder(w,r);return `<div class="run-orders run-orders-wing"><b>${esc(w.name)}</b>${WING_ORDERS.map(order=>command('order',order,esc(t(WING_ORDER_LABEL[order])),`data-run-index="${i}" class="${current===order?'is-selected':''}" aria-pressed="${current===order}"`)).join('')}</div>`;}).join('')}</details>`:'';
+   const crew=wingCrew.length?`<details class="run-crew" open><summary>${esc(t('WING'))} · ${wingCrew.length}</summary>${wingCrew.map((w,i)=>{const current=wingmanOrder(w,r);const hullPct=Math.round(100*Math.max(0,Math.min(1,w.hullFraction??1)));return `<div class="run-orders run-orders-wing"><b>${esc(w.name)}<span class="run-crew-hull${hullPct<50?' is-low':''}">${esc(t('HULL'))} ${hullPct}%</span></b>${WING_ORDERS.map(order=>command('order',order,esc(t(WING_ORDER_LABEL[order])),`data-run-index="${i}" class="${current===order?'is-selected':''}" aria-pressed="${current===order}"`)).join('')}</div>`;}).join('')}</details>`:'';
    const site=arenaSite(wave.site);
    const next=`<div class="run-next-wave" data-site="${esc(wave.site)}"><small>${esc(t('Next wave'))}</small><b>${esc(t(wave.name))}</b><span class="run-site"><i>${esc(t(site.name))}</i> · ${esc(t(site.place))}</span><span>${esc(t(waveAct(r.wave).name))} · ${esc(t(wave.hint))}</span><span class="run-site-tip">${esc(t(site.tip))}</span></div>`;
    body=`<div class="run-ready">${loadout}<section class="run-ship-panel"><header class="run-section-head"><span>${esc(SHIPS[p.shipId].name)}</span></header>${next}${readout}${crew}</section></div>`;

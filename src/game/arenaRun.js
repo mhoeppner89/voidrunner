@@ -355,7 +355,9 @@ export function refreshRunRewardOffers(save){
  const bossOffer=fresh[0];if(r.wave===RUN_WAVES.length-1&&['torpedo-launcher','mortar','ripper'].includes(equipmentBaseId(bossOffer))&&!valid.includes(bossOffer))valid[0]=bossOffer;
  r.offers=valid.slice(0,3);if(!valid.includes(r.selectedReward))r.selectedReward=null;
 }
-export function recoverRun(save,extra=false){const p=save.player,stats=getEffectiveShipStats(p),r=save.arenaRun;p.hull=Math.min(stats.hull,p.hull+stats.hull*(extra?.5:r.hard?.1:.3));p.shield=stats.shield;p.energy=stats.energyCapacity;p.fuel=stats.fuel;
+export function recoverRun(save,extra=false){const p=save.player,stats=getEffectiveShipStats(p),r=save.arenaRun,repair=extra?.5:r.hard?.1:.3;p.hull=Math.min(stats.hull,p.hull+stats.hull*repair);
+ // Wingmen share the pilot's repair rule, including a wingman disabled last level.
+ for(const wingman of r?.wingmen??[])if(wingman.alive!==false&&wingman.hullFraction!==undefined)wingman.hullFraction=Math.min(1,wingman.hullFraction+repair);p.shield=stats.shield;p.energy=stats.energyCapacity;p.fuel=stats.fuel;
  if(extra)fillLauncherMagazines(p);else {for(const entry of normalizeLauncherMagazines(p))if(entry.rounds<entry.capacity)p.launcherMagazines[entry.mount.id].rounds++;normalizeLauncherMagazines(p);}
 }
 // A reward is a complete, mount-checked replacement plan, not a loose gun.
@@ -512,7 +514,7 @@ export function upgradeRunWingman(save,wingIndex,candidate){
   wingman={id:candidate.id,name:candidate.name,role:'patrol',alive:true,order:normalizeWingOrder(r.wingOrder)};
   list[wingIndex]=wingman;r.wingmen=list;
  }
- wingman.hullId=candidate.hullId;wingman.fit=candidate.fit;
+ wingman.hullId=candidate.hullId;wingman.fit=candidate.fit;wingman.hullFraction=undefined;
  // A surviving pilot keeps their name and identity when changing hulls.
 
  return wingman;

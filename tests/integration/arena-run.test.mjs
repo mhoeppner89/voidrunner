@@ -8,11 +8,12 @@ import {MAX_RUN_WINGMEN,ARENA_HULL_OFFER_COUNT,PLAYER_FLYABLE_HULLS,HULL_FACTION
 import {LOCATIONS,SHIPS} from '../../src/game/data.js';
 import {loadoutFor,createOutfittingState,validateLoadout,HULL_HARDPOINTS,LOADOUT_KEYS,OUTFIT_ITEMS,itemFitsMount} from '../../src/game/outfitting.js';
 import {getEffectiveShipStats} from '../../src/game/shipStats.js';
-import {fillLauncherMagazines,launcherMagazineEntries} from '../../src/game/weapons.js';
+import {fillLauncherMagazines,launcherMagazineEntries,WEAPONS} from '../../src/game/weapons.js';
 import {GameUI} from '../../src/game/ui.js';
 import {equipmentBaseId} from '../../src/game/equipmentCatalog.js';
 import {setLanguage} from '../../src/game/i18n.js';
 import {DE_CATALOG} from '../../src/game/i18n-de.js';
+import {renderArenaRun,runShipTotals} from '../../src/game/arenaRunView.js';
 // A minimal root that behaves like the one ui.js sees: selectors resolve to
 // stand-in nodes, appended children land in the hud, and data-* attributes
 // mirror themselves into dataset the way the DOM does.
@@ -164,7 +165,7 @@ test('a hull stage puts three named veterans on the table: one hire per stage, t
  const seen=new Set();for(let seed=0;seed<120;seed++)for(const wave of [8,12,20,24]){const other=newArenaRun(false,seed);other.arenaRun.wave=wave;other.arenaRun.hullChosen=false;for(const candidate of runWingmanOffers(other))seen.add(candidate.hullId);}
  assert.equal(seen.size,PLAYER_FLYABLE_HULLS.length,'every hull can be offered as a wingman');
 });
-test('a hired wingman flies allied with role-fitting equipment and is lost for good when shot down',()=>{
+test('a hired wingman flies allied with role-fitting equipment; one whose ship is removed stays lost',()=>{
  storage();const s=runSession(0),r=s.save.arenaRun;
  r.wave=8;r.decisions[8]=false;r.phase='prepare';r.hullChosen=false;r.rewardChosen=true;r.hullOffers=runHullOffers(s.save);r.wingmanOffers=runWingmanOffers(s.save);
  s.arenaRunAction('wingman',r.wingmanOffers[0].id);const hired=r.wingmen[0];assert.ok(hired);
@@ -192,6 +193,42 @@ test('a hired wingman flies allied with role-fitting equipment and is lost for g
  s.ships=s.ships.filter(ship=>ship.id!==wing.id);s.tickArenaRun(0);
  assert.equal(r.wingmen[0].alive,false);assert.equal(r.phase,'combat');
  s.startRunWave();s.tickArenaRun(3);assert.equal(s.ships.filter(ship=>ship.arenaRunWingman).length,0,'a lost wingman stays lost');
+});
+test('a wingman shot to 0% powers down for the level and returns next level partly repaired',()=>{
+ storage();const s=runSession(0),r=s.save.arenaRun;
+ r.wave=8;r.decisions[8]=false;r.phase='prepare';r.hullChosen=false;r.rewardChosen=true;r.hullOffers=runHullOffers(s.save);r.wingmanOffers=runWingmanOffers(s.save);
+ s.arenaRunAction('wingman',r.wingmanOffers[0].id);const hired=r.wingmen[0];
+ s.startRunWave();s.tickArenaRun(3);
+ const wing=s.ships.find(ship=>ship.arenaRunWingman),enemy=s.ships.find(ship=>ship.arenaRunEnemy);
+ s.ui.showPilotLine=()=>{};
+ s.damageShip(wing,wing.shield+wing.hull+500,enemy.id,wing.position,WEAPONS.pulse,[0,0,0],true);
+ assert.equal(wing.hull,1,'the hit that would destroy the wingman leaves one point of hull');
+ assert.equal(wing.poweredDown,true);assert.equal(wing.hostile,false);assert.ok(s.ships.includes(wing),'the wingman stays in the field, dark');
+ assert.equal(s.livingWingmanId(wing.id),false,'a disabled wingman is not a live wing contact');
+ assert.equal(s.arenaThreatTarget(enemy),'player','opponents stop hunting a disabled wingman');
+ s.syncWingmanOrders();assert.equal(wing.holdFire,true,'standing orders do not wake a disabled wingman');
+ s.damageShip(wing,500,enemy.id,wing.position,WEAPONS.pulse,[0,0,0],true);assert.equal(wing.hull,1,'further hits cannot destroy it');
+ s.tickArenaRun(0);assert.notEqual(hired.alive,false,'a disabled wingman is not lost');
+ finishArenaLevel(s);
+ assert.equal(r.cleared,9);assert.ok(hired.hullFraction>0&&hired.hullFraction<=.3+1e-9,'between levels it is repaired like the pilot (+30%)');
+ r.phase='prepare';r.rewardChosen=true;r.hullChosen=true;r.decisions[r.wave]=true;
+ s.startRunWave();s.tickArenaRun(3);
+ const back=s.ships.find(ship=>ship.arenaRunWingman);
+ assert.ok(back,'the wingman flies the next level');assert.ok(!back.poweredDown,'it is active again');
+ assert.equal(back.hull,Math.max(1,Math.round(back.maxHull*hired.hullFraction)),'it starts the level at its repaired hull');
+ assert.equal(back.shield,back.maxShield,'shields start full');
+});
+test('reward cards and spares compare whole-ship totals before and after the fit',()=>{
+ storage();const s=runSession(0),save=s.save,r=save.arenaRun,p=save.player;
+ const now=runShipTotals(p);
+ assert.ok(now.firepower>0&&now.draw>0,'the fitted guns give firepower and an energy draw');
+ assert.ok(Math.abs(now.sustained-now.firepower*Math.min(1,now.regen/now.draw))<1e-6,'sustained fire is limited by the reactor');
+ const outfitting=JSON.parse(JSON.stringify(p.outfitting));outfitting.loadouts[p.shipId].guns=outfitting.loadouts[p.shipId].guns.map(()=>null);
+ const empty=runShipTotals(p,outfitting);assert.equal(empty.firepower,0);assert.equal(empty.draw,0);
+ r.phase='prepare';r.rewardChosen=false;r.offers=['pulse-cannon','repair','engine-mk2'].filter(id=>runRewardPlan(save,id));
+ const html=renderArenaRun({},save);
+ assert.match(html,/run-ship-after/,'each equipment card shows the ship after the fit');
+ assert.match(html,/data-total="speed"|No change to ship totals/,'a drive reward reports its speed change or no change');
 });
 test('wing orders are range-gated against the pilot: aggressive, defensive, break off',()=>{
  storage();const s=runSession(0),r=s.save.arenaRun;

@@ -91,18 +91,27 @@ export default {
         variants: 3, peak: -4, group: 'flight',
         make: (v, R) => d.drive(blend([thud(0.08, 250 - v * 20, 105, { sweep: 0.012, tau: 0.014 }), 1], [burst(R, 0.05, { from: 6000, to: 1800, tau: 0.007, mode: 'bp', q: 1.2 }), 0.7]), 2),
     },
-    // Scatter blast: a chesty opening concussion, then the wide pellet spray.
+    // Scatter blast: the shotgun of the arsenal. Phone and laptop speakers
+    // cannot reproduce much below 150 Hz, so the weight sits in a 220→90 Hz
+    // punch and a 250 Hz chest body, with a hard muzzle crack on top and a
+    // short slapback off the hull. The 40 Hz pressure tail stays for
+    // headphones and desktops, but no longer eats the headroom.
     'ripper-blast': {
         variants: 2, peak: -2, group: 'flight',
         make: (v, R) => {
+            const crack = blend([burst(R, 0.05, { from: 9000, to: 2000, sweep: 0.008, tau: 0.01, attack: 0.0004 }), 1], [tick(R, { hz: 2200, ms: 3 }), 0.7]);
             const blast = blend([burst(R, 0.42, { from: 7500, to: 500, sweep: 0.09, tau: 0.07 }), 1], [d.mul(d.bandpass(d.noise(0.3, R), 1200, 0.9), d.perc(0.3, 0.001, 0.06)), 0.7]);
+            const punch = thud(0.22, 220 - v * 12, 90, { sweep: 0.035, tau: 0.045, attack: 0.0006, push: 3 });
+            const body = d.mul(d.bandpass(d.noise(0.3, R, 'pink'), 250 + v * 20, 0.9), d.perc(0.3, 0.001, 0.09));
+            const pressure = thud(0.45, 110 - v * 6, 42, { sweep: 0.03, tau: 0.12, attack: 0.001, push: 2 });
             const pellets = scatter(R, 0.3, 7, (r) => tick(r, { hz: 3200, ms: 2 }), { span: 0.09, shape: 1, spread: 0.8, fall: 0.4 });
-            // Longer 40 Hz pressure body plus low-mid concussion that survives phone speakers.
-            const pressure = thud(0.38, 148 - v * 8, 40, { sweep: 0.025, tau: 0.12, attack: 0.001, push: 2.2 });
-            const chest = burst(R, 0.24, { color: 'pink', from: 650, to: 120, sweep: 0.035, tau: 0.085, attack: 0.001 });
-            const mono = d.drive(blend([blast, 1], [pressure, 1.65], [chest, 0.65]), 2.2);
-            const out = d.canvas(0.45);
+            const mixed = d.drive(blend([crack, 0.7], [blast, 0.85], [punch, 1.3], [body, 1.1], [pressure, 0.6]), 2.6);
+            // Shelve some sub away and lift the 300 Hz chest and 2.5 kHz bite small speakers carry.
+            const mono = d.drive(d.eq(d.eq(d.eq(mixed, 'low', 70, -4), 'peak', 300, 5, 0.9), 'peak', 2500, 3, 1), 1.8);
+            const out = d.canvas(0.6);
             d.place(out, d.widen(mono, R, 0.45)); d.place(out, pellets, 0.012, 0.35);
+            // Slapback: a darker copy ~85 ms later, the "boom" of a big gun in a small space.
+            d.place(out, d.widen(d.lowpass(mono, 900), R, 0.6), 0.085 + v * 0.01, 0.3);
             return d.reverb(out, { time: 0.6, mix: 0.15, seed: 51 + v });
         },
     },

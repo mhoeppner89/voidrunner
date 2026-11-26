@@ -10824,6 +10824,15 @@ export class GameSession {
             if(quest&&ship.storyPersonId)quest.flags['actor-'+ship.storyPersonId]=[ship.hull,ship.shield,Number(Boolean(ship.poweredDown))];
             return;
         }
+        // Arena wingmen are crew, not fodder: the hit that would destroy one
+        // powers it down for the rest of the level instead. It returns next
+        // level, partly repaired by the same rule as the pilot (recoverRun).
+        if (ship.arenaRunWingman) {
+            ship.hull = Math.max(1, ship.hull);
+            ship.hostile = false;
+            if (hullDamaged && ship.hull <= 1) this.powerDownRunWingman?.(ship);
+            return;
+        }
         if (attackerId === 'player') {
             ship.playerAwareness = 1;
             const last = ship.lastResolvedPlayer ?? (ship.lastResolvedPlayer = [0, 0, 0]);

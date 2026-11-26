@@ -1341,6 +1341,22 @@
 #arena-panel .run-trait { display: grid; gap: 4px; padding: 9px 11px; background: color-mix(in srgb, var(--loot-named) 11%, transparent); border-left: 2px solid var(--loot-named); }
 #arena-panel .run-trait b { font: 700 11px/1 var(--ui-text-font); letter-spacing: 0.14em; text-transform: uppercase; color: var(--loot-named); }
 #arena-panel .run-trait span { font: 500 14px/1.4 var(--ui-text-font); color: var(--sx-text); }
+/* Ship after: the whole-ship totals a reward or spare would change. */
+#arena-panel .run-ship-after { display: block; padding: 7px 9px 8px; background: var(--sx-sunk); border: 1px solid var(--sx-line); border-left: 2px solid var(--sx-cyan); }
+#arena-panel .run-ship-after > small { display: block; margin-bottom: 5px; font: 600 10px/1.2 var(--ui-text-font); letter-spacing: 0.14em; text-transform: uppercase; color: var(--sx-text-3); }
+#arena-panel .run-ship-rows { display: grid; gap: 3px; }
+#arena-panel .run-ship-row { display: grid; grid-template-columns: minmax(0, 1fr) auto 4.5ch; gap: 8px; align-items: baseline; font: 500 13px/1.25 var(--ui-text-font); color: var(--sx-text-2); text-align: left; }
+#arena-panel .run-ship-row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#arena-panel .run-ship-row > b { font-weight: 600; color: var(--sx-text); white-space: nowrap; font-variant-numeric: tabular-nums; }
+#arena-panel .run-ship-was i { font-style: normal; color: var(--sx-text-3); margin: 0 4px; }
+#arena-panel .run-ship-row > b small { margin-left: 2px; font-size: 11px; color: var(--sx-text-3); }
+#arena-panel .run-ship-row > em { font-style: normal; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+#arena-panel .run-ship-row > em.up { color: var(--sx-up); }
+#arena-panel .run-ship-row > em.down { color: var(--sx-down); }
+#arena-panel .run-ship-row.is-quiet { grid-template-columns: 1fr; color: var(--sx-text-3); }
+#arena-panel .run-ship-budget { display: block; margin-top: 5px; font: 500 11px/1.25 var(--ui-text-font); color: var(--sx-text-3); }
+#arena-panel .run-ship-budget.is-over { color: var(--sx-warn); }
+#arena-panel .run-spare > .run-ship-after { grid-column: 1 / -1; padding: 5px 7px 6px; }
 #arena-panel .run-replacement { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding-top: 10px; margin-top: auto; border-top: 1px dashed var(--sx-line-2); }
 #arena-panel .run-replacement > small { font: 700 10px/1 var(--ui-text-font); letter-spacing: 0.14em; text-transform: uppercase; color: var(--sx-text-3); }
 #arena-panel .run-swap-item { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font: 600 13px/1.2 var(--ui-text-font); color: var(--item-color, var(--sx-text-2)); }
@@ -1406,6 +1422,9 @@
 #arena-panel .run-crew summary { cursor: pointer; font: 700 12px/1 var(--ui-text-font); letter-spacing: 0.16em; text-transform: uppercase; color: var(--sx-gold); }
 #arena-panel .run-orders { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 #arena-panel .run-orders > b { flex: 1 0 100%; font: 600 13px/1.2 var(--ui-text-font); color: var(--sx-text-2); }
+#arena-panel .run-orders-wing > b { display: flex; justify-content: space-between; gap: 8px; }
+#arena-panel .run-crew-hull { font: 600 12px/1.2 var(--ui-text-font); letter-spacing: 0.04em; color: var(--sx-text-2); opacity: 0.8; }
+#arena-panel .run-crew-hull.is-low { color: var(--sx-gold); opacity: 1; }
 #arena-panel .run-orders button { min-height: 34px; padding: 0 10px; margin: 0; font: 600 12px/1 var(--ui-text-font); letter-spacing: 0.06em; text-transform: none; color: var(--sx-text-2); background: rgba(0, 0, 0, 0.35); border: 1px solid var(--sx-line-2); box-shadow: none; }
 #arena-panel .run-orders button.is-selected { color: var(--sx-gold-ink); background: var(--sx-gold); border-color: var(--sx-gold); }
 
@@ -1466,6 +1485,8 @@
   #arena-panel .run-offer { gap: 6px; padding: 8px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
   #arena-panel .run-offer:hover:not(:disabled) { transform: none; }
   #arena-panel .run-selected-mark { top: 4px; right: 4px; width: 20px; height: 20px; font-size: 12px; }
+  /* The tick sits inside the card on phones: make room so it never covers the rating. */
+  #arena-panel .run-offer.is-selected .run-offer-head .run-rating { margin-right: 22px; }
   #arena-panel .run-offer-head { gap: 8px; }
   #arena-panel .run-art-plate { width: 44px; height: 44px; }
   #arena-panel .run-art-plate .item-icon { width: 32px; height: 32px; }
@@ -1494,6 +1515,13 @@
   #arena-panel .run-trait b { font-size: 8px; }
   #arena-panel .run-trait span { font-size: 11px; line-height: 1.3; }
   #arena-panel .run-replacement { gap: 4px 6px; padding-top: 5px; }
+  /* Phones: the three most important changes, new value and change only. */
+  #arena-panel .run-ship-after { padding: 4px 6px 5px; }
+  #arena-panel .run-ship-after > small { margin-bottom: 2px; font-size: 8px; }
+  #arena-panel .run-ship-rows { gap: 1px; }
+  #arena-panel .run-ship-row { grid-template-columns: minmax(0, 1fr) auto 4.5ch; gap: 6px; font-size: 11px; }
+  #arena-panel .run-ship-row:nth-child(n + 4) { display: none; }
+  #arena-panel .run-ship-was, #arena-panel .run-ship-row > b small, #arena-panel .run-ship-budget { display: none; }
   #arena-panel .run-replacement > small { font-size: 8px; }
   #arena-panel .run-swap-item span { display: none; }
   #arena-panel .run-swap-item .item-icon, #arena-panel .run-empty-mount { width: 18px; height: 18px; }

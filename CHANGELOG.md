@@ -1,3 +1,10 @@
+## 0.8.2pu — See what a reward does to your ship, wingmen survive, a heavier scatter cannon
+
+- Arena reward cards and spare parts now show what they do to the whole ship: firepower, the sustained fire your reactor can keep up, weapon energy draw, turret fire, missile load, shield, hull, recharge, energy, speed and turning, old → new with the difference. A budget line shows the guns' energy draw against the reactor and turns amber when the guns draw more than it supplies.
+- Arena wingmen can no longer be destroyed. A wingman shot down powers down for the rest of the level and flies the next one, repaired like you (+30%, +10% on hard, +50% with field repairs, full before the finale). The run screen shows each wingman's hull.
+- The Scatter Cannon hits harder: a sharper muzzle crack and a punchier body that phone and laptop speakers can actually play, with a short echo off the hull.
+- On phones the selection tick no longer covers a reward's rating.
+
 ## 0.8.2pt — Caravan and Rookery frigates
 
 - New frigate pair. The **Caravan** is a Free Merchants convoy tender: two repair drones keep its escorts alive until you destroy its drone hangar or shoot the drones, its four container stacks break off and spill cargo, and with all three engines gone the crew surrenders and can be boarded. The **Rookery** is a stolen Caravan turned Red Talon carrier: each launch bay sends out a pair of Balors every 25 seconds until you destroy it, and destroying the flight-control mast halves the launch rate. Both have broad shields that torpedoes punch through, and only their shield generators and engines can be selected as subtargets.
