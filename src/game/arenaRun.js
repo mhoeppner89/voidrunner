@@ -53,7 +53,7 @@ export const RUN_ACTS=[
     group(balor()),
     group(balor()),
     {...group(veteran('demon',1,{guns:['pulse-cannon','pulse-cannon','beam-emitter','beam-emitter']})),limit:1}]),
-  level("Hit and run","acheron-horizon","Two Loki fighters screen a Red Njord Barrage. Rush it fast: its racks cannot lock a quick pilot.",[
+  level("Hit and run","acheron-horizon","Two Loki fighters screen a Red Njord Barrage. Its fire control cannot follow a pilot crossing fast.",[
     group(veteran('speedster'),novice('speedster')),
     group(barge(),balor())],{objective:{kind:'destroy',label:'Destroy Barrage',done:'Barrage destroyed',failed:'Barrage escaped'}}),
   level("Red Njord","redwake-belt","Destroy the Red Njord before more Balors reach the belt.",[

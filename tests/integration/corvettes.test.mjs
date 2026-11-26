@@ -39,13 +39,15 @@ test('all capital hulls declare their health, labels, sockets, hit areas and sel
         for(const index of [...expected,undefined]){s.cycleCapitalSubtarget();assert.equal(s.getTargetRef().mount,index);}
     }
 });
-test('one engine halves speed, two preserve momentum, and only a career Drover offers boarding',()=>{
+test('one engine halves speed, two leave a slowing drift, and only a career Drover offers boarding',()=>{
     for(const id of ['drover','ironjaw'])for(const arena of [false,true]){
         const {ship,s,mounts}=stage(id,arena);ship.shield=0;const engines=mounts.filter(m=>m.kind==='engine'),speed=ship.speed;
         hit(s,ship,engines[0]);assert.equal(ship.speed,speed/2);assert.equal(ship.engineThrust,.5);
         hit(s,ship,engines[1]);assert.equal(ship.speed,0);assert.equal(ship.engineThrust,0);
         assert.equal(!!ship.surrendered,id==='drover'&&!arena);assert.equal(s.boardable(ship),id==='drover'&&!arena);
-        ship.velocity=[2,0,0];s.updateTravelAI(ship,.5);assert.deepEqual(ship.position,[1,0,0]);assert.deepEqual(ship.velocity,[2,0,0]);
+        // Dead engines drift on, but manoeuvring thrusters bleed the drift off.
+        ship.velocity=[2,0,0];s.updateTravelAI(ship,.5);const left=2*Math.exp(-.25);
+        assert.ok(Math.abs(ship.velocity[0]-left)<1e-9&&ship.velocity[1]===0);assert.ok(Math.abs(ship.position[0]-left*.5)<1e-9);
     }
 });
 test('a disabled booster loses the extra five speed and a destroyed generator collapses its shield',()=>{
@@ -154,7 +156,7 @@ test('traffic frigates retain their own hull stats and lose a third of thrust pe
         }
         assert.equal(Boolean(s.boardable(ship)),variant==='caravan'&&!arena);
         assert.equal(Boolean(ship.surrendered),variant==='caravan'&&!arena);
-        ship.velocity=[2,0,0];s.updateTravelAI(ship,.5);assert.equal(ship.position[0],1);
+        ship.velocity=[2,0,0];s.updateTravelAI(ship,.5);assert.ok(Math.abs(ship.position[0]-Math.exp(-.25))<1e-9);
     }
 });
 

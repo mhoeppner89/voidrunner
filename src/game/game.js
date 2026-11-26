@@ -865,6 +865,8 @@ const NPC_SHIP_AVOID_HORIZON = 6.5;
 const NPC_SHIP_AVOID_RANGE = 320;
 const NPC_SHIP_AVOID_STEER = 2.4;
 const FRIGATE_NPC_IMPACT_DAMAGE_SCALE = 0.2;
+// Fraction of drift a hull without engines (or a captured prize) sheds per second.
+const DEAD_DRIFT_DECAY = 0.5;
 const npcShipCollisionDamage = (impact, victim, attacker) => {
     if (impact <= 4)
         return 0;
@@ -9888,9 +9890,11 @@ export class GameSession {
         const position = this.tmpA.set(ship.position[0], ship.position[1], ship.position[2]);
         const velocity = this.tmpB.set(ship.velocity[0], ship.velocity[1], ship.velocity[2]);
         if (ship.captured || ship.engineThrust===0) {
-            // A captured hull is inert but remains in the scene. Preserve its
-            // current momentum so the recovered ship keeps drifting instead of
-            // disappearing or snapping onto a civilian route.
+            // A captured hull is inert but remains in the scene. It keeps
+            // drifting instead of disappearing or snapping onto a civilian
+            // route, but manoeuvring thrusters bleed the drift off: a hull
+            // without engines used to coast out of the fight for good.
+            velocity.multiplyScalar(Math.exp(-DEAD_DRIFT_DECAY * dt));
             position.addScaledVector(velocity, dt);
             tupleInto(ship.position, position);
             tupleInto(ship.velocity, velocity);
@@ -10124,7 +10128,7 @@ export class GameSession {
         // closing velocity along the normal (a stationary freighter struck by
         // a fast fighter still takes the ram), and `sign` flips the normal for
         // the far side so each ship's recoil points away from the other.
-        const apply = (posArr, velArr, otherVel, vol, otherVol, sign, weighted = false) => {
+        const apply = (posArr, velArr, otherVel, vol, otherVol, sign, weighted = false, heavy = false) => {
             // Degenerate contacts (deep spawn overlaps, zero normals) used to
             // write NaN straight into live tuples and kill the sim.
             if (!Number.isFinite(contact.x) || !Number.isFinite(contact.y) || !Number.isFinite(contact.z) || !Number.isFinite(contact.push))
@@ -10147,7 +10151,10 @@ export class GameSession {
             if (inward > 0) {
                 // NPC impacts exchange momentum according to hull size, with
                 // a small bounce. The player's established response is unchanged.
-                const recoil = inward * (weighted ? 1.2 * share : 1.5);
+                // A ship the player rams keeps the old bounce against a hull of
+                // its own size but a heavier one takes only its share: a fighter
+                // used to fling a corvette at 1.5x its closing speed.
+                const recoil = inward * (weighted ? 1.2 * share : heavy ? 1.5 * Math.min(1, 2 * share) : 1.5);
                 velArr[0] += nx * recoil;
                 velArr[1] += ny * recoil;
                 velArr[2] += nz * recoil;
@@ -10178,7 +10185,7 @@ export class GameSession {
                 const playerVel0 = [pv[0], pv[1], pv[2]];
                 const shipVel0 = [sv[0], sv[1], sv[2]];
                 const playerImpact = apply(player.position, player.velocity, shipVel0, playerVolume, shipVolume, 1);
-                const shipImpact = apply(ship.position, ship.velocity, playerVel0, shipVolume, playerVolume, -1);
+                const shipImpact = apply(ship.position, ship.velocity, playerVel0, shipVolume, playerVolume, -1, false, true);
                 if (playerImpact > 4) {
                     this.damagePlayer((playerImpact - 3) * 1.65, ship.name);
                     if (this.collisionMessageCooldown <= 0) {

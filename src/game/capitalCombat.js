@@ -405,6 +405,9 @@ export function updateCapitalBroadsideAttack(session,ship,targetPosition,targetV
  n.heading.multiplyScalar(Math.sqrt(1-rangeBias*rangeBias)).addScaledVector(n.radial,rangeBias).normalize();
  if(targetVelocity?.isVector3)n.other.copy(targetVelocity);else n.other.fromArray(targetVelocity??zeroVelocity);
  n.desired.copy(n.other).addScaledVector(n.heading,Math.abs(correction));
+ // Corvettes keep moving on their broadside orbit instead of parking in the
+ // firing band (a barge relocates at full speed after each salvo).
+ if(traffic?.standoffCruise)n.desired.addScaledVector(n.heading,ship.speed*(session.save.world.time<(ship.capitalRelocateUntil??0)?1:traffic.standoffCruise));
  // Keep a dead band for range control without strafing to hold a firing lane.
  const blocked=session.lineBlocked(n.position,targetPosition,ship.id);
  if(blocked)n.desired.addScaledVector(n.heading,ship.speed*.8);

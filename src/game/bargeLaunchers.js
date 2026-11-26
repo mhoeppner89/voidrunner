@@ -1,12 +1,15 @@
-// Red Njord Barrage launcher racks. Missile artillery: the barge needs a slow,
-// steady target to build its lock, announces each salvo three seconds ahead
-// (CHARGING on the target monitor, LOCK lamp, rack flashes), and cannot fire
-// inside BARGE.minRange. A pilot who rushes it fast still draws one snap
-// canister per approach, which the normal break cue lets them dodge.
+// Red Njord Barrage launcher racks. Missile artillery: speed only slows its
+// lock (full rate up to 50, four times slower from 100). What breaks it is
+// line-of-sight rate: the fire-control tracker cannot follow a pilot crossing
+// its view fast enough, so the defence is a hard pass across the bearing, and
+// closer in the same speed crosses faster. Each salvo is announced three
+// seconds ahead (CHARGING on the target monitor, LOCK lamp, rack flashes);
+// nothing fires inside BARGE.minRange. A pilot who rushes it fast still draws
+// one snap canister per approach, which the normal break cue lets them dodge.
 // Allocation-free per step: one scratch record per barge.
 import * as THREE from 'three';
 import {LAUNCHERS} from './weapons.js';
-import {beginRackLock,rackLockProgress,torpedoMobilityFactor} from './weaponFlight.js';
+import {beginRackLock,rackLockProgress} from './weaponFlight.js';
 import {capitalHull} from './capitalHulls.js';
 import {tracksActivePlayer} from './combatTargeting.js';
 import {t} from './i18n.js';
@@ -15,16 +18,20 @@ export const BARGE=Object.freeze({
     every:15, warning:3, warheads:8, canister:4,
     lockTime:4, lockRange:1200, minRange:250,
     snapRange:600, snapRearm:800, snapSpeed:45, abortReload:5,
+    // Lock rate against target speed: full up to 50, a quarter from 100 on.
+    lockFullSpeed:50, lockSlowSpeed:100, lockSlowFactor:4,
+    // Tracker limit (line-of-sight rate): full rate up to 3°/s, lost at 6°/s.
+    fullTrack:3*Math.PI/180, lostTrack:6*Math.PI/180,
+    // After a full salvo the barge relocates at full speed for this long.
+    relocate:6,
 });
 // Stock swarm warheads (same speed, turn and 600-unit terminal phase, so the
 // measured break window holds) with the reach to shell from the stand-off.
-// The lock needs a slow, steady target: full at speed 30 and 8°/s line-of-sight
-// rate, none at 60 or 20°/s.
 export const BARGE_SWARM=Object.freeze({...LAUNCHERS.swarm,id:'barge-swarm',life:7,
-    lockRange:BARGE.lockRange,lockTime:BARGE.lockTime,
-    fullLockSpeed:30,zeroLockSpeed:60,fullLockAngularRate:8*Math.PI/180,zeroLockAngularRate:20*Math.PI/180});
+    lockRange:BARGE.lockRange,lockTime:BARGE.lockTime});
 const BLIND=Object.freeze({...BARGE_SWARM,lockRange:BARGE.lockRange/2,lockTime:BARGE.lockTime*2});
 
+const ZERO=[0,0,0];
 function stateFor(ship){
     return ship.bargeLaunch??={phase:'ready',readyAt:0,fireAt:0,salvoUntil:0,flashAt:0,snapArmed:true,rackCursor:0,
         position:new THREE.Vector3(),target:new THREE.Vector3(),bearing:new THREE.Vector3(),q:new THREE.Quaternion(),
@@ -45,6 +52,14 @@ function rackTop(ship,mount,s,out){
     const side=mount.normal[0];
     return out.set(mount.position[0]-side*mount.hitHalfExtents[0],mount.position[1]+mount.hitHalfExtents[1],mount.position[2])
         .applyQuaternion(s.q).add(s.position);
+}
+// Fraction of the full lock rate against a target at this speed and
+// line-of-sight rate (radians per second). Zero only when the tracker loses it.
+export function bargeLockRate(speed,angularRate){
+    if(angularRate>=BARGE.lostTrack)return 0;
+    const track=Math.min(1,(BARGE.lostTrack-angularRate)/(BARGE.lostTrack-BARGE.fullTrack));
+    const over=Math.min(1,Math.max(0,(speed-BARGE.lockFullSpeed)/(BARGE.lockSlowSpeed-BARGE.lockFullSpeed)));
+    return track/(1+(BARGE.lockSlowFactor-1)*over);
 }
 export function bargeWarheadCount(intact){return intact?Math.ceil(BARGE.warheads*intact/6):0;}
 
@@ -112,10 +127,12 @@ export function updateBargeLaunchers(session,ship,dt,targetPosition){
     }
     if(s.phase==='ready'&&now<s.readyAt){fit.lock=0;return;}
     beginRackLock(fit,targetId,'barge',now,dt);
-    const mobility=torpedoMobilityFactor(launcher,ship.velocity,v,s.bearing,distance);
+    // Line-of-sight rate from the relative velocity across the bearing.
+    s.scratch.fromArray(v??ZERO).sub(s.shot.fromArray(ship.velocity));
+    const mobility=bargeLockRate(speed,s.scratch.cross(s.bearing).length()/distance);
     if(s.phase==='warning'){
-        // The salvo needs the lock to hold through the warning. Speed or a
-        // hard turn breaks it and the racks reload short.
+        // The salvo needs the track to hold through the warning. Crossing the
+        // tracker's view too fast breaks it and the racks reload short.
         if(mobility===0){resetLock(ship,s,BARGE.abortReload,now);return;}
         fit.lock=1;
         if(targetId==='player')session.warnPlayerLock?.(t('BARRAGE LAUNCH — BREAK LOCK'),false);
@@ -126,13 +143,14 @@ export function updateBargeLaunchers(session,ship,dt,targetPosition){
         if(now<s.fireAt)return;
         launch(session,ship,s,bargeWarheadCount(racks.length),targetId);
         s.phase='ready';s.readyAt=now+BARGE.every;s.salvoUntil=now+1;fit.lock=0;fit.warned=false;
+        ship.capitalRelocateUntil=now+BARGE.relocate;
         return;
     }
     const previous=fit.lock??0;
     fit.lock=rackLockProgress(previous,launcher,ship.pilot?.tier,distance,1,0,dt,mobility);
     // A building lock lights the LOCK lamp (acquiring) while the pilot can still break it.
     fit.warned=fit.lock>0;
-    if(fit.lock>0&&targetId==='player')session.warnPlayerLock?.(t('BARRAGE LOCK · SPEED UP'),!previous);
+    if(fit.lock>0&&targetId==='player')session.warnPlayerLock?.(t('BARRAGE LOCK · CROSS FAST'),!previous);
     if(fit.lock<1)return;
     s.phase='warning';s.fireAt=now+BARGE.warning;s.flashAt=now;
     if(targetId==='player')session.warnPlayerLock?.(t('BARRAGE LAUNCH — BREAK LOCK'),true);

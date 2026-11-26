@@ -38,11 +38,14 @@ const lifted=mount=>({...mount,position:[mount.position[0],mount.position[1]+BAR
 export const CORVETTES={
     drover:{name:'MV Njord',cargoHolds:6,shield:300,hull:900,speed:25,role:'trader',faction:'independents',mounts:[bridge,dorsal,seat('mount_laser_ventral','laser','VENTRAL LASER',[0,-3.36,-2.45614],down),generator,...engines,...pods],
         readout:'TURRETS {turrets}/3 · PODS {pods}/6'},
-    ironjaw:{name:'Red Njord',shield:200,hull:1200,speed:30,role:'escort',faction:'pirates',mounts:[bridge,dorsal,...broadsides,generator,...engines,booster],
+    // standoffCruise: share of top speed a corvette keeps on its broadside
+    // orbit once in range, so it keeps manoeuvring instead of parking.
+    ironjaw:{name:'Red Njord',shield:200,hull:1200,speed:30,standoffCruise:.5,role:'escort',faction:'pirates',mounts:[bridge,dorsal,...broadsides,generator,...engines,booster],
         readout:'GUNS {guns}/2 · TURRETS {turrets}/2'},
-    // Missile artillery: shells a slow, steady pilot from range; a fast rush
-    // denies the lock but still draws one snap canister (bargeLaunchers.js).
-    barge:{name:'Red Njord Barrage',shield:200,hull:700,speed:25,role:'escort',faction:'pirates',preferredRange:900,
+    // Missile artillery: shells the pilot from range; a fast crossing pass
+    // breaks its lock and a rush draws one snap canister (bargeLaunchers.js).
+    // It crawls while locking and relocates at full speed after each salvo.
+    barge:{name:'Red Njord Barrage',shield:200,hull:700,speed:25,standoffCruise:.3,role:'escort',faction:'pirates',preferredRange:900,
         mounts:[bargeDish,{...lifted(dorsal)},lifted(generator),...engines.map(lifted),...bargeRacks],
         readout:'RACKS {racks}/6'},
 };

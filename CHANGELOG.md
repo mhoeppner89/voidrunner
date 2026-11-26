@@ -1,3 +1,9 @@
+## 0.8.2py — Barrage tracker, corvettes keep moving, rams fixed
+
+- The Red Njord Barrage locks onto fast pilots too, it just takes longer: full lock speed up to 50, four times slower from 100 on. What breaks its lock is crossing its view fast enough, because its fire-control tracker cannot follow: at its 900 m stand-off that takes an afterburner pass, closer in a cruising one, and you have to keep turning around it. The cockpit warning now reads BARRAGE LOCK · CROSS FAST.
+- Red Njord and the Barrage no longer park once in range: they keep circling you with a broadside turned toward you, and the Barrage repositions at full speed after each salvo.
+- Ramming a big ship no longer flings it away: a ship you hit recoils by its size, so a corvette barely moves. Ships with dead engines and captured prizes now coast to a stop instead of drifting off for good.
+
 ## 0.8.2px — No more fuel; big ships go down slower
 
 - Fuel is gone. The afterburner runs on your ship's energy, the same pool your guns and shield recharge use, so every burn is a choice between speed and firepower. A full capacitor alone feeds about 15 seconds of afterburner; reactor and capacitor upgrades make it last longer, and the Comet Tail engine cuts the cost by 30%. With an empty capacitor the afterburner still doubles your turning, so a missile break always works; you only lose the extra speed. Enemy pilots pay the same price for their burns.
