@@ -152,6 +152,14 @@
     "aspect": 0.3906238095238095
   },
   {
+    "variant": "barge",
+    "path": "assets/models/capital/barge.glb",
+    "sha256": "6183a3e12ea0e6abf77d4a8dd0d65a62dd1caf78a6b2d5261af301a7e4ac894f",
+    "contourVertices": 309,
+    "glassContours": 14,
+    "aspect": 0.3854166666666667
+  },
+  {
     "variant": "concord-frigate",
     "path": "assets/models/capital/concord-frigate.glb",
     "sha256": "6c3d0d2c2d1d96a177b5613210ee18e7dbd08bed10646e9ef4c8b11778f84be7",

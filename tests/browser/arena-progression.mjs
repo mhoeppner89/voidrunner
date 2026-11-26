@@ -112,7 +112,7 @@ try{
   });
   assert.ok(state.paint,JSON.stringify(state));if(level===2)assert.ok(state.inbound);
   await page.evaluate(assertArenaGlass);
-  if(level===8)assert.match(state.ticker,/Drover|engines/i);
+  if(level===8)assert.match(state.ticker,/Njord|engines/i);
   if(desktop)await page.screenshot({path:out+'/'+name+'.png'});
   if(level===2 && profile!=='iphone'){
    for(const language of ['de','en']){

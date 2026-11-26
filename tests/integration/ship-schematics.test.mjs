@@ -5,8 +5,8 @@ import {createHash} from 'node:crypto';
 import {GLB_TOP_DOWN_PROFILES} from '../../src/game/shipProfiles.js';
 import {shipTopDownProfile,shipProfilePath} from '../../src/game/shipTopDownProfile.js';
 import {SHIPS} from '../../src/game/data.js';
-const variants=['blade','speedster','legionary','andromeda','torsas','astra','kestrel','warden','demon','mule','scrapper','talon','prospector','lancer','atlas-freighter','concord-frigate','concord-battleship','concord-carrier','concord-cruiser','ironjaw','drover','caravan','rookery'];
-test('all 23 current hulls have their own finite vector schematic, including Blade and capitals',()=>{
+const variants=['blade','speedster','legionary','andromeda','torsas','astra','kestrel','warden','demon','mule','scrapper','talon','prospector','lancer','atlas-freighter','concord-frigate','concord-battleship','concord-carrier','concord-cruiser','ironjaw','drover','caravan','rookery','barge'];
+test('all 24 current hulls have their own finite vector schematic, including Blade and capitals',()=>{
  assert.deepEqual(Object.keys(GLB_TOP_DOWN_PROFILES).sort(),[...variants].sort());
  const paths=new Set();
  for(const variant of variants){const p=shipTopDownProfile(variant);assert.notEqual(p,shipTopDownProfile('unknown'));assert.ok(p.contours.length&&p.details.length,variant);assert.ok(p.maxX>p.minX&&p.maxZ>p.minZ);for(const c of [...p.contours,...p.details]){assert.ok(c.points.length>=2);assert.ok(c.points.flat().every(Number.isFinite));}
@@ -16,7 +16,7 @@ test('all 23 current hulls have their own finite vector schematic, including Bla
 });
 test('symmetric hulls, canopy and structural detail is exactly mirrored about its own centerline',()=>{
  for(const [variant,p]of Object.entries(GLB_TOP_DOWN_PROFILES)){
-  if(['drover','ironjaw','caravan','rookery'].includes(variant)){
+  if(['drover','ironjaw','caravan','rookery','barge'].includes(variant)){
    assert.ok(p.contours.every(c=>c.closed),'authored corvette silhouettes include both sides');continue;
   }
   const center=(p.bounds.minX+p.bounds.maxX)/2;assert.ok(Math.abs(center-p.cols/2)<1e-4,variant);
@@ -25,7 +25,7 @@ test('symmetric hulls, canopy and structural detail is exactly mirrored about it
  }
 });
 test('schematic evidence refers to the exact installed GLBs',async()=>{
- const evidence=JSON.parse(await readFile('docs/ship-schematics.json','utf8'));assert.equal(evidence.length,23);
+ const evidence=JSON.parse(await readFile('docs/ship-schematics.json','utf8'));assert.equal(evidence.length,24);
  for(const row of evidence){const hash=createHash('sha256').update(await readFile(row.path)).digest('hex');assert.equal(hash,row.sha256,`${row.variant}: rebake after a hull update`);assert.ok(row.contourVertices<400,'simplified rather than raw raster stair steps');}
 });
 test('similar broad hulls retain distinct structural identification cues',()=>{

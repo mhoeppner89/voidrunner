@@ -246,6 +246,16 @@
       ]
     },
     {
+      "id": "barge",
+      "variant": "barge",
+      "path": "assets/models/capital/barge.glb",
+      "sha256": "6183a3e12ea0e6abf77d4a8dd0d65a62dd1caf78a6b2d5261af301a7e4ac894f",
+      "category": "capital",
+      "factions": [
+        "pirates"
+      ]
+    },
+    {
       "id": "caravan",
       "variant": "caravan",
       "path": "assets/models/capital/caravan.glb",

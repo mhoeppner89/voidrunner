@@ -11,6 +11,7 @@ import {FRIGATE_COLLISION_TRIANGLES} from './frigateCollisionData.js';
 import {clearTurretArc,shipBlocksRay,updateAutomaticTurrets} from './turrets.js';
 import {disruptionFactor} from './weaponDamage.js';
 import {relativeIntercept,beginRackLock,rackLockProgress,torpedoMobilityFactor} from './weaponFlight.js';
+import {updateBargeLaunchers} from './bargeLaunchers.js';
 // Live capital hulls render at twice their authored scale. PDCs use the same
 // extents through npcHullExtents; main batteries and assembly hits must agree.
 import {capitalHull,capitalMountPosition,FRIGATE_EXTENTS,CAPITAL_HULLS} from './capitalHulls.js';
@@ -314,6 +315,7 @@ export function updateCorvetteWeapons(session,ship,dt,targetPosition,targetVeloc
  if(ship.targetId==='player' && !tracksActivePlayer(session,ship))targetPosition=undefined;
  if(targetPosition)s.target.copy(targetPosition);
  updateAutomaticTurrets(session,ship,ship.id,dt);
+ if(ship.variant==='barge')updateBargeLaunchers(session,ship,dt,targetPosition);
  s.q.fromArray(ship.rotation);
  for(const m of capitalHull(ship).mounts){
   if(m.kind==='laser'||m.kind==='pdc'){

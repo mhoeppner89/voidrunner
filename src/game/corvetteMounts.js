@@ -24,11 +24,27 @@ const broadsides=[-1,1].map(side=>({...seat(side<0?'mount_heavy_port':'mount_hea
     side<0?'PORT BROADSIDE':'STARBOARD BROADSIDE',[side*4.78,2.65,-1.47368]),bearing:side,barrels:broadsideBarrels}));
 const booster={node:'booster_port',kind:'booster',label:'PORT BOOSTER',hull:120,normal:aft,
     position:[-10.1,-.62,28.88772],hitCenterOffset:[.42,-.31,-7.63],hitHalfExtents:[2.35,2.15,7.64],hitShape:'box',exhaustRadius:1.3};
+// The Barrage rides its engineering block 1.2 higher than the Drover (BARGE_LIFT).
+// Racks sit on the old pod jaws; each is its own collision group (rack_N).
+const BARGE_LIFT=1.2,toFlight=u=>u*56/57-28;
+const bargeRacks=Array.from({length:6},(_,i)=>{
+    const side=i%2?1:-1,z=toFlight([18,27,36][i>>1]-.2);
+    return {node:'rack_'+i,kind:'rack',label:'LAUNCHER RACK '+(i+1),hull:90,normal:[side,0,0],position:[side*8.75,1.9,z],
+        hitShape:'box',hitHalfExtents:[3.05,4.5,3.45],hitCenterOffset:[-side*3.05,0,0],partBit:1<<i,launchUp:2.4/6.8};
+});
+const bargeDish={node:'fire_control',kind:'dish',label:'FIRE CONTROL',hull:90,normal:up,position:[0,9.2,toFlight(6)],
+    hitShape:'box',hitHalfExtents:[2.8,2.2,2.8],hitCenterOffset:[0,-.9,0]};
+const lifted=mount=>({...mount,position:[mount.position[0],mount.position[1]+BARGE_LIFT,mount.position[2]]});
 export const CORVETTES={
     drover:{name:'MV Njord',cargoHolds:6,shield:300,hull:900,speed:25,role:'trader',faction:'independents',mounts:[bridge,dorsal,seat('mount_laser_ventral','laser','VENTRAL LASER',[0,-3.36,-2.45614],down),generator,...engines,...pods],
         readout:'TURRETS {turrets}/3 · PODS {pods}/6'},
     ironjaw:{name:'Red Njord',shield:200,hull:1200,speed:30,role:'escort',faction:'pirates',mounts:[bridge,dorsal,...broadsides,generator,...engines,booster],
-        readout:'GUNS {guns}/2 · TURRETS {turrets}/2'}
+        readout:'GUNS {guns}/2 · TURRETS {turrets}/2'},
+    // Missile artillery: shells a slow, steady pilot from range; a fast rush
+    // denies the lock but still draws one snap canister (bargeLaunchers.js).
+    barge:{name:'Red Njord Barrage',shield:200,hull:700,speed:25,role:'escort',faction:'pirates',preferredRange:900,
+        mounts:[bargeDish,{...lifted(dorsal)},lifted(generator),...engines.map(lifted),...bargeRacks],
+        readout:'RACKS {racks}/6'},
 };
 
 // Collision envelopes and exterior marker positions come from the flight-frame exports.
@@ -60,7 +76,7 @@ export const TRAFFIC_HULLS={...CORVETTES,
             ...[-1,1].map((side,i)=>({node:'bay_'+(side<0?'port':'starboard'),kind:'bay',label:side<0?'PORT BAY':'STARBOARD BAY',hull:300,normal:[side,0,0],
                 position:[side*19.95,0,-2],hitShape:'box',hitHalfExtents:[8,5.75,28.3],hitCenterOffset:[-side*8,.45,-3.15],partBit:1<<i,bearing:side}))]},
 };
-export const CORVETTE_TRAFFIC={convoyChance:.15,raidChance:.15,minRaidTier:2};
+export const CORVETTE_TRAFFIC={convoyChance:.15,raidChance:.15,minRaidTier:2,bargeShare:1/3};
 export const FRIGATE_TRAFFIC={convoyChance:.05,minConvoyTier:2,towChance:.25,raidChance:.05,minRaidTier:3,raidEscorts:2};
 export function raidCarrier(_systemId,region,rng){return (region.piratePressure??1)>0&&careerRaidTier(region)>=FRIGATE_TRAFFIC.minRaidTier&&rng()<FRIGATE_TRAFFIC.raidChance;}
 export function convoyVariant(owner,region,rng,allowFrigate=true){

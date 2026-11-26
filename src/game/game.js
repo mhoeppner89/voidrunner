@@ -21,9 +21,10 @@ import {normalizePaintDesign,samePaint} from './paintDesign.js';
 import {FLEET_EQUIPMENT,droneDock} from './fleetEquipmentData.js';
 import {canonicalFaction,preferredNpcHull,FACTION_NAMES} from './factions.js';
 import {CapitalMarkers} from './capitalMarkers.js';
+import {OrdnanceMarkers} from './ordnanceMarkers.js';
 import {capitalHull,capitalMountPosition,capitalReadout} from './capitalHulls.js';
 import {updateTrafficLaunches} from './arenaBattle.js';
-import {TRAFFIC_HULLS,FRIGATE_TRAFFIC,convoyVariant,raidCorvette,raidCarrier} from './corvetteMounts.js';
+import {TRAFFIC_HULLS,FRIGATE_TRAFFIC,CORVETTE_TRAFFIC,convoyVariant,raidCorvette,raidCarrier} from './corvetteMounts.js';
 import {CRUISER_GUN,equipCruiser,updateCruiserAttack,updateCruiserBatteries,damageCruiserMount,segmentCruiserMountHit,cruiserSubsystemExplosionScale} from './cruiserCombat.js';
 import { prepareLocalPursuit, updateLocalPursuit, driveRecoveryRemaining, PLAYER_RADAR_RANGE, PIRATE_ARRIVAL_MIN } from './combatTravel.js';
 import { nearestPlayerBerth, playerBerth, playerBerths, setPlayerBerthResolver, preparePlayerLaunch, stepPlayerDocking } from './playerDocking.js';
@@ -155,6 +156,8 @@ const FALLBACK_AI_RNG = () => 0.5;
 // rank, and the valuable-load callouts) — remembered in pilotLineHistory.said.
 const PILOT_ONESHOT_KEYS = new Set(['contact', 'rank', 'case', 'cargo']);
 const PLAYER_RADIUS = 1.25;
+// Shootable torpedo body for the pilot's guns (PDC rounds keep their 1.6 fuse).
+const TORPEDO_HIT_RADIUS = 3;
 // The player's collision envelope is the GLB hull scaled down by this factor:
 // near-misses that look like they clear usually do, while the wide Talon sweep
 // still registers. NPCs collide at their full hull (no forgiveness).
@@ -775,6 +778,7 @@ const HULL_FLIGHT_STATS = {
     rookery: { speed: 20, afterburnSpeed: 0, turnRate: .15, collisionRadius: 28, hullHalfExtents: [10,7,28] },
     drover: { speed: 25, afterburnSpeed: 0, turnRate: .25, collisionRadius: 14, hullHalfExtents: [5.5,4.3,14] },
     ironjaw: { speed: 30, afterburnSpeed: 0, turnRate: .25, collisionRadius: 15, hullHalfExtents: [6.1,4.3,15.1] },
+    barge: { speed: 25, afterburnSpeed: 0, turnRate: .25, collisionRadius: 14, hullHalfExtents: [5.5,4.6,14] },
     'concord-frigate': { speed: 18, afterburnSpeed: 0, turnRate: 0.12, collisionRadius: 56.5, hullHalfExtents: [18.73, 22.46, 56.45] },
     'concord-cruiser': { speed: 9, afterburnSpeed: 0, turnRate: 0.12, collisionRadius: 282.05, hullHalfExtents: [96.31, 155.54, 282.05] },
     'concord-carrier': { speed: 4.5, afterburnSpeed: 0, turnRate: 0.06, collisionRadius: 451.28, hullHalfExtents: [209.06460441489827,119.7327401720047,452.17793918001655] },
@@ -785,7 +789,7 @@ const HULL_FLIGHT_STATS = {
 for(const [variant,profile] of Object.entries(SHIP_COLLIDERS))if(HULL_FLIGHT_STATS[variant]&&variant!=='concord-frigate')HULL_FLIGHT_STATS[variant].hullHalfExtents=profile.extent;
 const PLAYER_HULL_EXTENTS=Object.fromEntries(Object.entries(HULL_FLIGHT_STATS).map(([variant,stats])=>[variant,Object.freeze(stats.hullHalfExtents.map(n=>n*PLAYER_CONTACT_SCALE))]));
 const CAPITAL_CLASS_BY_VARIANT = Object.freeze({
-    drover:'corvette', ironjaw:'corvette', caravan:'frigate', rookery:'frigate',
+    drover:'corvette', ironjaw:'corvette', barge:'corvette', caravan:'frigate', rookery:'frigate',
     'concord-frigate': 'frigate',
     'concord-cruiser': 'cruiser',
     'concord-carrier': 'carrier',
@@ -3037,6 +3041,7 @@ export class GameSession {
         updateMissileWarning(flight, flying ? this.projectiles : null, this.projStore, this.save.player, this.audio?.outputLatency?.() ?? 0);
         // A destroyed ship hears no warning: the explosion owns the moment.
         if (this.save.player.hull <= 0 || this.deathTimer > 0) { flight.missileThreat = 0; flight.missileBreak = false; }
+        if (flight.missileBreak && !this.arena?.observer) this.ui.flashBreakCue?.();
         flight.lockState = flying && this.save.player.hull > 0 && !(this.deathTimer > 0)
             ? cockpitLockState(this.ships, this.save.world.time, flight.trackingMissile) : 'off';
         const missileThreat=flight.missileThreat;
@@ -7680,7 +7685,7 @@ export class GameSession {
             // the old flat if/else dispatch (patrol-engage → search → attack →
             // travel) now lives there as updateShipAI, with the task layer feeding
             // travel waypoints and the interaction layer running emergent mugs.
-            if(ship.variant==='ironjaw'&&ship.convoyLeader?.hull>0&&!ship.targetId)ship.targetId=ship.convoyLeader.targetId;
+            if((ship.variant==='ironjaw'||ship.variant==='barge')&&ship.convoyLeader?.hull>0&&!ship.targetId)ship.targetId=ship.convoyLeader.targetId;
             if(ship.arenaExit){
                 ship.destination=ship.arenaExit;
                 this.updateTravelAI(ship,dt);
@@ -7777,6 +7782,14 @@ export class GameSession {
     // player: story friends light blue, reputation friends blue, enemies red
     // and neutrals white. A neutral patrol fighting pirates is not by itself
     // evidence of friendship with the player.
+    // Any torpedo the player did not fire, unless an ally launched it.
+    torpedoThreatensPlayerSide(torpedo) {
+        if(torpedo.ownerId==='player')return false;
+        const owner=this.ships.find(ship=>ship.id===torpedo.ownerId);
+        if(!owner)return true;
+        const relation=this.shipRelation(owner);
+        return relation!=='ally'&&relation!=='story-friend';
+    }
     shipRelation(ship) {
         if(ship.tutorialCompanion||ship.storyPersonId)return 'story-friend';
         if(ship.hostile)return 'hostile';
@@ -9299,7 +9312,7 @@ export class GameSession {
             return this.updateTravelAI(ship,dt);
         }
         if(ship.capitalClass==='cruiser')return updateCruiserAttack(this,ship,targetPosition,targetVelocity,dt);
-        if(ship.capitalClass==='frigate'||ship.variant==='ironjaw')return updateCapitalBroadsideAttack(this,ship,targetPosition,targetVelocity,dt);
+        if(ship.capitalClass==='frigate'||ship.variant==='ironjaw'||ship.variant==='barge')return updateCapitalBroadsideAttack(this,ship,targetPosition,targetVelocity,dt);
         const flightStats=this.npcFlightStats(ship);
         if(flightStats)observeIncomingFire(this,ship);
         if(flightStats&&!ship.capitalClass)this.updateTurrets(ship,ship.id,dt);
@@ -10468,6 +10481,9 @@ export class GameSession {
         const player = this.save.player;
         const playerPos = vec(this.save.player.position, this.tmpP3);
         for(const p of this.projectiles)if((p.kind==='missile'||p.kind==='torpedo')&&p.life>0){const i=p.slot*3;p.stepX=this.projStore.pos[i];p.stepY=this.projStore.pos[i+1];p.stepZ=this.projStore.pos[i+2];}
+        // Torpedoes are slow and big enough to shoot down with the pilot's guns.
+        const torpedoes=this.shootableTorpedoes??=[];torpedoes.length=0;
+        for(const p of this.projectiles)if(p.launcherId==='torpedo'&&p.life>0&&this.torpedoThreatensPlayerSide(p))torpedoes.push(p);
         for (const projectile of this.projectiles) {
             if (projectile.life <= 0)
                 continue;
@@ -10563,19 +10579,27 @@ export class GameSession {
                         hitShip = ship;
                     }
                 }
-                if(projectile.targetMissile?.life>0){
-                    const m=projectile.targetMissile,i=m.slot*3;
+                let hitMissile;
+                const missileHit=(m,radius)=>{
+                    const i=m.slot*3;
                     const relativeStart=this.tmpBlastStart.set(sweepFrom.x-m.stepX,sweepFrom.y-m.stepY,sweepFrom.z-m.stepZ);
                     const relativeEnd=this.tmpBlastEnd.set(end.x-this.projStore.pos[i],end.y-this.projStore.pos[i+1],end.z-this.projStore.pos[i+2]);
-                    const hit=segmentSphereHit(relativeStart,relativeEnd,this.tmpP4.set(0,0,0),1.6);
-                    if(hit!==undefined&&hit<bestT){bestT=hit;hitKind='missile';}
-                }
+                    const hit=segmentSphereHit(relativeStart,relativeEnd,this.tmpP4.set(0,0,0),radius);
+                    if(hit!==undefined&&hit<bestT){bestT=hit;hitKind='missile';hitMissile=m;}
+                };
+                if(projectile.targetMissile?.life>0)missileHit(projectile.targetMissile,1.6);
+                if(projectile.ownerId==='player'&&!isMissile)for(const torpedo of torpedoes)if(torpedo.life>0)missileHit(torpedo,TORPEDO_HIT_RADIUS);
                 if(hitKind==='missile'){
-                    const missile=projectile.targetMissile;
+                    const missile=hitMissile,at=tuple(this.tmpP4.copy(sweepFrom).lerp(end,bestT));
                     if((missile.shield??0)>0)missile.shield=Math.max(0,missile.shield-projectile.damage);
                     else missile.life=0;
                     projectile.life=0;
-                    this.renderer.spawnImpact(tuple(this.tmpP4.copy(sweepFrom).lerp(end,bestT)),0xdce9ff,false);
+                    this.renderer.spawnImpact(at,0xdce9ff,false);
+                    if(missile.life<=0&&missile.launcherId==='torpedo'){
+                        this.renderer.spawnExplosion(at,false,.5);
+                        this.playWorldSound('explosion',.6,at[0],at[1],at[2]);
+                        if(projectile.ownerId==='player')this.ui.pushEvent?.(t('Torpedo destroyed'),'success',1600,'torpedo-kill');
+                    }
                     break;
                 }
                 if (hitKind) {
@@ -11182,10 +11206,12 @@ export class GameSession {
     addRaidCorvette(lead,escorts,region,rng){
         if(!lead||lead.variant==='rookery'||this.arena||!raidCorvette(region,rng))return;
         const position=this.tmpD.set(80,15,65).applyQuaternion(this.tmpQ.fromArray(lead.rotation)).add(this.tmpE.fromArray(lead.position));
-        const clearance=SHIP_COLLIDERS.ironjaw.contactRadius*npcShipScaleForVariant('ironjaw');
+        // One raid corvette in three is the missile barge (CORVETTE_TRAFFIC.bargeShare).
+        const variant=rng()>=1-CORVETTE_TRAFFIC.bargeShare?'barge':'ironjaw';
+        const clearance=SHIP_COLLIDERS[variant].contactRadius*npcShipScaleForVariant(variant);
         const point=this.visibleSpawnPosition(position,{clearance,required:true});
         if(!point)return;
-        const corvette=this.spawnCorvette('ironjaw',point.toArray(),true);
+        const corvette=this.spawnCorvette(variant,point.toArray(),true);
         if (!corvette) return;
         corvette.convoyLeader=lead;corvette.formationSlot=1;corvette.formationPoint=[0,0,0];escorts.push(corvette);
         return corvette;
@@ -12617,7 +12643,7 @@ export class GameSession {
         ship.collisionVariant=capitalCollisionVariant(ship.variant,ship.missingPods);
         if(m.kind==='bay')return;
         this.renderer.detachCargoPod?.(ship,m);
-        if(this.arena)return;
+        if(this.arena||!ship.cargoHolds)return;
         // Assign any indivisible units to the earliest intact holds. The same
         // pod carries the same share regardless of the order in which others detach.
         let remaining=1,rank=0;
@@ -15365,6 +15391,22 @@ export class GameSession {
         }
         return false;
     }
+    // The slowest projectile gun in the active fire group: the lead the pilot must fly.
+    aimGun() {
+        const p = this.save.player;
+        const fit = p.outfitting?.loadouts?.[p.shipId];
+        const mounts = HULL_HARDPOINTS[p.shipId]?.guns;
+        if (!fit || !mounts) return;
+        const group = this.activeFireGroup();
+        let gun;
+        for (let i = 0; i < mounts.length; i++) {
+            if (group !== 'ALL' && (fit.fireGroups?.assignments?.[mounts[i].id] ?? 'A') !== group) continue;
+            const weapon = weaponForOutfit(fit.guns[i]);
+            if (weapon && weapon.kind !== 'beam' && (!gun || weapon.speed < gun.speed ||
+                weapon.speed===gun.speed && weapon.life>gun.life)) gun = weapon;
+        }
+        return gun;
+    }
     leadSolution() {
         const p = this.save.player;
         const mesh = this.renderer.shipMeshes?.get(p.currentTargetId);
@@ -15378,16 +15420,8 @@ export class GameSession {
         }
         if (!ship || ship.hull <= 0 || ship.surrendered || ship.captured) return;
         const fit = p.outfitting?.loadouts?.[p.shipId];
-        const mounts = HULL_HARDPOINTS[p.shipId]?.guns;
         const group = this.activeFireGroup();
-        if (!fit || !mounts) return;
-        let gun;
-        for (let i = 0; i < mounts.length; i++) {
-            if (group !== 'ALL' && (fit.fireGroups?.assignments?.[mounts[i].id] ?? 'A') !== group) continue;
-            const weapon = weaponForOutfit(fit.guns[i]);
-            if (weapon && weapon.kind !== 'beam' && (!gun || weapon.speed < gun.speed ||
-                weapon.speed===gun.speed && weapon.life>gun.life)) gun = weapon;
-        }
+        const gun = this.aimGun();
         if (!gun) return;
         const origin = this.renderer.camera.position;
         const point = this.leadPoint.copy(mesh.position);
@@ -15489,6 +15523,13 @@ export class GameSession {
                 }
                 this.ui.updateCapitalMarkers(markers.entries,count,ship);
             }
+        }
+        if(this.ui.updateOrdnanceMarkers&&this.renderer.camera){
+            const markers=this.ordnanceMarkers??=new OrdnanceMarkers();
+            const flying=!this.save.player.dockedAt&&this.save.player.hull>0&&!this.arena?.observer;
+            const count=flying?markers.update(this,this.aimGunFn??=()=>this.aimGun()):0;
+            if(count||this.ordnanceMarkerCount)this.ui.updateOrdnanceMarkers(markers.entries,count);
+            this.ordnanceMarkerCount=count;
         }
         const shakeActive=!this.save.settings.reducedDamageEffects && this.shakeStrength>0;
         if(shakeActive || this.bracketWasShaking){

@@ -6,6 +6,7 @@ export const SCHEMATIC_DETAILS={
  rookery:{features:['ram','flight deck','twin launch rails'],paths:[[[0,.14],[.45,.14]],[[.48,.26],[.58,.68]],[[.8,.29],[.8,.66]],[[0,.8],[.68,.8]]]},
  drover:{features:['bridge','six cargo pods','engine block'],paths:[[[0,.18],[.45,.18]],[[.25,.25],[.25,.7]],[[.25,.38],[.75,.38]],[[.25,.54],[.75,.54]],[[0,.74],[.65,.74]]]},
  ironjaw:{features:['bridge','broadside sponsons','port booster'],paths:[[[0,.2],[.45,.2]],[[.3,.27],[.3,.56]],[[.3,.48],[.55,.48]],[[0,.75],[.6,.75]]]},
+ barge:{features:['fire-control dish','six launcher racks','engine block'],paths:[box(0,.07,.12,.15),[[0,.2],[.45,.2]],box(.3,.26,.78,.37),box(.3,.42,.78,.53),box(.3,.58,.78,.69),[[0,.76],[.65,.76]]]},
 
  blade:{features:['twin launcher fairings','swept wing roots'],paths:[[[.25,.53],[.55,.59],[.55,.76],[.25,.73],[.25,.53]],[[.58,.77],[.78,.86]]]},
  speedster:{features:['paired compact drives'],paths:[box(.17,.80,.58,.94)]},

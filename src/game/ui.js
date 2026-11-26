@@ -1,4 +1,5 @@
 import {CAPITAL_MARKER_COUNT} from './capitalMarkerCount.js';
+import {ORDNANCE_MARKER_LIMIT} from './ordnanceMarkers.js';
 import {getCockpitDefinition} from './cockpitDefinitions.js';
 import { CONTROLLER_ACTIONS, CONTROLLER_BUTTON_LABELS, defaultControllerBindings, normalizeControllerBindings, rebindController, requiredMenuBinding } from './controllerBindings.js';
 import {UI_TERMS,socialVenueKey,missionBoardKey} from './interfaceTerms.js';
@@ -479,7 +480,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2pv';
+const GAME_VERSION = '0.8.2pw';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -1307,7 +1308,7 @@ export class GameUI {
           <div class="cockpit-art" aria-hidden="true"></div>
           <div class="cockpit-glass" aria-hidden="true"></div>${cockpitDamageMarkup()}
           <div class="cockpit-screen cockpit-screen-own" role="button" tabindex="0" aria-label="${t('Own ship status display; tap to open ship menu')}">
-            <div class="monitor-damage" aria-hidden="true"></div><div class="screen-standoff" id="screen-standoff" data-tone="danger"><span>${t('STANDOFF')}</span><b id="screen-standoff-demand"></b><em id="screen-standoff-timer">9</em></div>
+            <div class="monitor-damage" aria-hidden="true"></div><div id="break-cue" class="screen-break" aria-hidden="true"><b>${t('BREAK')}</b></div><div class="screen-standoff" id="screen-standoff" data-tone="danger"><span>${t('STANDOFF')}</span><b id="screen-standoff-demand"></b><em id="screen-standoff-timer">9</em></div>
             <div class="screen-race-strip" id="screen-race-strip"><span id="screen-race-label"></span><b id="screen-race-value"></b></div>
             <div class="screen-ship-layout"><div class="screen-flight"><div><span data-short="SPD">${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span id="screen-own-fuel-label" data-short="FUEL">${t('FUEL')}</span><b id="screen-own-fuel">100</b><small>%</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Switch fire group — press X or tap')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em><small id="screen-own-launcher"></small><small id="screen-own-drone-pdc" class="is-hidden"></small></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span data-short="S">${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i></div><div><span data-short="E">${t('ENERGY')}</span><i><b id="screen-own-energy"></b></i></div><div><span data-short="H">${t('HULL')}</span><i><b id="screen-own-hull"></b></i></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
           </div>
@@ -1327,6 +1328,7 @@ export class GameUI {
           <div class="hud-wing-tactics" id="hud-wing-tactics"></div>
           <div id="race-flight-vector" class="race-flight-vector is-hidden" aria-hidden="true"><svg viewBox="0 0 32 32"><g class="flight-vector-ring"><circle cx="16" cy="16" r="6"/><path d="M2 16h8M22 16h8M16 2v8"/></g><path class="flight-vector-arrow" d="M8 20l8-10 8 10"/></svg></div>
           <div id="capital-markers" aria-hidden="true">${'<i hidden></i>'.repeat(CAPITAL_MARKER_COUNT)}</div>
+          <div id="ordnance-markers" aria-hidden="true">${'<i hidden></i>'.repeat(ORDNANCE_MARKER_LIMIT)}${'<s hidden></s>'.repeat(ORDNANCE_MARKER_LIMIT)}</div>
           <div id="target-bracket" class="target-bracket is-hidden" aria-hidden="true"><i></i><i></i><i></i><i></i><b class="lock-chevron"></b><b class="lock-chevron"></b><b class="lock-chevron"></b><b class="lock-chevron"></b></div>
           <div id="speaker-bracket" class="target-bracket speaker-bracket is-hidden" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
           <div id="target-edge-pointer" class="target-edge-pointer is-hidden" aria-hidden="true"><i></i><span></span></div>
@@ -4897,6 +4899,38 @@ export class GameUI {
         else {
             edgePointer?.classList.toggle('is-hidden', true);
         }
+    }
+    // Torpedo diamonds (+ lead dot) and inbound rounds (ring or edge chevron).
+    // DOM writes only when a marker's drawn state changes.
+    updateOrdnanceMarkers(entries,count) {
+        const layer=this.ordnanceMarkerLayer??=this.el('#ordnance-markers');
+        if(!layer)return;
+        for(let i=0;i<ORDNANCE_MARKER_LIMIT;i++){
+            const mark=layer.children[i],dot=layer.children[ORDNANCE_MARKER_LIMIT+i],e=entries[i],on=i<count,leadOn=on&&e.lead;
+            if(mark.hidden===on)mark.hidden=!on;
+            if(dot.hidden===leadOn)dot.hidden=!leadOn;
+            if(!on)continue;
+            const x=Math.round(e.x),y=Math.round(e.y),angle=e.edge?Math.round(e.angle):0;
+            const cls=(e.edge?'edge':e.kind)+(e.inbound?' inbound':'');
+            if(x!==e.drawnX||y!==e.drawnY||angle!==e.drawnAngle||cls!==e.drawnClass){
+                e.drawnX=x;e.drawnY=y;e.drawnAngle=angle;
+                if(cls!==e.drawnClass){e.drawnClass=cls;mark.className=cls;}
+                mark.style.transform=`translate(${x}px,${y}px)${e.edge?` rotate(${angle}deg)`:''}`;
+            }
+            if(leadOn){
+                const lx=Math.round(e.leadX),ly=Math.round(e.leadY);
+                if(lx!==e.drawnLeadX||ly!==e.drawnLeadY){e.drawnLeadX=lx;e.drawnLeadY=ly;dot.style.transform=`translate(${lx}px,${ly}px)`;}
+            }
+        }
+    }
+    // A visual twin of the audio break cue on the own-ship monitor, for pilots
+    // playing without sound: two quick red flashes over the whole screen.
+    flashBreakCue() {
+        const el=this.breakCueEl??=this.el('#break-cue');
+        if(!el)return;
+        el.classList.remove('is-on');
+        void el.offsetWidth;
+        el.classList.add('is-on');
     }
     updateCapitalMarkers(entries,count,ship) {
         const layer=this.capitalMarkerLayer??=this.el('#capital-markers');

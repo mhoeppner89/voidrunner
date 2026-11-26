@@ -144,6 +144,13 @@
       "sourceSha256": "bb725b1cbf7c2a5bea56dc1ec5a796b7543b79ebd08d31b4888b4847f898c97d"
     },
     {
+      "id": "barge",
+      "runtime": "assets/models/capital/barge.glb",
+      "runtimeSha256": "6183a3e12ea0e6abf77d4a8dd0d65a62dd1caf78a6b2d5261af301a7e4ac894f",
+      "source": "authoring/models/barge/barge.blend",
+      "sourceSha256": "611d7f0fea44f89aeaa02f6f413c72ed626bf7a0324860083c762abe20ad1831"
+    },
+    {
       "id": "caravan",
       "runtime": "assets/models/capital/caravan.glb",
       "runtimeSha256": "bae028bafddc93b0f3814d42edbb6d5f561a0cce465a0d1563b2582e89aa3fd4",

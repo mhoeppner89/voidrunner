@@ -36,7 +36,7 @@ The lead designer wrote this; the user approved the direction: keep 25 levels, m
 
      Levels 5, 8, 10 and 13 can run up to 3:00. Level 25 targets 3:00–4:30.
    - Level 1 has at most two authored groups. Levels 2–4 have at most three. Later regular levels have at most four. Levels 5, 8, 10 and 13 have at most five authored groups, plus their objective events and timed support or launches. Level 25 retains its three authored groups and allows one extra escort screen.
-4. **Objectives** appear on levels 5, 8, 10, 13 and 25. When an objective is decided, the remaining hostiles break off and jump out within 10 s. They never surrender; that rule holds in Arena.
+4. **Objectives** appear on levels 4 (Red Njord Barrage, since 0.8.2pw), 5, 8, 10, 13 and 25. When an objective is decided, the remaining hostiles break off and jump out within 10 s. They never surrender; that rule holds in Arena.
    - **Failing an objective does not end the run.** The level still counts as cleared, but its reward pick is skipped. Losing the pilot still ends the run, as today.
    - **Objective status on screen:** short lines in the existing ticker and comms log, never a floating card. They show at the start, at 60/30/10 s left where a timer applies, and with the result. The objective target can be selected as usual.
 5. **Big ships** use the corvette and frigate rules already in the game: subsystem damage, generator and engine subtargets, markers.
@@ -69,7 +69,7 @@ Notation:
 | 1 | First contact | verge-lanes | Balor N |
 | 2 | Scavengers | acheron-horizon | Balor N → Balor N → Loki N |
 | 3 | Cut loose | mourning-carrier | Balor N → Morrigan V (4 guns, 1) as a duel |
-| 4 | Hit and run | shardbelt-heart | Loki V + Loki N → Balor V + Loki N |
+| 4 | Hit and run (objective: destroy the Red Njord Barrage) | acheron-horizon | Loki V + Loki N → Barrage V + Balor N |
 | 5 | **Ironjaw** (objective: destroy the Ironjaw) | redwake-belt | Ironjaw V + Balor N. While the Ironjaw lives, a Balor N arrives every 45 s, at most 3. |
 
 ### Act II — Free Merchants
@@ -77,7 +77,7 @@ Notation:
 | # | Name | Site | Groups |
 |---|---|---|---|
 | 6 | Freight lane | foundry-lanes | Argo N (trader) + Hestia V (1) → Hestia N + Freya V. This is the breather. |
-| 7 | Claim jumpers | shardbelt-chimney | Gaia V + Hestia N → Gaia N + Freya V (1) → Hestia V |
+| 7 | Claim jumpers | shardbelt-heart | Gaia V + Hestia N → Gaia N + Freya V (1) → Hestia V |
 | 8 | **Convoy** (objective: stop the Drover) | pale-rings | Drover N running for its jump point (about 150 s away) + Hestia V + Loki V. After 40 s: Freya V + Hestia N. Success means the Drover is destroyed or both its engines are out before it jumps. |
 | 9 | **Caravan** (kill all) | mourning-center | Caravan + Freya V + Argo V (1) → Hestia V ×2. The Caravan's repair drones keep its escorts alive, so its drone hangar is the first target. |
 | 10 | **Rookery** (objective: destroy the carrier) | verge-lanes | Rookery + Balor V ×2. Each intact launch bay sends a pair of Balors every 25 s, at most 8 of its fighters alive. The level ends when the carrier and every fighter it launched are destroyed. Red Talons come for the merchant lanes, which closes the act. |
@@ -143,7 +143,7 @@ The table lists all differences from the approved encounters above. N, V and A d
 | 1. First contact | 2 | G2 adds a group of Balor N + Balor N |
 | 2. Scavengers | 3 | G3 changes from Loki N to Loki V |
 | 3. Cut loose | 3 | G2 adds a group of Balor N |
-| 4. Hit and run | 2 | G2 changes from Balor V + Loki N to Balor V (1) + Loki N |
+| 4. Hit and run | 2 | G2 is the Red Njord Barrage V with a Balor N (0.8.2pw; before: Balor V (1) + Loki N in the heart tunnel) |
 | 5. Ironjaw | 3 | G1 adds a group of Balor V + Loki N · G2 adds a group of Morrigan V (1) + Balor N · G3 adds Balor V |
 | 6. Freight lane | 4 | G3 adds a group of Argo N + Hestia N · G4 adds a group of Hestia N |
 | 7. Claim jumpers | 4 | G4 adds a group of Gaia V + Hestia V |

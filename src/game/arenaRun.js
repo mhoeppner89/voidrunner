@@ -39,6 +39,7 @@ const roles={scrapper:'pirate',demon:'pirate',mule:'trader',atlas:'trader',torsa
 const level=(name,site,hint,groups,extra={})=>({name,site,hint,groups,...extra});
 const balor=()=>novice('scrapper');
 const ironjaw=()=>capital('ironjaw','veteran');
+const barge=()=>capital('barge','veteran');
 export const RUN_ACTS=[
  {id:'talons',name:'Red Talons',faction:'pirates',waves:[
   level("First contact","verge-lanes","Novice Balors patrol the lane entrance.",[
@@ -52,9 +53,9 @@ export const RUN_ACTS=[
     group(balor()),
     group(balor()),
     {...group(veteran('demon',1,{guns:['pulse-cannon','pulse-cannon','beam-emitter','beam-emitter']})),limit:1}]),
-  level("Hit and run","shardbelt-heart","Two Loki fighters guard the bore. Watch the flank.",[
+  level("Hit and run","acheron-horizon","Two Loki fighters screen a Red Njord Barrage. Rush it fast: its racks cannot lock a quick pilot.",[
     group(veteran('speedster'),novice('speedster')),
-    group(veteran('scrapper',1),novice('speedster'))]),
+    group(barge(),balor())],{objective:{kind:'destroy',label:'Destroy Barrage',done:'Barrage destroyed',failed:'Barrage escaped'}}),
   level("Red Njord","redwake-belt","Destroy the Red Njord before more Balors reach the belt.",[
     group(veteran('scrapper'),novice('speedster')),
     group(veteran('demon',1),balor()),
@@ -66,7 +67,7 @@ export const RUN_ACTS=[
     group(novice('wayfarer'),veteran('torsas')),
     group(novice('mule'),novice('wayfarer')),
     group(novice('wayfarer'))]),
-  level("Claim jumpers","shardbelt-chimney","The claims crews call for armed escorts from the chimney.",[
+  level("Claim jumpers","shardbelt-heart","The claims crews call for armed escorts inside the heart tunnel.",[
     group(veteran('prospector'),novice('wayfarer')),
     group(novice('prospector'),veteran('torsas',1)),
     group(veteran('wayfarer')),

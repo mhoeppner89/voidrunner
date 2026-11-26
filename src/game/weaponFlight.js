@@ -19,7 +19,7 @@ export function breakCueEnd(rack){
 // Cockpit and pilot timing, measured on the fighter trials.
 export function breakCueStart(rack){
     if(rack?.id==='torpedo')return 2;
-    const start=(rack?.volley??1)>1?1.25:1.5;
+    const start=(rack?.volley??1)>1?1.5:1.75;
     return Math.max(1,start/Math.max(1,rack?.gunneryAccuracy??1));
 }
 // Seconds between hearing the break cue and the ship actually turning: a

@@ -123,7 +123,7 @@ const itemRecords = [
     {
         id: 'swarm-launcher', name: "Swarm Rockets", category: 'launcher',
         price: 4000, weaponId: 'swarm',
-        description: 'Four fast anti-hull micro-warheads overwhelm point defense. Best fired at close range.', stat: '4 canisters · 4 × 30 hull / 15 shield · 300 km/s',
+        description: 'Four fast anti-hull micro-warheads overwhelm point defense. Best fired at close range.', stat: '4 canisters · 4 × 30 hull / 15 shield · 220 km/s',
         effects: { weaponId: 'swarm', volley: 4, tracking: 'medium', ammoId: 'missiles' }, availability: ['rook', 'azure'],
         art: './art/outfitting/swarm-launcher.webp',
     },
@@ -137,14 +137,14 @@ const itemRecords = [
     {
         id: 'shield-swarm-launcher', name: "Anti-Shield Swarm Rockets", category: 'launcher',
         price: 4500, weaponId: 'shield-swarm',
-        description: 'Four fast ion micro-warheads overwhelm point defense and strip shields. Best fired at close range.', stat: '4 canisters · 4 × 30 shield / 15 hull · 300 km/s',
+        description: 'Four fast ion micro-warheads overwhelm point defense and strip shields. Best fired at close range.', stat: '4 canisters · 4 × 30 shield / 15 hull · 220 km/s',
         effects: { weaponId: 'shield-swarm', shieldDamageMultiplier: 2, volley: 4, ammoId: 'missiles' }, availability: ['rook', 'azure'],
         art: './art/outfitting/swarm-launcher.webp',
     },
     {
         id: 'torpedo-launcher', name: "Torpedo Launcher", category: 'launcher',
         price: 9800, weaponId: 'torpedo',
-        description: 'Pierces corvette and capital-ship shields. Locks only onto slow, steady targets such as transports, corvettes and capital ships.', stat: '2 torpedoes · 360 damage each · 600 km lock · 115 km/s',
+        description: 'Pierces corvette and capital-ship shields. Locks only onto slow, steady targets such as transports, corvettes and capital ships.', stat: '2 torpedoes · 360 damage each · 600 km lock · 90 km/s',
         effects: { weaponId: 'torpedo', tracking: 'low', splashRadius: 20, ammoId: 'missiles' }, availability: ['rook'],
         art: './art/outfitting/torpedo-launcher.webp',
     },

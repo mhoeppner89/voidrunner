@@ -85,7 +85,7 @@ test('NPC swarm launch consumes one canister and emits four warheads after the f
  assert.equal(ship.combatFit.missiles,0);assert.equal(s.projectiles.length,4);
  const muzzle=V(...SHIP_MOUNT_ANCHORS[ship.hullId].launchers[0]).multiplyScalar(npcShipScaleForVariant(ship.variant)).add(V(...ship.position));
  for(const p of s.projectiles){
-  assert.equal(p.launcherId,'swarm');assert.ok(Math.abs(s.projStore.getVel(p.slot,V()).sub(V(...ship.velocity)).length()-300)<.001);
+  assert.equal(p.launcherId,'swarm');assert.ok(Math.abs(s.projStore.getVel(p.slot,V()).sub(V(...ship.velocity)).length()-LAUNCHERS.swarm.speed)<.001);
   assert.ok(s.projStore.getPos(p.slot,V()).distanceTo(muzzle)<.001,'each warhead leaves the actual rack');
  }
 });

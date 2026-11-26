@@ -6,7 +6,7 @@ import {TURRET_LAYOUTS} from '../../src/game/turretLayouts.js';import {FLEET_TUR
 import {GLB_SHIP_CONFIG} from '../../src/game/render.js';import {clearTurretArc} from '../../src/game/turrets.js';
 const manifest=JSON.parse(fs.readFileSync(new URL('../../assets/models/fleet-manifest.json',import.meta.url)));
 test('every installed hull and drone matches the approved fleet bytes and shipping model path',()=>{
- assert.equal(manifest.models.length,26);
+ assert.equal(manifest.models.length,27);
  for(const m of manifest.models){const bytes=fs.readFileSync(m.path);assert.equal(createHash('sha256').update(bytes).digest('hex'),m.sha256,m.id);assert.equal(bytes.readUInt32LE(0),0x46546c67);if(m.category==='turret'){assert.equal(m.path,GLB_SHIP_CONFIG.ironjaw.broadsidePath);}else if(m.category!=='drone'){const c=GLB_SHIP_CONFIG[m.variant];assert.equal(c.path??'assets/models/ships/'+c.file,m.path);}}
 });
 test('reviewed guns retain their physical centers, factory scale and surface normal',()=>{

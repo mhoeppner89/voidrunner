@@ -15,7 +15,7 @@ for(const [variant,config] of Object.entries(GLB_SHIP_CONFIG)){
  const root=await buildGlbScene(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength));
  root.rotation.y=config.yaw;root.scale.setScalar(config.scale*(config.baseScale??1));root.updateMatrixWorld(true);
  const components=config.collisionSource?JSON.parse(await readFile(config.collisionSource,'utf8')).groups:null;
- const pods=components?Object.keys(components).filter(k=>/^(pod_|stack_|bay_)/.test(k)):[];
+ const pods=components?Object.keys(components).filter(k=>/^(pod_|stack_|bay_|rack_)/.test(k)):[];
  for(const part of (pods.length?[null,'body',...pods]:[null])){
  const vertices=[],indices=[],unique=new Map(),point=new T.Vector3();
  if(components){

@@ -23,12 +23,12 @@ const hitRate=cells=>cells.reduce((sum,cell)=>sum+cell.hits,0)/cells.reduce((sum
 // Expected per-range hit percentages at 400, 500 and 600 game units.
 const hitWindows={
  seeker:{
-  0:[100,100,100], .25:[100,100,100], .5:[100,0,0], .75:[0,0,0], 1:[0,0,0],
-  1.25:[0,0,0], 1.5:[100,0,0], 1.75:[100,100,0], 2:[100,100,100], 2.5:[100,100,100],
+  0:[100,100,100], .25:[100,100,100], .5:[100,0,0], .75:[0,0,0], 1:[0,0,0], 1.25:[0,0,0],
+  1.5:[0,0,0], 1.75:[100,0,0], 2:[100,100,0], 2.25:[100,100,100], 2.5:[100,100,100],
  },
  swarm:{
-  0:[100,100,100], .25:[100,100,100], .5:[100,100,100], .51:[100,0,0], .54:[0,0,0], .75:[0,0,0], 1:[0,0,0],
-  1.25:[100,0,0], 1.5:[100,100,100], 1.75:[100,100,100], 2:[100,100,100], 2.5:[100,100,100],
+  0:[100,100,100], .25:[100,100,100], .5:[0,0,0], .75:[0,0,0], 1:[0,0,0], 1.25:[0,0,0],
+  1.5:[100,0,0], 1.75:[100,100,0], 2:[100,100,100], 2.5:[100,100,100],
  },
 };
 for(const [rack,times] of Object.entries(hitWindows)){
@@ -40,12 +40,15 @@ for(const [rack,times] of Object.entries(hitWindows)){
   });
  });
 }
-test('roll and individual swarm lanes affect a grazing hit',()=>{
+test('roll affects a grazing hit, and a swarm salvo shares one outcome',()=>{
  const rolls=missileCells('seeker',{lead:.5,fixedBreakPlane:true})[0].byRoll;
  assert.ok(Math.min(...rolls)<Math.max(...rolls));
- // Loki rolls into a slightly off-axis salvo. Opposing lanes graze opposite sides.
- const lanes=[0,1,2,3].map(lane=>missileTrial('swarm',429,.79,lane,3*Math.PI/4,MISSILE_PADDING,3.01,{bearing:.1}));
- assert.deepEqual(lanes,[true,false,false,true]);
+ // The 600-unit terminal phase converges all four lanes on the same plume
+ // point, so one well-timed break shakes the whole salvo (or none of it).
+ for(const lead of [.25,.5,1,1.75,2.5]){
+  const lanes=[0,1,2,3].map(lane=>missileTrial('swarm',500,lead,lane,3*Math.PI/4,MISSILE_PADDING,3.01,{bearing:.1}));
+  assert.ok(lanes.every(hit=>hit===lanes[0]),`lead ${lead}: ${lanes}`);
+ }
 });
 test('seeker and swarm hit steady headings across rolls and launch ranges',()=>{
  for(const npc of [undefined,npcFixture()])for(const rack of ['seeker','swarm']){
@@ -104,10 +107,12 @@ test('rack, Precise roll and hull agility change the dodge window',async()=>{
  const {createEquipmentRecord}=await import('../../src/game/equipmentInventory.js');
  const {launcherForOutfit}=await import('../../src/game/weapons.js');
  const precise=launcherForOutfit(createEquipmentRecord('seeker-launcher',{id:'eq-window',rarity:'uncommon',affixes:['precise'],rolls:[1]}).id);
- const middle=[.5,.75,1,1.25,1.5],window=[...middle,1.75];
+ // Slower seekers (0.8.2pw) leave a wider window; Precise still trims both edges.
+ const middle=[.5,.75,1,1.25,1.5],window=[...middle,1.75,2];
  const mean=(id,options={},times=middle)=>times.reduce((sum,lead)=>sum+hitRate(missileCells(id,{...options,lead})),0)/times.length;
- assert.ok(mean('seeker',{rack:precise},window)-mean('seeker',{},window)>=.1);
- assert.ok(mean('swarm')-mean('seeker')>=.1);
+ assert.ok(mean('seeker',{rack:precise},window)-mean('seeker',{},window)>=.09);
+ // Swarm warheads stay the harder rack to shake, by a smaller margin since 0.8.2pw.
+ assert.ok(mean('swarm',{},window.slice(0,-1))-mean('seeker',{},window.slice(0,-1))>=.05);
  const hauler=mean('seeker',{npc:npcFixture('atlas')});
  for(const hull of ['speedster','talon','demon']){
   const npc=npcFixture(hull);

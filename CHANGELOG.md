@@ -1,3 +1,11 @@
+## 0.8.2pw — Red Njord Barrage, missiles you can dodge, torpedoes you can shoot
+
+- New Red Talon corvette: the **Red Njord Barrage**, a missile barge converted from a Njord. Six launcher racks on its spine, a fire-control dish on the bridge and a cage over the windows make it easy to tell apart from the Red Njord at a glance. It shells slow, steady pilots from up to 1.2 km: its lock builds while you fly slowly or straight, the target monitor shows CHARGING and the LOCK lamp lights three seconds before a salvo of eight swarm warheads, and speeding up or turning hard during the warning breaks the lock. Rushing it is the answer, but a fast approach still draws one snap canister of four warheads that a break on the cue beats. Inside 250 m it cannot fire at all. Each rack can be shot off and makes the salvo smaller; losing the dish halves its range and doubles its lock time.
+- About one pirate raid corvette in three is now a Barrage. Arena level 4 (Hit and run) ends with a Barrage objective on the Acheron horizon; Claim jumpers moves into the Shardbelt heart tunnel.
+- Missiles are easier to dodge: seekers fly 200 and turn 40°/s, swarm warheads fly 220 and turn 45°/s, and all four warheads of a swarm salvo share one outcome. A well-timed break now beats a seeker from about 1.75 s to 0.5 s before impact and a swarm from 1.5 s to 0.5 s.
+- BREAK flashes red on your ship monitor together with the audio cue, for playing without sound. Every missile homing on you gets an orange ring, or an arrow at the screen edge when it is behind you.
+- Torpedoes fly at 90 and can be shot down with your guns: hostile torpedoes within 2 km get a red diamond and a lead dot for your guns, and "Torpedo destroyed" confirms a kill. Torpedoes fired by your own side cannot be hit.
+
 ## 0.8.2pv — Objectives you can read, played out to the end; Njord and Brigid
 
 - Objective levels announce themselves: a title card names the job when it starts ("Escort · Defend Njord") and its outcome when it is decided. A slim strip beside the pause buttons shows the ship to protect or destroy, its shield and hull, and the jump clock or bays left; it steps below the comms bar while someone is talking.

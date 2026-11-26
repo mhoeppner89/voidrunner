@@ -71,9 +71,9 @@ export const LAUNCHERS = {
         id: 'seeker',
         nameKey: 'SEEKER MISSILE RACK',
         category: 'launcher',
-        speed: 260,
-        homingSpeed: 260,
-        trackRate: 60, homingTurn: 60*Math.PI/180,
+        speed: 200,
+        homingSpeed: 200,
+        trackRate: 60, homingTurn: 40*Math.PI/180,
         acceleration: 520, lockTime: 2, seekerCone: 45, lockRange: 800,
         damage: 60,
         hullMul: 2,
@@ -92,13 +92,13 @@ export const LAUNCHERS = {
         id: 'swarm',
         nameKey: 'SWARM MISSILE RACK',
         category: 'launcher',
-        speed: 300,
-        homingSpeed: 300,
-        trackRate: 60, homingTurn: 60*Math.PI/180,
+        speed: 220,
+        homingSpeed: 220,
+        trackRate: 60, homingTurn: 45*Math.PI/180,
         acceleration: 650, lockTime: 1, seekerCone: 30, lockRange: 600,
         damage: 15,
         hullMul: 2,
-        life: 3,
+        life: 4,
         cooldown: 1.3,
         capacity: 4,
         ordnanceId: 'swarm-canister',
@@ -111,7 +111,7 @@ export const LAUNCHERS = {
     },
     'shield-seeker': {
         id: 'shield-seeker', nameKey: 'ANTI-SHIELD MISSILE RACK', category: 'launcher',
-        speed: 260, homingSpeed: 260, trackRate: 60, homingTurn: 60*Math.PI/180,
+        speed: 200, homingSpeed: 200, trackRate: 60, homingTurn: 40*Math.PI/180,
         acceleration: 520, lockTime: 2, seekerCone: 45, lockRange: 800, damage: 60, shieldMul: 2,
         life: 8, cooldown: 1.1, capacity: 4,
         ordnanceId: 'shield-seeker-missile', ordnanceNameKey: 'ANTI-SHIELD MISSILE',
@@ -119,9 +119,9 @@ export const LAUNCHERS = {
     },
     'shield-swarm': {
         id: 'shield-swarm', nameKey: 'ANTI-SHIELD SWARM RACK', category: 'launcher',
-        speed: 300, homingSpeed: 300, trackRate: 60, homingTurn: 60*Math.PI/180,
+        speed: 220, homingSpeed: 220, trackRate: 60, homingTurn: 45*Math.PI/180,
         acceleration: 650, lockTime: 1, seekerCone: 30, lockRange: 600, damage: 15, shieldMul: 2,
-        life: 3, cooldown: 1.3, capacity: 4,
+        life: 4, cooldown: 1.3, capacity: 4,
         ordnanceId: 'shield-swarm-canister', ordnanceNameKey: 'ANTI-SHIELD SWARM CANISTER',
         shortCode: 'ASW', unitCost: 240, volley: 4, spreadRad: 3*Math.PI/180, audioKey: 'missile',
     },
@@ -129,8 +129,9 @@ export const LAUNCHERS = {
         id: 'torpedo',
         nameKey: 'TORPEDO TUBE',
         category: 'launcher',
-        speed: 115,
-        homingSpeed: 115,
+        // Slow on purpose: a pilot can shoot one down (game.js torpedo sweep).
+        speed: 90,
+        homingSpeed: 90,
         homingTurn: 10*Math.PI/180,
         // Heavy torpedoes punch through corvette and capital shield bubbles;
         // small-craft shields absorb them like any other hit.
@@ -141,7 +142,7 @@ export const LAUNCHERS = {
         // World units/s and radians/s. Both limits use the target's current motion.
         fullLockSpeed: 40, zeroLockSpeed: 60,
         fullLockAngularRate: 5*Math.PI/180, zeroLockAngularRate: 15*Math.PI/180,
-        life: 10,
+        life: 12,
         cooldown: 2.6,
         capacity: 2,
         ordnanceId: 'heavy-torpedo',
@@ -157,7 +158,9 @@ export const LAUNCHERS = {
 };
 for (const launcher of Object.values(LAUNCHERS)) {
     if(launcher.trackRate){
-        launcher.terminalRange=launcher.volley===1?600:400;
+        // A long terminal phase widens the window in which a break defeats the
+        // round (tests/helpers/missile-flight.mjs): about 1.25 s for a seeker.
+        launcher.terminalRange=600;
         launcher.plumeFraction=.025;
     }
     if (launcher.splashMin != null) launcher.splashMin *= WEAPON_DAMAGE_SCALE;

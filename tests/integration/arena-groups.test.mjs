@@ -40,10 +40,12 @@ test('one survivor starts a five-second warning, with one radio transmission and
  assert.deepEqual(opponents(s)[1].position,point);assert.equal(s.radio.length,1);
 });
 test('Act I timer warns after 40 s. The next pair waits until both fighters fit',()=>{
- const s=stage(4);advance(s,45);assert.equal(s.runBattle.group,1);
+ // Level 4's second group is the Barrage (capital limits); test the fighter rule with a pair.
+ const pair=s=>{s.runBattle.groups[1].enemies=s.runBattle.groups[0].enemies.map(e=>({...e}));return s;};
+ const s=pair(stage(4));advance(s,45);assert.equal(s.runBattle.group,1);
  assert.equal(s.runBattle.warning,undefined,'two alive plus two incoming exceeds three');
  opponents(s)[1].hull=0;advance(s,1);advance(s,5);assert.equal(s.runBattle.group,2);
- const v=stage(4);v.runBattle.groups[1].enemies.pop();
+ const v=pair(stage(4));v.runBattle.groups[1].enemies.pop();
  advance(v,39.99);assert.equal(v.runBattle.warning,undefined);
  advance(v,.02);assert.ok(v.runBattle.warning);advance(v,5);assert.equal(v.runBattle.group,2);
  const duel=stage(3);duel.runBattle.group=duel.runBattle.groups.length-1;

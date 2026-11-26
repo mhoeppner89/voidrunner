@@ -26,7 +26,7 @@ function hit(s,ship,m,amount=m.hull){
 }
 
 test('all capital hulls declare their health, labels, sockets, hit areas and selectable systems',()=>{
-    const counts={'concord-frigate':14,'concord-cruiser':14,drover:12,ironjaw:8,caravan:14,rookery:13};
+    const counts={'concord-frigate':14,'concord-cruiser':14,drover:12,ironjaw:8,barge:11,caravan:14,rookery:13};
     for(const [id,count] of Object.entries(counts)){
         const {mounts}=CAPITAL_HULLS[id];assert.equal(mounts.length,count);assert.ok(mounts.length<=CAPITAL_MARKER_COUNT);
         for(const m of mounts){

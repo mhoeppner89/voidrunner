@@ -61,7 +61,7 @@ export function capitalMountPosition(ship, index, out) {
 }
 
 export function capitalReadout(ship) {
-    const hull = capitalHull(ship), counts = { guns: 0, pdc: 0, turrets: 0, pods: 0, stacks: 0, bays: 0 };
+    const hull = capitalHull(ship), counts = { guns: 0, pdc: 0, turrets: 0, pods: 0, stacks: 0, bays: 0, racks: 0 };
     for (const m of hull.mounts) {
         if (ship.capitalMountHull[m.index] <= 0) continue;
         if (m.kind === 'battery' || m.kind === 'broadside') counts.guns++;
@@ -70,6 +70,7 @@ export function capitalReadout(ship) {
         if (m.kind === 'stack') counts.stacks++;
         if (m.kind === 'bay') counts.bays++;
         if (m.kind === 'pod') counts.pods++;
+        if (m.kind === 'rack') counts.racks++;
     }
     return t(hull.readout, counts);
 }

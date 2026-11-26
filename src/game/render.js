@@ -164,6 +164,12 @@ export const GLB_SHIP_CONFIG = {
         collisionSource: 'authoring/models/ironjaw/support/collision.json',
         placeholderVariant: 'atlas-freighter', placeholderScale: 2,
     },
+    barge: {
+        path: 'assets/models/capital/barge.glb', yaw: -Math.PI / 2, scale: 14, baseScale: 1,
+        enginePorts: [], preload: false, preserveColor: true, authoredPaint: true,
+        collisionSource: 'authoring/models/barge/support/collision.json',
+        placeholderVariant: 'atlas-freighter', placeholderScale: 2,
+    },
     'concord-frigate': {
         path: 'assets/models/capital/concord-frigate.glb', yaw: -Math.PI / 2, scale: 56.5,
         enginePorts: [[0.9975, -0.164375, -0.216875], [0.9975, -0.089375, 0], [0.9975, -0.164375, 0.216875]],
@@ -3713,7 +3719,7 @@ export class SpaceRenderer {
                     return damaged;
                 });
             }
-            wrapper.userData.corvetteParts=capitalHull({variant}).mounts.map(m=>['engine','generator','pod','booster','stack','bay','hangar','mast'].includes(m.kind)?group.getObjectByName(m.node):null);
+            wrapper.userData.corvetteParts=capitalHull({variant}).mounts.map(m=>['engine','generator','pod','booster','stack','bay','hangar','mast','rack','dish'].includes(m.kind)?group.getObjectByName(m.node):null);
         }
         if(variant==='concord-carrier')wrapper.userData.carrierArmament=bindCarrierArmament(group);
         if(variant==='mule')wrapper.userData.embeddedTurrets=FLEET_EQUIPMENT.mule.turrets.map(t=>{const gun=group.getObjectByName(t.embedded);gun.userData.yaw=group.getObjectByName(t.embedded.replace('.Root','.Yaw'));gun.userData.pitch=group.getObjectByName(t.embedded.replace('.Root','.Pitch'));gun.userData.inverse=new THREE.Quaternion();gun.userData.local=new THREE.Vector3();return gun;});
@@ -3839,7 +3845,7 @@ export class SpaceRenderer {
                             parts[i].visible=health>0;
                             damaged.scale.setScalar(health?0:1);damaged.visible=!health;damaged.updateMatrix();
                         }
-                    }else if(mounts[i].kind==='pod'||mounts[i].kind==='stack')parts[i].visible=health>0;
+                    }else if(mounts[i].kind==='pod'||mounts[i].kind==='stack'||mounts[i].kind==='rack')parts[i].visible=health>0;
                     else if(!health)setFrigateComponentDamage(parts[i],0,mounts[i].hull);
                 }
             }
@@ -6352,7 +6358,7 @@ export class SpaceRenderer {
                         stabilizeMaterialNormals(mesh.material);
                         root.add(mesh);signatures.add('base|' + signature);
                     }
-                    if((variant==='drover'||variant==='caravan') && !signatures.has('detached-pod|'+signature)){
+                    if((variant==='drover'||variant==='caravan'||variant==='barge') && !signatures.has('detached-pod|'+signature)){
                         const mesh=makeMesh(source.clone());
                         mesh.material.transparent=true;
                         stabilizeMaterialNormals(mesh.material);
