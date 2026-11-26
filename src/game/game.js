@@ -11,7 +11,8 @@ import {createRaceContacts,raceBody,resolveRaceContacts} from './raceContact.js'
 import {planRaceTactics} from './raceTactics.js';
 import {createRaceDrive,stepRaceDrive,collectRaceStabilizer,sweptBoostHit,raceDistance,raceDraft,RACE_BOOST_SECONDS} from './raceDynamics.js';
 import {createRepairDroneState,prepareRepairDrone,applyDroneRepair} from './repairDrones.js';
-import {equipCareerItems,equipCapitalLoot,makeCareerWreck,combatWreckNode,recoverWreckEntry,lootInReach,lootCollectionEnabled,updateCombatLoot} from './careerLoot.js';
+import {checkpointFrigateEncounter,restoreFrigateEncounter} from './frigateEncounters.js';
+import {orphanNpcDrone,equipCareerItems,equipCapitalLoot,makeCareerWreck,combatWreckNode,recoverWreckEntry,lootInReach,lootCollectionEnabled,updateCombatLoot} from './careerLoot.js';
 import {equipmentAction,normalizeEquipmentInventory,refreshInventoryProjection,rollEquipmentRecord,inventoryMounts} from './equipmentInventory.js';
 import {highestLootRarity} from './lootVisuals.js';
 import {equipmentBaseId,forgetEquipmentDefinition} from './equipmentCatalog.js';
@@ -21,14 +22,15 @@ import {FLEET_EQUIPMENT,droneDock} from './fleetEquipmentData.js';
 import {canonicalFaction,preferredNpcHull,FACTION_NAMES} from './factions.js';
 import {CapitalMarkers} from './capitalMarkers.js';
 import {capitalHull,capitalMountPosition,capitalReadout} from './capitalHulls.js';
-import {CORVETTES,convoyTraffic,raidCorvette} from './corvetteMounts.js';
+import {updateTrafficLaunches} from './arenaBattle.js';
+import {TRAFFIC_HULLS,FRIGATE_TRAFFIC,convoyVariant,raidCorvette,raidCarrier} from './corvetteMounts.js';
 import {CRUISER_GUN,equipCruiser,updateCruiserAttack,updateCruiserBatteries,damageCruiserMount,segmentCruiserMountHit,cruiserSubsystemExplosionScale} from './cruiserCombat.js';
 import { prepareLocalPursuit, updateLocalPursuit, driveRecoveryRemaining, PLAYER_RADAR_RANGE, PIRATE_ARRIVAL_MIN } from './combatTravel.js';
 import { nearestPlayerBerth, playerBerth, playerBerths, setPlayerBerthResolver, preparePlayerLaunch, stepPlayerDocking } from './playerDocking.js';
 import {fittedPlayerBerths,fitSessionPlayerBerths} from './shipLanding.js';
 setPlayerBerthResolver(fitSessionPlayerBerths);
 import { stationApproach, reserveStationDock, stationVisualSurfaceRadius, stationSurfaceDistance } from './stationTraffic.js';
-import { droverCollisionVariant, SHIP_COLLIDERS, PLAYER_CONTACT_SCALE, segmentShipColliderHit, shipVsStation, shipVsSphere, shipVsObstacle, shipVsShip } from './shipCollision.js';
+import { capitalCollisionVariant, SHIP_COLLIDERS, PLAYER_CONTACT_SCALE, segmentShipColliderHit, shipVsStation, shipVsSphere, shipVsObstacle, shipVsShip } from './shipCollision.js';
 import { addOrderedObstacle, removeObstacleFromCell, addObstacleToSegmentGrid, indexObstacleCells, visitObstacleCells } from './obstacleQueries.js';
 import { segmentMeshHit } from './meshQueries.js';
 import {createMiningContacts,updateMiningContacts} from './miningSurface.js';
@@ -191,7 +193,7 @@ const OBSERVER_MAPS = Object.freeze([
 const OBSERVER_SHIP_TYPES = Object.freeze([
     ...PLAYER_FLYABLE_HULLS.map(id => Object.freeze({ id, label: SHIPS[id].name.toUpperCase(), role: observerRoleFor(id), hullId: id, defaultFit: 'varied' })),
     ...Object.entries(CONCORD_CAPITAL_CLASSES).map(([id, name]) => Object.freeze({ id, label: `${name.toUpperCase()} · ${id.toUpperCase()}`, role: 'patrol', capitalVariant: `concord-${id}` })),
-    ...Object.entries(CORVETTES).map(([id,spec])=>Object.freeze({ id, label:id.toUpperCase(), role:spec.role, capitalVariant:id })),
+    ...Object.entries(TRAFFIC_HULLS).map(([id,spec])=>Object.freeze({ id, label:id.toUpperCase(), role:spec.role, capitalVariant:id })),
 ]);
 const OBSERVER_FITS = Object.freeze(['varied', 'balanced', 'assault', 'support', 'beam']);
 const OBSERVER_AIM_ERROR_MIN = 1;
@@ -769,6 +771,8 @@ const HULL_FLIGHT_STATS = {
     warden: { speed: 36, afterburnSpeed: 0, turnRate: 1.1, collisionRadius: 1.9, hullHalfExtents:[4.779000014066696, 3.17419992685318, 5.941299819946289] }, // patrol — medium
     prospector: { speed: 24, afterburnSpeed: 0, turnRate: 0.9, collisionRadius: 2.2, hullHalfExtents:[3.595488,2.99199,6.979727] }, // miner — agile industrial
     'atlas-freighter': { speed: 27, afterburnSpeed: 0, turnRate: 0.55, collisionRadius: 2.9, hullHalfExtents:[3.958028,3.920304,12.33277] }, // trader — ponderous
+    caravan: { speed: 20, afterburnSpeed: 0, turnRate: .15, collisionRadius: 26, hullHalfExtents: [8.6,7,26] },
+    rookery: { speed: 20, afterburnSpeed: 0, turnRate: .15, collisionRadius: 28, hullHalfExtents: [10,7,28] },
     drover: { speed: 25, afterburnSpeed: 0, turnRate: .25, collisionRadius: 14, hullHalfExtents: [5.5,4.3,14] },
     ironjaw: { speed: 30, afterburnSpeed: 0, turnRate: .25, collisionRadius: 15, hullHalfExtents: [6.1,4.3,15.1] },
     'concord-frigate': { speed: 18, afterburnSpeed: 0, turnRate: 0.12, collisionRadius: 56.5, hullHalfExtents: [18.73, 22.46, 56.45] },
@@ -781,7 +785,7 @@ const HULL_FLIGHT_STATS = {
 for(const [variant,profile] of Object.entries(SHIP_COLLIDERS))if(HULL_FLIGHT_STATS[variant]&&variant!=='concord-frigate')HULL_FLIGHT_STATS[variant].hullHalfExtents=profile.extent;
 const PLAYER_HULL_EXTENTS=Object.fromEntries(Object.entries(HULL_FLIGHT_STATS).map(([variant,stats])=>[variant,Object.freeze(stats.hullHalfExtents.map(n=>n*PLAYER_CONTACT_SCALE))]));
 const CAPITAL_CLASS_BY_VARIANT = Object.freeze({
-    drover:'corvette', ironjaw:'corvette',
+    drover:'corvette', ironjaw:'corvette', caravan:'frigate', rookery:'frigate',
     'concord-frigate': 'frigate',
     'concord-cruiser': 'cruiser',
     'concord-carrier': 'carrier',
@@ -1609,7 +1613,10 @@ export class GameSession {
         // Keep the last safe checkpoint until the short guided transfer finishes.
         if (this.playerDocking) return true;
         if(this.arena?.run)return this.save.arenaRun.phase==='combat'?true:writeArenaRun(this.save);
-        if (!this.arena) for (const ship of this.ships ?? []) this.checkpointCorvette(ship);
+        if (!this.arena){
+            for (const ship of this.ships ?? []) this.checkpointCorvette(ship);
+            checkpointFrigateEncounter(this);
+        }
         return saveGame(this.save);
     }
     tutorialSummary() {
@@ -1959,7 +1966,7 @@ export class GameSession {
         const world = this.observerWorldPosition(entry, this.observerPlacementWorld);
         // Pin every airframe independently of its faction or authored role.
         const ship = type.capitalVariant
-            ? this.spawnCapitalShip(type.capitalVariant, world.toArray(), undefined, undefined)
+            ? this.spawnCapitalShip(type.capitalVariant, world.toArray(), undefined, undefined, {tier:entry.tier ?? this.observerDifficulty})
             : this.spawnShip(type.role, world.toArray(), undefined, undefined, { tier: entry.tier ?? this.observerDifficulty }, type.hullId ? { hullId: type.hullId } : {});
         if (!type.capitalVariant) {
             const fit = entry.fit === 'varied' ? type.defaultFit : entry.fit;
@@ -2286,7 +2293,7 @@ export class GameSession {
                 role: ship.role,
                 shipType: ship.observerShipType,
                 fit: ship.observerFit ?? 'varied',
-                hullId: ship.observerShipType ?? (ship.capitalClass==='corvette' ? ship.variant : ship.capitalClass ?? ship.combatFit?.hullId),
+                hullId: ship.observerShipType ?? (TRAFFIC_HULLS[ship.variant] ? ship.variant : ship.capitalClass ?? ship.combatFit?.hullId),
                 tier: ship.pilot?.tier,
                 capital: Boolean(ship.capitalClass),
                 shield: Math.max(0, ship.shield),
@@ -4903,7 +4910,7 @@ export class GameSession {
         const right = this.tmpP5.copy(RIGHT).applyQuaternion(orientation).normalize();
         const velocity = player.velocity;
         const target = this.getTargetRef();
-        const targetId = target?.kind === 'ship' ? target.id : undefined;
+        const targetId = target?.kind === 'ship' || target?.kind === 'drone' ? target.id : undefined;
         player.ammo ??= {};
         if (!loadout || !spec) {
             // Compatibility path for hand-built combat probes. Career saves
@@ -5082,6 +5089,7 @@ export class GameSession {
         const p=this.save.player, id=p.currentTargetId;
         let target;
         if(id)for(const ship of this.ships)if(ship.id===id && ship.hull>0 && !ship.claimed && !ship.captured){target=ship;break;}
+        if(!target&&id)target=this.targetableRepairDrone(id);
         const locks=this.rackLocks??=new Map(),previous=this.rackProgress??0;
         this.rackProgress=0;
         if(!target || target.jumpPursuit || p.dockedAt || p.hull<=0 || this.hyperdriveFx==='spooling' || this.hyperdriveFx==='active' || this.hyperdriveFx==='gate'){locks.clear();return;}
@@ -5144,7 +5152,8 @@ export class GameSession {
     fireMountedMissiles() {
         const player = this.save.player;
         const target = this.getTargetRef();
-        const ship = target?.kind === 'ship' ? this.ships.find((entry) => entry.id === target.id && entry.hull > 0) : undefined;
+        const ship = target?.kind === 'drone' ? this.npcDroneUnits[target.id]
+            : target?.kind === 'ship' ? this.ships.find((entry) => entry.id === target.id && entry.hull > 0) : undefined;
         // A restored or automatically acquired ship lock can predate the mode
         // change. Honour the actual lock instead of blocking its launcher.
         if (ship) player.mode = 'combat';
@@ -5157,12 +5166,10 @@ export class GameSession {
             this.setMonitorStatus(t('NO MISSILE RACK INSTALLED'));
             return;
         }
-        if (!target || target.kind !== 'ship') {
+        if (!ship) {
             this.setMonitorStatus(t('NO SHIP TARGET LOCKED'));
             return;
         }
-        if (!ship)
-            return;
         const selectedIndex = Math.max(0, magazines.findIndex(entry => entry.selected));
         const mode = player.launcherFireMode;
         const now = this.save.world.time;
@@ -6177,7 +6184,7 @@ export class GameSession {
     triggerClaimDispute(nodeId) {
         const node = this.asteroids.find((entry) => entry.id === nodeId);
         if (node?.combatLoot || isTutorialGuided(this.save) || this.arena || this.activeRace
-            || this.hostilesNear(vec(this.save.player.position), ENCOUNTER_LOCK_RADIUS)) return;
+            || !this.careerFrigateEncounterOpen()) return;
         // A staked rock occasionally draws a rival prospector who contests the
         // seam mid-cut. Seeded per node and gated to fire once per claim, so the
         // same rock disputes the same way every career.
@@ -6227,7 +6234,7 @@ export class GameSession {
     }
     triggerSalvageAmbush(node) {
         if (isTutorialGuided(this.save) || this.arena || this.activeRace
-            || this.hostilesNear(vec(this.save.player.position), ENCOUNTER_LOCK_RADIUS))
+            || !this.careerFrigateEncounterOpen())
             return;
         if (this.salvageAmbushTriggered.has(node.id))
             return;
@@ -6439,7 +6446,7 @@ export class GameSession {
             this.audio.play('scan');
             return;
         }
-        if (target.kind === 'pickup')
+        if (target.kind === 'pickup' || target.kind === 'drone')
             return;
         const stats = this.playerStats();
         const distance = this.surfaceDistance(vec(this.save.player.position), target);
@@ -6503,7 +6510,7 @@ export class GameSession {
     // running must be disabled first), is worth a claim and is still in one piece.
     hasCaptureClaim(ship) {
         return Boolean(!this.arena && ship?.surrendered && !ship.claimed && !ship.captured && ship.hull > 0
-            && (ship.bountyValue > 0 || ship.missionId || ship.variant==='drover'&&ship.engineThrust===0));
+            && (ship.bountyValue > 0 || ship.missionId || ship.cargoHolds&&ship.engineThrust===0));
     }
     boardable(ship) {
         return this.hasCaptureClaim(ship) && !ship.fleeing;
@@ -6566,7 +6573,7 @@ export class GameSession {
         }
         const cycle = { keys, index, selectedAt: now, targetId: next.id };
         // Mode follows the selected target so the touch pads and radar filters match.
-        if (next.kind === 'ship')
+        if (next.kind === 'ship' || next.kind === 'drone')
             this.save.player.mode = 'combat';
         else if (next.kind === 'asteroid')
             this.save.player.mode = 'mining';
@@ -6631,6 +6638,14 @@ export class GameSession {
     pickupDetail(pickup) {
         if (pickup.distressSurvivor) return '1 POD';
         return pickup.commodity === 'credits' ? formatCredits(pickup.amount) : `${pickup.amount} ${t('UNITS')}`;
+    }
+    targetableRepairDrone(id) {
+        const unit = this.npcDroneUnits?.[id];
+        if (unit?.targetable && unit.hull > 0 && unit.position && unit.state !== 'stowed' &&
+            npcDistanceSq(unit.position, this.save.player.position) <= this.playerStats().radarRange ** 2) return unit;
+    }
+    droneContact(unit) {
+        return {kind:'drone', id:unit.id, position:unit.position, name:t('Repair Drone')};
     }
     targetCandidates() {
         const player = vec(this.save.player.position);
@@ -6713,6 +6728,12 @@ export class GameSession {
         // Scanned deposits/wrecks cycle before unscanned ones (a scan already
         // invested makes them the priority), then nearest first.
         const others = [];
+        for (const id in this.npcDroneUnits) {
+            const unit = this.targetableRepairDrone(id);
+            if (!unit || this.lineBlocked(player, vec(unit.position), unit.ownerId)) continue;
+            const owner = this.ships.find(entry => entry.id === unit.ownerId);
+            (owner?.hostile ? opponents : others).push(this.droneContact(unit));
+        }
         for (const entry of this.ships)
             if (!entry.hostile && !entry.claimed && !entry.captured && entry.hull > 0 && shipSeen(entry))
                 others.push({ kind: 'ship', id: entry.id, position: entry.position, name: entry.name });
@@ -6840,6 +6861,10 @@ export class GameSession {
                 this.setMonitorStatus(t('CONTACT TOO WEAK TO LOCK'));
                 return;
             }
+        }
+        else if (kind === 'drone') {
+            const unit = this.targetableRepairDrone(id);
+            if (unit) {target = this.droneContact(unit); this.save.player.mode = 'combat';}
         }
         else if (kind === 'pickup') {
             const pickup = this.pickups.find((entry) => entry.id === id && entry.life > 0);
@@ -7029,6 +7054,8 @@ export class GameSession {
             }
             return { kind: 'ship', id, position: ship.position, name: ship.name };
         }
+        const unit = this.targetableRepairDrone(id);
+        if (unit) return this.droneContact(unit);
         const pickup = this.pickups.find((entry) => entry.id === id && entry.life > 0);
         if (pickup)
             return { kind: 'pickup', id, position: tuple(this.pickupStore.getPos(pickup.slot, this.tmpP0)), name: this.pickupLabel(pickup) };
@@ -7201,6 +7228,8 @@ export class GameSession {
         return this.beginGalaxyGateTransition(jumpPoint);
     }
     clearTransientSpace() {
+        this.frigateTrafficReady=false;
+        if(!this.arena)this.save.world.frigateEncounter=null;
         this.lostTargetId = undefined;
         this.rackLocks?.clear();
         this.rackProgress=0;
@@ -7237,7 +7266,7 @@ export class GameSession {
     }
     spawnJumpPointPirates(route) {
         if (isTutorialGuided(this.save) || this.arena || this.activeRace || this.hyperdriveCooldownRemaining() > 0
-            || this.hostilesNear(vec(this.save.player.position), ENCOUNTER_LOCK_RADIUS)) return false;
+            || !this.careerFrigateEncounterOpen()) return false;
         const region = this.careerRegionAt();
         const visibility = DARK_ENCOUNTER_MULT + (1 - DARK_ENCOUNTER_MULT) * clamp(this.playerExposureRange() / NPC_SENSOR_RANGE, 0, 1);
         const risk = jumpPiracyRisk(route.id, this.holdWorth(), {arrivalSystemId:this.save.player.systemId}) * this.combatEncounterScale() * visibility;
@@ -7248,11 +7277,11 @@ export class GameSession {
         const count = careerGroupSize(region, rng);
         const escorts = [];
         let lead;
-        for (let index = 0; index < count; index += 1) {
+        for (let index = 0; index < (lead?.variant==='rookery'?1+FRIGATE_TRAFFIC.raidEscorts:count); index += 1) {
             const offset = new THREE.Vector3(rng() - 0.5, (rng() - 0.5) * 0.45, rng() - 0.5)
                 .normalize()
                 .multiplyScalar(PIRATE_ARRIVAL_MIN + index * 120 + rng() * 180);
-            const pirate = this.spawnCareerRaider(index === 0 ? 'pirate' : 'escort', tuple(player.clone().add(offset)), region, rng);
+            const pirate = this.spawnCareerRaider(index === 0 ? 'pirate' : 'escort', tuple(player.clone().add(offset)), region, rng,true,lead);
             if (index === 0)
                 lead = pirate;
             else
@@ -7539,19 +7568,19 @@ export class GameSession {
     spawnHyperdriveIntercept() {
         if (isTutorialGuided(this.save)) { this.hyperdriveEncounterAt = null; return false; }
         const player = vec(this.save.player.position);
-        if (this.arena || this.activeRace || this.hostilesNear(player, ENCOUNTER_LOCK_RADIUS) || this.hyperdriveCooldownRemaining() > 0) return false;
+        if (this.arena || this.activeRace || !this.careerFrigateEncounterOpen() || this.hyperdriveCooldownRemaining() > 0) return false;
         const rng = seededRandom(`${this.save.world.seed}:intercept:${++this.interceptCounter}`);
         const region = careerRegion(this.save.player.systemId, this.hyperdriveEncounterRegionId);
         const count = careerGroupSize(region, rng);
         const escorts = [];
         let lead;
-        for (let index = 0; index < count; index += 1) {
+        for (let index = 0; index < (lead?.variant==='rookery'?1+FRIGATE_TRAFFIC.raidEscorts:count); index += 1) {
             // The lead spawns inside the dark-detection line so a dark pilot can
             // always see — and target — who is hailing them; escorts may ride
             // the dark band and emerge as the fight develops.
             const spawnRange = PIRATE_ARRIVAL_MIN + index * 120 + rng() * 180;
             const offset = new THREE.Vector3(rng() - 0.5, (rng() - 0.5) * 0.5, rng() - 0.5).normalize().multiplyScalar(spawnRange);
-            const pirate = this.spawnCareerRaider(index === 0 ? 'pirate' : 'escort', tuple(player.clone().add(offset)), region, rng);
+            const pirate = this.spawnCareerRaider(index === 0 ? 'pirate' : 'escort', tuple(player.clone().add(offset)), region, rng,true,lead);
             this.hyperdriveInterceptIds.add(pirate.id);
             if (index === 0)
                 lead = pirate;
@@ -7632,7 +7661,7 @@ export class GameSession {
             else {
                 const shieldRateScale = combatShieldRechargeScale(ship, dt);
                 if (!ship.poweredDown && ship.shieldDelay <= 0)
-                    ship.shield = Math.min(ship.maxShield, ship.shield + dt * passiveShieldRechargeRate(ship.shieldRegen ?? 3.8, ship.capitalClass) * shieldRateScale);
+                    ship.shield = Math.min(ship.maxShield, ship.shield + dt * (TRAFFIC_HULLS[ship.variant] ? ship.shieldRegen : passiveShieldRechargeRate(ship.shieldRegen ?? 3.8, ship.capitalClass)) * shieldRateScale);
             }
             // The standoff clock runs down: once it expires the hunters open
             // fire (or they already did if the pilot shot first). A hired
@@ -7679,19 +7708,21 @@ export class GameSession {
                     ship.task.kind='trade';ship.task.port=ship.convoyPort;ship.task.phase='leg';
                     ship.targetId=ship.convoyEscape=undefined;ship.stationDockCompleted=ship.convoyPort;
                 }else this.updateTravelAI(ship,dt);
-                if(ship.convoyDistress&&this.chatterOpen()&&this.sayPilotLine(ship,t('Convoy under attack. All escorts engage!')))ship.convoyDistress=false;
+                if(ship.convoyDistress&&this.chatterOpen()&&this.sayPilotLine(ship,t(ship.variant==='caravan'?'Caravan taking heavy fire. Escorts, cover our turn!':'Convoy under attack. All escorts engage!')))ship.convoyDistress=false;
             }else if(ship.convoyLeader&&!ship.targetId&&ship.convoyLeader.hull>0&&!ship.surrendered&&!ship.captured
                 &&!(ship.combatThreatUntil>this.save.world.time)){
                 this.updateSensorAwareness(ship,dt);
                 const leader=ship.convoyLeader,slot=ship.formationSlot;
-                this.tmpD.set(slot*45,10,55).applyQuaternion(this.tmpQ.fromArray(leader.rotation)).add(this.tmpE.fromArray(leader.position)).toArray(ship.formationPoint);
+                this.tmpD.set(slot*45,10,ship.formationTrail??55).applyQuaternion(this.tmpQ.fromArray(leader.rotation)).add(this.tmpE.fromArray(leader.position)).toArray(ship.formationPoint);
                 ship.destination=ship.formationPoint;this.updateTravelAI(ship,dt);
             }else if (ship.tutorialCompanion)
                 this.updateTutorialCompanion(ship, dt);
             else if(ship.tutorialPatrol) this.updateTutorialPatrol(ship,dt);
             else if (!ship.arenaObjectiveAttacker || !this.flyRunBombingPass(ship,dt))
                 updateShipAI(this, ship, dt);
-            if(ship.capitalClass==='corvette'&&ship.capitalBatteriesAt!==this.save.world.time){
+            if(TRAFFIC_HULLS[ship.variant]?.launch && !ship.arenaRunEnemy && !ship.poweredDown && !ship.captured && !ship.surrendered && !ship.holdFire)
+                updateTrafficLaunches(this,ship,TRAFFIC_HULLS[ship.variant].launch,dt);
+            if(TRAFFIC_HULLS[ship.variant]&&ship.capitalBatteriesAt!==this.save.world.time){
                 let enemy;
                 if (ship.targetId === 'player') {
                     if (tracksActivePlayer(this, ship)) enemy = this.save.player;
@@ -7701,7 +7732,7 @@ export class GameSession {
                 updateCorvetteWeapons(this,ship,dt,enemy?this.tmpD.fromArray(enemy.position):undefined,enemy?.velocity);
             }
             if(ship.capitalClass==='cruiser' && ship.cruiserBatteriesAt!==this.save.world.time)updateCruiserBatteries(this,ship,dt);
-            if(ship.capitalClass==='frigate' && ship.capitalBatteriesAt!==this.save.world.time)updateFrigateBatteries(this,ship,dt);
+            if(ship.variant==='concord-frigate' && ship.capitalBatteriesAt!==this.save.world.time)updateFrigateBatteries(this,ship,dt);
             this.resolveNpcCollisions(ship);
             const position = vec(ship.position, this.tmpShipPos);
             // Priority order for the one-voice slot: the one-shot recognition
@@ -7722,7 +7753,7 @@ export class GameSession {
                 // stack: a greeting never steals the floor from a fight.
                 this.maybeNeutralChatter(ship, position, playerPosition);
             }
-            if (!this.arena && position.distanceTo(playerPosition) > this.playerStats().radarRange * 1.3 && ship.lifetime > 40 && !(ship.pursuitLeaseUntil > this.save.world.time) && !ship.stationDock && !ship.missionId && !ship.captured && (!ship.capitalClass||ship.capitalClass==='corvette') && !ship.tutorialCompanion && !ship.tutorialEnemy && !ship.arenaRunEnemy && !ship.arenaRunWingman) {
+            if (!this.arena && position.distanceTo(playerPosition) > this.playerStats().radarRange * 1.3 && ship.lifetime > 40 && !(ship.pursuitLeaseUntil > this.save.world.time) && !ship.stationDock && !ship.missionId && !ship.captured && (!ship.capitalClass||TRAFFIC_HULLS[ship.variant]) && !ship.tutorialCompanion && !ship.tutorialEnemy && !ship.arenaRunEnemy && !ship.arenaRunWingman) {
                 // An NPC hyperdrive hop: trade, smuggle, and flee pilots jump to
                 // another port — mark the departure with a warp streak instead of
                 // a silent cull (renderer.spawnHyperdriveStreak).
@@ -9257,7 +9288,7 @@ export class GameSession {
     }
     updateAttackAI(ship, targetPosition, targetVelocity, dt) {
         if (ship.fieldTactic?.kind && flyFieldTactic(this, ship, dt)) return;
-        if (ship.variant === 'drover') {
+        if (ship.cargoHolds) {
             updateCorvetteWeapons(this,ship,dt,targetPosition,targetVelocity);
             return this.updateTravelAI(ship,dt);
         }
@@ -9918,7 +9949,7 @@ export class GameSession {
         desired.normalize();
         this.tmpQ2.setFromUnitVectors(FORWARD, desired);
         if (!flightStats) {
-            if(ship.capitalClass==='corvette')orientation.rotateTowards(this.tmpQ2,ship.turnRate*dt);
+            if(TRAFFIC_HULLS[ship.variant])orientation.rotateTowards(this.tmpQ2,ship.turnRate*dt);
             else orientation.slerp(this.tmpQ2, 1 - Math.exp(-ship.turnRate * 0.62 * dt));
             orientation.normalize();
         }
@@ -9933,6 +9964,11 @@ export class GameSession {
         // An escorted transport runs near its cruise speed: the pilot sets the
         // line, and a half-throttle mule would make the storm clock unwinnable.
         if (ship.distressEscort) travelSpeed = ship.speed * 0.9;
+        if (ship.variant==='caravan'&&!ship.convoyEscape) {
+            for(const escort of this.ships)if(escort.convoyLeader===ship&&escort.hull>0&&position.distanceToSquared(this.tmpD.fromArray(escort.position))>200*200){
+                travelSpeed*=.5;break;
+            }
+        }
         if (inFormation) {
             const v = ship.convoyLeader.velocity;
             const closing = Math.max(0, position.distanceTo(destination) - 4) * .5;
@@ -10247,7 +10283,7 @@ export class GameSession {
             if(current||isPlayer){
                 if(this.lineBlocked(start,point,ship.id))continue;
             }else if(!this.canSee(start,point,candidate.dark,npcSpeed(candidate.velocity),candidate.speed))continue;
-            if(ship.capitalClass==='frigate'){
+            if(ship.variant==='concord-frigate'){
                 if(!frigateTorpedoLaneClear(this,ship,point,targetId))continue;
             }else if(rackLaneBlocked(this,ship,start,forward,bearing,distance,targetId))continue;
             if(decaying)return candidate;
@@ -10683,7 +10719,7 @@ export class GameSession {
         if (applied.shield > 0 && ship.shield > 0)
             this.renderer.flashShield?.(ship, this.npcHullExtents(ship), .25, false, position, origin);
 
-        const remaining = applied.hull*(ship.capitalClass==='frigate'?frigateHullDamageScale(weapon):1);
+        const remaining = applied.hull*(ship.capitalClass==='frigate'&&!TRAFFIC_HULLS[ship.variant]?frigateHullDamageScale(weapon):1);
         if ((combatWeapon || weapon.kind) && position && origin && ship.hull>0) {
             if (shieldBeforeHit <= 0 && !ship.crippled) {
                 wearFighterDrive(ship, remaining, position, origin);
@@ -10716,7 +10752,7 @@ export class GameSession {
         const disabledMount=(ship.capitalClass==='cruiser'?damageCruiserMount:damageCapitalMount)(ship,position,applied.hull);
         if(disabledMount>=0&&ship.capitalMountHull[disabledMount]===0){
             this.renderer.spawnExplosion?.(position,true,(ship.capitalClass==='cruiser'?cruiserSubsystemExplosionScale(disabledMount):capitalSubsystemExplosionScale(disabledMount,capitalHull(ship))));
-            if(ship.capitalClass==='corvette')this.corvetteSubsystemDestroyed(ship,disabledMount);
+            if(TRAFFIC_HULLS[ship.variant])this.corvetteSubsystemDestroyed(ship,disabledMount);
             if(attackerId==='player')this.ui.pushEvent(`${t(capitalHull(ship).mounts[disabledMount].labelKey)} · ${t('OFFLINE')}`,'info',3500);
         }
         if (amount > 0) disruptWeapons(ship, weapon, this.save.world.time, shieldBeforeHit);
@@ -10740,13 +10776,16 @@ export class GameSession {
                 ship.combatThreatUntil = this.save.world.time + 2;
             }
         }
-        if(ship.variant==='drover'&&attackerId&&attackerId!=='environment'&&ship.hull>0&&!ship.surrendered&&!ship.captured){
+        if(ship.cargoHolds&&(ship.variant!=='caravan'||!this.arena&&ship.shield<ship.maxShield*.5)&&attackerId&&attackerId!=='environment'&&ship.hull>0&&!ship.surrendered&&!ship.captured){
             ship.targetId=attackerId;
             if(!ship.convoyEscape){
                 let nearest=Infinity;
+                const attacker=ship.variant==='caravan'?(attackerId==='player'?this.save.player:this.ships.find(actor=>actor.id===attackerId)):undefined;
+                const away=attacker?this.tmpF.fromArray(ship.position).sub(this.tmpG.fromArray(attacker.position)).normalize():undefined;
                 for(const port of Object.values(LOCATIONS)){
                     if(port.systemId!==this.save.player.systemId||!['station','jump-point'].includes(port.kind))continue;
-                    const d=this.tmpD.fromArray(port.position).distanceToSquared(this.tmpE.fromArray(ship.position));
+                    const route=this.tmpD.fromArray(port.position).sub(this.tmpE.fromArray(ship.position));
+                    const d=route.length()+(away&&route.dot(away)<0?1e6:0);
                     if(d<nearest){nearest=d;ship.convoyPort=port.id;ship.convoyEscape=stationApproach(port.id)??port.position;}
                 }
                 ship.convoyDistress=true;
@@ -11126,7 +11165,7 @@ export class GameSession {
     // Scripted close ambushes can opt into a firm initial track; ordinary
     // ambient hunters must build one through the sensor model.
     addRaidCorvette(lead,escorts,region,rng){
-        if(!lead||this.arena||!raidCorvette(region,rng))return;
+        if(!lead||lead.variant==='rookery'||this.arena||!raidCorvette(region,rng))return;
         const position=this.tmpD.set(80,15,65).applyQuaternion(this.tmpQ.fromArray(lead.rotation)).add(this.tmpE.fromArray(lead.position));
         const clearance=SHIP_COLLIDERS.ironjaw.contactRadius*npcShipScaleForVariant('ironjaw');
         const point=this.visibleSpawnPosition(position,{clearance,required:true});
@@ -11437,6 +11476,10 @@ export class GameSession {
         }
         this.cancelPendingMug(ship);
         ship.hull = 0;
+        if(ship.variant==='caravan'&&ship.droneFleet){
+            for(const unit of Object.values(ship.droneFleet.unitsById))
+                if(unit.hull>0&&unit.state!=='stowed'&&unit.position)orphanNpcDrone(this,ship,unit);
+        }
         this.checkpointCorvette(ship);
         this.onExplorationActorDefeated(ship);
         this.onDistressActorDefeated(ship);
@@ -11672,7 +11715,7 @@ export class GameSession {
         this.persistSave();
     }
     updateBountySpawns() {
-        if (isTutorialGuided(this.save)) return;
+        if (isTutorialGuided(this.save)||this.activeFrigateEncounterNearby()) return;
         const player = vec(this.save.player.position);
         for (const mission of this.save.activeMissions) {
             if (mission.kind !== 'bounty' || !mission.targetZone || !mission.targetName)
@@ -11754,8 +11797,10 @@ export class GameSession {
             this.beamAmbushNextAt = this.save.world.time + 4;
         // Keep the approach lanes populated: station traffic tops up before the
         // encounter timer (or the near-dock skip) decides anything.
+        if (this.activeFrigateEncounterNearby()) return;
         this.updateCapitalTraffic();
         this.updateStationTraffic();
+        if(this.activeFrigateEncounterNearby())return;
         if (this.ships.some(ship => ship.hull > 0 && ship.jumpPursuit)) return;
         // The family prologue owns its one controlled hostile and its pacing.
         // Ambient pirates would stack on top of that lesson and can make the
@@ -11798,8 +11843,8 @@ export class GameSession {
         if (missionPressure && this.save.world.time >= (this.missionThreatNextAt ?? 0)
             && rng() < 0.22 * region.piratePressure * missionPressure.level * (exposed ? 1.25 : 0.7) && police < 0.72) {
             this.missionThreatNextAt = this.save.world.time + randomBetween(rng, 78, 118);
-            const lead = this.spawnCareerRaider('pirate', this.encounterPosition(rng, 800), region, rng);
-            const escorts = Array.from({length:careerGroupSize(region, rng)-1}, (_, i) => this.spawnCareerRaider('escort', this.encounterPosition(rng, 950+i*120), region, rng));
+            const lead = this.spawnCareerRaider('pirate', this.encounterPosition(rng, 800), region, rng,true);
+            const escorts = Array.from({length:lead.variant==='rookery'?FRIGATE_TRAFFIC.raidEscorts:careerGroupSize(region, rng)-1}, (_, i) => this.spawnCareerRaider('escort', this.encounterPosition(rng, 950+i*120), region, rng,true,lead));
             this.addRaidCorvette(lead,escorts,region,rng);
             this.stageHunterGroup(lead, escorts, { forceTrack: true });
             recordSortieEncounter(this.save, 'mission', missionPressure.kind);
@@ -11828,8 +11873,8 @@ export class GameSession {
                 const count = careerGroupSize(region, rng);
                 const escorts = [];
                 let lead;
-                for (let i = 0; i < count; i += 1) {
-                    const pirate = this.spawnCareerRaider(i === 0 ? 'pirate' : 'escort', this.encounterPosition(rng, 780 + i * 110), region, rng);
+                for (let i = 0; i < (lead?.variant==='rookery'?1+FRIGATE_TRAFFIC.raidEscorts:count); i += 1) {
+                    const pirate = this.spawnCareerRaider(i === 0 ? 'pirate' : 'escort', this.encounterPosition(rng, 780 + i * 110), region, rng,true,lead);
                     if (i === 0)
                         lead = pirate;
                     else
@@ -11873,8 +11918,8 @@ export class GameSession {
             const count = careerGroupSize(region, rng);
             const escorts = [];
             let lead;
-            for (let i = 0; i < count; i += 1) {
-                const pirate = this.spawnCareerRaider(i === 0 ? 'pirate' : 'escort', this.encounterPosition(rng, 780 + i * 110), region, rng);
+            for (let i = 0; i < (lead?.variant==='rookery'?1+FRIGATE_TRAFFIC.raidEscorts:count); i += 1) {
+                const pirate = this.spawnCareerRaider(i === 0 ? 'pirate' : 'escort', this.encounterPosition(rng, 780 + i * 110), region, rng,true,lead);
                 if (i === 0)
                     lead = pirate;
                 else
@@ -11932,7 +11977,7 @@ export class GameSession {
         }
         else if (bucket < traderCutoff) {
             const trader = this.spawnShip('trader', this.encounterPosition(rng, 225), undefined, undefined, undefined, this.leagueTrafficOptions('trader',locationId,rng));
-            if (rng() < .55 * region.piratePressure * (1 - police)) {
+            if (!this.activeFrigateEncounterNearby() && rng() < .55 * region.piratePressure * (1 - police)) {
                 recordSortieEncounter(this.save, 'distress', 'trader-lane');
                 const pirate = this.spawnCareerRaider('pirate', this.encounterPosition(rng, 850), region, rng);
                 pirate.targetId = trader.id;
@@ -11952,8 +11997,8 @@ export class GameSession {
             const count = careerGroupSize(region, rng);
             const escorts = [];
             let lead;
-            for (let i = 0; i < count; i += 1) {
-                const pirate = this.spawnCareerRaider(i === 0 ? 'pirate' : 'escort', this.encounterPosition(rng, 700 + i * 90 + rng() * 140), region, rng);
+            for (let i = 0; i < (lead?.variant==='rookery'?1+FRIGATE_TRAFFIC.raidEscorts:count); i += 1) {
+                const pirate = this.spawnCareerRaider(i === 0 ? 'pirate' : 'escort', this.encounterPosition(rng, 700 + i * 90 + rng() * 140), region, rng,true,lead);
                 if (i === 0)
                     lead = pirate;
                 else
@@ -12050,7 +12095,7 @@ export class GameSession {
     // The homeworld cordon fields the battleship, carrier, and an escort. The
     // cruiser guards Gatehouse Twelve while frigates also patrol Rookhaven.
     updateCapitalTraffic(force = false) {
-        if (this.arena || (!force && this.save.world.time < this.nextCapitalTrafficCheckAt))
+        if (this.arena || (!force && this.save.world.time < this.nextCapitalTrafficCheckAt) || this.activeFrigateEncounterNearby())
             return;
         this.nextCapitalTrafficCheckAt = this.save.world.time + CAPITAL_TRAFFIC_CHECK_SECONDS;
         const player = vec(this.save.player.position);
@@ -12091,6 +12136,7 @@ export class GameSession {
     // without any per-ship scripting. Ships are tagged so each station keeps
     // its own budget, and they despawn naturally when the player leaves.
     updateStationTraffic() {
+        if(this.activeFrigateEncounterNearby())return;
         const player = vec(this.save.player.position);
         for (const id of this.currentDockLocationIds()) {
             const location = LOCATIONS[id];
@@ -12135,6 +12181,7 @@ export class GameSession {
             // Avoid creating a ship under the player's nose; later arrivals use the lane.
             if (existing === 0 && player.distanceTo(vec(location.position)) > location.radius * 1.8)
                 reserveStationDock(this,ship,id,true);
+            if(ship.frigateEncounterId)return;
         }
     }
     // Mission hostiles start where the pilot can see them. Keep the chosen
@@ -12193,6 +12240,21 @@ export class GameSession {
         offset.normalize().multiplyScalar(clearance);
         return position.copy(center).add(offset);
     }
+    activeFrigateEncounterNearby() {
+        const player=this.save.player.position;
+        for(const ship of this.ships){
+            if(ship.hull>0&&!ship.surrendered&&!ship.captured&&(ship.frigateEncounterId||TRAFFIC_HULLS[ship.variant]?.capitalClass==='frigate')&&
+                npcDistanceSq(ship.position,player)<ENCOUNTER_LOCK_RADIUS**2)return true;
+        }
+        return false;
+    }
+    careerFrigateEncounterOpen() {
+        if (this.activeRace || this.save.world.distress?.active || this.activeMug?.() || this.activeFrigateEncounterNearby()) return false;
+        const player = this.save.player.position;
+        return !this.ships.some(ship => ship.hull > 0 && !ship.captured && !ship.surrendered &&
+            (ship.hostile || TRAFFIC_HULLS[ship.variant]) &&
+            npcDistanceSq(ship.position, player) < ENCOUNTER_LOCK_RADIUS ** 2);
+    }
     leagueTrafficOptions(role,locationId,rng) {
         const location=LOCATIONS[locationId],systemId=this.save.player.systemId;
         const owner=location?.faction ?? (systemId==='acheron'?'alliance':systemId==='redwake'?'pirates':systemId==='pale-ring'?'independents':'concord');
@@ -12201,9 +12263,10 @@ export class GameSession {
         if(!this.arena&&['patrol','trader'].includes(role)&&rng()<leagueTrafficChance(systemId,locationId))return{faction:'alliance',hullId:careerCombatHull('alliance',role,region,rng)};
         if(role==='patrol')return{faction:owner,guild:owner==='independents'?'bounty':undefined,hullId:careerCombatHull(owner,role,region,rng)};
         const guild=role==='miner'?'mining':(location?.guilds??[]).find(g=>['merchant','mining','salvage'].includes(g))??'merchant';
-        return{faction:'independents',guild,convoy:role==='trader'&&!this.arena&&!isTutorialGuided(this.save)&&convoyTraffic(owner,rng)};
+        return{faction:'independents',guild,convoy:role==='trader'&&!this.arena&&!isTutorialGuided(this.save)&&convoyVariant(owner,region,rng,this.careerFrigateEncounterOpen())};
     }
     spawnInitialTraffic() {
+        if(restoreFrigateEncounter(this,ENCOUNTER_LOCK_RADIUS))return;
         const systemId = this.save.player.systemId;
         const rng = seededRandom(`${this.save.world.seed}:initial-traffic:${systemId}:${Math.floor(this.save.world.time / 60)}`);
         const docks = this.currentDockLocationIds();
@@ -12217,6 +12280,7 @@ export class GameSession {
         if (dockId) {
             const trader = this.spawnShip('trader', around(LOCATIONS[dockId]), undefined, undefined, undefined, this.leagueTrafficOptions('trader',dockId,rng));
             trader.destination = LOCATIONS[docks.find((id) => id !== dockId) ?? dockId].position;
+            if(trader.frigateEncounterId)return;
             const patrolHome = docks.reduce((best,id) => portPoliceStrength(LOCATIONS[id]) > portPoliceStrength(LOCATIONS[best]) ? id : best, dockId);
             const patrol = this.spawnShip('patrol', around(LOCATIONS[patrolHome]), undefined, undefined, undefined, this.leagueTrafficOptions('patrol',patrolHome,rng));
             patrol.destination = LOCATIONS[dockId].position;
@@ -12230,7 +12294,16 @@ export class GameSession {
     }
     // Keep a spawned group tied to the region that rolled it, even if an
     // arrival offset puts its ships just outside that region's boundary.
-    spawnCareerRaider(role, position, region, rng) {
+    spawnCareerRaider(role, position, region, rng, raid=false, leader) {
+        if(raid&&role==='pirate'&&!this.arena&&raidCarrier(this.save.player.systemId,region,rng)&&this.careerFrigateEncounterOpen()){
+            const point=this.visibleSpawnPosition(this.tmpD.fromArray(position),{clearance:SHIP_COLLIDERS.rookery.contactRadius*2,required:true});
+            const carrier=point&&this.spawnTrafficCapital('rookery',point.toArray(),true,{tier:careerPilotTier(region,rng)});
+            if(carrier)return carrier;
+        }
+        if(leader?.variant==='rookery'){
+            const escort=this.spawnShip('escort',position,undefined,undefined,{tier:careerPilotTier(region,rng)},{faction:'pirates',hullId:'scrapper'});
+            escort.frigateEncounterId=leader.frigateEncounterId;return escort;
+        }
         return this.spawnShip(role, position, undefined, undefined, {tier:careerPilotTier(region,rng)},
             {faction:'pirates',hullId:careerCombatHull('pirates',role,region,rng)});
     }
@@ -12246,13 +12319,21 @@ export class GameSession {
     }
     spawnShip(role, position, missionId, nameOverride, pilotOverride, fleetOptions = {}) {
         if(role==='trader'&&fleetOptions.convoy){
-            const trader=this.spawnCorvette('drover',position,true);
+            const caravan=fleetOptions.convoy==='caravan';
+            const trader=this.spawnTrafficCapital(caravan?'caravan':'drover',position,true);
             if (!trader) return this.spawnShip(role,position,missionId,nameOverride,pilotOverride,{...fleetOptions,convoy:false});
-            const count=trader.aiRng()<.5?1:2;
+            if(trader.convoyFormed)return trader;
+            trader.convoyFormed=true;
+            const count=(caravan?2:1)+(trader.aiRng()<.5?0:1);
             for(let i=0;i<count;i++){
-                const slot=i?1:-1,offset=this.tmpD.set(slot*45,10,55).applyQuaternion(this.tmpQ.fromArray(trader.rotation)).add(this.tmpE.fromArray(position));
+                const slot=[-1,1,-2][i],offset=this.tmpD.set(slot*45,10,55).applyQuaternion(this.tmpQ.fromArray(trader.rotation)).add(this.tmpE.fromArray(position));
                 const escort=this.spawnShip('escort',offset.toArray(),undefined,undefined,undefined,{faction:'independents'});
-                escort.convoyLeader=trader;escort.formationSlot=slot;escort.formationPoint=[0,0,0];escort.targetId=undefined;
+                escort.frigateEncounterId=trader.frigateEncounterId;escort.convoyLeader=trader;escort.formationSlot=slot;escort.formationPoint=[0,0,0];escort.targetId=undefined;
+            }
+            if(caravan&&trader.aiRng()<FRIGATE_TRAFFIC.towChance){
+                const point=this.tmpD.set(0,-10,150).applyQuaternion(this.tmpQ.fromArray(trader.rotation)).add(this.tmpE.fromArray(position));
+                const tow=this.spawnCorvette('drover',point.toArray(),true);
+                if(tow)Object.assign(tow,{frigateEncounterId:trader.frigateEncounterId,convoyLeader:trader,formationSlot:0,formationTrail:150,formationPoint:[0,0,0]});
             }
             return trader;
         }
@@ -12419,7 +12500,7 @@ export class GameSession {
         ship.combatFit = createEnemyLoadout(ship, index);
         // Live hulls and controlled duels use the same durability. Tutorials
         // and capital spawners explicitly replace these values afterwards.
-        equipCareerItems(this,ship,{tutorialMiningPirate:fleetOptions.tutorialEncounter==='mining'});
+        if(!this.restoringFrigateEncounter)equipCareerItems(this,ship,{tutorialMiningPirate:fleetOptions.tutorialEncounter==='mining'});
         ship.maxShield=ship.shield=ship.combatFit.stats.shield;
         ship.maxHull=ship.hull=ship.combatFit.stats.hull;
         ship.combatFit.resources.shield=ship.maxShield;
@@ -12450,10 +12531,11 @@ export class GameSession {
         }
         const mounts = capitalHull(ship).mounts;
         if (!world.capitalTraffic?.[key] && ship.hull >= ship.maxHull && ship.shield >= ship.maxShield
-            && !mounts.some(m => ship.capitalMountHull[m.index] < m.hull)) return;
+            && !ship.lostDroneBays && !mounts.some(m => ship.capitalMountHull[m.index] < m.hull)) return;
         const ledger = world.capitalTraffic ??= {};
         const record = ledger[key] ??= {};
         record.mounts = ship.capitalMountHull;
+        record.lostDroneBays = ship.lostDroneBays;
         record.missingPods = ship.missingPods ?? 0;
         record.hull = ship.hull;
         record.shield = ship.shield;
@@ -12463,19 +12545,32 @@ export class GameSession {
         record.fleeing = ship.fleeing;
     }
     spawnCorvette(variant,position,traffic=false,pilotOverride){
-        const spec=CORVETTES[variant];if(!spec)return;
+        return this.spawnTrafficCapital(variant,position,traffic,pilotOverride);
+    }
+    spawnTrafficCapital(variant,position,traffic=false,pilotOverride){
+        const spec=TRAFFIC_HULLS[variant];if(!spec)return;
         const origin=position??this.tmpD.set(0,0,-800).applyQuaternion(this.tmpQ.fromArray(this.save.player.rotation)).add(this.tmpE.fromArray(this.save.player.position)).toArray();
         const key = !traffic || this.arena ? undefined : [this.save.player.systemId,variant,...origin].join(':');
+        if(key&&spec.capitalClass==='frigate'){
+            if(!this.frigateTrafficReady&&this.save.world.frigateEncounter?.members.some(member=>member.state.capitalSpawnKey===key))
+                restoreFrigateEncounter(this);
+            const existing=this.ships.find(actor=>actor.capitalSpawnKey===key&&actor.hull>0);
+            if(existing)return existing;
+        }
         const saved = key && this.save.world.capitalTraffic?.[key];
         if (saved?.retired) return;
-        const ship=this.spawnShip(spec.role,origin,undefined,variant==='drover'?'MV Drover':'Ironjaw',pilotOverride,{faction:spec.faction});
-        ship.variant=variant;ship.capitalClass='corvette';ship.velocity.fill(0);ship.dark=false;ship.smuggling=false;
-        equipCorvette(ship);equipCapitalLoot(this,ship);
+        const ship=this.spawnShip(spec.role,origin,undefined,spec.name,pilotOverride,{faction:spec.faction});
+        ship.variant=variant;ship.capitalClass=spec.capitalClass??'corvette';ship.cargoHolds=spec.cargoHolds;ship.velocity.fill(0);ship.dark=false;ship.smuggling=false;
+        equipCorvette(ship);
+        if(!this.restoringFrigateEncounter)equipCapitalLoot(this,ship);
+        if(key&&spec.capitalClass==='frigate'){ship.frigateEncounterId=ship.id;this.frigateTrafficReady=true;}
         ship.capitalSpawnKey = key;
         if (saved) {
             ship.capitalMountHull = [...saved.mounts];
             ship.missingPods = saved.missingPods;
-            if (ship.missingPods) ship.collisionVariant = droverCollisionVariant(ship.missingPods);
+            ship.repairDronesHeld=capitalHull(ship).mounts.some(m=>m.kind==='hangar'&&!ship.capitalMountHull[m.index]);
+            ship.lostDroneBays=saved.lostDroneBays;
+            if (ship.missingPods) ship.collisionVariant = capitalCollisionVariant(ship.variant,ship.missingPods);
             ship.hull = saved.hull;
             ship.shield = saved.shield;
             ship.cargo = {...saved.cargo};
@@ -12493,20 +12588,26 @@ export class GameSession {
     }
     corvetteSubsystemDestroyed(ship,index){
         const m=capitalHull(ship).mounts[index];
-        if(m.kind==='engine'&&ship.variant==='drover'&&ship.engineThrust===0&&ship.hull>0&&!this.arena&&!ship.surrendered)
+        if(m.kind==='engine'&&ship.cargoHolds&&ship.engineThrust===0&&ship.hull>0&&!this.arena&&!ship.surrendered)
             this.surrenderShip(ship,{action:'down'});
-        if(m.kind!=='pod')return;
-        const bit=1<<Number(m.node.slice(4));
+        if(m.kind==='hangar')ship.repairDronesHeld=true;
+        if(m.kind==='bay'){
+            const gun=capitalHull(ship).mounts.find(part=>part.kind==='broadside'&&part.bearing===m.bearing);
+            ship.capitalMountHull[gun.index]=0;
+        }
+        if(m.kind!=='pod'&&!m.partBit)return;
+        const bit=m.partBit??1<<Number(m.node.slice(4));
         if(ship.missingPods&bit)return;
         ship.missingPods=(ship.missingPods??0)|bit;
-        ship.collisionVariant=droverCollisionVariant(ship.missingPods);
+        ship.collisionVariant=capitalCollisionVariant(ship.variant,ship.missingPods);
+        if(m.kind==='bay')return;
         this.renderer.detachCargoPod?.(ship,m);
         if(this.arena)return;
         // Assign any indivisible units to the earliest intact holds. The same
         // pod carries the same share regardless of the order in which others detach.
         let remaining=1,rank=0;
         for(const part of capitalHull(ship).mounts){
-            if(part.kind!=='pod'||ship.capitalMountHull[part.index]<=0)continue;
+            if(part.kind!==m.kind||ship.capitalMountHull[part.index]<=0)continue;
             remaining++;
             if(part.index<index)rank++;
         }
@@ -12518,7 +12619,7 @@ export class GameSession {
         }
     }
     spawnCapitalShip(variant, position, homeId, name, pilotOverride) {
-        if(CORVETTES[variant])return this.spawnCorvette(variant,position,false,pilotOverride);
+        if(TRAFFIC_HULLS[variant])return this.spawnTrafficCapital(variant,position,false,pilotOverride);
         const capitalClass = CAPITAL_CLASS_BY_VARIANT[variant];
         const profile = CAPITAL_SHIP_STATS[capitalClass];
         if (!profile)
@@ -13444,6 +13545,10 @@ export class GameSession {
         const tp = target.position;
         return Math.max(0, Math.hypot(position.x - tp[0], position.y - tp[1], position.z - tp[2]) - this.targetSurfaceRadius(target));
     }
+    launchRailObstacles() {
+        this.ensureObstacleGrid();
+        return this.gridObstacleList;
+    }
     ensureObstacleGrid() {
         const now = this.save.world.time;
         const revision = this.renderer?.staticObstacleRevision ?? 0;
@@ -13517,6 +13622,7 @@ export class GameSession {
             if (movingNode)
                 this.fieldGridDrift.entries.push({ node: movingNode, obstacle, centerKey, keys, largeIndex });
         }
+        this.gridObstacleList = obstacles;
         this.obstacleGrid = grid;
         this.obstacleBoxIndex = indexObstacleCells(grid, size);
         this.obstacleSegmentGrid = segmentGrid;
@@ -13530,6 +13636,7 @@ export class GameSession {
             const before = entry.obstacle;
             const after = drift.makeObstacle.call(this, entry.node);
             after._gridOrder = before._gridOrder;
+            this.gridObstacleList[after._gridOrder] = after;
             // Keep previously returned snapshots valid for pilots that hold
             // their local obstacle list until their next planning tick.
             const key = this.cellKey(Math.floor(after.x / size), Math.floor(after.y / size), Math.floor(after.z / size));
@@ -14811,7 +14918,7 @@ export class GameSession {
         }
         if(action==='recover-drone'){
             const unit=this.npcDroneUnits?.[args.id],player=this.save.player;
-            if(!unit?.orphaned||unit.hull<=0||this.save.world.orphanDrones?.[unit.id]?.systemId!==player.systemId||Math.hypot(...unit.position.map((v,i)=>v-player.position[i]))>this.playerStats().salvageRange)return {ok:false,code:'Drone is outside salvage range.'};
+            if(!unit?.orphaned||unit.expiresAt!==undefined||unit.hull<=0||this.save.world.orphanDrones?.[unit.id]?.systemId!==player.systemId||Math.hypot(...unit.position.map((v,i)=>v-player.position[i]))>this.playerStats().salvageRange)return {ok:false,code:'Drone is outside salvage range.'};
             if(cargoFree(player)<1)return {ok:false,code:'Cargo hold is full.'};
             const record=createDroneUnit(unit.id,unit.type);record.hull=unit.hull;record.ammo=unit.ammo;player.droneFleet.unitsById[record.id]=record;player.droneFleet.lockerIds.push(record.id);
             for(const actor of this.ships)if(actor.droneFleet?.unitsById[unit.id])delete actor.droneFleet.unitsById[unit.id];delete this.npcDroneUnits[unit.id];delete this.save.world.orphanDrones[unit.id];refreshInventoryProjection(player);this.persistSave();return {ok:true,code:'Drone recovered into cargo.'};
@@ -15428,7 +15535,7 @@ export class GameSession {
         const target = this.getTargetRef();
         const launcherMagazines = launcherMagazineEntries(this.save.player);
         const selectedLauncher = launcherMagazines.find((entry) => entry.selected);
-        const tooFast=target?.kind==='ship'&&this.rackMotionBlocksLaunch(launcherMagazines,target.id);
+        const tooFast=(target?.kind==='ship'||target?.kind==='drone')&&this.rackMotionBlocksLaunch(launcherMagazines,target.id);
         const drones = this.miningDroneHud();
         let hudTarget;
         if (target) {
@@ -15491,6 +15598,7 @@ export class GameSession {
                     // skill tier, prefixed with the recognition marker when the
                     // pilot remembers the player (spared or escaped). Temperament
                     // stays off the HUD: it reads through behavior and comms.
+                    trafficCapital: Boolean(TRAFFIC_HULLS[ship.variant]),
                     readout: ship.captured || ship.surrendered ? surrenderReadout
                         : ship.capitalMountHull && identified ? capitalReadout(ship)
                         : ship.crippled ? t('DRIVE DAMAGED') : !identified
@@ -15514,6 +15622,12 @@ export class GameSession {
                     maxHull: ship.maxHull,
                     ...screen,
                 };
+            }
+            else if (target.kind === 'drone') {
+                const unit = this.npcDroneUnits[target.id], owner = this.ships.find(ship => ship.id === unit.ownerId);
+                hudTarget = {kind:'drone', name:target.name, subtitle:owner?.name, hostile:owner?.hostile,
+                    relation:owner && this.shipRelation(owner), hull:unit.hull, maxHull:DRONE_TYPES.repair.maxHull,
+                    readout:owner?.name, distance, ...screen};
             }
             else if (target.kind === 'asteroid') {
                 const node = this.asteroids.find((entry) => entry.id === target.id);

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { FRIGATE_MOUNTS } from './frigateMounts.js';
 import { CRUISER_MOUNTS } from './cruiserModelData.js';
-import { CORVETTES } from './corvetteMounts.js';
+import { TRAFFIC_HULLS } from './corvetteMounts.js';
 import { t } from './i18n.js';
 
 export const FRIGATE_EXTENTS = [37.46, 44.92, 112.9];
@@ -45,8 +45,7 @@ function define(sockets, readout, extents) {
 export const CAPITAL_HULLS = {
     'concord-frigate': define(FRIGATE_MOUNTS, 'BATTERIES {guns}/4 · PDC {pdc}/4', FRIGATE_EXTENTS),
     'concord-cruiser': define(CRUISER_MOUNTS, 'BATTERIES {guns}/4 · PDC {pdc}/6'),
-    drover: define(CORVETTES.drover.mounts, CORVETTES.drover.readout),
-    ironjaw: define(CORVETTES.ironjaw.mounts, CORVETTES.ironjaw.readout),
+    ...Object.fromEntries(Object.entries(TRAFFIC_HULLS).map(([id,spec])=>[id,define(spec.mounts,spec.readout)])),
 };
 
 const classDefaults = { frigate: CAPITAL_HULLS['concord-frigate'], cruiser: CAPITAL_HULLS['concord-cruiser'] };
@@ -62,12 +61,14 @@ export function capitalMountPosition(ship, index, out) {
 }
 
 export function capitalReadout(ship) {
-    const hull = capitalHull(ship), counts = { guns: 0, pdc: 0, turrets: 0, pods: 0 };
+    const hull = capitalHull(ship), counts = { guns: 0, pdc: 0, turrets: 0, pods: 0, stacks: 0, bays: 0 };
     for (const m of hull.mounts) {
         if (ship.capitalMountHull[m.index] <= 0) continue;
         if (m.kind === 'battery' || m.kind === 'broadside') counts.guns++;
         if (m.kind === 'pdc') counts.pdc++;
         if (m.kind === 'pdc' || m.kind === 'laser') counts.turrets++;
+        if (m.kind === 'stack') counts.stacks++;
+        if (m.kind === 'bay') counts.bays++;
         if (m.kind === 'pod') counts.pods++;
     }
     return t(hull.readout, counts);

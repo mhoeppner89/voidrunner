@@ -1,3 +1,9 @@
+## 0.8.2pt — Caravan and Rookery frigates
+
+- New frigate pair. The **Caravan** is a Free Merchants convoy tender: two repair drones keep its escorts alive until you destroy its drone hangar or shoot the drones, its four container stacks break off and spill cargo, and with all three engines gone the crew surrenders and can be boarded. The **Rookery** is a stolen Caravan turned Red Talon carrier: each launch bay sends out a pair of Balors every 25 seconds until you destroy it, and destroying the flight-control mast halves the launch rate. Both have broad shields that torpedoes punch through, and only their shield generators and engines can be selected as subtargets.
+- In career, about one in twenty merchant spawns in tier-2+ independent space is a Caravan convoy, and about one in twenty raids in the most dangerous pirate space is led by a Rookery. Saving mid-fight keeps the encounter as it was, including damage, launched fighters and drones.
+- Arena levels 9 and 10 now feature the real Caravan and Rookery.
+
 ## 0.8.2ps — Longer Arena fights in waves, objective levels
 
 - Arena levels now come in groups: a new group arrives when only one enemy is left or after a set time, announced by range control and a marker at its entry point. Fights last about two to four times as long as before, but never with more than three enemy fighters at once (four, with at most two aces, in the last act).

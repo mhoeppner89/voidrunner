@@ -28,7 +28,8 @@ for(const [variant,config] of Object.entries(GLB_SHIP_CONFIG))test(`${variant}: 
  const vertices=[],indices=[],point=new T.Vector3();
  if(config.collisionSource){
   const {groups}=JSON.parse(await readFile(config.collisionSource,'utf8'));
-  for(const group of Object.values(groups)){
+  for(const [name,group] of Object.entries(groups)){
+   if(name.endsWith('_damaged'))continue;
    const offset=vertices.length/3;
    for(const point of group.vertices)vertices.push(...point.map(n=>n/2));
    for(const face of group.triangles)indices.push(...face.map(i=>i+offset));

@@ -187,7 +187,7 @@ export const DistressMethods = {
     // Is there room for a new call right now? Autopilot is deliberately absent:
     // calls are picked up mid-hyperdrive, so the drive must not disqualify them.
     distressSectorBusy() {
-        if (!this.distressEligible()) return true;
+        if (!this.distressEligible() || this.activeFrigateEncounterNearby?.()) return true;
         if (this.ui?.adventure || this.ui?.isModalOpen) return true;
         if (this.activeMug?.()) return true;
         if (this.save.world.exploration?.finale === 'fighting' && this.ships.some(ship => ship.explorationGroup === 'salvagers' && ship.hull > 0)) return true;

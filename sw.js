@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v700-arena-groups';
+const CACHE = 'voidrunner-v702-frigate-encounters';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -199,6 +199,7 @@ const CORE_ASSETS = [
   './src/game/itemSprites.js',
   './src/game/equipmentStatPresentation.js',
   './src/game/careerLoot.js',
+  './src/game/frigateEncounters.js',
   './src/game/explorationData.js',
   './src/game/exploration.js',
   './src/game/distressData.js',

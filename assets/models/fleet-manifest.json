@@ -244,6 +244,26 @@
       "factions": [
         "pirates"
       ]
+    },
+    {
+      "id": "caravan",
+      "variant": "caravan",
+      "path": "assets/models/capital/caravan.glb",
+      "sha256": "bae028bafddc93b0f3814d42edbb6d5f561a0cce465a0d1563b2582e89aa3fd4",
+      "category": "capital",
+      "factions": [
+        "independents"
+      ]
+    },
+    {
+      "id": "rookery",
+      "variant": "rookery",
+      "path": "assets/models/capital/rookery.glb",
+      "sha256": "66f61a2b45f8c929fc405a4bb65820a5b28034d6fc1be1bd33d361dabfc99998",
+      "category": "capital",
+      "factions": [
+        "pirates"
+      ]
     }
   ]
 }

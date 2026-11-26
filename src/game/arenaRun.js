@@ -1,3 +1,4 @@
+import {ROOKERY_LAUNCH} from './corvetteMounts.js';
 import {arenaSite} from './arenaSites.js';
 import {equipmentBaseId,equipmentRating,RARITY_ORDER,NAMED_EQUIPMENT} from './equipmentCatalog.js';
 import {DRONE_TYPES,createDroneUnit} from './droneData.js';
@@ -76,17 +77,15 @@ export const RUN_ACTS=[
     group(veteran('mule'),veteran('wayfarer')),
     group(capital('drover','novice'),veteran('wayfarer'),veteran('speedster')),
     {...group(veteran('torsas'),novice('wayfarer')),at:40}],{objective:{kind:'stop',label:'Stop the Drover',seconds:150}}),
-  level("Caravan","mourning-center","An Atlas and an Argo cross the wrecks. Intercept the convoy and its escorts.",[
-    group(veteran('atlas'),veteran('mule')),
+  level("Caravan","mourning-center","Intercept the Caravan and its escorts. Its drone hangar supplies repairs.",[
+    group(capital('caravan','veteran')),
+    group(veteran('torsas'),veteran('mule',1)),
     group(veteran('wayfarer'),veteran('wayfarer')),
-    group(veteran('atlas'),veteran('mule'),veteran('wayfarer')),
-    group(veteran('torsas'),veteran('wayfarer'))],{placeholderFor:'caravan'}),
-  level("Rookery","verge-lanes","Fight through the Red Talons. Destroy the Ironjaw and every Balor it calls in.",[
-    group(ace('demon',3),veteran('scrapper',2)),
-    group(veteran('scrapper'),veteran('speedster')),
-    group(veteran('demon',2),veteran('speedster',1)),
-    group(veteran('demon'),veteran('speedster')),
-    group(ironjaw(),veteran('scrapper'),veteran('scrapper'))],{placeholderFor:'rookery',faction:'pirates',objective:{kind:'destroy',label:'Destroy carrier',clearLaunches:true},launch:{every:30,cap:4,fighter:balor()}}),
+    group(veteran('atlas'),veteran('wayfarer',1))]),
+  level("Rookery","verge-lanes","Destroy the Rookery and its launched Balors. Each intact bay launches fighters.",[
+    group(veteran('demon')),
+    group(novice('speedster'),novice('speedster')),
+    group(capital('rookery','veteran'),veteran('scrapper'),novice('scrapper'))],{faction:'pirates',objective:{kind:'destroy',label:'Destroy carrier',clearLaunches:true},launch:{...ROOKERY_LAUNCH,fighter:veteran(ROOKERY_LAUNCH.fighter)}}),
  ]},
  {id:'league',name:'Frontier League',faction:'alliance',waves:[
   level("Patrol shift","acheron-horizon","Intercept the League patrols above Acheron.",[

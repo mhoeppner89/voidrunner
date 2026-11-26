@@ -25,8 +25,8 @@ function hit(s,ship,m,amount=m.hull){
     s.damageShip(ship,amount,'environment',p.toArray());
 }
 
-test('all four capital hulls declare their health, labels, sockets, hit areas and selectable systems',()=>{
-    const counts={'concord-frigate':14,'concord-cruiser':14,drover:12,ironjaw:8};
+test('all capital hulls declare their health, labels, sockets, hit areas and selectable systems',()=>{
+    const counts={'concord-frigate':14,'concord-cruiser':14,drover:12,ironjaw:8,caravan:14,rookery:13};
     for(const [id,count] of Object.entries(counts)){
         const {mounts}=CAPITAL_HULLS[id];assert.equal(mounts.length,count);assert.ok(mounts.length<=CAPITAL_MARKER_COUNT);
         for(const m of mounts){
@@ -125,13 +125,90 @@ test('capital markers cull facing and hull occlusion separately, fade, and hide 
 });
 test('career rolls gate corvettes by lane and raid danger, and an active encounter suppresses a new raid',()=>{
     const rng=seededRandom('corvette rates');let convoys=0,raids=0;
-    for(let i=0;i<5000;i++){convoys+=Number(convoyTraffic('independents',rng));raids+=Number(raidCorvette({danger:.8},rng));}
+    for(let i=0;i<5000;i++){convoys+=Number(convoyTraffic('independents',rng));raids+=Number(raidCorvette({danger:.8,piratePressure:1},rng));}
     for(const count of [convoys,raids])assert.ok(count>650&&count<850);
-    assert.equal(convoyTraffic('concord',()=>0),false);assert.equal(raidCorvette({danger:.29},()=>0),false);assert.equal(raidCorvette({danger:.3},()=>0),true);
+    assert.equal(convoyTraffic('concord',()=>0),false);assert.equal(raidCorvette({danger:.29},()=>0),false);assert.equal(raidCorvette({danger:.3,piratePressure:1},()=>0),true);
     const {s,ship}=stage('drover');s.save.player.position=[100,0,0];ship.hostile=true;s.nextEncounterAt=0;
     s.updateStationTraffic=s.updateCapitalTraffic=()=>{};s.updateDynamicEncounters();assert.equal(s.ships.length,1);
     const trader=s.spawnShip('trader',[700,0,0],undefined,undefined,undefined,{convoy:true});
     const escorts=s.ships.filter(s=>s.convoyLeader===trader);assert.ok(escorts.length>=1&&escorts.length<=2);assert.ok(escorts.every(s=>s.faction==='independents'));
     s.damageShip(trader,10,'player',[700,0,0]);assert.ok(trader.convoyEscape);assert.ok(escorts.every(s=>s.targetId==='player'));
-    const group=[];s.addRaidCorvette(ship,group,{danger:.7},()=>0);assert.equal(group[0].variant,'ironjaw');assert.equal(group[0].convoyLeader,ship);
+    const group=[];s.addRaidCorvette(ship,group,{danger:.7,piratePressure:1},()=>0);assert.equal(group[0].variant,'ironjaw');assert.equal(group[0].convoyLeader,ship);
+});
+
+test('traffic frigates retain their own hull stats and lose a third of thrust per engine',()=>{
+    for(const variant of ['caravan','rookery'])for(const arena of [false,true]){
+        const {s,ship,mounts}=stage(variant,arena);
+        assert.equal(ship.capitalClass,'frigate');
+        assert.deepEqual([ship.maxShield,ship.maxHull,ship.speed,ship.turnRate],[500,variant==='caravan'?2000:2400,20,.15]);
+        const cycle=mounts.filter(m=>m.targetable);
+        assert.deepEqual(cycle.map(m=>m.kind).sort(),['engine','engine','engine','generator','generator']);
+        ship.shield=0;
+        const regen=ship.shieldRegen;
+        for(const [i,m] of mounts.filter(m=>m.kind==='generator').entries()){
+            assert.equal(m.hull,95);hit(s,ship,m);assert.equal(ship.shieldRegen,regen*(1-i)/2);
+        }
+        for(const [i,m] of mounts.filter(m=>m.kind==='engine').entries()){
+            assert.equal(m.hull,150);hit(s,ship,m);assert.equal(ship.engineThrust,(2-i)/3);
+            assert.ok(Math.abs(ship.speed-20*(2-i)/3)<1e-8);
+        }
+        assert.equal(Boolean(s.boardable(ship)),variant==='caravan'&&!arena);
+        assert.equal(Boolean(ship.surrendered),variant==='caravan'&&!arena);
+        ship.velocity=[2,0,0];s.updateTravelAI(ship,.5);assert.equal(ship.position[0],1);
+    }
+});
+
+test('Caravan stacks release once and the collision gap and reduced hold survive a career reload',()=>{
+    const {s}=stage('caravan',false),origin=[2000,0,0];
+    const ship=s.spawnCorvette('caravan',origin,true),m=CAPITAL_HULLS.caravan.mounts.find(m=>m.node==='stack_0');
+    ship.shield=0;ship.cargo={ore:19};hit(s,ship,m);
+    assert.equal(ship.missingPods,1);assert.equal(ship.cargo.ore,14);assert.equal(s.pickups.length,1);
+    const saved=JSON.parse(JSON.stringify(s.save)),resumed=stage('caravan',false).s;
+    resumed.save=saved;const next=resumed.spawnCorvette('caravan',origin,true);
+    assert.equal(next.collisionVariant,ship.collisionVariant);assert.equal(next.capitalMountHull[m.index],0);
+    resumed.corvetteSubsystemDestroyed(next,m.index);
+    assert.equal(next.cargo.ore,14);assert.equal(resumed.pickups.length,0);
+});
+
+test('frigate traffic rolls only on qualifying routes and suppresses a new carrier during a fight',async()=>{
+    const {convoyVariant,raidCarrier}=await import('../../src/game/corvetteMounts.js');
+    const mid={danger:.4,piratePressure:1},high={danger:.9,piratePressure:1};
+    const rolls=Array.from({length:100},(_,i)=>(i+.5)/100);
+    assert.equal(rolls.filter(r=>convoyVariant('independents',mid,()=>r)==='caravan').length,5);
+    assert.equal(rolls.filter(r=>raidCarrier('redwake',high,()=>r)).length,5);
+    for(const [f,r,allow] of [['pirates',mid,true],['independents',{danger:.2},true],['independents',mid,false]])
+        assert.notEqual(convoyVariant(f,r,()=>.17,allow),'caravan');
+    assert.equal(raidCarrier('redwake',{...high,piratePressure:0},()=>0),false);assert.equal(raidCarrier('redwake',mid,()=>0),false);
+    const {s}=stage('caravan',false);s.save.player.systemId='redwake';
+    const convoy=s.spawnShip('trader',[0,0,800],undefined,undefined,undefined,{convoy:'caravan'});
+    assert.equal(convoy.variant,'caravan');
+    const escorts=s.ships.filter(x=>x.convoyLeader===convoy&&x.variant!=='drover');
+    assert.ok(escorts.length>=2&&escorts.length<=3);assert.ok(escorts.every(x=>x.faction==='independents'));
+    s.visibleSpawnPosition=p=>p;
+    assert.equal(s.careerFrigateEncounterOpen(),false,'a local convoy counts as an active encounter');
+    assert.notEqual(s.spawnCareerRaider('pirate',[0,0,900],high,()=>0,true).variant,'rookery');
+    s.ships.length=0;
+    s.save.world.distress={active:{id:'test-distress'}};
+    assert.equal(s.careerFrigateEncounterOpen(),false);
+    s.save.world.distress.active=null;
+    const carrier=s.spawnCareerRaider('pirate',[0,0,900],high,()=>0,true);
+    assert.equal(carrier.variant,'rookery');
+    const balor=s.spawnCareerRaider('escort',[80,0,900],high,()=>0,true,carrier);
+    assert.equal(balor.hullId,'scrapper');
+    assert.notEqual(s.spawnCareerRaider('pirate',[0,0,600],high,()=>0,true).variant,'rookery');
+});
+
+test('career Rookery launches regional Balor pairs up to eight survivors and leaves them fighting',async()=>{
+    const {updateTrafficLaunches}=await import('../../src/game/arenaBattle.js');
+    const {ROOKERY_LAUNCH}=await import('../../src/game/corvetteMounts.js');
+    const {s,ship}=stage('rookery',false);
+    s.siteSpotClear=()=>true;s.careerRegionAt=()=>({danger:.9});ship.targetId='player';
+    const tick=dt=>updateTrafficLaunches(s,ship,ROOKERY_LAUNCH,dt);
+    const fighters=()=>s.ships.filter(s=>s.hull>0&&s.launchOwner===ship.id);
+    tick(24);assert.equal(fighters().length,0);
+    tick(1);assert.equal(fighters().length,4);
+    assert.ok(fighters().every(f=>f.hullId==='scrapper'&&f.pilot.tier==='ace'&&f.targetId==='player'));
+    for(const fighter of fighters())fighter.position[1]+=500; // Fly the first pair clear of each rail.
+    tick(25);tick(25);assert.equal(fighters().length,8);
+    ship.hull=0;tick(50);assert.equal(fighters().length,8);
 });

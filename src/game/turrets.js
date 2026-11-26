@@ -29,7 +29,7 @@ const rangeEpsilon=0.0001;
 // The forward sector crosses the mounting plane, but never the owner's hull.
 export function clearTurretArc(actor,mount,extents,point,state) {
     const local=state.local.copy(point).sub(state.scratch.fromArray(actor.position)).applyQuaternion(state.inverse);
-    if(actor.capitalClass==='corvette'){
+    if(mount.visualScale && actor.capitalClass){
         const surface=state.scratch.copy(state.position).addScaledVector(state.normal,mount.visualScale*.6);
         if(state.local.copy(point).sub(surface).dot(state.normal)<0)return false;
         return segmentShipColliderHit(surface,point,actor.position,actor.rotation,actor.collisionVariant??actor.variant,2)===undefined;
@@ -72,12 +72,12 @@ export function shipBlocksRay(session,actor,ownerId,target,point,state) {
     return session.ships.some(other=>other!==actor && other.id!==ownerId && other!==target && other.hull>0 && blocks(other.position,Math.max(...session.npcHullExtents(other))));
 }
 function selectedHostile(session,actor,ownerId,player) {
-    if(actor.fieldTactic?.kind==='ambush' || actor.patrolMemoryActive || actor.recoveryTargetHidden || actor.terrainManeuver?.active&&actor.terrainManeuver.targetHidden || (actor.fleeing&&actor.variant!=='drover') || actor.holdFire || actor.pursuitHoldFire || actor.combatPlan?.recovery?.active || (player && actor.mode!=='combat'))return;
+    if(actor.fieldTactic?.kind==='ambush' || actor.patrolMemoryActive || actor.recoveryTargetHidden || actor.terrainManeuver?.active&&actor.terrainManeuver.targetHidden || (actor.fleeing&&!actor.cargoHolds) || actor.holdFire || actor.pursuitHoldFire || actor.combatPlan?.recovery?.active || (player && actor.mode!=='combat'))return;
     const selected=player ? session.getTargetRef() : undefined;
     const targetId=player ? (selected?.kind==='ship' ? selected.id : undefined) : actor.targetId;
     if(!targetId)return;
     if (!player && targetId === 'player') {
-        if (actor.capitalClass === 'corvette' && !tracksActivePlayer(session, actor)) return;
+        if (actor.capitalShieldCapacity && !tracksActivePlayer(session, actor)) return;
         return actor.hostile && session.save.player.hull > 0 ? session.save.player : undefined;
     }
     for(const ship of session.ships){
@@ -93,7 +93,7 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
     const hullId=player?actor.shipId:fit?.hullId,layouts=TURRET_LAYOUTS[hullId]??[],items=fit?.turrets??[];
     if(!items.some(Boolean))return;
     const stats=player?session.playerStats():fit.stats;
-    const frigate=actor.capitalClass==='frigate';
+    const frigate=hullId==='concord-frigate';
     const extents=session.turretHullExtents(actor,ownerId),now=session.save.world.time;
     const assignments=session.pdcAssignments,defense=getPdcDefenseChannel(session,ownerId);
     if(actor.turretRuntime?.[0] && !(actor.turretRuntime[0].position instanceof THREE.Vector3))actor.turretRuntime=[];
@@ -112,10 +112,10 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
         state.q.fromArray(actor.rotation);state.inverse.copy(state.q).invert();
         const modelScale=mount.visualScale??extents[2]/mount.hullHalfLength;
         state.position.fromArray(mount.position);
-        if(actor.capitalClass!=='corvette')state.position.multiply(state.scratch.fromArray(extents));
+        if(!(actor.capitalClass && mount.visualScale))state.position.multiply(state.scratch.fromArray(extents));
         state.position.applyQuaternion(state.q).add(state.scratch.fromArray(actor.position));
         if(mount.normal)state.normal.fromArray(mount.normal).applyQuaternion(state.q);else state.normal.set(0,0,0).setComponent(mount.axis??1,mount.side).applyQuaternion(state.q);
-        if(actor.capitalClass==='corvette')state.position.addScaledVector(state.normal,.59*modelScale-.045);
+        if(mount.visualScale && actor.capitalClass)state.position.addScaledVector(state.normal,.59*modelScale-.045);
         if(state.direction.lengthSq()<0.1) {
             if(mount.restDirection)state.direction.fromArray(mount.restDirection).applyQuaternion(state.q);
             else state.direction.copy(state.normal);

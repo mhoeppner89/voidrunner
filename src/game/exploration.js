@@ -9,7 +9,7 @@ const near=(a,b,r)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2])<r;
 const offset=(p,x,y,z)=>[p[0]+x,p[1]+y,p[2]+z];
 const state=s=>s.save.world.exploration??normalizeExploration(s.save.world);
 const cargo=(id,commodity,quantity)=>({id:'exploration-cargo-'+id,kind:'cargo',commodity,quantity});
-const clearBattle=s=>!s.ships.some(a=>a.hull>0&&a.hostile&&near(a.position,s.save.player.position,7000)&&!a.explorationActor);
+const clearBattle=s=>!s.activeFrigateEncounterNearby?.()&&!s.ships.some(a=>a.hull>0&&a.hostile&&near(a.position,s.save.player.position,7000)&&!a.explorationActor);
 const eligible=s=>!s.arena&&!s.activeRace&&!s.save.player.raceReturn&&!isTutorialGuided(s.save);
 const serialise=ship=>({key:ship.explorationActor,hull:ship.hull,shield:ship.shield,driveWear:ship.driveWear,crippled:ship.crippled,position:[...ship.position],rotation:[...ship.rotation],velocity:[...ship.velocity],surrendered:Boolean(ship.surrendered)});
 // The recurring Lantern convoy now lives in distressEvents.js. Only the

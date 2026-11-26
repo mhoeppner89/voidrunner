@@ -121,10 +121,10 @@ test('an early survivor gate advances timed bombers with at least 15 seconds bet
 for(const level of [5,10])test('Hard promotes auxiliary fighters on level '+level,()=>{
  const s=stage(level,true),d=reach(s);opp(s).filter(x=>x!==d).forEach(x=>x.hull=0);
  until(s,()=>level===5?s.runBattle.supportCount>0:opp(s).some(x=>x.arenaLaunched));
- assert.ok(opp(s).filter(x=>x!==d).every(x=>x.pilot.tier==='veteran'));
+ assert.ok(opp(s).filter(x=>x!==d).every(x=>x.pilot.tier===(level===5?'veteran':'ace')));
 });
 test('moving socket warning reuses its pose and its Three.js scratch objects',()=>{
- const s=stage(10),d=reach(s),b=s.runBattle,wave={...RUN_WAVES[9],launch:{...RUN_WAVES[9].launch,every:25,sockets:{port:{game_position:[-10,0,-12],direction_game:[-1,0,0]}},bays:[{subsystem:'mount_heavy_port',socket:'port'}]}};
+ const s=stage(10),d=reach(s),b=s.runBattle,wave={...RUN_WAVES[9],launch:{...RUN_WAVES[9].launch,every:25,sockets:{port:{game_position:[-10,0,-12],direction_game:[-1,0,0]}},bays:[{subsystem:'bay_port',socket:'port'}]}};
  s.renderer.camera=new T.PerspectiveCamera();s.renderer.viewportWidth=1440;s.renderer.viewportHeight=900;
  const markers=new Set();s.ui.setRunInbound=point=>{if(point)markers.add(point);};
  let elapsed=s.save.world.time-s.save.arenaRun.startedAt;

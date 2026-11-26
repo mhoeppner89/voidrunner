@@ -25,12 +25,49 @@ const broadsides=[-1,1].map(side=>({...seat(side<0?'mount_heavy_port':'mount_hea
 const booster={node:'booster_port',kind:'booster',label:'PORT BOOSTER',hull:120,normal:aft,
     position:[-10.1,-.62,28.88772],hitCenterOffset:[.42,-.31,-7.63],hitHalfExtents:[2.35,2.15,7.64],hitShape:'box',exhaustRadius:1.3};
 export const CORVETTES={
-    drover:{shield:300,hull:900,speed:25,role:'trader',faction:'independents',mounts:[bridge,dorsal,seat('mount_laser_ventral','laser','VENTRAL LASER',[0,-3.36,-2.45614],down),generator,...engines,...pods],
+    drover:{name:'MV Drover',cargoHolds:6,shield:300,hull:900,speed:25,role:'trader',faction:'independents',mounts:[bridge,dorsal,seat('mount_laser_ventral','laser','VENTRAL LASER',[0,-3.36,-2.45614],down),generator,...engines,...pods],
         readout:'TURRETS {turrets}/3 · PODS {pods}/6'},
-    ironjaw:{shield:200,hull:1200,speed:30,role:'escort',faction:'pirates',mounts:[bridge,dorsal,...broadsides,generator,...engines,booster],
+    ironjaw:{name:'Ironjaw',shield:200,hull:1200,speed:30,role:'escort',faction:'pirates',mounts:[bridge,dorsal,...broadsides,generator,...engines,booster],
         readout:'GUNS {guns}/2 · TURRETS {turrets}/2'}
 };
 
+// Collision envelopes and exterior marker positions come from the flight-frame exports.
+const frigateSystems=[
+    ...[-1,1].map(side=>seat('mount_pdc_'+(side<0?'port':'starboard'),'pdc',side<0?'PORT PDC':'STARBOARD PDC',[side*7.65,6.55,-42])),
+    seat('mount_laser_dorsal','laser','DORSAL LASER',[0,8.42,38]),
+    ...[-1,1].map(side=>({node:'generator_'+(side<0?'port':'starboard'),kind:'generator',label:side<0?'PORT GENERATOR':'STARBOARD GENERATOR',
+        position:[side*17.05,.25,32],normal:[side,0,0],hull:95,hitShape:'box',hitHalfExtents:[1.5,3,3],hitCenterOffset:[-side*1.5,0,0]})),
+    ...['port','centre','starboard'].map((name,i)=>({node:'engine_'+name,kind:'engine',label:name.toUpperCase()+' ENGINE',position:[(i-1)*8,-.94,52],
+        normal:aft,hull:150,hitShape:'cylinder',hitRadius:3.8,hitHalfLength:3.6,hitCenterOffset:[0,0,-3.6],exhaustRadius:3})),
+];
+export const ROOKERY_LAUNCH={
+    every:25,cap:8,mast:'mast',fighter:'scrapper',
+    bays:[{subsystem:'bay_port',socket:'launch_port'},{subsystem:'bay_starboard',socket:'launch_starboard'}],
+    sockets:Object.fromEntries([-1,1].map(side=>['launch_'+(side<0?'port':'starboard'),{
+        game_position:[side*11.6578,-.07,-27.14],direction_game:[side*.26066583,0,-.96542901]}])),
+};
+export const TRAFFIC_HULLS={...CORVETTES,
+    caravan:{name:'Caravan',capitalClass:'frigate',shield:500,hull:2000,speed:20,turn:.15,regen:10,cargoHolds:4,
+        role:'trader',faction:'independents',dronePort:[0,7.81,-3.9],readout:'TURRETS {turrets}/4 · STACKS {stacks}/4',
+        mounts:[...frigateSystems,seat('mount_laser_ventral','laser','VENTRAL LASER',[0,-5.85,-22],down),
+            {node:'drone_hangar',kind:'hangar',label:'DRONE HANGAR',hull:160,normal:up,position:[0,7.81,-3.9],hitShape:'box',hitHalfExtents:[4.6,2.2,6.1],hitCenterOffset:[0,-2.7,1.9]},
+            ...Array.from({length:4},(_,i)=>{const side=i%2?1:-1;return {node:'stack_'+i,kind:'stack',label:'CARGO STACK '+(i+1),hull:150,normal:[side,0,0],
+                position:[side*15.85,0,i<2?-16:12],hitShape:'box',hitHalfExtents:[5.35,5.1,10.92],hitCenterOffset:[-side*5.35,-.18,0],partBit:1<<i};})]},
+    rookery:{name:'Rookery',capitalClass:'frigate',shield:500,hull:2400,speed:20,turn:.15,regen:10,preferredRange:1200,launch:ROOKERY_LAUNCH,
+        role:'escort',faction:'pirates',readout:'GUNS {guns}/2 · BAYS {bays}/2',mounts:[...frigateSystems,
+            ...[-1,1].map((side,i)=>({...broadsides[i],node:'mount_broadside_'+(side<0?'port':'starboard'),position:[side*17.88,4.03,-2]})),
+            {node:'mast',kind:'mast',label:'FLIGHT CONTROL',hull:120,normal:up,position:[0,13.36,-2],hitShape:'box',hitHalfExtents:[4.4,5.2,5.9],hitCenterOffset:[0,-5.2,0]},
+            ...[-1,1].map((side,i)=>({node:'bay_'+(side<0?'port':'starboard'),kind:'bay',label:side<0?'PORT BAY':'STARBOARD BAY',hull:300,normal:[side,0,0],
+                position:[side*19.95,0,-2],hitShape:'box',hitHalfExtents:[8,5.75,28.3],hitCenterOffset:[-side*8,.45,-3.15],partBit:1<<i,bearing:side}))]},
+};
 export const CORVETTE_TRAFFIC={convoyChance:.15,raidChance:.15,minRaidTier:2};
+export const FRIGATE_TRAFFIC={convoyChance:.05,minConvoyTier:2,towChance:.25,raidChance:.05,minRaidTier:3,raidEscorts:2};
+export function raidCarrier(_systemId,region,rng){return (region.piratePressure??1)>0&&careerRaidTier(region)>=FRIGATE_TRAFFIC.minRaidTier&&rng()<FRIGATE_TRAFFIC.raidChance;}
+export function convoyVariant(owner,region,rng,allowFrigate=true){
+    if(owner!=='independents')return false;
+    const roll=rng();
+    if(roll<CORVETTE_TRAFFIC.convoyChance)return 'drover';
+    return allowFrigate&&careerRaidTier(region)>=FRIGATE_TRAFFIC.minConvoyTier&&roll<CORVETTE_TRAFFIC.convoyChance+FRIGATE_TRAFFIC.convoyChance?'caravan':false;
+}
 export function convoyTraffic(owner,rng){return owner==='independents'&&rng()<CORVETTE_TRAFFIC.convoyChance;}
-export function raidCorvette(region,rng){return careerRaidTier(region)>=CORVETTE_TRAFFIC.minRaidTier&&rng()<CORVETTE_TRAFFIC.raidChance;}
+export function raidCorvette(region,rng){return (region.piratePressure??1)>0&&careerRaidTier(region)>=CORVETTE_TRAFFIC.minRaidTier&&rng()<CORVETTE_TRAFFIC.raidChance;}

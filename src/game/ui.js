@@ -479,7 +479,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2ps';
+const GAME_VERSION = '0.8.2pt';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -4814,7 +4814,7 @@ export class GameUI {
             line = target.readout;
         } else if (!line && capital) {
             line = target.capitalTorpedoWarning ? t('TORPEDO') : target.capitalDisarmed ? t('DISARMED')
-                : target.capitalAttack === 'CHARGING' ? t('CHARGING') : target.capitalAttack === 'SALVO' ? t('SALVO') : target.capitalClass==='corvette'?target.readout:'';
+                : target.capitalAttack === 'CHARGING' ? t('CHARGING') : target.capitalAttack === 'SALVO' ? t('SALVO') : target.trafficCapital?target.readout:'';
         } else if (!line) {
             line = target?.readout ?? '—';
             if (target?.kind === 'ship') line = line.replace(/\s*·\s*[\d.,]+\s*\/\s*[\d.,]+\s*km\s*$/i, '');
@@ -4825,7 +4825,7 @@ export class GameUI {
         subtarget?.classList.toggle('is-hidden',!target?.capitalSubtarget);
         this.targetLayout?.classList.toggle('has-capital-target',capital);
         this.targetScreen?.classList.toggle('has-capital-target',capital);
-        this.targetScreen?.classList.toggle('has-corvette-target',target?.capitalClass==='corvette');
+        this.targetScreen?.classList.toggle('has-corvette-target',Boolean(target?.trafficCapital));
         this.targetScreen?.classList.toggle('has-capital-controls',!!target?.capitalSubtarget);
         if(target?.capitalSubtarget){
             const mount=target.capitalMount;
@@ -4840,7 +4840,7 @@ export class GameUI {
             setHudAttribute(subtarget, 'aria-label', `${subtarget.title}: ${label}${selected?' '+health+'%':''}`);
         }
         const bracket = this.el('#target-bracket');
-        const progress=target?.kind==='ship'?(model?.rackProgress??0):0;
+        const progress=(target?.kind==='ship'||target?.kind==='drone')?(model?.rackProgress??0):0;
         // Missile lock, old-school: the bracket stays put in its own colour
         // while four chevrons slide in from each side and seat on the box.
         if(bracket){
@@ -4865,8 +4865,8 @@ export class GameUI {
             }
             return;
         }
-        const hostile = target.kind === 'ship' && target.hostile;
-        if(bracket){if(target.kind==='ship')bracket.style.setProperty('--target-relation-color',relationColor(target.relation));else bracket.style.removeProperty('--target-relation-color');}
+        const hostile = Boolean(target.hostile);
+        if(bracket){if(target.kind==='ship'||target.kind==='drone')bracket.style.setProperty('--target-relation-color',relationColor(target.relation));else bracket.style.removeProperty('--target-relation-color');}
         const surrendered = target.kind === 'ship' && target.surrendered;
         bracket?.classList.toggle('is-hostile', hostile);
         bracket?.classList.toggle('is-surrendered', surrendered && !hostile);
@@ -5070,7 +5070,7 @@ export class GameUI {
         const isShip = Boolean(target && target.kind === 'ship');
         // Ships show shield/hull bars; stations, planets, asteroids and wrecks
         // are invulnerable, so the target monitor shows only their outline.
-        this.targetLayout?.classList.toggle('no-bars', !isShip);
+        this.targetLayout?.classList.toggle('no-bars', !(isShip || target?.kind === 'drone'));
         if (!target) {
             setText('#screen-target-name', t('NO LOCK'));
             setHudTitle(this.el('#screen-target-name'), '');

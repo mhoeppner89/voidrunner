@@ -40,7 +40,7 @@ The lead designer wrote this; the user approved the direction: keep 25 levels, m
    - **Failing an objective does not end the run.** The level still counts as cleared, but its reward pick is skipped. Losing the pilot still ends the run, as today.
    - **Objective status on screen:** short lines in the existing ticker and comms log, never a floating card. They show at the start, at 60/30/10 s left where a timer applies, and with the result. The objective target can be selected as usual.
 5. **Big ships** use the corvette and frigate rules already in the game: subsystem damage, generator and engine subtargets, markers.
-   - Until the Caravan and Rookery are integrated, levels 9 and 10 use the placeholders below. Swap the real ships in when they land.
+   - Level 9 uses the Caravan tender and its two physical repair drones. Level 10 uses the Rookery carrier and its two independent launch rails. Both hulls have three engines and two shield generators.
 
 ## Pilot power through the run (for reading the table)
 
@@ -79,8 +79,8 @@ Notation:
 | 6 | Freight lane | foundry-lanes | Argo N (trader) + Hestia V (1) → Hestia N + Freya V. This is the breather. |
 | 7 | Claim jumpers | shardbelt-chimney | Gaia V + Hestia N → Gaia N + Freya V (1) → Hestia V |
 | 8 | **Convoy** (objective: stop the Drover) | pale-rings | Drover N running for its jump point (about 150 s away) + Hestia V + Loki V. After 40 s: Freya V + Hestia N. Success means the Drover is destroyed or both its engines are out before it jumps. |
-| 9 | **Caravan** (kill all) | mourning-center | Caravan + Freya V + Argo V (1) → Hestia V ×2. The Caravan's repair drones keep its escorts alive, so its drone hangar is the first target. *Placeholder until integrated: Atlas V + Argo V convoy, then Hestia V ×2.* |
-| 10 | **Rookery** (objective: destroy the carrier) | verge-lanes | Rookery + Balor V ×2. Each intact launch bay sends a pair of Balors every 25 s, at most 8 of its fighters alive. The level ends when the carrier and every fighter it launched are destroyed. Red Talons come for the merchant lanes, which closes the act. *Placeholder: Ironjaw V with a Balor N pair every 30 s while it lives, at most 4.* |
+| 9 | **Caravan** (kill all) | mourning-center | Caravan + Freya V + Argo V (1) → Hestia V ×2. The Caravan's repair drones keep its escorts alive, so its drone hangar is the first target. |
+| 10 | **Rookery** (objective: destroy the carrier) | verge-lanes | Rookery + Balor V ×2. Each intact launch bay sends a pair of Balors every 25 s, at most 8 of its fighters alive. The level ends when the carrier and every fighter it launched are destroyed. Red Talons come for the merchant lanes, which closes the act. |
 
 ### Act III — Frontier League
 
@@ -136,7 +136,7 @@ Tune group contents against these measurements. Check that pressure builds throu
 
 ## Measured roster changes
 
-The table lists all differences from the approved encounters above. N, V and A denote novice, veteran and ace. Parentheses give missile counts. The three Thor bombers carry three torpedoes each. Levels 9 and 10 keep their approved temporary hulls.
+The table lists all differences from the approved encounters above. N, V and A denote novice, veteran and ace. Parentheses give missile counts. The three Thor bombers carry three torpedoes each.
 
 | Level | Groups | Changes from the approved table |
 |---|---:|---|
@@ -148,8 +148,8 @@ The table lists all differences from the approved encounters above. N, V and A d
 | 6. Freight lane | 4 | G3 adds a group of Argo N + Hestia N · G4 adds a group of Hestia N |
 | 7. Claim jumpers | 4 | G4 adds a group of Gaia V + Hestia V |
 | 8. Convoy | 5 | G1 adds a group of Hestia V + Loki N · G2 adds a group of Gaia V + Freya V · G3 adds a group of Argo V + Hestia V |
-| 9. Caravan | 4 | G3 adds a group of Atlas Hauler V + Argo V + Hestia V · G4 adds a group of Freya V + Hestia V |
-| 10. Rookery | 5 | G1 adds a group of Morrigan A (3) + Balor V (2) · G2 adds a group of Balor V + Loki V · G3 adds a group of Morrigan V (2) + Loki V (1) · G4 adds a group of Morrigan V + Loki V |
+| 9. Caravan | 4 | The Caravan enters first. Freya V + Argo V (1) arrive next, followed by two Hestia V and a final Atlas V + Hestia V (1). |
+| 10. Rookery | 3 | A veteran Morrigan and a pair of novice Lokis arrive in successive groups. One veteran and one novice Balor escort the Rookery. Its bays launch veterans. |
 | 11. Patrol shift | 4 | G3 adds a group of Tyr V + Loki V · G4 adds a group of Tyr N + Loki N + Loki N |
 | 12. Courier run | 4 | G4 adds a group of Thor V + Tyr V + Loki V |
 | 13. Strike | 3 | G1 adds Loki V (1) · G3 adds Tyr V (1) |
@@ -165,3 +165,16 @@ The table lists all differences from the approved encounters above. N, V and A d
 | 23. Ace screen | 4 | G1 changes from Bellona A (2) + Victoria A (2) to Bellona A (2) + Victoria V (1) · G3 adds a group of Bellona V + Bellona V + Mercury V + Mercury N · G4 adds Victoria N |
 | 24. Elite guard | 4 | G2 adds Bellona N · G3 adds a group of Bellona N + Victoria V + Mercury V + Mercury N · G4 changes from Artemis A (2) + Victoria A (2) + Mercury V (1) to Artemis A (2) + Victoria V (2) + Mercury V (1) + Bellona V |
 | 25. The line | 3 | G1 adds Bellona V (2) + Victoria V (2) |
+
+## Frigate integration measurements
+
+Levels 9 and 10 were retested after the frigate fixes on seeds 175, 718 and 941. The other rows retain their original measurements. Values are medians, except peak hostiles and pilot losses. All duration medians meet their bands. Damage rises through level 10 in both panels and falls on level 11. The only ordinary-health loss in these 18 sorties was level 10, seed 941.
+
+| Level | Endurance seconds | Endurance damage | Peak hostiles | Ordinary seconds | Ordinary damage | Pilot losses / 3 |
+|---:|---:|---:|---:|---:|---:|---:|
+| 6 | 75.35 | 114.2 | 2 | 81.18 | 177.1 | 0 |
+| 7 | 95.75 | 146.8 | 3 | 95.75 | 186.1 | 0 |
+| 8 | 88.27 | 247.2 | 3 | 87.83 | 290.1 | 0 |
+| 9 | 85.72 | 259.3 | 3 | 89.85 | 390.7 | 0 |
+| 10 | 101.95 | 439.3 | 5 | 98.07 | 432.8 | 1 |
+| 11 | 87.60 | 168.8 | 3 | 92.17 | 188.4 | 0 |

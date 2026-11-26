@@ -1,4 +1,4 @@
-import {CORVETTES} from './corvetteMounts.js';
+import {TRAFFIC_HULLS} from './corvetteMounts.js';
 import {segmentShipColliderHit} from './shipCollision.js';
 import {t} from './i18n.js';
 import {friendlyFiringLaneBlocked} from './combatPlanning.js';
@@ -31,11 +31,12 @@ export function equipFrigate(ship,boss=false){
  {ship.maxShield=FRIGATE_SHIELD_CAPACITY;ship.shield=ship.maxShield;ship.maxHull=FRIGATE_HULL;ship.hull=ship.maxHull;ship.shieldRegen=FRIGATE_GENERATOR_REGEN*2;ship.turnRate=.12;ship.capitalBaseSpeed??=ship.speed;ship.speed=ship.capitalBaseSpeed;ship.capitalTorpedoes=LAUNCHERS.torpedo.capacity;}
 }
 export function equipCorvette(ship){
- const spec=CORVETTES[ship.variant],mounts=capitalHull(ship).mounts;
- ship.hullId=ship.variant;ship.capitalBaseSpeed=ship.speed=spec.speed;ship.afterburnSpeed=0;ship.turnRate=.25;ship.engineThrust=1;
- ship.shield=ship.maxShield=ship.capitalShieldCapacity=spec.shield;ship.hull=ship.maxHull=spec.hull;ship.shieldRegen=10;
+ const spec=TRAFFIC_HULLS[ship.variant],mounts=capitalHull(ship).mounts;
+ ship.hullId=ship.variant;ship.capitalBaseSpeed=ship.speed=spec.speed;ship.afterburnSpeed=0;ship.turnRate=spec.turn??.25;ship.engineThrust=1;
+ ship.shield=ship.maxShield=ship.capitalShieldCapacity=spec.shield;ship.hull=ship.maxHull=spec.hull;ship.shieldRegen=spec.regen??10;
  ship.capitalMountHull=mounts.map(m=>m.hull);ship.noSurrender=true;ship.mugCapable=false;
  ship.combatFit={hullId:ship.variant,fitId:ship.variant+'-standard',stats:{energyCapacity:200},turrets:mounts.map(m=>m.kind==='pdc'?'pdc':m.kind==='laser'?'tracking-turret':null),guns:[],weapons:[],attackOrder:[],fireAt:[],missiles:0};
+ if(spec.dronePort)Object.assign(ship.combatFit,{droneTypes:['repair','repair'],dronePort:spec.dronePort});
  ship.energy=200;
 }
 function stateFor(ship){
@@ -114,10 +115,11 @@ export function applyCapitalSubsystemEffects(ship){
   if(m.kind==='booster')booster=fraction>0;
  }
  thrust/=engineCount;
- if(ship.capitalClass==='corvette'){
+ const spec=TRAFFIC_HULLS[ship.variant];
+ if(spec){
   if(ship.arenaJumpPoint&&thrust>0)thrust=Math.max(.5,thrust);
   ship.engineThrust=thrust;ship.speed=(booster?ship.capitalBaseSpeed:25)*thrust;
-  ship.turnRate=.25*thrust;ship.maxShield=regen>0?ship.capitalShieldCapacity:0;ship.shieldRegen=10*regen;
+  ship.turnRate=(spec.turn??.25)*thrust;ship.maxShield=regen>0?ship.capitalShieldCapacity:0;ship.shieldRegen=spec.regen?spec.regen*regen/2:10*regen;
  }else{
   ship.speed=(ship.capitalBaseSpeed??18)*(.15+.85*thrust);ship.turnRate=.12*(.12+.88*thrust);
   ship.maxShield=regen>0?FRIGATE_SHIELD_CAPACITY:0;ship.shieldRegen=FRIGATE_GENERATOR_REGEN*regen;
@@ -322,6 +324,7 @@ export function updateCorvetteWeapons(session,ship,dt,targetPosition,targetVeloc
    continue;
   }
   if(m.kind!=='broadside')continue;
+  if(ship.variant==='rookery' && ((ship.missingPods??0) & (m.bearing<0?1:2)))continue;
   const gun=s.mounts[m.index],weapon=CORVETTE_BROADSIDE;
   capitalMountPosition(ship,m.index,s.position);
   s.normal.set(m.bearing,0,0).applyQuaternion(s.q);
@@ -333,7 +336,7 @@ export function updateCorvetteWeapons(session,ship,dt,targetPosition,targetVeloc
    aim=flight<=weapon.life&&s.direction.dot(s.normal)>.5;
    if(aim){
     s.lead.add(s.position);s.scratch.copy(s.position).addScaledVector(s.direction,2);s.scratch.addScaledVector(s.local.set(0,1,0).applyQuaternion(s.q),1.3);
-    aim=segmentShipColliderHit(s.scratch,s.lead,ship.position,ship.rotation,ship.variant,2)===undefined&&!session.lineBlocked(s.position,s.lead,ship.id)
+    aim=segmentShipColliderHit(s.scratch,s.lead,ship.position,ship.rotation,ship.collisionVariant??ship.variant,2)===undefined&&!session.lineBlocked(s.position,s.lead,ship.id)
       &&!friendlyFiringLaneBlocked(session,ship,s.position,s.direction,s.position.distanceTo(s.lead),ship.targetId);
    }
   }
@@ -358,8 +361,8 @@ export function updateCapitalBroadsideAttack(session,ship,targetPosition,targetV
   s.attackTarget=ship.targetId;s.local.copy(n.radial).applyQuaternion(s.inverse.copy(n.q).invert());
   s.attackSide=s.local.x>=0?1:-1;
  }
- const corvette=ship.capitalClass==='corvette';
- const preferred=corvette?520:FRIGATE_GUN.range*.69,band=corvette?20:FRIGATE_GUN.range*.06;
+ const traffic=TRAFFIC_HULLS[ship.variant];
+ const preferred=traffic?.preferredRange??(traffic?520:FRIGATE_GUN.range*.69),band=traffic?20:FRIGATE_GUN.range*.06;
  // Aim a broadside at the primary. If a valid enemy is substantially
  // opposite it, bisect the pair so one can fall on each side of the hull.
  n.axis.copy(n.radial);
@@ -406,17 +409,19 @@ export function updateCapitalBroadsideAttack(session,ship,targetPosition,targetV
  n.desired.clampLength(0,ship.speed);
  if(session.getAvoidanceVector){
   n.other.copy(n.desired);if(n.other.lengthSq()<.001)n.other.copy(n.heading);else n.other.normalize();
-  const avoid=session.getAvoidanceVector(n.position,n.other,FRIGATE_EXTENTS[2]+20,ship.speed);
-  if(avoid.lengthSq()>.001)n.desired.addScaledVector(avoid,ship.speed).clampLength(0,ship.speed);
+  // Clear the long hull plus the distance its bow needs to turn one radian.
+  const range=traffic?.preferredRange?(n.terrainRange??=Math.max(...session.npcHullExtents(ship))+traffic.speed/traffic.turn):FRIGATE_EXTENTS[2]+20;
+  const avoid=session.getAvoidanceVector(n.position,n.other,range,ship.speed);
+  if(avoid.lengthSq()>.001)n.desired.addScaledVector(avoid,ship.speed*(traffic?.preferredRange?3:1)).clampLength(0,ship.speed);
  }
 
- const trafficAvoidance=corvette&&session.getShipAvoidance?.(n.position,n.velocity.fromArray(ship.velocity),ship);
+ const trafficAvoidance=traffic&&session.getShipAvoidance?.(n.position,n.velocity.fromArray(ship.velocity),ship);
  if(trafficAvoidance)n.desired.addScaledVector(trafficAvoidance,ship.speed).clampLength(0,ship.speed);
 
  // Aim the bow along the requested flight path, then roll one broadside onto
  // the target. Inertial side slip is damped by the same assisted-flight model
  // used by other ships rather than being commanded every combat step.
- if(n.desired.lengthSq()>.001&&(!corvette||trafficAvoidance||distance>600||distance<400))n.heading.copy(n.desired).normalize();
+ if(n.desired.lengthSq()>.001&&(!traffic||trafficAvoidance||distance>preferred+80||distance<preferred-120))n.heading.copy(n.desired).normalize();
  n.goal.setFromUnitVectors(forward,n.heading);
  n.right.set(1,0,0).applyQuaternion(n.goal);
  n.tangent.crossVectors(n.right,n.axis);
@@ -434,7 +439,7 @@ export function updateCapitalBroadsideAttack(session,ship,targetPosition,targetV
  n.position.addScaledVector(n.velocity,dt);
  n.velocity.toArray(ship.velocity);n.position.toArray(ship.position);
  s.goal.copy(n.goal);ship.capitalPreferredRange=preferred;
- if(corvette)updateCorvetteWeapons(session,ship,dt,targetPosition,targetVelocity);
+ if(traffic)updateCorvetteWeapons(session,ship,dt,targetPosition,targetVelocity);
  else updateFrigateBatteries(session,ship,dt,targetPosition,targetVelocity);
 }
 const zeroVelocity=[0,0,0];
@@ -443,7 +448,7 @@ const worldUp=new THREE.Vector3(0,1,0);
 // The small structural mesh is exported from Blender in the gameplay frame.
 // Möller–Trumbore intersection runs on numeric buffers, without per-shot objects.
 export function segmentFrigateHullHit(start,end,ship){
- if(ship.capitalClass!=='frigate')return undefined;
+ if(ship.capitalClass!=='frigate'||TRAFFIC_HULLS[ship.variant])return undefined;
  const s=stateFor(ship);s.inverse.fromArray(ship.rotation).invert();
  s.local.copy(start).sub(s.scratch.fromArray(ship.position)).applyQuaternion(s.inverse);
  s.direction.copy(end).sub(start).applyQuaternion(s.inverse);
@@ -470,6 +475,7 @@ export function segmentCapitalMountHit(start,end,ship,padding=0){
  let nearest=Infinity;
  for(const m of capitalHull(ship).mounts){
   const i=m.index;if(ship.capitalMountHull[i]<=0)continue;
+  if(m.partBit)continue; // The exported solid, including open launch rails, supplies the actual contact.
   if(m.barrels)nearest=Math.min(nearest,broadsideBarrelHit(s,m,true,padding));
   s.lead.fromArray(m.hitCenter);
   s.scratch.copy(s.local).sub(s.lead);const half=m.hitHalfExtents;

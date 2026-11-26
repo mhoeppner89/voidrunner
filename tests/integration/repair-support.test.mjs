@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {equipmentBaseId} from '../../src/game/equipmentCatalog.js';
 import {tutorialFixture} from '../helpers/tutorial.mjs';
-import {updateNpcDrones} from '../../src/game/npcDrones.js';
+import {CAPITAL_HULLS} from '../../src/game/capitalHulls.js';
+import {updateNpcDrones,damageNpcDrone} from '../../src/game/npcDrones.js';
 import {selectRepairTarget,repairTargetEligible,applyDroneRepair,createRepairDroneState} from '../../src/game/repairDrones.js';
 
 function fixture(){
@@ -75,4 +76,30 @@ test('spectator simulation advances stock NPC repair drones and sends them to th
  assert.ok(ship.hull>initial,'observer branch must actually run repairs');const units=Object.values(ship.droneFleet.unitsById);assert.equal(units.length,1);assert.equal(units[0].type,'repair');
  let rendered;r.updateObserverFocus=()=>null;r.observerViewModel=()=>({});r.ui.updateObserverView=()=>{};for(const key of ['setCockpitVisible','updateObserverCamera','syncProjectiles','syncPickups','render'])r.renderer[key]=()=>{};
  r.renderer.syncDrones=fleet=>{rendered=fleet.unitsById;};r.syncRender(0,0);assert.equal(rendered[units[0].id],units[0],'NPC drone must also be visible in observer mode');
+});
+
+test('the Caravan repairs its hull and an escort through its hangar and its two physical drones',()=>{
+ const {session:r,save}=tutorialFixture('earn-standing');
+ save.player.dockedAt=undefined;save.player.position=[10000,90000,0];
+ const ship=r.spawnCapitalShip('caravan',[0,90000,0]),friend=r.spawnShip('escort',[65,90000,10],undefined,'Escort',undefined,{hullId:'scrapper',faction:'independents'});
+ for(const actor of [ship,friend]){actor.rotation=[0,0,0,1];actor.velocity.fill(0);}
+ ship.hull-=3;friend.hull-=25;const before=friend.hull;
+ advance(r,()=>ship.hull===ship.maxHull);advance(r,()=>friend.hull>before);
+ const units=Object.values(ship.droneFleet.unitsById);assert.equal(units.length,2);
+ assert.ok(units.every(u=>u.type==='repair'&&u.position&&r.npcDroneUnits[u.id]===u));
+ save.player.position=[100,90020,0];
+ assert.ok(r.targetCandidates().some(contact=>contact.kind==='drone'&&contact.id===units[0].id));
+ r.selectPickedTarget({kind:'drone',id:units[0].id});
+ assert.equal(r.getTargetRef().kind,'drone');assert.equal(save.player.mode,'combat');
+ r.scanTarget();assert.equal(r.getTargetRef().id,units[0].id);
+ const hangar=CAPITAL_HULLS.caravan.mounts.find(m=>m.kind==='hangar');
+ ship.shield=0;r.damageShip(ship,160,'environment',hangar.hitCenter.map((v,i)=>v+ship.position[i]));
+ assert.equal(ship.capitalMountHull[hangar.index],0);const hull=friend.hull,owner=ship.hull;
+ for(let i=0;i<180;i++)updateNpcDrones(r,1/60);
+ assert.equal(friend.hull,hull);assert.equal(ship.hull,owner);
+ const fresh=r.spawnCapitalShip('caravan',[0,90400,0]);updateNpcDrones(r,1/60);
+ for(const unit of Object.values(fresh.droneFleet.unitsById))damageNpcDrone(r,unit,unit.hull);
+ fresh.hull-=5;for(let i=0;i<180;i++)updateNpcDrones(r,1/60);
+ assert.equal(fresh.hull,fresh.maxHull-5);assert.equal(fresh.lostDroneBays,3);
+ for(const id in fresh.droneFleet.unitsById)assert.equal(r.targetableRepairDrone(id),undefined);
 });

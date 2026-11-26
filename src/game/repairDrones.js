@@ -12,6 +12,13 @@ const maximum=(session,actor)=>actor===session.save.player?session.playerStats()
 function available(session,actor){return actor&&actor.hull>0&&(!actor.poweredDown||actor.distressRepairEligible===true)&&!actor.captured&&!actor.claimed&&!actor.surrendered&&!actor.race&&actor.position&&(actor!==session.save.player||!actor.dockedAt&&!session.arena?.observer);}
 function friendly(session,owner,target){
  const p=session.save.player;if(owner===target)return true;
+ if(owner.variant==='caravan'){
+  const id=target===p?'player':target.id,now=session.save.world.time;
+  for(const member of session.ships){
+   if(member!==owner&&member.convoyLeader!==owner)continue;
+   if(member.targetId===id || member.combatThreatId===id&&member.combatThreatUntil>now || target===p&&member.hostile)return false;
+  }
+ }
  if(owner.observerTeam||target.observerTeam)return Boolean(owner.observerTeam&&owner.observerTeam===target.observerTeam);
  if(owner===p)return !target.hostile&&!target.tutorialEnemy;
  if(target===p)return !owner.hostile&&!owner.tutorialEnemy;
@@ -111,7 +118,7 @@ export function prepareRepairDrone(session,owner,unit,anchor,dt,state,active=tru
 
 export function applyDroneRepair(session,owner,unit,dt,state){
  unit.repairing=false;const target=targetById(session,owner,unit.repairTargetId);
- if(!unit.repairAttached||!repairTargetEligible(session,owner,target))return 0;
+ if(owner.repairDronesHeld||!unit.repairAttached||!repairTargetEligible(session,owner,target))return 0;
  // Contact and cover are checked at the tool, rather than healing through a hull
  // or across space merely because the mothership is within the support radius.
  state.start.fromArray(unit.position);state.end.fromArray(target.position);

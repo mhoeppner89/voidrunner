@@ -67,14 +67,20 @@ const waitFor = async (expression, timeoutMs = 20000) => {
 const measureFps = (seconds = 2.5) => evaluate(`(() => new Promise((resolve) => {
     const startedAt = performance.now();
     let frames = 0;
+    const intervals = [];
     let worst = 0;
     let previous = startedAt;
     const loop = (now) => {
+        if (frames) intervals.push(now - previous);
         worst = Math.max(worst, now - previous);
         previous = now;
         frames += 1;
         if (now - startedAt < ${seconds * 1000}) requestAnimationFrame(loop);
-        else resolve({ fps: frames / ((now - startedAt) / 1000), worst });
+        else {
+            intervals.sort((a, b) => a - b);
+            resolve({ fps: frames / ((now - startedAt) / 1000), worst,
+                median: intervals[Math.floor(intervals.length * .5)], p90: intervals[Math.floor(intervals.length * .9)] });
+        }
     };
     requestAnimationFrame(loop);
 }))()`);
@@ -105,7 +111,9 @@ const measureRenderPath = () => evaluate(`(() => {
     rt.lastFrame = performance.now();
     rt.frameId = requestAnimationFrame(rt.frame);
     const canvas = webgl.domElement;
+    const rendererInfo = gl.getExtension('WEBGL_debug_renderer_info');
     return {
+        gpu: rendererInfo && gl.getParameter(rendererInfo.UNMASKED_RENDERER_WEBGL),
         meanMs: samples.reduce((sum, value) => sum + value, 0) / samples.length,
         medianMs: samples[Math.floor(samples.length / 2)],
         p90Ms: samples[Math.floor(samples.length * 0.9)],
@@ -162,16 +170,41 @@ try {
     await waitFor('Boolean(window.__VOID_PRIVATEER__)');
 
     for (const scene of SCENES) {
-        await evaluate(`window.__VOID_PRIVATEER__.startArena(${JSON.stringify(scene)}, '1v3'); true`);
+        const fleet=scene==='concord-frigate'||scene==='traffic-frigates';
+        const environment=fleet?'open':scene;
+        await evaluate(`window.__VOID_PRIVATEER__.startArena(${JSON.stringify(environment)}, '1v3'); true`);
         // The session exists before flight warmup and the loading veil finish.
         // Measuring then attributes startup compilation to playable flight.
-        await waitFor(`(() => { const rt = window.__VOID_PRIVATEER__.getRuntime(); return rt?.arena?.environment === ${JSON.stringify(scene)} && rt.flightPrepared && document.querySelector('#loading-screen')?.classList.contains('is-hidden'); })()`, 120000);
+        await waitFor(`(() => { const rt = window.__VOID_PRIVATEER__.getRuntime(); return rt?.arena?.environment === ${JSON.stringify(environment)} && rt.flightPrepared && document.querySelector('#loading-screen')?.classList.contains('is-hidden'); })()`, 120000);
         await evaluate(`(() => {
             const save = window.__VOID_PRIVATEER__.getState();
             save.player.armor = 1e9;
             save.player.hull = 1e9;
             save.player.shield = 1e9;
             return true;
+        })()`);
+        if(fleet)await evaluate(`(async()=>{
+            const rt=__VOID_PRIVATEER__.getRuntime(),p=rt.save.player,T=await import('three');
+            rt.ships.length=0;p.velocity.fill(0);p.throttle=0;p.rotation=[0,0,0,1];
+            const origin=new T.Vector3(...p.position),pose=(x,y,z)=>origin.clone().add(new T.Vector3(x,y,z)).toArray();
+            const ids=${JSON.stringify(scene)}==='concord-frigate'?['concord-frigate']:['caravan','rookery'];
+            for(const [i,id] of ids.entries()){
+                const ship=rt.spawnCapitalShip(id,pose(ids.length===1?0:i?95:-95,10,-800));
+                ship.rotation=new T.Quaternion().setFromEuler(new T.Euler(.3,.9,0)).toArray();
+                ship.faction='independents';ship.hostile=false;ship.targetId=undefined;
+                ship.velocity.fill(0);ship.poweredDown=true;
+            }
+            if(ids.length>1)for(const [i,id] of ['wayfarer','mule','scrapper','scrapper'].entries()){
+                const ship=rt.spawnShip('escort',pose(-145+i*90,45,-750),undefined,undefined,{tier:'veteran'},{faction:'independents',hullId:id});
+                ship.velocity.fill(0);ship.poweredDown=true;
+            }
+            for(const ship of rt.ships)rt.renderer.ensureGlbShipModel(ship.variant);
+            await Promise.all(rt.renderer.glbShipLoading.values());rt.snapshotInterpolationState();rt.syncRender(0,performance.now());
+            for(const ship of rt.ships){
+                const mesh=rt.renderer.shipMeshes.get(ship.id);
+                if(!mesh?.userData.glb||!mesh.visible||Math.abs(mesh.position.clone().project(rt.renderer.camera).x)>1)
+                    throw Error('Benchmark hull missing from view: '+ship.variant);
+            }
         })()`);
         await sleep(1800);
         for (const mode of MODES) {
@@ -197,7 +230,7 @@ try {
             await sleep(mode === 'auto' ? 3200 : 900);
             const fps = await measureFps();
             const render = await measureRenderPath();
-            console.log(JSON.stringify({ scene, mode, fps: Number(fps.fps.toFixed(1)), worstMs: Number(fps.worst.toFixed(1)), ...render }));
+            console.log(JSON.stringify({ scene, mode, fps: Number(fps.fps.toFixed(1)), frameMedianMs: Number(fps.median.toFixed(1)), frameP90Ms: Number(fps.p90.toFixed(1)), worstMs: Number(fps.worst.toFixed(1)), ...render }));
             if (RENDER_BREAKDOWN && mode === MODES[0]) {
                 const breakdown = await evaluate(`(() => {
                     const rt = window.__VOID_PRIVATEER__.getRuntime();

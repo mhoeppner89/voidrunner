@@ -120,6 +120,22 @@
     "aspect": 0.3229190476190476
   },
   {
+    "variant": "caravan",
+    "path": "assets/models/capital/caravan.glb",
+    "sha256": "bae028bafddc93b0f3814d42edbb6d5f561a0cce465a0d1563b2582e89aa3fd4",
+    "contourVertices": 123,
+    "glassContours": 10,
+    "aspect": 0.3333333333333333
+  },
+  {
+    "variant": "rookery",
+    "path": "assets/models/capital/rookery.glb",
+    "sha256": "66f61a2b45f8c929fc405a4bb65820a5b28034d6fc1be1bd33d361dabfc99998",
+    "contourVertices": 80,
+    "glassContours": 8,
+    "aspect": 0.36458333333333337
+  },
+  {
     "variant": "drover",
     "path": "assets/models/capital/drover.glb",
     "sha256": "ecd0730ee21a5fd1eff59b089babd2cf0e8c96e80958b75e5efbf3970a358184",

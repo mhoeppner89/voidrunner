@@ -46,7 +46,7 @@ export function equipCapitalLoot(session,ship){
  ship.equipmentRecords=[];
  const mounts=capitalHull(ship)?.mounts??[];
  for(const [index,m] of mounts.entries()){
-  if(m.kind==='pod'||m.kind==='booster'||m.kind==='broadside')continue;
+  if(!['laser','engine','generator','torpedo','pdc','battery'].includes(m.kind))continue;
   const base=m.kind==='laser'?'tracking-turret':m.kind==='engine'?'engine-mk2':m.kind==='generator'?'capital-shield-generator':m.kind==='torpedo'?'torpedo-launcher':m.label==='PDC'||m.kind==='pdc'?'pdc':ship.capitalClass==='cruiser'?'cruiser-battery':'frigate-battery';
   const item=createEquipmentRecord(base,{id:`${ship.lootKey}-capital-${index}`,tier:BASE_OUTFIT_ITEMS[base]?.tier??1});
   ship.equipmentRecords.push({item,key:'capital',index});
@@ -57,6 +57,17 @@ export function combatWreckNode(wreck){
  for(const entry of wreck.contents)if(entry.item)registerInventoryDefinitions({items:{[entry.item.id]:entry.item}});
  const count=wreck.contents.reduce((n,e)=>n+(e.quantity??1),0);
  return {id:wreck.id,name:wreck.name,position:wreck.position,rotation:[0,0,0],radius:wreck.radius,shape:0,salvage:'scrap',remaining:count,scanned:wreck.scanned??false,combatLoot:true,locked:Boolean(wreck.locked),derelict:wreck.derelict,sensorRange:wreck.sensorRange,lootRarity:highestLootRarity(wreck.contents),systemId:wreck.systemId,instanceId:wreck.instanceId};
+}
+export function orphanNpcDrone(session,ship,unit){
+ if(unit.orphaned)return;
+ unit.orphaned=true;unit.state='orphaned';unit.targetId=undefined;
+ if(ship.variant==='caravan'&&unit.type==='repair'){
+  unit.expiresAt=session.save.world.time+20;unit.targetable=true;unit.repairing=false;
+  unit.repairAttached=false;unit.repairTargetId=null;unit.thrust=0;
+ }
+ (session.save.world.orphanDrones??={})[unit.id]={id:unit.id,type:unit.type,hull:unit.hull,ammo:unit.ammo,
+  position:[...unit.position],velocity:[...(unit.velocity??[0,0,0])],rotation:[...(unit.rotation??[0,0,0,1])],
+  expiresAt:unit.expiresAt,targetable:unit.targetable,systemId:session.save.player.systemId};
 }
 export function makeCareerWreck(session,ship,{captured=false,intact=false}={}){
  if(session.arena||ship.lootResolved)return null;
@@ -80,7 +91,10 @@ export function makeCareerWreck(session,ship,{captured=false,intact=false}={}){
   if(quantity)contents.push({id:`${ship.lootKey}-cargo-${commodity}`,kind:'cargo',commodity,quantity});
  }
  for(const unit of Object.values(tutorialOnly?{}:ship.droneFleet?.unitsById??{}))if(unit.hull>0){
-  if(!captured&&!intact&&unit.state!=='stowed'&&unit.position){unit.orphaned=true;unit.state='orphaned';unit.targetId=undefined;session.save.world.orphanDrones??={};session.save.world.orphanDrones[unit.id]={id:unit.id,type:unit.type,hull:unit.hull,ammo:unit.ammo,position:[...unit.position],velocity:[...(unit.velocity??[0,0,0])],rotation:[...(unit.rotation??[0,0,0,1])],systemId:session.save.player.systemId};continue;}
+  if(!captured&&!intact&&unit.state!=='stowed'&&unit.position){
+   orphanNpcDrone(session,ship,unit);
+   continue;
+  }
   if(survives(DRONE_SURVIVAL_CHANCE))contents.push({id:`${ship.lootKey}-${unit.id}`,kind:'drone',type:unit.type,hull:unit.hull,ammo:unit.ammo});
  }
  // Cosmetic debris always appears; an empty hull does not advertise loot.

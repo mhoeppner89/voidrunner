@@ -75,12 +75,12 @@ export const rollNpcCargo = (ship, session) => {
         const commodity = pick(rng, TRADER_CARGO_POOL);
         cargo[commodity] = Math.round((cargo[commodity] ?? 0) + randomBetween(rng, 4, 18));
     }
-    if (ship.variant === 'drover' && ship.missingPods) {
+    if (ship.cargoHolds && ship.missingPods) {
         // Divide indivisible units between the same numbered pods as a spill.
         for (const [commodity, full] of Object.entries(cargo)) {
             let loaded = 0;
-            for (let pod = 0; pod < 6; pod++) {
-                if (!(ship.missingPods & (1 << pod))) loaded += Math.floor(full / 6) + Number(pod < full % 6);
+            for (let pod = 0; pod < ship.cargoHolds; pod++) {
+                if (!(ship.missingPods & (1 << pod))) loaded += Math.floor(full / ship.cargoHolds) + Number(pod < full % ship.cargoHolds);
             }
             if (loaded) cargo[commodity] = loaded;
             else delete cargo[commodity];
@@ -447,7 +447,7 @@ const legTick = (ship, session, task, nextLeg) => {
         ship.destination = approach;
         if (ship.stationQueue === task.port || Math.hypot(approach[0]-ship.position[0],approach[1]-ship.position[1],approach[2]-ship.position[2]) < 65) {
             // A bulk hauler exchanges cargo at the outer approach. Fighter berths are too small.
-            if(ship.variant==='drover')ship.stationDockCompleted=task.port;
+            if(ship.cargoHolds)ship.stationDockCompleted=task.port;
             else reserveStationDock(session, ship, task.port);
         }
         if(!ship.stationDockCompleted)return;

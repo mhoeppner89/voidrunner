@@ -270,6 +270,42 @@
     ]
   },
   {
+    "variant": "caravan",
+    "path": "assets/models/capital/caravan.glb",
+    "sha256": "bae028bafddc93b0f3814d42edbb6d5f561a0cce465a0d1563b2582e89aa3fd4",
+    "triangles": 3004,
+    "vertices": 1704,
+    "boxes": 853,
+    "grid": [
+      48,
+      48,
+      128
+    ],
+    "extent": [
+      8.555000305175783,
+      6.990000247955322,
+      26.000000000000007
+    ]
+  },
+  {
+    "variant": "rookery",
+    "path": "assets/models/capital/rookery.glb",
+    "sha256": "66f61a2b45f8c929fc405a4bb65820a5b28034d6fc1be1bd33d361dabfc99998",
+    "triangles": 3156,
+    "vertices": 1748,
+    "boxes": 699,
+    "grid": [
+      48,
+      48,
+      128
+    ],
+    "extent": [
+      9.967499732971193,
+      7.525386333465576,
+      28.000000000000007
+    ]
+  },
+  {
     "variant": "drover",
     "path": "assets/models/capital/drover.glb",
     "sha256": "ecd0730ee21a5fd1eff59b089babd2cf0e8c96e80958b75e5efbf3970a358184",

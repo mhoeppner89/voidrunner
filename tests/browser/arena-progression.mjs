@@ -50,7 +50,7 @@ try{
    review.draw();
   };
  });
- for(const [level,name] of [[2,'inbound-group'],[8,'drover-intercept'],[13,'thor-torpedo-run'],[10,'ironjaw-raid'],[25,'final-second-group']].filter(([level])=>!process.env.LEVELS||process.env.LEVELS.split(',').includes(String(level)))){
+ for(const [level,name] of [[2,'inbound-group'],[8,'drover-intercept'],[13,'thor-torpedo-run'],[9,'caravan-convoy'],[10,'rookery-raid'],[25,'final-second-group']].filter(([level])=>!process.env.LEVELS||process.env.LEVELS.split(',').includes(String(level)))){
   await page.evaluate(async level=>{
    const {s,p,r,T,start,watch,draw}=arenaReview;await start(level);
    const b=s.runBattle;
@@ -84,15 +84,20 @@ try{
     const focus=a.clone().addScaledVector(line,95).addScaledVector(up,-10);
     watch(bomber,offset.toArray(),focus.toArray(),up);arenaReview.torpedo={owner:bomber.hullId,target:d.variant};
    }
+   if(level===9){for(let i=0;i<180&&!b.target;i++){for(const ship of s.ships)if(ship.arenaRunEnemy)ship.hull=0;tick(1);}
+    if(b.target?.variant!=='caravan')throw Error('Missing Caravan');
+    for(let i=0;i<75&&b.group<2;i++)tick(1);
+    s.renderer.ensureGlbShipModel('caravan');await s.renderer.glbShipLoading.get('caravan');watch(b.target,[105,55,145]);}
    if(level===10){
     for(let i=0;i<180&&!b.target;i++){for(const ship of s.ships)if(ship.arenaRunEnemy)ship.hull=0;tick(1);}
-    if(b.target.variant!=='ironjaw')throw Error('Wrong raid hull');watch(b.target,[100,48,135]);}
+    if(b.target?.variant!=='rookery')throw Error('Wrong raid hull');
+    s.renderer.ensureGlbShipModel('rookery');await s.renderer.glbShipLoading.get('rookery');watch(b.target,[100,48,135]);}
    if(level===25){
     for(const ship of s.ships)if(ship.arenaRunEnemy&&ship!==b.target)ship.hull=0;
     b.target.hull=.55*b.target.maxHull;tick(10.1);tick(5.1);
     if(b.group!==2)throw Error('The frigate did not bring in group two');
-    const pair=s.ships.filter(x=>x.arenaRunEnemy&&x.hull>0&&x.hullId==='talon');
-    if(pair.length!==2)throw Error('Missing second group');
+    const pair=s.ships.filter(x=>x.arenaRunEnemy&&x.hull>0&&x.hullId==='talon'&&x.pilot.tier==='ace');
+    if(pair.length!==2)throw Error('Missing second group '+JSON.stringify(s.ships.filter(x=>x.arenaRunEnemy&&x.hull>0).map(x=>[x.variant,x.hullId,x.pilot?.tier])));
     const mid=new T.Vector3(...pair[0].position).lerp(new T.Vector3(...pair[1].position),.5);
     watch(pair[0],[25,22,110],mid.toArray());
    }

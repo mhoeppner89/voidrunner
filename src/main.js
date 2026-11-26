@@ -473,7 +473,7 @@ const actions = {
     repair: () => session?.repair(),
     refuel: () => session?.refuel(),
     buyEquipment: (equipmentId) => session?.buyEquipment(equipmentId),
-    orphanDrones:()=>Object.values(session?.npcDroneUnits??{}).filter(u=>u.orphaned&&u.hull>0),
+    orphanDrones:()=>Object.values(session?.npcDroneUnits??{}).filter(u=>u.orphaned&&u.hull>0&&u.expiresAt===undefined),
     inventoryCommand:(action,args)=>session?.inventoryCommand(action,args),
     applyOutfitting: (shipId, draft, options) => session?.applyOutfitting(shipId, draft, options),
     buyShip: (shipId, keepCurrent) => session?.buyShip(shipId, keepCurrent),
@@ -608,6 +608,7 @@ window.__VOID_PRIVATEER__ = {
     observerClearFormation: () => session?.observerClearFormation(),
     observerRemoveShip: (unitId) => session?.observerRemoveShip(unitId),
     getState: () => session?.save ?? cachedSave,
+    spawnFrigate: variant => ['caravan','rookery'].includes(variant) ? session?.spawnTrafficCapital(variant,undefined,true)?.id : undefined,
     spawnCorvette: variant => session?.spawnCorvette(variant)?.id,
     getRuntime: () => session,
     startPerformanceCapture: async (options = {}) => {

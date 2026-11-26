@@ -351,7 +351,7 @@ export const ArenaRunMethods={
   return Boolean(position&&this.spawnRunShip(spec,index,{...planned,position}));
  },
  runCapitalEntry(spec,entry){
-  const radius=spec.role==='frigate'?140:42,obstacles=this.activeFieldObstacles();
+  const radius=spec.role==='frigate'?140:spec.hullId==='caravan'||spec.hullId==='rookery'?65:42,obstacles=this.activeFieldObstacles();
   const point=new THREE.Vector3().fromArray(entry.position);
   if(this.entryPositionClear(point,obstacles,radius))return {...entry,largeClear:true};
   const origin=new THREE.Vector3().fromArray(this.save.player.position);

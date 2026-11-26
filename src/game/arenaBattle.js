@@ -1,12 +1,14 @@
 // Transient sortie state. Only the checkpoint at level start goes into the save.
 import * as THREE from 'three';
 import {capitalHull,capitalMountPosition} from './capitalHulls.js';
+import {careerRaidTier} from './careerDanger.js';
 import {arenaSite} from './arenaSites.js';
 import {SHIP_COLLIDERS,shipVsSphere} from './shipCollision.js';
 import {npcShipScaleForVariant} from './render.js';
 import {SHIPS} from './data.js';
 import {t} from './i18n.js';
 
+const REGION_TIERS=['novice','veteran','ace'];
 const WARNING = 5;
 const MIN_GROUP_INTERVAL = 15;
 const NOSE = new THREE.Vector3(0,0,-1);
@@ -137,12 +139,18 @@ export function launchCycle(battle,config,dt) {
     const target=battle.target;
     if(!alive(target))return [];
     const mounts=capitalHull(target).mounts;
-    const intact=node=>mounts.some(m=>m.node===node&&target.capitalMountHull[m.index]>0);
-    const rate=config.mast&&!intact(config.mast)?0.5:1;
-    const lanes=battle.lanes??=(config.bays??[{}]).map(bay=>({...bay,anchor:config.sockets?.[bay.socket],remaining:config.every}));
+    if(!battle.lanes){
+        battle.mastIndex=config.mast?mounts.findIndex(m=>m.node===config.mast):undefined;
+        battle.lanes=(config.bays??[{}]).map(bay=>({...bay,index:bay.subsystem?mounts.findIndex(m=>m.node===bay.subsystem):undefined,
+            anchor:config.sockets?.[bay.socket],remaining:config.every}));
+    }
+    const mastDisabled=battle.mastIndex!==undefined&&!(target.capitalMountHull[battle.mastIndex]>0);
+    const rate=mastDisabled?.5:1;
+    const lanes=battle.lanes;
     for(const bay of lanes){
         bay.rate=rate;
-        bay.open=!bay.subsystem||intact(bay.subsystem);
+        bay.open=bay.index===undefined||target.capitalMountHull[bay.index]>0;
+        bay.retryIn=Math.max(0,(bay.retryIn??0)-dt);
         if(bay.open)bay.remaining=Math.max(0,bay.remaining-dt*rate);
     }
     return lanes;
@@ -154,20 +162,55 @@ function launchEntry(session,battle,bay) {
         const mount=bay.anchor?null:capitalHull(ship).mounts.find(m=>m.node===bay.socket);
         if(!bay.anchor&&!mount)return null;
         bay.mount=mount;
-        bay.pose={position:[0,0,0],socket:{normal:bay.anchor?.direction_game??mount.normal}};
+        bay.pose={position:[0,0,0],socket:{normal:bay.anchor?.direction_game??mount.normal,rotation:ship.rotation}};
         bay.point=new THREE.Vector3();bay.origin=new THREE.Vector3();bay.rotation=new THREE.Quaternion();
     }
     if(bay.anchor)bay.point.fromArray(bay.anchor.game_position).applyQuaternion(bay.rotation.fromArray(ship.rotation)).add(bay.origin.fromArray(ship.position));
     else capitalMountPosition(ship,bay.mount.index,bay.point);
+    bay.pose.socket.rotation=ship.rotation;
     bay.point.toArray(bay.pose.position);
     return bay.pose;
 }
 const capPosition=new THREE.Vector3(),capRotation=new THREE.Quaternion(),contact={};
-// Keep the advertised point if possible. Search outward from that point
-// (or along the launch normal) when a moving obstacle occupies it.
+// Reserve the two exits together. Move far enough to clear the carrier, then
+// sweep the rail to those fixed exits. An obstruction holds this bay in place.
+function railPair(session,battle,bay,anchor,spec) {
+    const carrier=battle.target,variant=SHIPS[spec.hullId]?.variant??spec.hullId;
+    const radius=Math.max(18,(SHIP_COLLIDERS[variant]?.contactRadius??18)*npcShipScaleForVariant(variant)+3);
+    const outward=bay.outward??=new THREE.Vector3(),plans=bay.plans??=[{position:[0,0,0]},{position:[0,0,0]}];
+    outward.fromArray(anchor.socket.normal).applyQuaternion(bay.rotation.fromArray(carrier.rotation)).normalize();
+    const point=bay.point,origin=bay.origin.fromArray(anchor.position);
+    capPosition.fromArray(carrier.position);capRotation.fromArray(carrier.rotation);
+    let distance=16;
+    for(;distance<=256;distance+=8){
+        point.copy(origin).addScaledVector(outward,distance);
+        if(!shipVsSphere(capPosition,capRotation,carrier.collisionVariant??carrier.variant,npcShipScaleForVariant(carrier.variant),point.x,point.y,point.z,radius,contact))break;
+    }
+    if(distance>256)return null;
+    const spacing=Math.max(40,radius*2),reach=distance+spacing;
+    const obstacles=session.launchRailObstacles(),site=arenaSite(session.arenaStage?.siteId);
+    // Inflating by half the sample interval encloses the entire swept volume.
+    if(obstacles.length)for(let d=0;d<reach+8;d+=8){
+        point.copy(origin).addScaledVector(outward,Math.min(d,reach));
+        if(!session.siteSpotClear(site,point,obstacles,radius+4))return null;
+    }
+    for(let i=0;i<2;i++){
+        point.copy(origin).addScaledVector(outward,distance+i*spacing);
+        for(const ship of session.ships){
+            if(!alive(ship))continue;
+            const model=ship.collisionVariant??ship.variant;
+            if(shipVsSphere(capPosition.fromArray(ship.position),capRotation.fromArray(ship.rotation),model,npcShipScaleForVariant(ship.variant),point.x,point.y,point.z,radius,contact))return null;
+        }
+        const player=session.save.player;
+        if(!session.arena?.observer&&!player.dockedAt&&capPosition.fromArray(player.position).distanceTo(point)<radius+session.playerCollisionRadius())return null;
+        point.toArray(plans[i].position);
+    }
+    return plans;
+}
+// Find space near the advertised entry for conventional group arrivals.
 function formationEntry(session,anchor,index,spec,capitals,obstacles){
-    const socket=anchor.socket, point=new THREE.Vector3(), origin=new THREE.Vector3().fromArray(anchor.position);
-    const rotation=new THREE.Quaternion().fromArray(socket?session.runBattle.target.rotation:session.save.player.rotation);
+    const point=new THREE.Vector3(), origin=new THREE.Vector3().fromArray(anchor.position);
+    const rotation=new THREE.Quaternion().fromArray(session.save.player.rotation);
     const variant=SHIPS[spec.hullId]?.variant??spec.hullId??'concord-frigate';
     const radius=Math.max(18,(SHIP_COLLIDERS[variant]?.contactRadius??18)*npcShipScaleForVariant(variant)+3);
     const site=arenaSite(session.arenaStage?.siteId);
@@ -179,14 +222,6 @@ function formationEntry(session,anchor,index,spec,capitals,obstacles){
         }
         return true;
     };
-    if(socket){
-        const outward=new THREE.Vector3().fromArray(socket.normal).applyQuaternion(rotation).normalize();
-        for(let distance=16+index*24;distance<=256;distance+=8){
-            point.copy(origin).addScaledVector(outward,distance);
-            if(clear())return {...anchor,position:point.toArray()};
-        }
-        return null;
-    }
     if(index){
         const angle=(index-1)*Math.PI*2/3;
         origin.add(point.set(Math.cos(angle)*58,Math.sin(angle)*58,10*index).applyQuaternion(rotation));
@@ -207,7 +242,7 @@ function formationEntry(session,anchor,index,spec,capitals,obstacles){
     }
     return {...anchor,position:point.toArray(),largeClear:Boolean(isRunCapital(spec))};
 }
-function arrive(session,battle,specs,anchor,bay) {
+function groupPlans(session,specs,anchor) {
     let center=anchor;
     const obstacles=session.activeFieldObstacles(),capitals=session.ships.filter(ship=>ship.capitalClass&&alive(ship));
     const plans=new Array(specs.length);
@@ -224,22 +259,51 @@ function arrive(session,battle,specs,anchor,bay) {
             capitals.push({variant:spec.hullId??'concord-frigate',position:plan.position,rotation:new THREE.Quaternion().setFromUnitVectors(NOSE,heading).toArray()});
         }
     }
+    return plans;
+}
+function arrive(session,battle,specs,anchor,bay) {
+    const plans=bay?.socket?railPair(session,battle,bay,anchor,specs[0]):groupPlans(session,specs,anchor);
+    if(!plans)return false;
+    if(battle.trafficCarrier){
+        const carrier=battle.trafficCarrier;
+        specs[0].tier=carrier.observerTeam?carrier.pilot.tier:REGION_TIERS[careerRaidTier(session.careerRegionAt(carrier.position))-1];
+    }
     for(const [i,spec] of specs.entries()){
-        const ship=session.spawnRunShip(spec,battle.serial++,plans[i]);
+        const carrier=battle.trafficCarrier;
+        const ship=carrier?session.spawnShip('escort',plans[i].position,undefined,undefined,
+            {tier:spec.tier},{faction:carrier.faction,hullId:spec.hullId}):session.spawnRunShip(spec,battle.serial++,plans[i]);
         if(!ship)return false;
         if(spec.primary)battle.target=ship;
         if(bay){
-            ship.arenaLaunched=true;
+            ship.launchOwner=battle.target.id;
+            ship.frigateEncounterId=battle.target.frigateEncounterId;
+            if(carrier){
+                ship.targetId=carrier.targetId;ship.hostile=carrier.hostile;ship.observerTeam=carrier.observerTeam;
+                ship.observerShipType=carrier.observerTeam?spec.hullId:undefined;
+            }else ship.arenaLaunched=true;
             if(bay.socket){
-                const direction=new THREE.Vector3().fromArray(anchor.socket.normal)
-                    .applyQuaternion(new THREE.Quaternion().fromArray(battle.target.rotation)).normalize();
-                new THREE.Quaternion().setFromUnitVectors(NOSE,direction).toArray(ship.rotation);
-                direction.multiplyScalar(ship.speed*.5).add(new THREE.Vector3().fromArray(battle.target.velocity)).toArray(ship.velocity);
+                bay.rotation.setFromUnitVectors(NOSE,bay.outward).toArray(ship.rotation);
+                bay.point.fromArray(battle.target.velocity).addScaledVector(bay.outward,ship.speed*.5).toArray(ship.velocity);
             }
         }
         if(spec.attackObjective){ship.arenaObjectiveAttacker=true;ship.targetId=battle.target?.id;}
     }
     return true;
+}
+// Career and spectator carriers use the same socket transform, clearance and pair placement.
+export function updateTrafficLaunches(session,ship,config,dt){
+    const battle=ship.carrierBattle??={target:ship,trafficCarrier:ship};
+    const lanes=launchCycle(battle,config,dt);
+    for(const bay of lanes){
+        if(!bay.open||bay.remaining>0||bay.retryIn>.00001)continue;
+        let count=0;
+        for(const fighter of session.ships)if(fighter.launchOwner===ship.id&&alive(fighter))count++;
+        if(count+2>config.cap)return;
+        const fighter=battle.fighter??={hullId:config.fighter};
+        const pair=battle.pair??=[fighter,fighter],slot=launchEntry(session,battle,bay);
+        if(slot&&arrive(session,battle,pair,slot,bay))bay.remaining=config.every;
+        else bay.retryIn=2;
+    }
 }
 function opening(session,wave,battle,elapsed) {
     const group=battle.groups[0],transport=wave.objective?.transport;
@@ -274,6 +338,12 @@ export function tickBattle(session,wave,elapsed,dt) {
     }
     const group=battle.groups[battle.group];
     const lanes=wave.launch?launchCycle(battle,wave.launch,dt):[];
+    for(const bay of lanes){
+        if(!bay.warned||!bay.open||bay.retryIn>.00001||launched+2>wave.launch.cap)continue;
+        if(arrive(session,battle,battle.launchPair,launchEntry(session,battle,bay),bay)){
+            bay.remaining=wave.launch.every;bay.warned=false;launched+=2;survivors+=2;
+        }else bay.retryIn=2;
+    }
     let pending=battle.warning;
     if(!pending){
         let specs,at,line,bay,support=false;
@@ -291,8 +361,8 @@ export function tickBattle(session,wave,elapsed,dt) {
             support=true;specs=[battle.supportFighter];at=Math.max(battle.nextSupport,elapsed+WARNING);
         }
         if(wave.launch&&launched+2<=wave.launch.cap){
-            bay=lanes.find(b=>b.open&&b.remaining<=WARNING*b.rate);
-            if(bay){specs=[battle.launchFighter,battle.launchFighter];at=elapsed+WARNING;}
+            bay=lanes.find(b=>b.open&&!b.warned&&b.remaining<=WARNING*b.rate);
+            if(bay){specs=battle.launchPair??=[battle.launchFighter,battle.launchFighter];at=elapsed+WARNING;}
         }
         if(specs){
             let anchor=bay?launchEntry(session,battle,bay):entry(session,battle.serial,true);
@@ -315,20 +385,16 @@ export function tickBattle(session,wave,elapsed,dt) {
             }
             announce(session,pending,elapsed);
             if(pending.announced && elapsed>=pending.at && (bay?bay.remaining<=.001:fits(session,battle,specs,pending.limit))){
-                if(arrive(session,battle,specs,pending.entry,bay)){
-                    if(bay){
-                        bay.remaining=wave.launch.every;
-                        // Bays that warmed together launch together. Count complete pairs.
-                        let occupied=launched+2;
-                        for(const sibling of lanes){
-                            if(!sibling.open||sibling===bay||sibling.remaining>.001||occupied+2>wave.launch.cap)continue;
-                            const slot=launchEntry(session,battle,sibling);
-                            if(slot&&arrive(session,battle,specs,slot,sibling)){
-                                sibling.remaining=wave.launch.every;occupied+=2;
-                            }
-                        }
+                if(bay){
+                    for(const lane of lanes){
+                        if(!lane.open||lane.warned||lane.remaining>.001||launched+2>wave.launch.cap)continue;
+                        if(arrive(session,battle,specs,launchEntry(session,battle,lane),lane)){
+                            lane.remaining=wave.launch.every;launched+=2;
+                        }else{lane.retryIn=2;lane.warned=true;}
                     }
-                    else if(support){battle.supportCount++;battle.nextSupport=elapsed+wave.support.every;}
+                    battle.warning=null;session.ui.setRunInbound?.(null);
+                }else if(arrive(session,battle,specs,pending.entry)){
+                    if(support){battle.supportCount++;battle.nextSupport=elapsed+wave.support.every;}
                     else{battle.group++;battle.lastArrival=elapsed;
                         const arrival=t('Group {group}/{total}',{group:battle.group,total:battle.groups.length});
                         session.ui.pushEvent(arrival,'info',4000,arrival);
