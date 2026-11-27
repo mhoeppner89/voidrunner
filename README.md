@@ -1,6 +1,6 @@
 # Voidrunner
 
-A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2qc**. Assets stream on demand (about 14 MB before first flight on a phone) and every visible wreck chunk is solid cover. The League Heimdall gauss corvette and the Concord Tacita jamming picket lead patrols and appear in Arena levels 14 and 19; the Red Njord Barrage fires six-rocket flak salvos that re-aim once mid-flight; Arena levels have at most three waves with wave warnings on the own-ship monitor; the largest wreck sections drift as cover. There is no fuel: the afterburner draws ship energy, and big ships break up slowly while Arena holds the level for the explosion. The Caravan convoy tender and Rookery raider carrier fly in career traffic, spectator battles and Arena levels 9 and 10. The Red Njord Barrage missile barge joins pirate raids and Arena level 4; speed only slows its lock, a fast crossing pass breaks it, and it circles at stand-off range instead of parking. Ramming a big ship no longer flings it away. Missiles are tuned so a timed break beats them, BREAK flashes on the ship monitor, and torpedoes can be shot down. The 25 Arena Run levels bring in successive groups and include convoy, escort and capital-ship objectives. Failing an objective costs the equipment pick for that level. Torpedoes deal 360 damage and pierce corvette and capital-ship shields. Their locks depend on target speed and crossing motion. Ships have separate gun and missile slots. A selected ship that returns to sensor view is selected again unless the pilot has chosen another target.
+A browser spaceflight game with career missions, equipment loot, Arena Run and spectator battles. Current runtime: **0.8.2qd**. Assets stream on demand (about 14 MB before first flight on a phone) and every visible wreck chunk is solid cover. The League Heimdall gauss corvette and the Concord Tacita jamming picket lead patrols and appear in Arena levels 14 and 19; the Red Njord Barrage fires six-rocket flak salvos that re-aim once mid-flight; Arena levels have at most three waves with wave warnings on the own-ship monitor; the largest wreck sections drift as cover. There is no fuel: the afterburner draws ship energy, and big ships break up slowly while Arena holds the level for the explosion. The Caravan convoy tender and Rookery raider carrier fly in career traffic, spectator battles and Arena levels 9 and 10. The Red Njord Barrage missile barge joins pirate raids and Arena level 4; speed only slows its lock, a fast crossing pass breaks it, and it circles at stand-off range instead of parking. Ramming a big ship no longer flings it away. Missiles are tuned so a timed break beats them, BREAK flashes on the ship monitor, and torpedoes can be shot down. The 25 Arena Run levels bring in successive groups and include convoy, escort and capital-ship objectives. Failing an objective costs the equipment pick for that level. Torpedoes deal 360 damage and pierce corvette and capital-ship shields. Their locks depend on target speed and crossing motion. Ships have separate gun and missile slots. A selected ship that returns to sensor view is selected again unless the pilot has chosen another target.
 
 League patrols can field the Heimdall rail corvette. Take cover or break across its frozen white beam. The Concord Tacita protects its escorts with a violet jamming field. Target its emitter to restore missile guidance.
 
@@ -133,6 +133,23 @@ python3 -m http.server 4192
 ```
 
 Open `http://127.0.0.1:4192/game.html`. Spectator mode: `game.html?mode=observer`.
+
+### LAN multiplayer
+
+Connect the devices to the same Wi-Fi. Open **Multiplayer → Host room** on a phone or computer and keep the host's game in the foreground. Choose free-for-all or 2v2. The host sets the Arena site, five- or ten-minute timer, and friendly fire for team deathmatch. Hyperdrive is disabled.
+
+On the static site, the host creates one invite code per guest. The guest opens **Multiplayer → Join**, pastes the invite, and sends back the reply code. The host pastes the reply and selects **Connect pilot**. You can start free-for-all with two to four pilots or team deathmatch with two pilots on each team.
+
+To use a clickable room link, run the optional helper on a computer on the network:
+
+```sh
+npm run build
+npm run host:multiplayer
+```
+
+Open the printed Wi-Fi address on the host device, then share the room link from the lobby. The helper serves the game and exchanges connection details. The device that selected **Host room** runs the match. Both setup flows use direct WebRTC connections for the fight. Use a Wi-Fi network that lets connected devices reach each other. To serve the helper over HTTPS, supply `TLS_CERT` and `TLS_KEY` or run it behind a same-origin HTTPS reverse proxy.
+
+Every pilot starts in a chosen Tier 1 hull with its stock loadout. Death pays 1,000 credits and opens the refit shop. Credits, purchased ships, and equipment carry between lives for the round. The shop shows stock gear for your equipped hull's tier. Points already earned carry through refits. The shop previews how a purchase will change your next kill's score. Press **Esc** or tap the pause button to open the scoreboard while the round continues.
 
 Start a new career to play the rebuilt family prologue: trade and flight lessons, a mining contract, Paul’s rescue and repair-drone lesson, carrier-hangar stealth, then local free play and the black-box mission. The jump gate reopens after the Cairn reunion; Mara’s call keeps the existing 50k ship/equipment/half-cash value threshold.
 

@@ -3,8 +3,8 @@ import { t } from './i18n.js';
 import { MENU_CONTROLLER_BINDINGS as DEFAULT_MENU, CONTROLLER_BUTTON_LABELS } from './controllerBindings.js';
 
 const CONTROLS = 'button, a[href], input, select, textarea, summary, [role="button"], [role="tab"], [tabindex="0"]';
-const PANELS = ['#rotate-notice', '#new-career-panel', '#pause-panel', '#adventure-panel', '#story-panel', '#chat-panel', '#ship-panel', '#map-panel', '#arena-panel', '#observer-panel', '#title-screen', '#dock-screen'];
-const BACK = ['cancel-new-career', 'close-options', 'resume-flight', 'close-chat', 'close-ship', 'close-map', 'close-story', 'adventure-exit', 'close-arena', 'observer-exit'];
+const PANELS = ['#rotate-notice', '#new-career-panel', '#pause-panel', '#adventure-panel', '#story-panel', '#chat-panel', '#ship-panel', '#map-panel', '#arena-panel', '#observer-panel', '#multiplayer-panel', '#title-screen', '#dock-screen'];
+const BACK = ['cancel-new-career', 'close-options', 'resume-flight', 'close-chat', 'close-ship', 'close-map', 'close-story', 'adventure-exit', 'close-arena', 'observer-exit', 'multiplayer-back'];
 const visible = element => Boolean(element && !element.disabled && !element.closest('[hidden], .is-hidden, [inert]') && element.getClientRects().length);
 
 // One lightweight UI poller survives title/session changes. Flight input stays

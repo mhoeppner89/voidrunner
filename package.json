@@ -11,6 +11,8 @@
     "test:downloads": "node tools/playtest/probes/first-flight-download.mjs",
     "test:render": "node --import ./tests/helpers/offline-imports.mjs --test tests/performance/render-work.test.mjs tests/integration/glb-packed-accessors.test.mjs tests/performance/renderer-resources.test.mjs tests/performance/phone-power.test.mjs",
     "test:browser:arena": "node tests/browser/arena-progression.mjs",
+    "test:browser:multiplayer": "node tests/browser/multiplayer-links.mjs && node tests/browser/multiplayer-gameplay.mjs",
+    "host:multiplayer": "node tools/multiplayer/serve.mjs",
     "test:browser:controller-setup": "node tests/browser/controller-setup.mjs",
     "test:browser:controller": "node tests/browser/controller.mjs",
     "test:browser": "node tests/browser/gameplay-smoke.mjs && node tests/browser/player-actions.mjs && node tests/browser/offline-startup.mjs",

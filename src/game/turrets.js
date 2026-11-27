@@ -69,7 +69,7 @@ export function shipBlocksRay(session,actor,ownerId,target,point,state) {
         return along>0 && along<distance && delta.addScaledVector(direction,-along).length()<radius;
     };
     // Include the player when an NPC fires past them at another ship/missile.
-    if(ownerId!=='player' && target!==session.save.player && blocks(session.save.player.position,session.playerCollisionRadius()))return true;
+    if(actor!==session.save.player && ownerId!=='player' && target!==session.save.player && blocks(session.save.player.position,session.playerCollisionRadius()))return true;
     return session.ships.some(other=>other!==actor && other.id!==ownerId && other!==target && other.hull>0 && blocks(other.position,Math.max(...session.npcHullExtents(other))));
 }
 function selectedHostile(session,actor,ownerId,player) {
@@ -89,8 +89,8 @@ function selectedHostile(session,actor,ownerId,player) {
         if(session.projectileCanHitShip(probe,ship))return ship;
     }
 }
-export function updateAutomaticTurrets(session,actor,ownerId,dt) {
-    const player=ownerId==='player',fit=player?actor.outfitting?.loadouts?.[actor.shipId]:actor.combatFit;
+export function updateAutomaticTurrets(session,actor,ownerId,dt,pilotControl) {
+    const player=ownerId==='player'||Boolean(pilotControl),fit=player?actor.outfitting?.loadouts?.[actor.shipId]:actor.combatFit;
     const hullId=player?actor.shipId:fit?.hullId,layouts=TURRET_LAYOUTS[hullId]??[],items=fit?.turrets??[];
     if(!items.some(Boolean))return;
     const stats=player?session.playerStats():fit.stats;
@@ -136,7 +136,7 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
             if(target){point=session.projStore.getPos(target.slot,state.goal);intercept=true;}
         }
         // Reconsider missiles on every simulation step, including burst pauses.
-        if(!disabled && !target){target=selectedHostile(session,actor,ownerId,player);if(target)point=state.goal.fromArray(target.position);}
+        if(!disabled && !target){target=pilotControl ? pilotControl.target : selectedHostile(session,actor,ownerId,player);if(target)point=state.goal.fromArray(target.position);}
         if(disabled || !target || intercept)state.burstRemaining=0;
         if(!target || disabled)state.targetId=null;
         if(point) {

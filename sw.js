@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v711-0-8-2qc-streamed-assets';
+const CACHE = 'voidrunner-v712-0-8-2qd-lan';
 
 // Static title imports and the first room for an offline return. Flight code
 // and optional models enter the release cache when a session requests them.

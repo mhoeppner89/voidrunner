@@ -485,7 +485,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2qc';
+const GAME_VERSION = '0.8.2qd';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -1371,6 +1371,7 @@ export class GameUI {
               <button class="primary" data-ui-command="resume">${t('RESUME FLIGHT')}</button>
               <button data-ui-command="new">${t('NEW CAREER')}</button>
               <button data-ui-command="arena">${t('Arena')}</button>
+              <button data-ui-command="multiplayer">${t('Multiplayer')}</button>
               <button data-ui-command="options">${t('OPTIONS')}</button>
             </div>
 
@@ -1389,6 +1390,7 @@ export class GameUI {
             </div>
           </div>
         </section>
+        <section id="multiplayer-panel" class="multiplayer-panel is-hidden" role="dialog" aria-modal="true" aria-labelledby="multiplayer-heading"></section>
         <section id="story-panel" class="story-panel is-hidden" role="dialog" aria-modal="true" aria-labelledby="story-heading"></section>
         <section id="dock-screen" class="dock-screen is-hidden" aria-label="${t('Docked location')}"></section>
         <section id="map-panel" class="modal-panel is-hidden" aria-label="${t('Navigation map')}"></section>
@@ -1828,6 +1830,12 @@ export class GameUI {
             case 'arena':
                 this.showArena();
                 break;
+            case 'multiplayer':
+                this.actions?.multiplayer?.();
+                break;
+            case 'multiplayer-back':
+                this.actions?.multiplayerBack?.();
+                break;
             case 'observer-start':
                 this.hideArena();
                 this.actions?.startObserver('open');
@@ -1918,7 +1926,7 @@ export class GameUI {
                     void this.launchFromDock();
                 break;
             case 'pause':
-                this.showPause();
+                if (!this.actions?.multiplayerMenu?.()) this.showPause();
                 break;
             case 'options':
                 this.showOptions();
@@ -2156,6 +2164,7 @@ export class GameUI {
             this.root.querySelector('[data-ui-command="new"]')?.focus({preventScroll:true});
     }
     showTitle(hasSave, save) {
+        this.root.classList.remove('is-multiplayer');
         this.cancelVesperLaunchTransition();
         this.cancelPlanetTransit();
         this.hideStory(false);
@@ -4576,6 +4585,7 @@ export class GameUI {
     }
     updateHud(model) {
         this.lastHud = model;
+        this.root.classList.toggle('is-multiplayer', Boolean(model.multiplayer));
         this.updateSpeakerBracket(model.speaker);
         this.droneHud = this.droneHudSnapshot(model);
         this.setCockpitShip(model.shipId);
@@ -4590,9 +4600,10 @@ export class GameUI {
         const card = this.el('#hyperdrive-card');
         if (card) {
             setHudAttribute(card, 'data-hyperdrive-ready', !model.raceControl && model.hyperdriveReady ? 'true' : 'false');
-            if (card.disabled !== Boolean(model.raceControl)) card.disabled = Boolean(model.raceControl);
-            setText('#hyperdrive-card b', model.raceControl ? t(model.raceControl) : 'HYPERDRIVE');
-            setHudAttribute(card, 'aria-label', model.raceControl ? t(model.raceControl) : t('Hyperdrive: engage jump to nav point'));
+            const driveDisabled = Boolean(model.raceControl || model.multiplayer);
+            if (card.disabled !== driveDisabled) card.disabled = driveDisabled;
+            setText('#hyperdrive-card b', model.raceControl ? t(model.raceControl) : model.multiplayer ? t('JUMP OFF') : 'HYPERDRIVE');
+            setHudAttribute(card, 'aria-label', model.raceControl ? t(model.raceControl) : model.multiplayer ? t('Hyperdrive disabled') : t('Hyperdrive: engage jump to nav point'));
         }
         // Monitor tickers: the own-ship flight recorder and the radar sensor
         // log replace the in-flight toast stack. Each shows the newest entry
@@ -6765,7 +6776,7 @@ export class GameUI {
         if (this.adventure) return true;
         // These shells survive panel content changes. Read the live classes,
         // as a modal can open in the middle of a multi-step flight frame.
-        this.modalPanels ??= ['#map-panel', '#ship-panel', '#pause-panel', '#arena-panel', '#chat-panel', '#rotate-notice']
+        this.modalPanels ??= ['#map-panel', '#ship-panel', '#pause-panel', '#arena-panel', '#chat-panel', '#multiplayer-panel', '#rotate-notice']
             .map(selector => this.root.querySelector(selector));
         return this.modalPanels.some(panel => !panel?.classList.contains('is-hidden'));
     }

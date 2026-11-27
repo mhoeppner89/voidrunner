@@ -1433,7 +1433,7 @@ export class GameSession {
         normalizeLauncherMagazines(this.save.player, { legacyMissiles: this.save.player.missiles });
         this.save.player.equipment = projectLegacyEquipment(this.save.player, this.save.player.outfitting);
         this.save.player.droneFleet = normalizeDroneFleet(this.save.player.droneFleet,
-            this.save.player.outfitting.loadouts, { grantInitial: true, activeShipId: this.save.player.shipId });
+            this.save.player.outfitting.loadouts, { grantInitial: !arena?.multiplayer, activeShipId: this.save.player.shipId });
         this.initializeMiningDrones();
         this.initializePdcDrones();
         this.recallPdcDrones('session-restored');
@@ -1642,6 +1642,7 @@ export class GameSession {
         this.ownMonitorStatusUntil = 0;
     }
     persistSave() {
+        if (this.arena?.multiplayer) return true;
         // Keep the last safe checkpoint until the short guided transfer finishes.
         if (this.playerDocking) return true;
         if(this.arena?.run)return this.save.arenaRun.phase==='combat'?true:writeArenaRun(this.save);
@@ -2388,7 +2389,7 @@ export class GameSession {
         // clear session-only heat/cooldowns before spawning the player or
         // hostiles. Career snapshots are untouched because arena saves are
         // disposable.
-        if(!config.run){this.configureArenaImpulseFit(config.fit ?? 'balanced');
+        if(!config.run&&!config.multiplayer){this.configureArenaImpulseFit(config.fit ?? 'balanced');
         this.resetArenaWeaponState();}
         // An Arena site stages itself (system, start, entry points); the plain
         // environments keep the original three simulator layouts.
@@ -2502,7 +2503,7 @@ export class GameSession {
                 }
             }
         }
-        if (announce) {
+        if (announce && !config.multiplayer) {
             if (debrisCollisionTest) {
                 this.ui.pushEvent(t('TEST FLIGHT · DEBRIS FIELD · NO HOSTILES'), 'info', 6200);
                 this.ui.pushEvent(t('Reload to return to the carrier bay.'), 'info', 6200);
@@ -2692,6 +2693,10 @@ export class GameSession {
         this.observerPointer = undefined;
     };
     selectPickedTarget(target) {
+        if (this.arena?.multiplayer) {
+            if (target.kind === 'ship') this.arena.multiplayer.selectTarget(target.id);
+            return;
+        }
         this.selectTarget(target.kind, target.id);
         if(Number.isInteger(target.mount)&&capitalHull(this.ships.find(s=>s.id===target.id)??{})?.mounts[target.mount]?.targetable)this.capitalSubtarget={id:target.id,index:target.mount};
     }
@@ -2888,6 +2893,10 @@ export class GameSession {
             this.renderBudget?.reset();
             this.resetQualitySample();
             this.input?.getActions?.(); // discard one-shot presses made while loading
+            return;
+        }
+        if (this.arena?.multiplayer) {
+            this.arena.multiplayer.frame(this, now);
             return;
         }
         // Auto cadence samples only live flight. A stopped spectator battle
@@ -7501,7 +7510,7 @@ export class GameSession {
     }
     toggleHyperdrive(actions = {}) {
         if(this.save.player.raceReturn)return;
-        if(this.arena?.run || this.playerDocking)return;
+        if(this.arena?.run || this.arena?.multiplayer || this.playerDocking)return;
         if (this.pendingDroneDeparture) { this.cancelDroneDeparture(); return; }
         if (this.armedJumpPointId) {
             // Gates are physical fly-through links, not another drive toggle.
@@ -15732,7 +15741,9 @@ export class GameSession {
         this.ui.updateSight?.(this.leadSolution(),this.save.world.time < this.hitTickUntil ? this.hitTick : undefined);
         if (!this.save.player.dockedAt && now - this.lastHudUpdate > 42) {
             this.lastHudUpdate = now;
-            this.ui.updateHud(this.buildHudModel());
+            const model = this.buildHudModel();
+            this.arena?.multiplayer?.decorateHud(model);
+            this.ui.updateHud(model);
         }
         if(this.ui.updateCapitalMarkers&&this.renderer.camera){
             let ship;

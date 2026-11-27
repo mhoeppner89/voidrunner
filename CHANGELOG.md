@@ -1,3 +1,9 @@
+## 0.8.2qd — LAN multiplayer
+
+- Play free-for-all or 2v2 on the same Wi-Fi, with one browser hosting and up to three guests. The host picks any Arena site and a five- or ten-minute round. Team deathmatch has a friendly-fire setting.
+- Start with a stock Hestia, Balor or Loki. Kills earn points based on the current ship and fitted gear. After a death, spend the fixed credit payout on stock upgrades or another hull. The equipment shop shows the current hull's tier.
+- A static game page supports invite and reply codes. The optional LAN server adds a shareable room link. The host browser runs the fight and the other browsers connect directly.
+
 ## 0.8.2qc — Much smaller downloads, smoother phones, solid debris
 
 - The game downloads about a third as much before your first flight (about 14 MB instead of 42 MB on a phone) and starts in about 15 seconds on fast 4G instead of 50. Return visits load from the device with no download. Ships, stations, room art and audio now load when they are nearby or selected; the rest streams in during quiet flight, never with data saver on or on 2G. Cockpit art and hull textures keep their full quality.

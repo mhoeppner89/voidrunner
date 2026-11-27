@@ -19,6 +19,8 @@ const ui = new GameUI(host);
 let session;
 let sessionStarting;
 let gameSessionModulePromise;
+let multiplayer;
+let multiplayerLoading;
 let cachedSave = loadGame();
 const loadGameSession = () => {
     gameSessionModulePromise ??= import('./game/game.js');
@@ -151,7 +153,7 @@ const beginSession = (mode, arena, tutorial = true) => {
         await new Promise(resolve => setTimeout(resolve, 0));
         const save = arena?.run ? (arena.resume?readArenaRun():newArenaRun(Boolean(arena.hard&&arenaRecord().unlockedHard)))
             : LANDING_PREVIEW_ID && mode !== 'arena' && mode !== 'observer' ? createNewSave(undefined, { tutorial: false })
-                : mode === 'new' || mode === 'arena' || mode === 'observer' ? createNewSave(DRONE_TEST_MODE ? 4242 : undefined, { tutorial: mode === 'new' && tutorial && !DRONE_TEST_MODE })
+                : mode === 'new' || mode === 'arena' || mode === 'observer' ? createNewSave(arena?.multiplayer ? arena.seed : DRONE_TEST_MODE ? 4242 : undefined, { tutorial: mode === 'new' && tutorial && !DRONE_TEST_MODE })
                     : loadGame();
         if (!save) {
             audioManager.dispose();
@@ -246,13 +248,19 @@ const beginSession = (mode, arena, tutorial = true) => {
         }
         if (mode === 'arena' || mode === 'observer')
             save.arena = arena;
-        syncTitleSettings(save.settings);
+        if (arena?.multiplayer) {
+            Object.assign(save.player, arena.starterPlayer);
+            save.player.droneFleet = undefined;
+            save.settings.easyMode = false;
+        } else syncTitleSettings(save.settings);
         // The combat sim uses the same canonical factory hardpoints as a career.
         // Its disposable save still keeps the sortie consequence-free, while an
         // arena run can no longer bypass installed-only weapons through the old
         // flat equipment list.
-        cachedSave = save;
-        saveGame(save);
+        if (!arena?.multiplayer) {
+            cachedSave = save;
+            saveGame(save);
+        }
         // Asset warm-up is opportunistic. It must not be part of session boot:
         // iOS Safari can leave an explicit image decode pending, and a slow
         // GLB/image request must never keep the loading veil on screen.
@@ -271,6 +279,10 @@ const beginSession = (mode, arena, tutorial = true) => {
         const { GameSession } = gameModule;
         const nextSession = new GameSession(save, ui, () => {
             session = undefined;
+            if (arena?.multiplayer) {
+                multiplayer?.leave();
+                return;
+            }
             cachedSave = loadGame();
             if (cachedSave) {
                 Object.assign(cachedSave.settings, titleSettings);
@@ -315,6 +327,25 @@ const beginSession = (mode, arena, tutorial = true) => {
     });
     sessionStarting = starting;
     return starting;
+};
+const stopMultiplayerFlight = expected => {
+    if (expected && session !== expected) return;
+    if (session?.arena?.multiplayer) {
+        session.dispose();
+        session = undefined;
+    }
+    showTitleScreen();
+};
+const openMultiplayer = (fromInvite = false) => {
+    multiplayerLoading ??= import('./game/multiplayer/multiplayer.js').then(({ Multiplayer }) => {
+        multiplayer = new Multiplayer(ui, arena => beginSession('arena', arena), stopMultiplayerFlight);
+        return multiplayer;
+    }).catch(error => {
+        multiplayerLoading = undefined;
+        console.error('Multiplayer startup failed.', error);
+        ui.showToast(t('Could not open Multiplayer.'), 'warning', 6000);
+    });
+    return multiplayerLoading.then(controller => controller?.open(fromInvite));
 };
 const withSession = (callback) => session
     ? callback(session)
@@ -384,6 +415,9 @@ const actions = {
     startRunWave: () => session?.startRunWave(),
     wingOrder: (order, wing) => session?.wingOrderCommand(order, wing),
     startArena: (environment, scenario, difficulty, fit) => beginSession('arena', { environment, scenario, difficulty, fit }),
+    multiplayer: () => openMultiplayer(),
+    multiplayerBack: () => multiplayer?.back(),
+    multiplayerMenu: () => multiplayer?.flightMenu(),
     startObserver: (environment = 'open') => beginSession('observer', { observer: true, editor: true, environment }),
     observerTogglePause: () => session?.toggleObserverPause(),
     observerCycleSpeed: () => session?.cycleObserverSpeed(),
@@ -415,9 +449,9 @@ const actions = {
     },
     setNav: (locationId) => session?.setNav(locationId),
     setDestination: (locationId) => session?.setDestination(locationId),
-    openMap: () => session?.openMap(),
-    openShipMenu: () => session?.openShipMenu(),
-    weaponCycle: () => session?.cycleWeapon(),
+    openMap: () => !(session?.arena?.multiplayer && multiplayer?.flightMenu()) && session?.openMap(),
+    openShipMenu: () => !(session?.arena?.multiplayer && multiplayer?.flightMenu()) && session?.openShipMenu(),
+    weaponCycle: () => session?.arena?.multiplayer ? (session.arena.multiplayer.pendingActions.weaponCycle = true) : session?.cycleWeapon(),
     toggleTransponder: () => session?.toggleTransponder(),
     toggleTurrets: () => session?.toggleTurrets(),
     toggleMiningDrones: () => session?.toggleMiningDrones(),
@@ -434,7 +468,7 @@ const actions = {
     setGroupFireMode: (group,mode) => session?.setGroupFireMode(group,mode),
     selectFireGroup: group => session?.selectFireGroup(group),
     setLauncherFireMode: mode => session?.setLauncherFireMode(mode),
-    launcherCycle: () => session?.cycleLauncher(),
+    launcherCycle: () => session?.arena?.multiplayer ? (session.arena.multiplayer.pendingActions.launcherCycle = true) : session?.cycleLauncher(),
     selectTarget: (kind, id) => session?.selectTarget(kind, id, 'map'),
     trade: (kind, commodityId, quantity) => session?.trade(kind, commodityId, quantity),
     jettison: (commodityId, quantity) => session?.jettisonCargo(commodityId, quantity),
@@ -510,6 +544,7 @@ ui.mugStandoff = () => session?.standoffBriefing();
 ui.setActions(actions);
 ui.controller = new ControllerUI(ui, () => session, () => session?.save.settings ?? titleSave().settings);
 showTitleScreen();
+if (new URLSearchParams(location.hash.slice(1)).has('room')) void openMultiplayer(true);
 scheduleLikelyFlightWarmup();
 window.addEventListener('pagehide', () => {
     if (session)
@@ -518,6 +553,7 @@ window.addEventListener('pagehide', () => {
 const pauseFlightOnFocusLoss = () => {
     if (!session || session.save.player.dockedAt || ui.isModalOpen)
         return false;
+    if (session.arena?.multiplayer) return false;
     ui.showPause();
     return true;
 };
@@ -566,6 +602,22 @@ if ('serviceWorker' in navigator && isProductionBuild && !startupProbe && !docum
     });
 }
 window.__VOID_PRIVATEER__ = {
+    ...(devPreviewParams.get('multiplayer-test') === '1' ? {
+        stageMultiplayerDuel: () => {
+            const world = multiplayer?.world;
+            const actors = world?.actors();
+            if (actors?.length !== 2 || world.site.instanceId) return false;
+            const { x, y, z } = world.center;
+            for (const [index, actor] of actors.entries()) {
+                actor.position.splice(0, 3, x, y, z + (index === 0 ? 55 : -55));
+                actor.rotation.splice(0, 4, 0, index, 0, 1 - index);
+                actor.velocity.fill(0);
+                actor.angularVelocity.fill(0);
+                actor.throttle = 0;
+            }
+            return true;
+        },
+    } : {}),
     newGame: () => beginSession('new'),
     resume: () => beginSession('resume'),
     startArenaRun: (resume=false,hard=false) => beginSession('arena',{run:true,resume,hard}),
@@ -622,6 +674,23 @@ window.__VOID_PRIVATEER__ = {
 // object graph.
 window.render_game_to_text = () => {
     const runtime = session;
+    if (multiplayer?.screen) {
+        const player = runtime?.arena?.multiplayer ? runtime.save.player : null;
+        return JSON.stringify({
+            mode: 'multiplayer', screen: multiplayer.screen, phase: multiplayer.state?.phase,
+            coordinates: 'world [x,y,z]; +y is up; ship forward is local -z',
+            remainingSeconds: multiplayer.remainingSeconds,
+            settings: multiplayer.state?.settings, pilot: multiplayer.localPilot(),
+            player: player && {
+                shipId: player.shipId, position: player.position, velocity: player.velocity,
+                hull: player.hull, shield: player.shield, energy: player.energy,
+                missiles: player.missiles, targetId: player.currentTargetId,
+            },
+            contacts: runtime?.ships.map(({ id, name, shipId, position, hull, shield, hostile }) =>
+                ({ id, name, shipId, position, hull, shield, hostile })),
+            standings: multiplayer.state?.standings,
+        });
+    }
     const save = runtime?.save ?? cachedSave;
     if (!save)
         return JSON.stringify({ mode: 'title', coordinates: 'world [x,y,z]; +y is up; ship forward is local -z' });
@@ -762,6 +831,11 @@ window.render_game_to_text = () => {
 window.advanceTime = (milliseconds) => {
     if (!session || session.save.player.dockedAt)
         return;
+    if (session.arena?.multiplayer) {
+        if (devPreviewParams.get('multiplayer-test') === '1' && multiplayer.live)
+            multiplayer.world?.advance(Number(milliseconds) / 1000);
+        return;
+    }
     const steps = Math.max(1, Math.min(600, Math.round(Number(milliseconds) / (1000 / 60))));
     const actions = { throttleDelta: 0, pitch: 0, yaw: 0, roll: 0 };
     session.simAccumulator = 0;

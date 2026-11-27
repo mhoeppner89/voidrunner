@@ -3990,7 +3990,7 @@ export class SpaceRenderer {
             const damage = 1 - entity.hull / entity.maxHull;
             const baseScale = Number(mesh.userData.baseScale ?? 1);
             // Rigid hulls keep a fixed scale. Engine effects carry the animation.
-            mesh.scale.setScalar(baseScale);
+            mesh.scale.setScalar(entity.matchPilot ? baseScale / npcShipScaleForVariant(variant) : baseScale);
             mesh.visible = entity.hull > 0 && !entity.jumpPursuit;
             const emissiveIntensity = entity.race ? 0.24 + damage * 0.12 : entity.hostile ? 0.18 + damage * 0.28 : damage * 0.12;
             const emissiveMaterials = mesh.userData.emissiveMaterials;
