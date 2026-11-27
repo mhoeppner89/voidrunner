@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v707-0-8-2py-barrage-tracker';
+const CACHE = 'voidrunner-v708-0-8-2pz-flak-corvettes';
 
 // Keep only the title/dock shell's static module graph here. Mission data and
 // cockpit silhouettes use their lightweight modules; the flight session,
@@ -95,6 +95,7 @@ const CORE_ASSETS = [
   './src/game/explosionFx.js',
   './src/game/impactFx.js',
   './src/game/shipWreckFx.js',
+  './src/game/wreckCover.js',
     './src/game/graveyardArt.js',
   './src/game/capitalEngineExhaust.js',
   './src/game/battleshipModels.js',
@@ -121,6 +122,10 @@ const CORE_ASSETS = [
   './src/game/capitalMarkers.js',
   './src/game/ordnanceMarkers.js',
   './src/game/bargeLaunchers.js',
+  './src/game/siegeLance.js',
+  './src/game/picketField.js',
+  './assets/models/capital/siege.glb',
+  './assets/models/capital/picket.glb',
   './src/game/capitalMarkerCount.js',
   './src/game/corvetteMounts.js',
   './src/game/frigateComponents.js',

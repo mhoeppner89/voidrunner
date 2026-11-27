@@ -50,7 +50,7 @@ try{
    review.draw();
   };
  });
- for(const [level,name] of [[2,'inbound-group'],[8,'drover-intercept'],[13,'thor-torpedo-run'],[9,'caravan-convoy'],[10,'rookery-raid'],[25,'final-second-group']].filter(([level])=>!process.env.LEVELS||process.env.LEVELS.split(',').includes(String(level)))){
+ for(const [level,name] of [[2,'inbound-group'],[8,'drover-intercept'],[13,'thor-torpedo-run'],[9,'caravan-convoy'],[10,'rookery-raid'],[14,'heimdall-charge'],[19,'tacita-screen'],[25,'final-second-group']].filter(([level])=>!process.env.LEVELS||process.env.LEVELS.split(',').includes(String(level)))){
   await page.evaluate(async level=>{
    const {s,p,r,T,start,watch,draw}=arenaReview;await start(level);
    const b=s.runBattle;
@@ -92,6 +92,51 @@ try{
     for(let i=0;i<180&&!b.target;i++){for(const ship of s.ships)if(ship.arenaRunEnemy)ship.hull=0;tick(1);}
     if(b.target?.variant!=='rookery')throw Error('Wrong raid hull');
     s.renderer.ensureGlbShipModel('rookery');await s.renderer.glbShipLoading.get('rookery');watch(b.target,[100,48,135]);}
+   if(level===14){
+    let ship;
+    for(let i=0;i<180&&!ship;i++){
+     for(const escort of s.ships)if(escort.arenaRunEnemy)escort.hull=0;
+     tick(1);ship=s.ships.find(x=>x.variant==='siege'&&x.hull>0);
+    }
+    if(!ship)throw Error('Missing Heimdall');
+    await s.renderer.ensureGlbShipModel('siege');
+    const {updateSiegeLance}=await import('/src/game/siegeLance.js');
+    // The camera pilot watches from the flank. An NPC ahead of the muzzle
+    // supplies a real target for the production aim ray and firing effect.
+    const target=s.spawnShip('pirate',[0,0,0],undefined,undefined,undefined,{hullId:'talon',faction:'pirates'});
+    ship.rotation=[0,0,0,1];ship.velocity.fill(0);
+    const pos=new T.Vector3(...ship.position);
+    const aim=pos.clone().add(new T.Vector3(0,0,-220));
+    aim.toArray(target.position);ship.targetId=target.id;ship.holdFire=false;ship.hostile=true;
+    watch(ship,[70,32,25],pos.clone().add(new T.Vector3(0,0,-8)).toArray(),new T.Vector3(0,1,0));
+    const started=s.save.world.time;
+    arenaReview.charge=tick=>{
+     s.save.world.time=started+tick/60;
+     updateSiegeLance(s,ship,aim);draw();
+     const mesh=s.renderer.shipMeshes.get(ship.id);
+     const glass=mesh.userData.emissiveMaterials.find(mat=>mat.name==='bridge_glass');
+     if(!glass?.emissiveMap||!(glass.emissiveIntensity>=1))throw Error('Heimdall interior lights went dark');
+     const lit=mesh.userData.lanceCoils.map(mat=>mat.emissiveIntensity>0);
+     if(lit.filter(Boolean).length!==ship.lanceCoils)throw Error('Joint lighting differs from the simulation');
+     return [ship.lanceCoils,ship.lance.frozen];
+    };
+    arenaReview.charge(0);arenaReview.charge(90);
+   }
+   if(level===19){
+    const ship=s.ships.find(x=>x.variant==='picket');
+    if(!ship)throw Error('Tacita missing from Screened');
+    await s.renderer.ensureGlbShipModel('picket');
+    for(let i=0;i<180;i++){
+     s.updateSimulation(1/60,{});
+     if(i>3&&Math.abs(Math.sin(ship.rotorAngle)-.55)<.025)break;
+    }
+    const q=new T.Quaternion().fromArray(ship.rotation);
+    const offset=new T.Vector3(-38,33,-43).applyQuaternion(q);
+    const aim=new T.Vector3(0,-3,0).applyQuaternion(q).add(new T.Vector3(...ship.position));
+    watch(ship,offset.toArray(),aim.toArray(),new T.Vector3(0,1,0).applyQuaternion(q));
+    s.cycleCapitalSubtarget();
+    arenaReview.picket=ship;
+   }
    if(level===25){
     for(const ship of s.ships)if(ship.arenaRunEnemy&&ship!==b.target)ship.hull=0;
     b.target.hull=.55*b.target.maxHull;tick(10.1);tick(5.1);
@@ -114,19 +159,68 @@ try{
   await page.evaluate(assertArenaGlass);
   if(level===8)assert.match(state.ticker,/Njord|engines/i);
   if(desktop)await page.screenshot({path:out+'/'+name+'.png'});
-  if(level===2 && profile!=='iphone'){
-   for(const language of ['de','en']){
-    const fit=await page.evaluate(async language=>{
-     const {setLanguage,t}=await import('/src/game/i18n.js');setLanguage(language);
-     const {s}=arenaReview,warning=t('Group {group}/{total} inbound.',{group:2,total:s.runBattle.groups.length});
-     s.runRadio(warning);await new Promise(resolve=>requestAnimationFrame(resolve));
-     const el=document.querySelector('#comms-bar .talker-text'),range=document.createRange();
-     const end=el.textContent.indexOf(':');range.setStart(el.firstChild,0);range.setEnd(el.firstChild,Math.max(0,end));
-     const label=range.getBoundingClientRect(),box=el.getBoundingClientRect();
-     return {text:el.textContent,expected:t('RANGE')+': '+warning,visible:label.width>0&&label.left>=box.left-1&&label.right<=box.right+1&&label.bottom<=box.bottom+1};
-    },language);
-    assert.equal(fit.text,fit.expected,profile+' '+language);assert.ok(fit.visible,profile+' '+language+' radio label outside its strip');
+  if(level===14){
+   const directory='output/siege/ingame',deviceName=profile==='android'?'pixel-7':profile;
+   await mkdir(directory,{recursive:true});
+   assert.deepEqual(await page.evaluate(()=>arenaReview.charge(90)),[3,true]);
+   await page.screenshot({path:directory+'/'+deviceName+'-mid-charge.png'});
+   assert.deepEqual(await page.evaluate(()=>arenaReview.charge(180)),[6,false]);
+   await page.screenshot({path:directory+'/'+deviceName+'-firing.png'});
+   assert.deepEqual(await page.evaluate(()=>arenaReview.charge(187)),[0,false]);
+  }
+  if(level===19){
+   const directory='output/picket/ingame',deviceName=profile==='android'?'pixel-7':profile;
+   await mkdir(directory,{recursive:true});
+   const measure=()=>page.evaluate(()=>{
+    const {s,picket}=arenaReview,mesh=s.renderer.shipMeshes.get(picket.id);
+    return {angle:mesh.userData.rotor.rotation.y,sim:picket.rotorAngle,tilt:mesh.userData.rotor.rotation.x,
+     glow:mesh.userData.systemGlow.emissiveIntensity,visible:mesh.userData.rotor.parent.visible};
+   });
+   const active=await measure();assert.ok(active.visible&&active.glow>0);
+   assert.ok(Math.abs(active.angle-active.sim)<1e-6);
+   await page.screenshot({path:directory+'/'+deviceName+'-active.png'});
+   await page.evaluate(async()=>{
+    const {s,picket,draw,T}=arenaReview;
+    const {damageCapitalMount}=await import('/src/game/capitalCombat.js');
+    const point=new T.Vector3(0,11.89,12.96).applyQuaternion(new T.Quaternion().fromArray(picket.rotation)).add(new T.Vector3(...picket.position));
+    if(damageCapitalMount(picket,point.toArray(),150)!==0)throw Error('Missed mast bearing');
+    s.corvetteSubsystemDestroyed(picket,0);s.updateSimulation(1/60,{});draw();
+   });
+   const dead=await measure();assert.equal(dead.angle,active.angle);assert.ok(dead.visible);assert.equal(dead.glow,0);assert.equal(active.tilt,0);assert.ok(Math.abs(dead.tilt-25*Math.PI/180)<1e-6);
+   await page.screenshot({path:directory+'/'+deviceName+'-destroyed.png'});
+  }
+  if(level===2){
+   const hulls=await page.evaluate(async()=>Object.keys((await import('/src/game/cockpitDefinitions.js')).COCKPITS));
+   for(const hull of hulls){
+    const geometry=await page.evaluate(async hull=>{
+     const {s}=arenaReview,ui=s.ui;
+     ui.setCockpitShip(hull);await ui.cockpitArtwork.ready;ui.cockpitArtwork.relayout();
+     ui.showRangeCue('WAVE 2/3','INBOUND 5 S');
+     const card=document.querySelector('#range-cue'),animation=card.getAnimations()[0];
+     animation.pause();animation.currentTime=600;
+     const glass=ui.cockpitArtwork.layout.monitors.own;
+     const band=card.firstElementChild,box=band.getBoundingClientRect(),monitor=card.getBoundingClientRect();
+     const style=getComputedStyle(band);
+     const framed=style.borderTopWidth==='2px'&&style.borderBottomWidth==='2px'&&Math.abs(box.width-monitor.width)<1
+      &&Math.abs((box.top+box.bottom-monitor.top-monitor.bottom)/2)<1;
+     const [title,detail]=band.children;
+     return {framed,largeTitle:parseFloat(getComputedStyle(title).fontSize)>parseFloat(getComputedStyle(detail).fontSize),
+      visible:getComputedStyle(card).opacity==='1',fits:[...band.children].every(child=>{
+      const r=child.getBoundingClientRect();return r.width>0&&r.left>=glass.x&&r.right<=glass.x+glass.width&&r.top>=glass.y&&r.bottom<=glass.y+glass.height;
+     })};
+    },hull);
+    assert.deepEqual(geometry,{framed:true,largeTitle:true,visible:true,fits:true},profile+' '+hull);
+    if(profile!=='iphone'&&['wayfarer','talon'].includes(hull)){
+     await mkdir('output/arena-waves',{recursive:true});
+     await page.screenshot({path:'output/arena-waves/'+(desktop?'desktop':'pixel-7')+'-'+hull+'.png'});
+    }
    }
+   await page.evaluate(()=>{
+    const ui=arenaReview.s.ui,card=document.querySelector('#range-cue');
+    ui.flashBreakCue();ui.showRangeCue('SWEEP 3 S','');
+    if(card.getAnimations().length||card.classList.contains('is-on'))throw Error('Range cue obscures BREAK');
+    ui.setCockpitShip(arenaReview.p.shipId);
+   });
   }
   reports.push({name,...state});console.log(profile,name,state.ticker);
  }

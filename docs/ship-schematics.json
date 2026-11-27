@@ -152,6 +152,22 @@
     "aspect": 0.3906238095238095
   },
   {
+    "variant": "siege",
+    "path": "assets/models/capital/siege.glb",
+    "sha256": "275aa9dcff93a83d66e4979605225faad6da9d3a96dfadc592046b6ddace67df",
+    "contourVertices": 73,
+    "glassContours": 12,
+    "aspect": 0.2604166666666667
+  },
+  {
+    "variant": "picket",
+    "path": "assets/models/capital/picket.glb",
+    "sha256": "05bac37884ea801ab2298d7098095f93b6cb1ff94561545e1fcb1f63cad42e43",
+    "contourVertices": 35,
+    "glassContours": 6,
+    "aspect": 0.4166666666666667
+  },
+  {
     "variant": "barge",
     "path": "assets/models/capital/barge.glb",
     "sha256": "6183a3e12ea0e6abf77d4a8dd0d65a62dd1caf78a6b2d5261af301a7e4ac894f",

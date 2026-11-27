@@ -144,6 +144,20 @@
       "sourceSha256": "bb725b1cbf7c2a5bea56dc1ec5a796b7543b79ebd08d31b4888b4847f898c97d"
     },
     {
+      "id": "siege",
+      "runtime": "assets/models/capital/siege.glb",
+      "runtimeSha256": "275aa9dcff93a83d66e4979605225faad6da9d3a96dfadc592046b6ddace67df",
+      "source": "authoring/models/siege/siege.blend",
+      "sourceSha256": "3aa93d32337c03df6e71cfc5d94324e1c80050b3cffa1a36e57cce24f9aad65c"
+    },
+    {
+      "id": "picket",
+      "runtime": "assets/models/capital/picket.glb",
+      "runtimeSha256": "05bac37884ea801ab2298d7098095f93b6cb1ff94561545e1fcb1f63cad42e43",
+      "source": "authoring/models/picket/picket.blend",
+      "sourceSha256": "0f34bf820ebb732acb760b5a633572c8629de6b140389a707ee65f3090d41cb2"
+    },
+    {
       "id": "barge",
       "runtime": "assets/models/capital/barge.glb",
       "runtimeSha256": "6183a3e12ea0e6abf77d4a8dd0d65a62dd1caf78a6b2d5261af301a7e4ac894f",

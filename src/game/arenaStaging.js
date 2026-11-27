@@ -54,6 +54,7 @@ export const ArenaStagingMethods = {
     // Put the pilot at the site's start, in its system and field, and plan the
     // entry points. Returns the pose; the plan is kept on `this.arenaStage`.
     stageArenaSite(siteId) {
+        this.clearCombatDebris?.();
         const site = arenaSite(siteId), player = this.save.player;
         if (player.systemId !== site.systemId || this.renderer?.systemId !== site.systemId) {
             player.systemId = site.systemId;

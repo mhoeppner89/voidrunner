@@ -342,6 +342,42 @@
     ]
   },
   {
+    "variant": "siege",
+    "path": "assets/models/capital/siege.glb",
+    "sha256": "275aa9dcff93a83d66e4979605225faad6da9d3a96dfadc592046b6ddace67df",
+    "triangles": 5460,
+    "vertices": 2822,
+    "boxes": 1927,
+    "grid": [
+      48,
+      48,
+      128
+    ],
+    "extent": [
+      4.175000190734864,
+      5.363349914550781,
+      16.000000000000004
+    ]
+  },
+  {
+    "variant": "picket",
+    "path": "assets/models/capital/picket.glb",
+    "sha256": "05bac37884ea801ab2298d7098095f93b6cb1ff94561545e1fcb1f63cad42e43",
+    "triangles": 8568,
+    "vertices": 4756,
+    "boxes": 1396,
+    "grid": [
+      54,
+      48,
+      128
+    ],
+    "extent": [
+      4.989999771118164,
+      5.960887908935547,
+      12
+    ]
+  },
+  {
     "variant": "barge",
     "path": "assets/models/capital/barge.glb",
     "sha256": "6183a3e12ea0e6abf77d4a8dd0d65a62dd1caf78a6b2d5261af301a7e4ac894f",

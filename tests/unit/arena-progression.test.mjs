@@ -6,7 +6,7 @@ import {battleState} from '../../src/game/arenaBattle.js';
 test('each level stays within its authored group budget',()=>{
  for(const [index,wave] of RUN_WAVES.entries()){
   const level=index+1;
-  const cap=level===1?2:level<=4?3:[5,8,10,13].includes(level)?5:4;
+  const cap=level===1?2:3;
   assert.ok(wave.groups.length<=cap,`Level ${level} has ${wave.groups.length} groups (maximum ${cap})`);
  }
 });

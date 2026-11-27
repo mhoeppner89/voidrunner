@@ -6,6 +6,7 @@ import { combatTargetEligible, tracksActivePlayer } from './combatTargeting.js';
 import { disruptionFactor } from './weaponDamage.js';
 import * as THREE from 'three';
 import {OUTFIT_ITEMS} from './outfitting.js';
+import {ordnanceEnemy} from './picketField.js';
 import {TURRET_LAYOUTS} from './turretLayouts.js';
 import {spendEnergy} from './combatResources.js';
 import {PDC_TURRET,TRACKING_LASER,WEAPON_DAMAGE_SCALE} from './weapons.js';
@@ -32,7 +33,7 @@ export function clearTurretArc(actor,mount,extents,point,state) {
     if(mount.visualScale && actor.capitalClass){
         const surface=state.scratch.copy(state.position).addScaledVector(state.normal,mount.visualScale*.6);
         if(state.local.copy(point).sub(surface).dot(state.normal)<0)return false;
-        return segmentShipColliderHit(surface,point,actor.position,actor.rotation,actor.collisionVariant??actor.variant,2)===undefined;
+        return segmentShipColliderHit(surface,point,actor.position,actor.rotation,actor.collisionVariant??actor.variant,2,0,undefined,actor.rotorAngle)===undefined;
     }
     if(actor.capitalClass==='frigate'&&mount.label==='MAIN BATTERY') {
         const distance=local.length();
@@ -126,7 +127,7 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
         if(!disabled && pdc && now>=defense.readyAt) {
             let nearest=pdcWeapon.range;
             for(const p of session.projectiles) {
-                if((p.kind!=='missile'&&p.kind!=='torpedo')||p.life<=0||p.ownerId===ownerId||p.targetId!==ownerId||(assignments?assignments.get(p.id)?.until:p.pdcAssignedUntil)>now)continue;
+                if((p.kind!=='missile'&&p.kind!=='torpedo')||p.life<=0||p.ownerId===ownerId||(actor.variant==='picket'?!ordnanceEnemy(session,actor,p):p.targetId!==ownerId)||(assignments?assignments.get(p.id)?.until:p.pdcAssignedUntil)>now)continue;
                 const pos=session.projStore.getPos(p.slot,state.goal),distance=pos.distanceTo(state.position);
                 if(distance<=nearest+rangeEpsilon && clearTurretArc(actor,mount,extents,pos,state) && !session.lineBlocked(state.position,pos,ownerId) && !shipBlocksRay(session,actor,ownerId,p,pos,state)){
                     nearest=distance;target=p;
@@ -208,7 +209,8 @@ export function updateAutomaticTurrets(session,actor,ownerId,dt) {
         // When banking carries a held barrel into the deck, retract its aim
         // outward. The base remains attached to the hull throughout the turn.
         state.goal.copy(state.position).addScaledVector(state.direction,1.1*(mount.size==='M'?1.3:1)*modelScale);
-        if(!clearTurretArc(actor,mount,extents,state.goal,state))state.direction.copy(state.normal);
+        if(actor.variant==='picket' && (!point || disabled))state.direction.fromArray(mount.restDirection).applyQuaternion(state.q);
+        else if(!clearTurretArc(actor,mount,extents,state.goal,state))state.direction.copy(state.normal);
         session.renderer.showTurret?.((state.meshId??=ownerId+'-'+index),state.position,state.direction,mount.size,pdc?'pdc':'laser',state.q,mount.side,mount.pedestal,modelScale,mount.axis??1,actor,index);
     }
 }

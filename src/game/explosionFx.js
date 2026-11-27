@@ -23,7 +23,8 @@ export function blastHeft(size, reference, power) {
 const FIGHTER_BLAST = 1.6, FIGHTER_SHARDS = FIGHTER_BLAST * .65;
 export function createShipExplosion(position, scale = 1, { velocity, variant, seed, capital: capitalPace = 0 } = {}) {
     const random = seededRandom(seed ?? position.join(':') + ':blast');
-    const kind = EXPLOSION_VARIANTS.includes(variant) ? variant : EXPLOSION_VARIANTS[Math.floor(random() * EXPLOSION_VARIANTS.length)];
+    const flak = variant === 'flak';
+    const kind = flak ? 'flak' : EXPLOSION_VARIANTS.includes(variant) ? variant : EXPLOSION_VARIANTS[Math.floor(random() * EXPLOSION_VARIANTS.length)];
     const root = new THREE.Group();
     root.position.fromArray(position);
     root.scale.setScalar(Math.max(.1, scale));
@@ -31,7 +32,7 @@ export function createShipExplosion(position, scale = 1, { velocity, variant, se
     // Capital destruction takes longer, with secondary hull sections igniting
     // after the first flash. Small ship timing stays unchanged.
     // Big ships pass their own pace (corvette .5, frigate .75, larger 1).
-    const capital = Math.max(capitalPace, Math.min(1, (scale - 3) / 9), 0);
+    const capital = flak ? 0 : Math.max(capitalPace, Math.min(1, (scale - 3) / 9), 0);
     const pace = { value: 1 + capital * 1.8 };
     const delay = capital * 3;
     // Blast centres: [x, y, z, start]. Secondaries scale with the hull.
@@ -70,10 +71,10 @@ export function createShipExplosion(position, scale = 1, { velocity, variant, se
     const heat = { value: kind === 'breach' ? .35 : 0 }, soot = { value: kind === 'chain' || kind === 'breakup' ? 1.25 : 1 };
     const flashTint = { value: new THREE.Color(kind === 'breach' ? 0xcfe8ff : 0xffe3a6) };
     const material = new THREE.ShaderMaterial({
-        uniforms: { time, pace, heat, soot, flashTint }, transparent: true, depthWrite: false,
+        uniforms: { time, pace, heat, soot, flashTint, flak: {value:Number(flak)} }, transparent: true, depthWrite: false,
         vertexShader: `
-            attribute vec3 drift; attribute vec3 params; attribute vec3 offset; uniform float time; uniform float pace;
-            varying vec2 blastUv; varying float age; varying float seed; varying float flash;
+            attribute vec3 drift; attribute vec3 params; attribute vec3 offset; uniform float time; uniform float pace; uniform float flak;
+            varying vec2 blastUv; varying float age; varying float seed; varying float flash; varying float visibility;
             void main() {
                 blastUv=position.xy; age=max(0.,(time-params.z)/pace); seed=params.y;
                 flash=1.-step(.1,params.x);
@@ -84,13 +85,32 @@ export function createShipExplosion(position, scale = 1, { velocity, variant, se
                 vec4 view=modelViewMatrix*vec4(centre,1.);
                 float radius=mix((.65+spread*2.8)*(0.85+params.x*.12), (2.+age*32.)*params.y, flash)*started;
                 float worldScale=length(modelMatrix[0].xyz);
-                view.xy+=position.xy*radius*worldScale;
+                visibility=1.;
+                if(flak>.5){
+                    vec4 origin=modelViewMatrix[3];
+                    float depth=max(0.,-origin.z);
+                    float focal=max(projectionMatrix[0][0],projectionMatrix[1][1]);
+                    // The entire puff fits inside a ten-unit radius and a small
+                    // fraction of the viewport, including its drifting lobes.
+                    float shrink=min(1.,.075*depth/(10.*focal));
+                    if(flash>.5){
+                        radius=min(2.+2.*clamp(age/.1,0.,1.),.065*depth/focal);
+                        view=origin;
+                    }else{
+                        float driftRadius=(2.+.5*params.x)*spread;
+                        view=origin;
+                        view.xyz+=mat3(modelViewMatrix)*drift*(driftRadius*shrink/worldScale);
+                        radius=(2.+3.8*spread)*shrink;
+                        visibility=smoothstep(15.,60.,depth);
+                    }
+                }else radius*=worldScale;
+                view.xy+=position.xy*radius;
                 gl_Position=projectionMatrix*view;
             }`,
         fragmentShader: `
             precision highp float;
-            uniform float heat; uniform float soot; uniform vec3 flashTint;
-            varying vec2 blastUv; varying float age; varying float seed; varying float flash;
+            uniform float heat; uniform float soot; uniform float flak; uniform vec3 flashTint;
+            varying vec2 blastUv; varying float age; varying float seed; varying float flash; varying float visibility;
             float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
             float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
                 return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
@@ -98,8 +118,13 @@ export function createShipExplosion(position, scale = 1, { velocity, variant, se
                 float r=length(blastUv);
                 if(r>1.) discard;
                 if(flash>.5){
-                    float a=exp(-r*r*5.)*max(0.,1.-age/.22);
-                    gl_FragColor=vec4(flashTint,a); return;
+                    float a=exp(-r*r*5.)*max(0.,1.-age/mix(.22,.1,flak));
+                    vec3 tint=flashTint;
+                    if(flak>.5){
+                        tint=mix(vec3(1.,.14,.012),vec3(1.,.78,.44),1.-smoothstep(.08,.55,r));
+                        a*=1.-smoothstep(.55,1.,r);
+                    }
+                    gl_FragColor=vec4(tint,a); return;
                 }
                 vec2 p=blastUv*3.8+seed;
                 float n=noise(p+age*.23)*.6+noise(p*2.1-age*.31)*.28+noise(p*4.3)*.12;
@@ -109,8 +134,13 @@ export function createShipExplosion(position, scale = 1, { velocity, variant, se
                 vec3 fire=mix(vec3(.62,.075,.009),vec3(1.,.48,.055),smoothstep(.1,.65,h));
                 fire=mix(fire,mix(vec3(1.,.94,.69),vec3(.86,.94,1.),heat*2.),smoothstep(.7,1.,h));
                 vec3 color=mix(smoke,fire,smoothstep(.12,.55,h));
+                if(flak>.5){
+                    vec3 charcoal=vec3(.015,.010,.007)*(.6+n);
+                    float ember=(1.-smoothstep(.02,.30,age))*(1.-smoothstep(.05,.85,r));
+                    color=charcoal+vec3(.32,.061,.009)*ember;
+                }
                 float fade=(1.-smoothstep(1.3*soot,2.5*soot,age))*smoothstep(0.,.08,age);
-                gl_FragColor=vec4(color,density*fade*.86);
+                gl_FragColor=vec4(color,density*fade*.86*visibility);
             }`,
     });
     const cloud = new THREE.Mesh(geometry, material);
@@ -121,13 +151,15 @@ export function createShipExplosion(position, scale = 1, { velocity, variant, se
     // pattern scaled up.
     const heft = blastHeft(scale, FIGHTER_BLAST, .75);
     const parts = [
-        createStreakBurst({ count: kind === 'breach' ? 48 : 40, speedMin: 18 * heft, speedMax: 58 * heft, drag: 1.4, lifeMin: .45 * pace.value, lifeMax: 1.1 * pace.value, width: .15, lag: .06,
-            hot: 0xfffbe8, cool: kind === 'breach' ? 0x5aa8ff : 0xff6a1e, random, delay: (i) => centres[i % centres.length][3] }),
+        createStreakBurst({ count: flak ? 14 : kind === 'breach' ? 48 : 40, speedMin: 18 * heft, speedMax: 58 * heft, drag: 1.4, lifeMin: .45 * pace.value, lifeMax: 1.1 * pace.value, width: flak ? .08 : .15, lag: flak ? .035 : .06, nearClip: flak ? 15 : 0,
+            hot: flak ? 0xffa148 : 0xfffbe8, cool: kind === 'breach' ? 0x5aa8ff : 0xff6a1e, random, delay: flak ? .07 : (i) => centres[i % centres.length][3] }),
+    ];
+    if(!flak)parts.push(
         createStreakBurst({ count: kind === 'breakup' ? 12 : 8, direction: kind === 'breakup' ? (i, out, rnd) => out.copy(axis).multiplyScalar(i % 2 ? 1 : -1).add(new THREE.Vector3(rnd() - .5, rnd() - .5, rnd() - .5).multiplyScalar(.9)) : undefined,
             speedMin: 8 * heft, speedMax: 20 * heft, drag: .5, lifeMin: 1.6 * pace.value, lifeMax: 2.6 * pace.value, width: .34, lag: .35, hot: 0xffd27a, cool: 0xc02a08, random }),
         createShockRing({ radius: kind === 'breach' ? 9 : 4.5, life: kind === 'breach' ? .55 : .32, hex: kind === 'breach' ? 0xbfe2ff : 0xffd9a0, opacity: kind === 'breach' ? .8 : .45, thickness: kind === 'breach' ? .12 : .22,
             normal: kind === 'breach' ? [axis.x, axis.y + .6, axis.z] : undefined }),
-    ];
+    );
     for (const part of parts) root.add(part.object);
     const duration = Math.max(2.65 * pace.value + delay + Math.max(...centres.map((c) => c[3])), ...parts.map((part) => part.life));
     // The blast keeps the dying ship's momentum and slowly sheds it.

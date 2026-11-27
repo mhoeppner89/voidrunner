@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from '../../vendor/three.module.min.js';
+import {flakPanel} from '../helpers/flak-flight.mjs';
+import {seededRandom} from '../../src/game/random.js';
 import {fixture} from '../helpers/session.mjs';
 import {EntityStore} from '../../src/game/entityStore.js';
 import {CAPITAL_HULLS,capitalReadout} from '../../src/game/capitalHulls.js';
-import {BARGE,BARGE_SWARM,bargeLockRate,bargeWarheadCount,updateBargeLaunchers} from '../../src/game/bargeLaunchers.js';
+import {BARGE,FLAK,bargeLockRate,updateBargeLaunchers} from '../../src/game/bargeLaunchers.js';
 import {LAUNCHERS} from '../../src/game/weapons.js';
 import {SHIP_COLLIDERS} from '../../src/game/shipCollision.js';
 import {TRAFFIC_HULLS} from '../../src/game/corvetteMounts.js';
@@ -32,7 +34,7 @@ function run(s,ship,seconds){
         updateBargeLaunchers(s,ship,STEP,target.fromArray(p.position));
     }
 }
-const warheads=s=>s.projectiles.filter(p=>p.kind==='missile'&&p.hitWeapon===BARGE_SWARM);
+const warheads=s=>s.projectiles.filter(p=>p.kind==='missile'&&p.hitWeapon===FLAK);
 function hit(s,ship,m){
     const p=new THREE.Vector3().fromArray(m.hitCenter).add(new THREE.Vector3(...ship.position));
     ship.shield=0;s.damageShip(ship,m.hull,'environment',p.toArray());
@@ -45,22 +47,26 @@ test('the Barrage carries six detachable racks, a fire-control dish, a laser and
     assert.equal(ship.maxHull,700);assert.equal(ship.maxShield,200);
     assert.ok(SHIP_COLLIDERS.barge.contactRadius>0);
 });
-test('its warheads fly like stock swarm warheads, so the measured break window holds',()=>{
-    for(const key of ['speed','homingSpeed','homingTurn','trackRate','seekerCone','terminalRange','acceleration','volley','damage'])
-        assert.equal(BARGE_SWARM[key],LAUNCHERS.swarm[key],key);
-    assert.ok(BARGE_SWARM.life*BARGE_SWARM.speed>BARGE.lockRange,'reaches across the lock range');
-});
-test('a slow, steady pilot draws a CHARGING warning, then a full eight-warhead salvo three seconds later',()=>{
+test('a slow, steady pilot draws a CHARGING warning, then a six-rocket ripple three seconds later',()=>{
     const {s,ship}=stage();pilot(s,900,[0,0,10]);
     run(s,ship,1);assert.ok(ship.combatFit.lock>0&&ship.combatFit.lock<1,'the lock builds');assert.equal(warheads(s).length,0);
     let warnedAt;
     for(let t=0;t<10&&!warnedAt;t+=STEP){run(s,ship,STEP);if(ship.capitalAttack==='CHARGING')warnedAt=s.save.world.time;}
     assert.ok(warnedAt,'the salvo is announced');assert.equal(warheads(s).length,0);
     run(s,ship,BARGE.warning-.1);assert.equal(warheads(s).length,0,'no launch before the warning ends');
-    run(s,ship,.2);assert.equal(warheads(s).length,8);
-    assert.equal(new Set(warheads(s).map(p=>p.salvo)).size,2,'two canisters');
-    assert.ok(warheads(s).every(p=>p.targetId==='player'&&p.launcherId==='swarm'));
-    run(s,ship,BARGE.every-1);assert.equal(warheads(s).length,8,'reloads for fifteen seconds');
+    run(s,ship,.2);assert.equal(warheads(s).length,1);
+    const launches=[s.save.world.time];
+    while(warheads(s).length<6&&s.save.world.time-launches[0]<1){
+        run(s,ship,STEP);
+        if(warheads(s).length>launches.length)launches.push(s.save.world.time);
+    }
+    assert.equal(launches.length,6);
+    for(let i=2;i<6;i++)assert.ok(Math.abs(launches[i]-launches[i-1]-.15)<1e-7);
+    assert.equal(new Set(warheads(s).map(p=>s.projStore.pos.slice(p.slot*3,p.slot*3+3).join())).size,6);
+    assert.equal(FLAK.speed,LAUNCHERS.torpedo.speed);
+    assert.equal(new Set(warheads(s).map(p=>p.salvo)).size,1,'one salvo');
+    assert.ok(warheads(s).every(p=>p.targetId==='player'&&p.launcherId==='flak'));
+    run(s,ship,BARGE.every-1);assert.equal(warheads(s).length,6,'reloads for fifteen seconds');
 });
 test('crossing fast during the warning breaks the track and the racks reload short',()=>{
     const {s,ship}=stage();pilot(s,1000,[0,0,10]);
@@ -86,21 +92,20 @@ test('speed only slows the lock, four times at 100 and beyond; line-of-sight rat
         assert.equal(ship.combatFit.lock,0,`${speed} across at ${range}`);
     }
 });
-test('a rush draws one snap canister per approach',()=>{
+test('a rush draws one snap volley per approach',()=>{
     const {s,ship}=stage();pilot(s,1100,[-70,0,0]);
     run(s,ship,8);
-    assert.equal(warheads(s).length,4,'one canister inside snap range');
+    assert.equal(warheads(s).length,3,'three rockets inside snap range');
     assert.ok(s.save.player.position[0]<BARGE.snapRange);
-    s.save.player.position=[400,0,0];run(s,ship,1);assert.equal(warheads(s).length,4,'not again on the same approach');
+    s.save.player.position=[400,0,0];run(s,ship,1);assert.equal(warheads(s).length,3,'not again on the same approach');
     s.save.player.position=[BARGE.snapRearm+50,0,0];s.save.player.velocity=[0,0,0];run(s,ship,STEP);
-    s.save.player.velocity=[-70,0,0];run(s,ship,5);assert.equal(warheads(s).length,8,'rearmed after leaving');
+    s.save.player.velocity=[-70,0,0];run(s,ship,5);assert.equal(warheads(s).length,6,'rearmed after leaving');
 });
 test('inside the minimum range the racks stay silent',()=>{
     const {s,ship}=stage();pilot(s,BARGE.minRange-20,[0,0,0]);
     run(s,ship,20);assert.equal(warheads(s).length,0);assert.equal(ship.combatFit.lock,0);
 });
 test('lost racks shrink the salvo and drop their collision; losing the dish halves the lock range',()=>{
-    assert.deepEqual([6,5,4,3,2,1,0].map(bargeWarheadCount),[8,7,6,4,3,2,0]);
     const {s,ship,mounts}=stage();
     const racks=mounts.filter(m=>m.kind==='rack');
     hit(s,ship,racks[0]);hit(s,ship,racks[3]);
@@ -108,12 +113,12 @@ test('lost racks shrink the salvo and drop their collision; losing the dish halv
     assert.equal(ship.missingPods,racks[0].partBit|racks[3].partBit);assert.notEqual(ship.collisionVariant,'barge');
     pilot(s,900,[0,0,10]);
     for(let t=0;t<12&&!warheads(s).length;t+=STEP)run(s,ship,STEP);
-    assert.equal(warheads(s).length,6);
+    run(s,ship,1);assert.equal(warheads(s).length,4);
     const blind=stage();hit(blind.s,blind.ship,blind.mounts.find(m=>m.kind==='dish'));
     pilot(blind.s,900,[0,0,10]);run(blind.s,blind.ship,20);
     assert.equal(warheads(blind.s).length,0,'beyond the halved range');
     for(const r of racks)ship.capitalMountHull[r.index]=0;
-    run(s,ship,STEP);assert.equal(ship.capitalDisarmed,true);
+    run(s,ship,24);assert.equal(ship.capitalDisarmed,true);assert.equal(warheads(s).length,4);
 });
 // Bug report: ramming the Barrage flung it out of the fight at more than its
 // own cruise speed, and a hull without engines then never slowed down.
@@ -165,4 +170,67 @@ test('in range a corvette keeps moving on its broadside orbit, and the barge rel
             assert.ok(fastest>ship.capitalBaseSpeed*.8,`it relocates after a salvo (${fastest.toFixed(1)})`);
         }
     }
+});
+
+test('flak scatters inside its cone, samples the whole disk, and jitters each fuze',t=>{
+    t.mock.method(Math,'random',seededRandom(415));
+    const {s,ship}=stage();pilot(s,900);
+    const direction=new THREE.Vector3(),muzzle=new THREE.Vector3(),ray=new THREE.Vector3();
+    let smallest=Infinity,largest=0,early=0,late=0;
+    for(let salvo=0;salvo<16;salvo++){
+        run(s,ship,25);
+        for(const shot of s.projectiles.splice(0)){
+            s.projStore.getPos(shot.slot,muzzle);s.projStore.getVel(shot.slot,direction);
+            ray.fromArray(s.save.player.position).sub(muzzle);
+            const angle=ray.angleTo(direction),jitter=shot.life-ray.length()/FLAK.speed;
+            assert.ok(angle<=FLAK.spread+1e-6&&Math.abs(jitter)<=FLAK.jitter+1e-6);
+            smallest=Math.min(smallest,angle);largest=Math.max(largest,angle);
+            early=Math.min(early,jitter);late=Math.max(late,jitter);
+        }
+    }
+    assert.ok(smallest<FLAK.spread*.5&&largest>FLAK.spread*.85);
+    assert.ok(early<-.2&&late>.2);
+});
+
+test('timed, proximity and terrain bursts respect the earliest hit and damage nearby hostiles once',()=>{
+    const {s,ship}=stage(),p=s.save.player,point=new THREE.Vector3(),velocity=new THREE.Vector3(0,0,-90);
+    function rocket(life){
+        return {slot:s.projStore.alloc(),life,flightTime:life,ownerId:ship.id,faction:ship.faction,targetId:'player',
+            threatensPilot:true,wobbleX:0,wobbleY:0,wobbleZ:0,wobblePhase:0};
+    }
+    s.firstObstacleHitInfo=()=>undefined;
+    const blasts=[];s.renderer.spawnFlakBurst=v=>blasts.push(v.toArray());
+    p.position=[0,0,-1000];
+    let shot=rocket(0);s.advanceFlak(shot,point,velocity,.01);assert.equal(blasts.length,1);
+    assert.ok(Math.abs(blasts[0][2]+.9)<1e-7);
+    s.firstObstacleHitInfo=()=>({t:.25});shot=rocket(1);s.advanceFlak(shot,point,velocity,STEP);
+    assert.ok(Math.abs(blasts[1][2]+.375)<1e-7);
+    s.firstObstacleHitInfo=()=>undefined;p.position=[0,0,-31];p.rotation=[0,0,0,1];
+    const actor=(id,faction,x)=>({id,faction,hull:100,rotation:[0,0,0,1],position:[x,0,-1]});
+    s.ships=[ship,actor('near','independents',0),actor('edge','independents',51),actor('outside','independents',52),actor('ally',ship.faction,0)];
+    // Place NPCs after the proximity crossing to measure a single blast's falloff.
+    const group=s.ships;s.ships=[ship];s.damagePlayer=()=>{};s.kickCamera=()=>{};
+    shot=rocket(1);s.advanceFlak(shot,point,velocity,STEP);assert.equal(shot.life,0);
+    assert.ok(Math.abs(blasts[2][2]+1)<1e-7);
+    s.ships=group;s.npcHullExtents=()=>[1,1,1];
+    const hits=[];s.damageShip=(target,amount)=>hits.push([target.id,Math.round(amount)]);
+    s.burstFlak(rocket(1),new THREE.Vector3(0,0,-1));
+    assert.deepEqual(hits,[['near',40],['edge',10]]);
+});
+
+test('a single BREAK falls inside the measured evasion window in the fixed-step trials',()=>{
+    const steady=flakPanel('straight'),jink=flakPanel('break'),drover=flakPanel('drover'),rush=flakPanel('rush');
+    assert.ok(steady.damage>=60&&steady.damage<=100);
+    assert.equal(jink.cues,1);assert.ok(jink.firstCue>3.5&&jink.firstCue<4.2);
+    assert.ok(jink.damage<=20&&rush.damage<=20&&drover.damage>=120);
+});
+
+test('a long but reachable flak intercept uses the full flight time',()=>{
+    const {s,ship}=stage();pilot(s,900);
+    for(let i=0;i<600&&ship.capitalAttack!=='CHARGING';i++)run(s,ship,STEP);
+    assert.equal(ship.capitalAttack,'CHARGING');
+    // The pilot accelerates along the same bearing just before ignition.
+    run(s,ship,BARGE.warning-.1);
+    s.save.player.velocity=[70,0,0];run(s,ship,.2);
+    assert.ok(warheads(s)[0].life>40);
 });

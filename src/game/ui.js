@@ -480,7 +480,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2py';
+const GAME_VERSION = '0.8.2pz';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -1308,7 +1308,7 @@ export class GameUI {
           <div class="cockpit-art" aria-hidden="true"></div>
           <div class="cockpit-glass" aria-hidden="true"></div>${cockpitDamageMarkup()}
           <div class="cockpit-screen cockpit-screen-own" role="button" tabindex="0" aria-label="${t('Own ship status display; tap to open ship menu')}">
-            <div class="monitor-damage" aria-hidden="true"></div><div id="break-cue" class="screen-break" aria-hidden="true"><b>${t('BREAK')}</b></div><div class="screen-standoff" id="screen-standoff" data-tone="danger"><span>${t('STANDOFF')}</span><b id="screen-standoff-demand"></b><em id="screen-standoff-timer">9</em></div>
+            <div class="monitor-damage" aria-hidden="true"></div><div id="range-cue" class="screen-range" aria-hidden="true"><div class="range-band"><b></b><span></span></div></div><div id="break-cue" class="screen-break" aria-hidden="true"><b>${t('BREAK')}</b></div><div class="screen-standoff" id="screen-standoff" data-tone="danger"><span>${t('STANDOFF')}</span><b id="screen-standoff-demand"></b><em id="screen-standoff-timer">9</em></div>
             <div class="screen-race-strip" id="screen-race-strip"><span id="screen-race-label"></span><b id="screen-race-value"></b></div>
             <div class="screen-ship-layout"><div class="screen-flight"><div><span data-short="SPD">${t('SPD')}</span><b id="screen-own-speed">0</b><small id="screen-own-max-speed">/100</small></div><div><span id="screen-own-drive-label" data-short="THR">${t('THR')}</span><b id="screen-own-drive">0</b><small>%</small></div></div><div class="screen-own-weapon" id="screen-own-weapon" data-touch-action="weaponCycle" data-venting="false" role="button" tabindex="0" title="${t('Switch fire group — press X or tap')}"><span id="screen-own-weapon-name"></span><em id="screen-own-weapon-ammo">∞</em><small id="screen-own-launcher"></small><small id="screen-own-drone-pdc" class="is-hidden"></small></div><canvas class="hull-outline" id="own-hull-outline" aria-hidden="true"></canvas><div class="screen-bars"><div><span data-short="S">${t('SHIELDS')}</span><i><b id="screen-own-shield"></b></i></div><div><span data-short="E">${t('ENERGY')}</span><i><b id="screen-own-energy"></b></i></div><div><span data-short="H">${t('HULL')}</span><i><b id="screen-own-hull"></b></i></div></div><div class="screen-ticker screen-event-ticker" id="screen-event-ticker" data-tone="info"></div></div>
           </div>
@@ -4923,9 +4923,20 @@ export class GameUI {
             }
         }
     }
-    // A visual twin of the audio break cue on the own-ship monitor, for pilots
-    // playing without sound: two quick red flashes over the whole screen.
+    showRangeCue(title,detail) {
+        const card=this.rangeCueEl??=this.el('#range-cue');
+        const danger=this.breakCueEl??=this.el('#break-cue');
+        if(danger.getAnimations().length)return;
+        const band=card.firstElementChild;
+        band.firstElementChild.textContent=title;
+        band.lastElementChild.textContent=detail;
+        card.classList.remove('is-on');
+        void card.offsetWidth;
+        card.classList.add('is-on');
+    }
+    // BREAK cancels an informational flash, including its dark interval.
     flashBreakCue() {
+        this.rangeCueEl?.classList.remove('is-on');
         const el=this.breakCueEl??=this.el('#break-cue');
         if(!el)return;
         el.classList.remove('is-on');

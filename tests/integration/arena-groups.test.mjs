@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from '../../vendor/three.module.min.js';
+import {t} from '../../src/game/i18n.js';
 import {fixture} from '../helpers/session.mjs';
 import {newArenaRun,RUN_WAVES,readArenaRun,writeArenaRun} from '../../src/game/arenaRun.js';
 import {CAPITAL_HULLS} from '../../src/game/capitalHulls.js';
@@ -31,22 +32,24 @@ function reachPrimary(s) {
  assert.ok(s.runBattle.target);
  return s;
 }
-test('one survivor starts a five-second warning, with one radio transmission and a flanking group',()=>{
- const s=stage(6);assert.equal(opponents(s).length,2);
+test('one survivor starts a five-second warning, with one monitor cue and a flanking group',()=>{
+ const s=stage(6),cards=[];s.ui.showRangeCue=(...args)=>cards.push(args);
+ s.nextChatterAt=999;assert.equal(opponents(s).length,2);
  advance(s,1);assert.equal(s.runBattle.warning,undefined);
  opponents(s)[0].hull=0;advance(s,9);assert.ok(s.runBattle.warning);
- assert.equal(s.radio.length,1);const point=s.runBattle.warning.entry.position;
+ assert.deepEqual(cards,[[t('WAVE {wave}/{total}',{wave:2,total:3}),t('INBOUND {seconds} S',{seconds:5})]]);assert.deepEqual(s.radio,[]);assert.ok(s.log.includes(s.runBattle.warning.line));
+ assert.equal(s.nextChatterAt,999);s.nextChatterAt=0;assert.equal(s.chatterOpen(),true);const point=s.runBattle.warning.entry.position;
  advance(s,4.99);assert.equal(s.runBattle.group,1);
  advance(s,.02);assert.equal(s.runBattle.group,2);assert.equal(opponents(s).length,3);
- assert.deepEqual(opponents(s)[1].position,point);assert.equal(s.radio.length,1);
+ assert.deepEqual(opponents(s)[1].position,point);assert.equal(cards.length,1);
 });
 test('Act I timer warns after 40 s. The next pair waits until both fighters fit',()=>{
- // Level 4's second group is the Barrage (capital limits); test the fighter rule with a pair.
+ // Use a pair from the opening screen to exercise the capacity and timer independently.
  const pair=s=>{s.runBattle.groups[1].enemies=s.runBattle.groups[0].enemies.map(e=>({...e}));return s;};
- const s=pair(stage(4));advance(s,45);assert.equal(s.runBattle.group,1);
+ const s=pair(stage(5));advance(s,45);assert.equal(s.runBattle.group,1);
  assert.equal(s.runBattle.warning,undefined,'two alive plus two incoming exceeds three');
  opponents(s)[1].hull=0;advance(s,1);advance(s,5);assert.equal(s.runBattle.group,2);
- const v=pair(stage(4));v.runBattle.groups[1].enemies.pop();
+ const v=pair(stage(5));v.runBattle.groups[1].enemies.pop();
  advance(v,39.99);assert.equal(v.runBattle.warning,undefined);
  advance(v,.02);assert.ok(v.runBattle.warning);advance(v,5);assert.equal(v.runBattle.group,2);
  const duel=stage(3);duel.runBattle.group=duel.runBattle.groups.length-1;
@@ -55,7 +58,7 @@ test('Act I timer warns after 40 s. The next pair waits until both fighters fit'
  assert.deepEqual(opponents(duel).map(ship=>ship.hullId),['demon']);
 });
 test('a later act sends a fitting solo reinforcement after 60 seconds with two survivors',()=>{
- const s=stage(7);opponents(s)[0].hull=0;advance(s,10);advance(s,5);
+ const s=stage(7);s.runBattle.groups[2].enemies=s.runBattle.groups[2].enemies.slice(0,1);opponents(s)[0].hull=0;advance(s,10);advance(s,5);
  assert.equal(s.runBattle.group,2);
  opponents(s)[0].hull=0;assert.equal(opponents(s).length,2);
  advance(s,54.99);assert.equal(s.runBattle.warning,null);

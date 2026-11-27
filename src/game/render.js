@@ -19,11 +19,13 @@ import {CRUISER_MOUNTS} from './cruiserModelData.js';
 import {createCruiserTurret,createCruiserPdc,createCruiserEngineDamage,updateCruiserEngineDamage} from './cruiserModels.js';
 import { createShipExplosion, createHullDebris } from './explosionFx.js';
 import {derelictSurfaceObstacles,createDerelictVents,createDriveLeak} from './derelictFx.js';
+import {fractureBounds} from './wreckCover.js';
 import {ShipWreckFactory} from './shipWreckFx.js';
 import { isAppleTouchDevice, skipHiddenWorldMatrices, markAttributeSpan, configureShaderDiagnostics, prepareRenderScene, freezeStaticTransforms, waitForRenderWork } from './renderWork.js';
 import { DRONE_PORTS } from './droneFlight.js';
 import {cockpitDamageStage} from './cockpitDamage.js';
 import {createGraveyardPlating,prepareGraveyardModel,arrangeGraveyardModel,batchGraveyardModelAsync,clipWreckSections,createCollisionWreck,installWreckDrawRanges} from './graveyardArt.js';
+import {picketDishTilt} from './picketField.js';
 import {createTurretModel,paintFrigateTurret} from './turretModels.js';
 import {createFrigateSystems,updateFrigateSystems,setFrigateComponentDamage,frigateEngineFraction} from './frigateComponents.js';
 import {capitalHull} from './capitalHulls.js';
@@ -164,6 +166,12 @@ export const GLB_SHIP_CONFIG = {
         collisionSource: 'authoring/models/ironjaw/support/collision.json',
         placeholderVariant: 'atlas-freighter', placeholderScale: 2,
     },
+    ...Object.fromEntries(['siege','picket'].map(variant => [variant, {
+        path: 'assets/models/capital/'+variant+'.glb', yaw: -Math.PI/2, scale: variant==='siege'?16:12, baseScale: 1,
+        enginePorts: [], preload: false, preserveColor: true, authoredPaint: true,
+        collisionSource: 'authoring/models/'+variant+'/support/collision.json',
+        placeholderVariant:'atlas-freighter', placeholderScale:2,
+    }])),
     barge: {
         path: 'assets/models/capital/barge.glb', yaw: -Math.PI / 2, scale: 14, baseScale: 1,
         enginePorts: [], preload: false, preserveColor: true, authoredPaint: true,
@@ -3654,7 +3662,8 @@ export class SpaceRenderer {
                 const cached = tintedMaterials.get(paintKey);
                 if (cached) { child.material = cached; return; }
                 const material = source.clone();
-                if((variant==='concord-battleship'||variant==='concord-carrier')&&source.emissive&&(source.emissive.r+source.emissive.g+source.emissive.b)>0)
+                const litGlazing=variant==='siege'&&source.name==='bridge_glass';
+                if((litGlazing||variant==='concord-battleship'||variant==='concord-carrier'||variant==='picket')&&source.emissive&&(source.emissive.r+source.emissive.g+source.emissive.b)>0)
                     material.userData.minimumEmissiveIntensity=source.emissiveIntensity;
                 tintedMaterials.set(paintKey, material);
                 const isCanopy = material.name.startsWith('VR_Canopy_');
@@ -3719,15 +3728,38 @@ export class SpaceRenderer {
                     return damaged;
                 });
             }
-            wrapper.userData.corvetteParts=capitalHull({variant}).mounts.map(m=>['engine','generator','pod','booster','stack','bay','hangar','mast','rack','dish'].includes(m.kind)?group.getObjectByName(m.node):null);
+            wrapper.userData.corvetteParts=capitalHull({variant}).mounts.map(m=>['engine','generator','pod','booster','stack','bay','hangar','mast','rack','dish','capacitor','rangefinder','emitter'].includes(m.kind)?group.getObjectByName(m.node):null);
         }
         if(variant==='concord-carrier')wrapper.userData.carrierArmament=bindCarrierArmament(group);
         if(variant==='mule')wrapper.userData.embeddedTurrets=FLEET_EQUIPMENT.mule.turrets.map(t=>{const gun=group.getObjectByName(t.embedded);gun.userData.yaw=group.getObjectByName(t.embedded.replace('.Root','.Yaw'));gun.userData.pitch=group.getObjectByName(t.embedded.replace('.Root','.Pitch'));gun.userData.inverse=new THREE.Quaternion();gun.userData.local=new THREE.Vector3();return gun;});
         this.tagTargetable(wrapper, 'ship', entity.id);
         wrapper.userData.baseScale = baseScale;
         wrapper.userData.variant = variant;
+        wrapper.userData.fractureBounds=fractureBounds(variant,npcShipScaleForVariant(variant)/baseScale);
         wrapper.userData.engineFlares = flares;
         wrapper.userData.emissiveMaterials = emissiveMaterials;
+        if(variant==='siege'){
+            wrapper.userData.lanceCoils=Array.from({length:6},(_,i)=>emissiveMaterials.find(m=>m.name==='lance_coil_'+i));
+        }
+        if(variant==='picket'||variant==='siege'){
+            wrapper.userData.systemGlow=emissiveMaterials.find(m=>m.name===(variant==='picket'?'emitter_glow':'lance_glow'));
+            wrapper.userData.driveGlow=emissiveMaterials.find(m=>m.name===(variant==='picket'?'engine_glow':'exhaust_glow'));
+        }
+        if(variant==='picket'){
+            wrapper.userData.embeddedTurrets=capitalHull(entity).mounts.map(m=>{
+                if(m.kind!=='pdc'&&m.kind!=='laser')return null;
+                const seat=group.getObjectByName(m.node);
+                seat.userData.yaw=seat.getObjectByName(m.node+'_yaw');
+                seat.userData.pitch=seat.getObjectByName(m.node+'_pitch');
+                seat.userData.yaw.matrixAutoUpdate=seat.userData.pitch.matrixAutoUpdate=true;
+                seat.userData.inverse=new THREE.Quaternion();
+                seat.userData.local=new THREE.Vector3();
+                return seat;
+            });
+            wrapper.userData.rotor=group.getObjectByName('emitter_rotor');
+            wrapper.userData.shell=this.createPicketShell();
+            wrapper.add(wrapper.userData.shell);
+        }
         wrapper.userData.glb = true;
         if(config.authoredPaint||variant==='concord-cruiser'||variant==='concord-frigate'||variant==='concord-battleship'||variant==='concord-carrier'){wrapper.userData.capitalExhaust=createCapitalEngineExhaust(variant);wrapper.add(wrapper.userData.capitalExhaust);}
         // Racing hulls cannot be destroyed: clipping their detailed hull into
@@ -3751,6 +3783,13 @@ export class SpaceRenderer {
     // alive until renderer shutdown.
     disposeGlbShip(mesh) {
         if (this.deferShaderDisposal(() => this.disposeGlbShip(mesh))) return;
+        if(mesh.userData.scorches){
+            for(let i=this.effects.length-1;i>=0;i--){
+                const effect=this.effects[i];
+                if(effect.object.parent===mesh){effect.dispose();this.effects.splice(i,1);}
+            }
+        }
+        mesh.userData.shell?.geometry.dispose();
         mesh.userData.driveLeak?.dispose();
         const ports = mesh.getObjectByName('drone-docking-ports');
         if (ports) { mesh.remove(ports); this.disposeObject(ports); }
@@ -3765,6 +3804,43 @@ export class SpaceRenderer {
             materials.forEach((material) => { if (material) ownedMaterials.add(material); });
         });
         for (const material of ownedMaterials) if(!material.userData?.shared)material.dispose();
+    }
+    createPicketShell(){
+        const material=new THREE.ShaderMaterial({
+            uniforms:{time:{value:0},strength:{value:1}},
+            vertexShader:`varying float edge; varying vec3 local;
+                void main(){vec4 p=modelViewMatrix*vec4(position,1.);local=normal;
+                    edge=1.-abs(dot(normalize(normalMatrix*normal),normalize(-p.xyz)));
+                    gl_Position=projectionMatrix*p;}`,
+            fragmentShader:`uniform float time,strength; varying float edge; varying vec3 local;
+                void main(){
+                    float shimmer=sin(local.y*22.+time*.65+sin(local.x*8.+local.z*6.));
+                    float rim=pow(clamp(edge,0.,1.),5.);
+                    float alpha=rim*(gl_FrontFacing?.16:.012)*(.8+.2*shimmer)*strength;
+                    gl_FragColor=vec4(.50,.28,.88,alpha);}`,
+            side:THREE.DoubleSide,transparent:true,depthWrite:false,forceSinglePass:true
+        });
+        const shell=new THREE.Mesh(new THREE.SphereGeometry(400,32,20),material);
+        shell.position.fromArray(capitalHull({variant:'picket'}).mounts[0].localPosition);shell.name='ecm-field';shell.raycast=()=>{};
+        return shell;
+    }
+    syncCapitalParts(mesh,entity){
+        if(mesh.userData.corvetteParts&&entity.capitalMountHull){
+            const parts=mesh.userData.corvetteParts,mounts=capitalHull(entity).mounts;
+            for(let i=0;i<parts.length;i++)if(parts[i]){
+                const health=entity.capitalMountHull[i];
+                if(mounts[i].kind==='bay'){
+                    const damaged=mesh.userData.damagedBays[i];
+                    if(parts[i].visible!==Boolean(health)){
+                        parts[i].visible=health>0;
+                        damaged.scale.setScalar(health?0:1);damaged.visible=!health;damaged.updateMatrix();
+                        // The swapped bay changes the fracture template; build it before the hull dies.
+                        this.wreckFactory?.schedule(mesh);
+                    }
+                }else if(mounts[i].kind==='pod'||mounts[i].kind==='stack'||mounts[i].kind==='rack')parts[i].visible=health>0;
+                else if(!health)setFrigateComponentDamage(parts[i],0,mounts[i].hull);
+            }
+        }
     }
     syncShips(entities, alpha = 0) {
         const revision = ++this.shipSyncRevision,exhaustTime=performance.now()*.001;
@@ -3835,20 +3911,7 @@ export class SpaceRenderer {
                 if(!mesh.userData.frigateSystems){mesh.userData.frigateSystems=createFrigateSystems(entity.id);mesh.add(mesh.userData.frigateSystems);}
                 updateFrigateSystems(mesh.userData.frigateSystems,entity);
             }
-            if(mesh.userData.corvetteParts&&entity.capitalMountHull){
-                const parts=mesh.userData.corvetteParts,mounts=capitalHull(entity).mounts;
-                for(let i=0;i<parts.length;i++)if(parts[i]){
-                    const health=entity.capitalMountHull[i];
-                    if(mounts[i].kind==='bay'){
-                        const damaged=mesh.userData.damagedBays[i];
-                        if(parts[i].visible!==Boolean(health)){
-                            parts[i].visible=health>0;
-                            damaged.scale.setScalar(health?0:1);damaged.visible=!health;damaged.updateMatrix();
-                        }
-                    }else if(mounts[i].kind==='pod'||mounts[i].kind==='stack'||mounts[i].kind==='rack')parts[i].visible=health>0;
-                    else if(!health)setFrigateComponentDamage(parts[i],0,mounts[i].hull);
-                }
-            }
+            this.syncCapitalParts(mesh,entity);
             if(mesh.userData.capitalExhaust)updateCapitalEngineExhaust(mesh.userData.capitalExhaust,entity,exhaustTime);
             const damage = 1 - entity.hull / entity.maxHull;
             const baseScale = Number(mesh.userData.baseScale ?? 1);
@@ -3860,6 +3923,33 @@ export class SpaceRenderer {
             if (emissiveMaterials) {
                 for (const material of emissiveMaterials)
                     material.emissiveIntensity = Math.max(material.userData.minimumEmissiveIntensity ?? 0, entity.capitalClass==='cruiser'&&material.emissiveMap?Math.max(.7,emissiveIntensity):emissiveIntensity);
+            }
+            const rotor=mesh.userData.rotor;
+            if(rotor&&entity.rotorAngle!==undefined){
+                rotor.rotation.y=entity.capitalMountHull[0]>0?
+                    entity.prevRotorAngle+(entity.rotorAngle-entity.prevRotorAngle)*alpha:entity.rotorAngle;
+                rotor.rotation.order='YXZ';
+                rotor.rotation.x=picketDishTilt(entity);
+                rotor.updateMatrix();
+            }
+            const coils=mesh.userData.lanceCoils;
+            if(coils){
+                const lit=entity.capitalMountHull?.[0]>0 ? entity.lanceCoils??0 : 0;
+                for(let i=0;i<coils.length;i++)coils[i].emissiveIntensity=i<lit?(lit===6?8:3):0;
+            }
+            if(mesh.userData.systemGlow){
+                mesh.userData.systemGlow.emissiveIntensity=variant==='siege'?(entity.lanceGlow??0)*5:
+                    entity.capitalMountHull?.[0]>0?.65:0;
+            }
+            if(mesh.userData.driveGlow)mesh.userData.driveGlow.emissiveIntensity=entity.engineThrust??1;
+            const shell=mesh.userData.shell;
+            if(shell){
+                if(entity.capitalMountHull?.[0]>0)shell.userData.collapse=undefined;
+                else if(shell.userData.collapse===undefined)shell.userData.collapse=shell.userData.wasOnline?exhaustTime:exhaustTime-1;
+                const fraction=shell.userData.collapse===undefined?1:Math.max(0,1-(exhaustTime-shell.userData.collapse));
+                shell.visible=fraction>0;shell.scale.setScalar(fraction);
+                shell.material.uniforms.time.value=exhaustTime;shell.material.uniforms.strength.value=fraction;
+                shell.userData.wasOnline=entity.capitalMountHull?.[0]>0;
             }
             const rimMaterial = mesh.userData.rimMaterial;
             if (rimMaterial?.uniforms) {
@@ -3914,9 +4004,11 @@ export class SpaceRenderer {
             mesh.userData.pitch.rotation.x=Math.atan2(local.y,Math.hypot(local.x,local.z));
             mesh.visible=true;
         }
-        for(const glow of this.capitalCharges?.values()??[]){
-            const a=glow.userData.attachment;if(!a)continue;
-            const hull=this.shipMeshes.get(a.ownerId);if(hull)glow.position.copy(a.position).applyQuaternion(hull.quaternion).add(hull.position);
+        for(const [id,glow] of this.capitalCharges??[]){
+            const hull=this.shipMeshes.get(glow.userData.ownerId);
+            if(!hull?.visible){this.removeCapitalCharge(id,glow);continue;}
+            const a=glow.userData.attachment;
+            if(a)glow.position.copy(a.position).applyQuaternion(hull.quaternion).add(hull.position);
         }
     }
     createDronePorts(hullId) {
@@ -4253,6 +4345,8 @@ export class SpaceRenderer {
                 // Exhaust flicker: the engine plume strobes while the motor
                 // burns. No smoke trail — there is no atmosphere out here to
                 // suspend one (user report); the hot plume is the whole trail.
+                if(projectile.launcherId==='flak')
+                    mesh.getObjectByName('flak-trail').material.uniforms.age.value=projectile.flightTime-projectile.life;
                 const plume = mesh.getObjectByName('plume');
                 if (plume)
                     plume.material.opacity = 0.35 + Math.sin(this.skyTime * 47 + projectile.slot * 3.3) * 0.08;
@@ -5243,6 +5337,7 @@ export class SpaceRenderer {
         this.landingGuideRoot.visible = true;
     }
     setSystem(systemId) {
+        if(this.systemId && this.systemId!==systemId)this.clearEffects();
         this.systemId = SYSTEM_RENDER_STYLE[systemId] ? systemId : 'helios-verge';
         const style = SYSTEM_RENDER_STYLE[this.systemId];
         this.ensureStationModels(this.systemId);
@@ -5508,6 +5603,24 @@ export class SpaceRenderer {
         this.utilityBeamMaterial.opacity = 0.54 + Math.sin(performance.now() * 0.03) * 0.18;
         this.utilityBeam.visible = true;
     }
+    prepareFlakBursts() {
+        if(this.flakBursts)return;
+        this.flakBursts=Array.from({length:8},(_,i)=>{
+            const burst=createShipExplosion([0,0,0],2,{variant:'flak',seed:i+1});
+            burst.age=0;
+            return burst;
+        });
+        this.flakBurstIndex=0;
+    }
+    spawnFlakBurst(point) {
+        this.prepareFlakBursts();
+        const burst=this.flakBursts[this.flakBurstIndex];
+        this.flakBurstIndex=(this.flakBurstIndex+1)%this.flakBursts.length;
+        burst.update(-burst.age);
+        burst.age=0;
+        burst.object.position.copy(point);
+        this.scene.add(burst.object);
+    }
     spawnExplosion(position, hostile = true, scale = 1, velocity, { capital } = {}) {
         const effect = createShipExplosion(position, scale, { velocity, capital });
         this.scene.add(effect.object);
@@ -5521,7 +5634,7 @@ export class SpaceRenderer {
         const effect=createDetachedPod(pod,ship,mount.normal[0]);
         pod.visible=false;this.scene.add(effect.object);this.effects.push(effect);
     }
-    spawnShipWreck(ship, variant, explosionScale) {
+    spawnShipWreck(ship, variant, explosionScale, sections=[]) {
         const fragments=createHullDebris(ship.position,Math.max(.5,explosionScale*.65),ship.velocity,ship.capitalClass?1:0);
         this.scene.add(fragments.object);this.effects.push(fragments);
         // Retire older cosmetic wrecks before debris-heavy battles accumulate
@@ -5529,11 +5642,43 @@ export class SpaceRenderer {
         const limit=this.qualityMode==='low'||this.touchDevice||this.isIOS||this.viewportWidth<1000?3:6;
         const wrecks=this.effects.filter(effect=>effect.combatWreck&&effect.life>0);
         if(wrecks.length>=limit)wrecks[0].life=0;
-        const source=this.shipMeshes?.get(ship.id);if(!source?.userData.glb)return fragments.object;
-        this.wreckFactory??=new ShipWreckFactory();
-        const hardware=[...(this.turretMeshes?.values()??[])].filter(mesh=>mesh.visible&&mesh.userData.attachment?.ownerId===ship.id);
-        const effect=this.wreckFactory.create(source,ship,hardware);if(!effect)return fragments.object;
-        this.scene.add(effect.object);this.effects.push(effect);return effect.object;
+        const source=this.shipMeshes?.get(ship.id);
+        let effect;
+        if(source?.userData.glb){
+            this.syncCapitalParts(source,ship);
+            this.wreckFactory??=new ShipWreckFactory();
+            const hardware=[...(this.turretMeshes?.values()??[])].filter(mesh=>mesh.visible&&mesh.userData.attachment?.ownerId===ship.id);
+            effect=this.wreckFactory.create(source,ship,hardware);
+            if(effect){this.scene.add(effect.object);this.effects.push(effect);}
+        }
+        for(const body of sections){
+            const visual=effect?.releaseSection(body.key,body.origin,source.userData.baseScale);
+            // A death can beat the model download. The actual collision surface
+            // gives that section a visible hull even on a cold or offline start.
+            let mesh=visual?.mesh;
+            if(!mesh){
+                const g=new THREE.BufferGeometry();
+                g.setAttribute('position',new THREE.BufferAttribute(body.meshVerts,3));
+                g.setIndex(new THREE.BufferAttribute(body.meshIndices,1));g.computeVertexNormals();
+                mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x626977,roughness:.88,side:THREE.DoubleSide}));
+            }
+            mesh.name=body.id;mesh.position.copy(body.position);mesh.quaternion.copy(body.rotation);
+            this.scene.add(mesh);
+            (this.coverVisuals??=new Map()).set(body,{mesh,fade:1,dispose:visual?.dispose??(()=>this.disposeObject(mesh))});
+        }
+        return effect?.object??fragments.object;
+    }
+    syncCover(alpha,dt){
+        for(const [body,view] of this.coverVisuals){
+            const mesh=view.mesh;
+            mesh.position.lerpVectors(body.prevPosition,body.position,alpha);
+            mesh.quaternion.slerpQuaternions(body.prevRotation,body.rotation,alpha);
+            if(body.retired){
+                view.fade=Math.max(0,view.fade-dt);
+                mesh.scale.setScalar(view.fade);
+                if(!view.fade){mesh.removeFromParent();view.dispose();this.coverVisuals.delete(body);}
+            }
+        }
     }
 
     shieldImpactPoint(actor, extents, impact, origin, out = this.shieldImpactWorld ??= new THREE.Vector3()) {
@@ -5566,8 +5711,10 @@ export class SpaceRenderer {
         const position=point?.isVector3 ? point.toArray() : point;
         // Surface normal from the hull/shield ellipsoid and the shot direction
         // let the hit spray, skitter or punch through like the weapon would.
-        const centre=(this.impactCentre ??= new THREE.Vector3()).fromArray(actor.position);
-        const inverse=(this.impactInverse ??= new THREE.Quaternion()).fromArray(actor.rotation).invert();
+        const centre=this.impactCentre ??= new THREE.Vector3();
+        const inverse=this.impactInverse ??= new THREE.Quaternion();
+        if(actor.cover){centre.copy(actor.position);inverse.copy(actor.rotation).invert();}
+        else {centre.fromArray(actor.position);inverse.fromArray(actor.rotation).invert();}
         const local=(this.impactLocal ??= new THREE.Vector3()).fromArray(position).sub(centre).applyQuaternion(inverse);
         local.set(local.x/Math.max(.1,extents[0]**2),local.y/Math.max(.1,extents[1]**2),local.z/Math.max(.1,extents[2]**2));
         if(local.lengthSq()<1e-12)local.set(0,0,1);
@@ -5686,19 +5833,29 @@ export class SpaceRenderer {
         // Keep the wrecked armored pedestal and yaw housing attached; damage
         // hides barrels and chars its own materials without affecting other guns.
     }
-    showCapitalCharge(id,position,amount,actor) {
+    removeCapitalCharge(id,glow) {
+        glow.removeFromParent();
+        glow.material.dispose();
+        this.capitalCharges.delete(id);
+        if(!this.capitalCharges.size){
+            this.capitalChargeGeometry.dispose();
+            this.capitalChargeGeometry=undefined;
+        }
+    }
+    showCapitalCharge(id,position,amount,actor,color=0xffb34d,attach=true) {
         this.capitalCharges??=new Map();
         let glow=this.capitalCharges.get(id);
         if(!glow){
             this.capitalChargeGeometry??=new THREE.SphereGeometry(1,8,6);
             glow=new THREE.Mesh(this.capitalChargeGeometry,new THREE.MeshBasicMaterial({color:0xffb34d,transparent:true,depthWrite:false}));
+            glow.userData.ownerId=actor?.id;
             this.capitalCharges.set(id,glow);this.scene.add(glow);
         }
-        if(actor){
+        if(actor&&attach){
             const a=glow.userData.attachment??={ownerId:actor.id,position:new THREE.Vector3(),origin:new THREE.Vector3(),q:new THREE.Quaternion()};
             a.position.copy(position).sub(a.origin.fromArray(actor.position)).applyQuaternion(a.q.fromArray(actor.rotation).invert());
         }
-        glow.position.copy(position);glow.scale.setScalar(1.2+amount);glow.material.opacity=.25+amount*.45;glow.userData.life=.12;glow.visible=true;
+        glow.material.color.setHex(color);glow.position.copy(position);glow.scale.setScalar(1.2+amount);glow.material.opacity=.25+amount*.45;glow.userData.life=.12;glow.visible=true;
     }
     showTurret(id,position,direction,size,kind='laser',rotation,side=1,pedestal=0,hullScale=1,axis=1,actor,mountIndex) {
         // The cockpit camera is at the ship origin and its exterior hull is
@@ -5709,6 +5866,7 @@ export class SpaceRenderer {
         const footprintScale=reviewedMount?.footprintScale??1;
         const embedded=this.shipMeshes?.get(actor?.id)?.userData.embeddedTurrets?.[mountIndex];
         if(embedded){
+            if(actor.variant==='picket')setFrigateComponentDamage(embedded,actor.capitalMountHull[mountIndex],capitalHull(actor).mounts[mountIndex].hull);
             embedded.updateWorldMatrix(true,false);
             const local=embedded.userData.local.copy(direction).applyQuaternion(embedded.getWorldQuaternion(embedded.userData.inverse).invert());
             embedded.userData.yaw.rotation.y=Math.atan2(-local.x,-local.z);
@@ -5773,7 +5931,7 @@ export class SpaceRenderer {
         mesh.userData.pitch.rotation.x=Math.atan2(local.y,Math.hypot(local.x,local.z));
         mesh.userData.expiresAt=(this.skyTime??0)+.25;mesh.visible=true;
     }
-    showCombatBeam(id,start,end,color,player) {
+    showCombatBeam(id,start,end,color,player,life=.09,width=1,lancePilot) {
         this.combatBeams ??= new Map();
         let beam=this.combatBeams.get(id);
         if(!beam) {
@@ -5788,6 +5946,23 @@ export class SpaceRenderer {
             this.combatBeams.set(id,beam);
         }
         const data=beam.userData;
+        // Only the lance crosses the cockpit at this width. Its cylinder spans
+        // the full shot, so evaluate the fade at each fragment, not its endpoints.
+        if(Boolean(lancePilot)!==Boolean(data.lancePilot)){
+            const material=beam.material;
+            if(lancePilot){
+                data.pilotCentre??={value:new THREE.Vector3()};
+                material.onBeforeCompile=shader=>{
+                    shader.uniforms.pilotCentre=data.pilotCentre;
+                    shader.vertexShader='varying vec3 lancePoint;\n'+shader.vertexShader.replace('#include <project_vertex>',
+                        '#include <project_vertex>\nlancePoint=(modelMatrix*vec4(transformed,1.)).xyz;');
+                    shader.fragmentShader='varying vec3 lancePoint; uniform vec3 pilotCentre;\n'+shader.fragmentShader.replace('#include <color_fragment>',
+                        '#include <color_fragment>\ndiffuseColor.a*=smoothstep(15.,60.,distance(lancePoint,cameraPosition))*smoothstep(10.,30.,distance(lancePoint,pilotCentre));');
+                };
+            }else material.onBeforeCompile=THREE.Material.prototype.onBeforeCompile;
+            material.needsUpdate=true;
+        }
+        data.lancePilot=lancePilot;
         data.start ??= new THREE.Vector3();
         data.end ??= new THREE.Vector3();
         data.localStart ??= new THREE.Vector3();
@@ -5799,13 +5974,14 @@ export class SpaceRenderer {
             data.localStart.copy(start).sub(data.direction.fromArray(player.position)).applyQuaternion(data.inverse);
         }
         beam.material.color.setHex(color);beam.material.opacity=0.9;
-        beam.visible=true;data.life=0.09;data.fresh=true;
+        beam.visible=true;beam.scale.x=beam.scale.z=width;data.fade=life>.1?life:.035;data.life=life;data.fresh=true;
         this.positionCombatBeam(beam);
     }
     positionCombatBeam(beam) {
         const data=beam.userData;
         // Match the interpolated cockpit pose, not the last simulation tick.
         // The far end stays at the actual raycast hit: this is cosmetic only.
+        if(data.lancePilot)data.pilotCentre.value.fromArray(data.lancePilot.position);
         if(data.playerAttached) data.start.copy(data.localStart).applyQuaternion(this.camera.quaternion).add(this.camera.position);
         beam.position.copy(data.start).lerp(data.end,0.5);
         beam.scale.y=data.start.distanceTo(data.end);
@@ -5916,9 +6092,23 @@ export class SpaceRenderer {
         this.effects.push({ object: streak, streak, velocities: [], life: 0.75, maxLife: 0.75 });
     }
     clearEffects() {
+        if(this.flakBursts)for(const burst of this.flakBursts)burst.object.removeFromParent();
+        if(this.coverVisuals){
+            for(const view of this.coverVisuals.values()){view.mesh.removeFromParent();view.dispose();}
+            this.coverVisuals.clear();
+        }
+        for(const beam of this.combatBeams?.values()??[]){beam.visible=false;beam.userData.life=0;}
+        for(const [id,glow] of this.capitalCharges??[])this.removeCapitalCharge(id,glow);
+        for(const plume of this.railPlumes??[])plume.visible=false;
+        if(this.turretMeshes){
+            for(const mesh of this.turretMeshes.values()){mesh.removeFromParent();this.disposeObject(mesh);}
+            this.turretMeshes.clear();
+        }
+        for(const tracer of this.pdcTracers??[])tracer.visible=false;
+        for(const field of this.shieldFields?.values()??[])field.visible=false;
         this.effects??=[];
         for(const effect of this.effects){
-            this.scene.remove(effect.object);
+            effect.object.removeFromParent();
             if(effect.dispose)effect.dispose();else this.disposeObject(effect.object);
         }
         // LaserFx holds this same list. Replacing it strands future muzzle
@@ -5926,6 +6116,11 @@ export class SpaceRenderer {
         this.effects.length=0;
     }
     updateEffects(dt) {
+        if(this.flakBursts)for(const burst of this.flakBursts){
+            if(!burst.object.parent)continue;
+            if(burst.age+dt>=burst.maxLife)burst.object.removeFromParent();
+            else {burst.age+=dt;burst.update(dt);}
+        }
         for (let index = this.effects.length - 1; index >= 0; index -= 1) {
             const effect = this.effects[index];
             // Effects spawned during catch-up steps must reach the screen once.
@@ -5996,7 +6191,7 @@ export class SpaceRenderer {
             else data.life-=dt;
             beam.visible=data.life>0;
             if(beam.visible) {
-                beam.material.opacity=0.9*Math.min(1,Math.max(0,data.life)/0.035);
+                beam.material.opacity=0.9*Math.min(1,Math.max(0,data.life)/data.fade);
                 this.positionCombatBeam(beam);
             }
         }
@@ -6261,7 +6456,7 @@ export class SpaceRenderer {
         createDriveLeak(root);
         this.prepareTrafficWarmup(root);
         for (const kind of ['laser', 'gauss', 'pdc', 'ripper', 'ion', 'mortar', 'missile']) {
-            const launchers = kind === 'missile' ? ['seeker', 'swarm', 'torpedo'] : [undefined];
+            const launchers = kind === 'missile' ? ['seeker', 'swarm', 'torpedo','flak'] : [undefined];
             for (const launcherId of launchers) {
                 const mesh = this.createProjectileMesh({kind, faction:'player', launcherId});
                 root.add(mesh);
@@ -6278,6 +6473,7 @@ export class SpaceRenderer {
         this.laserFx.rockImpact([0,0,1],[0,0,0]);
         for (const effect of this.effects.splice(first)) root.add(effect.object);
         root.add(createShipExplosion([0,0,0],1,{variant:'breach'}).object);
+        this.prepareFlakBursts();
         const actor = {id:'combat-warmup',position:[0,0,0],rotation:[0,0,0,1],hull:1,shield:1};
         this.flashShield(actor,[1,1,1],.25,false,[0,0,1],[0,0,10]);
         root.add(this.shieldFields.get(actor.id));
@@ -6842,6 +7038,7 @@ export class SpaceRenderer {
     }
     disposeResources() {
         this.clearEffects();
+        if(this.flakBursts)for(const burst of this.flakBursts)burst.dispose();
         if(this.broadsideModel)this.disposeObject(this.broadsideModel);
         for(const mesh of this.combatLootMeshes?.values()??[]){mesh.userData.derelictVents?.dispose();const effect=mesh.userData.derelictEffect;if(effect){this.scene.remove(effect.object);effect.dispose();}if(mesh.userData.derelictSource)this.disposeObject(mesh.userData.derelictSource);}
         this.derelictCollisionObstacles?.clear();
@@ -6893,8 +7090,6 @@ export class SpaceRenderer {
         this.pdcTracers=[];
         for(const mesh of this.turretMeshes?.values()??[]) {this.scene.remove(mesh);}
         this.turretMeshes?.clear();
-        for(const glow of this.capitalCharges?.values()??[]){this.scene.remove(glow);glow.material.dispose();}
-        this.capitalCharges?.clear();
         for (const field of this.shieldFields?.values() ?? []) { this.scene.remove(field); field.material.dispose(); }
         this.shieldFields?.clear();
         this.shieldFieldGeometry?.dispose();

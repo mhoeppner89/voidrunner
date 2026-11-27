@@ -2170,3 +2170,23 @@ Frigate encounter review, 0.8.2pu.
 - Incoming damage on levels 9 and 10 was 259.3 and 439.3 in endurance, with median durations of 85.72 and 101.95 seconds. Ordinary-health losses were zero and one on the three matched seeds. The revised report and screenshots are in `output/frigates/`.
 - Passed 1,659 automated tests, 70 render cases, 18 live Arena encounters, 19 corvette views and all 30 desktop/Android cockpit hardware cases.
 - Old damage-only records recover the nearby hull and its recorded damage and cargo. Live browser reloads retained five Rookery encounter ships and three Caravan convoy ships across two resumes each.
+
+Combat debris follow-up. Clear local combat effects at transitions. The simulation owns large, clipped cover sections and both ship and projectile contacts. Measurement and browser captures live in output/debris-cover/.
+Verification: 1,693 tests passed. All 15 Arena samples retained their outcome; maximum duration change was 3.20 seconds. Cliff-duel movement and collision counts matched. Desktop and touch/low showed four live Red Njord sections and verified NPC occlusion.
+
+Heimdall and Tacita corvettes. The lance freezes for the final 1.5 seconds. All 12 axial Mercury, Loki and Tyr breaks at cue +0.3 s dodged at 800 and 1,400, and all 12 straight controls were hit. Tacita’s destructible emitter jams hostile locks and guidance within 400 units. Both hulls use the shared career and Arena combat paths.
+- Honorguard and Screened measured 85.03 s and 118.15 s on the three matched engage seeds. Ordinary-health clears were 2/3 and 1/3.
+- The final cockpit captures show a faint exterior ECM rim, clear interior and distance-faded lance and tracer. Pixel 7 low-quality emulation measured 16.7 ms frame intervals with the shell off and on. All 1,705 automated tests and the Arena browser suite passed. The visual changes passed 57 focused checks. Captures, measurements and the file list are in `output/new-corvettes/report.md`.
+
+Tacita redesign. Rebuilt the 48 × 26 Concord picket in 4,864 triangles with a rotating bedspring array. The fixed-step clock drives the rotor, weapon surface and HUD sightlines. A disabled emitter retains its heading across career checkpoints using its shutdown time. All 128 native solids passed connectivity and closure checks. The concept comparison and five review views are in output/picket. Arena levels 8 and 19 passed on desktop Chrome, Pixel 7 Chrome and iPhone WebKit. Active and destroyed emitter screenshots are in output/picket/ingame.
+
+Arena Run now caps every level at three groups, including the final frigate’s escorts. Red Njord’s Balors arrive with its authored groups. Range control flashes the wave or sweep warning on the own-ship monitor for two seconds, yields to BREAK, and leaves pilot chatter available. All 1,716 automated tests passed, along with the Arena and cockpit browser suites. Three-seed measurements and four desktop/Pixel 7 cockpit captures are in output/arena-waves. Median endurance time fell from 90.3 to 68.9 seconds. Ordinary-health flight completed 66 of 75 sorties and met every per-level loss limit.
+
+## Arena Run three-wave balance and monitor card
+
+- All 25 endurance medians met their targets on seeds 175, 718 and 941. In ordinary flight 62 of 75 pilots survived. Act V levels 21–25 lost 2, 1, 2, 2 and 3 pilots respectively. Level 4 was rechecked with the Barrage’s flak. The per-level roster and matched results are in [Arena progression](docs/ARENA_PROGRESSION.md).
+- The range warning uses an amber-framed navy band on the own monitor. Each hull passed the card fit and BREAK precedence checks on desktop, Pixel 7 and iPhone. The two-hull desktop and Pixel captures are in `output/arena-waves/`.
+
+The Red Njord Barrage now ripple-fires one unguided flak rocket per intact rack. In 64 seeded trials the steady Wayfarer averaged 63.3 damage, a cue-driven jink and a boosted rush both averaged zero, and the slow Njord averaged 122.7. The 900-unit BREAK cue fired 3.87 seconds after first ignition. Level 4 cleared on all three seeds in endurance and ordinary-health play. Cockpit captures, frame times and the before/after results are in output/barrage-flak.
+
+Barrage visual review. Flak bursts now use compact charcoal smoke with brief orange underlighting, a two-tone 0.1 s flash, and shorter shrapnel. The shaders fade smoke near the cockpit and cap projected sizes for the cloud, flash, streaks and rocket trail. All 1,720 tests passed. The matched Pixel 7 profile measured 2.2 ms median before and after polish.

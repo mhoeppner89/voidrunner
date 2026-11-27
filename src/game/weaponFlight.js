@@ -73,17 +73,21 @@ export function updateMissileWarning(flight,projectiles,store,player,latency=0){
         const i=shot.slot*3;
         const x=store.pos[i]-player.position[0],y=store.pos[i+1]-player.position[1],z=store.pos[i+2]-player.position[2];
         const vx=store.vel[i]-player.velocity[0],vy=store.vel[i+1]-player.velocity[1],vz=store.vel[i+2]-player.velocity[2];
-        const time=-(x*vx+y*vy+z*vz)/Math.max(1,vx*vx+vy*vy+vz*vz);
-        if(time<=0 || time>shot.life)continue;
+        const time=shot.flakVolley?shot.flakVolley.interceptTime-(shot.flightTime-shot.life):-(x*vx+y*vy+z*vz)/Math.max(1,vx*vx+vy*vy+vz*vz);
+        if(time<=0 || !shot.flakVolley && time>shot.life)continue;
         const range=Math.hypot(x,y,z);
         flight.missileThreat=Math.max(flight.missileThreat,1-range/700,.05);
         if(time<nearest){nearest=time;urgent=shot;}
     }
     if(!urgent)return;
-    const cueAt=breakCueTime(urgent.hitWeapon)+latency;
+    // The flak trials allow a break from ignition to about two seconds
+    // before interception. Split that window before adding pilot reaction.
+    const volley=urgent.flakVolley;
+    const cueAt=volley ? (volley.interceptTime+2)/2+BREAK_REACTION+latency : breakCueTime(urgent.hitWeapon)+latency;
     if(nearest>cueAt)return;
     flight.missileCommitted=true;
-    if(urgent.breakCued)return;
+    if(urgent.breakCued||volley?.cued)return;
+    if(volley)volley.cued=true;
     // A round first seen too late for a break gets no cue at all.
     flight.missileBreak=nearest>=breakCueEnd(urgent.hitWeapon);
     for(const shot of projectiles)if(shot===urgent || urgent.salvo!==undefined && shot.salvo===urgent.salvo)shot.breakCued=true;
@@ -189,10 +193,13 @@ export function torpedoMobilityFactor(launcher,shooterVelocity,targetVelocity,be
     const angularRate=relative.cross(bearing).length()/distance;
     return speedFactor*lockFalloff(angularRate,launcher.fullLockAngularRate,launcher.zeroLockAngularRate);
 }
+export function rackLockSeconds(launcher,pilot,aspect){
+    const scale=pilot==='novice'?2:pilot==='veteran'?1.5:1;
+    return launcher.lockTime*scale*(.75-.25*Math.max(-1,Math.min(1,aspect)));
+}
 export function rackLockProgress(progress,launcher,pilot,distance,alignment,aspect,dt,mobility=1){
     if(distance>launcher.lockRange || alignment<(progress===1?holdCone:acquireCone))return 0;
-    const scale=pilot==='novice'?2:pilot==='veteran'?1.5:1;
-    const seconds=launcher.lockTime*scale*(.75-.25*Math.max(-1,Math.min(1,aspect)));
+    const seconds=rackLockSeconds(launcher,pilot,aspect);
     if(mobility===0)return Math.max(0,progress-dt/seconds);
     const next=progress+mobility*dt/seconds;
     return next>=1-1e-12?1:next;

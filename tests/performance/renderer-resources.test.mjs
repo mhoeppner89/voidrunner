@@ -313,7 +313,9 @@ test('renderer shutdown releases postprocessing and cached resources', () => {
     r.bloomQuad = new THREE.Mesh(new THREE.PlaneGeometry(), r.bloomCompositeMaterial);
     r.renderer = { domElement: { removeEventListener() {}, remove() {} }, dispose() {} };
     const glow = r.radialTexture('#ffffff', '#123456');
-    const resources = [sprite.geometry, sprite.material, glow, r.scene.environment, r.sunLight.shadow.map, r.bloomSceneTarget, ...r.bloomBlurTargets,
+    r.showCapitalCharge('siege-lance',new THREE.Vector3(),1);
+    const charge=r.capitalCharges.get('siege-lance');
+    const resources = [charge.geometry,charge.material,sprite.geometry, sprite.material, glow, r.scene.environment, r.sunLight.shadow.map, r.bloomSceneTarget, ...r.bloomBlurTargets,
         r.bloomBrightMaterial, r.bloomBlurMaterial, r.bloomCompositeMaterial, r.bloomQuad.geometry,
         r.pixelSceneTarget,r.pixelResolveMaterial,r.pixelQuad.geometry,
         r.glbShipModels.get('talon').children[0].geometry];
@@ -388,4 +390,29 @@ test('environment shader preparation restores hidden regions and shadow settings
  Object.assign(r,{scene,camera:new THREE.PerspectiveCamera(),instanceRoots:new Map([['shardbelt',region]]),sunLight:{castShadow:false},isIOS:false,bloomSceneTarget:{},bloomEnabled:()=>true,prepareCombatWarmup:()=>new THREE.Group(),renderer:{shadowMap:{enabled:false,type:THREE.PCFShadowMap},getRenderTarget:()=>target,setRenderTarget:t=>{target=t;},compileAsync:async()=>{calls.push({region:region.visible,shadow:r.renderer.shadowMap.enabled,type:r.renderer.shadowMap.type});}}});
  await r.prepareActiveScene();assert.equal(calls.length,2);assert.ok(calls.every(c=>c.region));assert.ok(calls.some(c=>c.shadow&&c.type===THREE.PCFSoftShadowMap));
  assert.equal(region.visible,false);assert.equal(r.renderer.shadowMap.enabled,false);assert.equal(r.renderer.shadowMap.type,THREE.PCFShadowMap);assert.equal(r.sunLight.castShadow,false);assert.equal(target,originalTarget);
+});
+
+test('capital charge resources retire with their ship and on effect reset',()=>{
+    const r=renderer();
+    Object.assign(r,{scene:new THREE.Scene(),shipMeshes:new Map(),dynamicRoot:new THREE.Group()});
+    const origin=new THREE.Vector3();
+    for(let i=0;i<32;i++){
+        const id='siege-'+i,actor={id,position:[0,0,0],rotation:[0,0,0,1]};
+        const hull=new THREE.Group();
+        hull.position.x=50;r.shipMeshes.set(id,hull);
+        r.showCapitalCharge(id+'-lance',origin,1,actor,0xffffff,false);
+        const mesh=r.capitalCharges.get(id+'-lance'),materialDisposals=watch(mesh.material);
+        const geometryDisposals=watch(mesh.geometry);
+        r.syncTurretAttachments();
+        assert.equal(mesh.parent,r.scene);
+        assert.deepEqual(mesh.position.toArray(),[0,0,0]);
+        if(i%3===0)r.syncShips([]);
+        else if(i%3===1){hull.visible=false;r.syncTurretAttachments();}
+        else r.clearEffects();
+        r.shipMeshes.clear();
+        assert.equal(geometryDisposals(),1);
+        assert.equal(mesh.parent,null);
+        assert.equal(materialDisposals(),1);
+        assert.equal(r.capitalCharges.size,0);
+    }
 });

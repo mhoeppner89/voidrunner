@@ -511,6 +511,11 @@ export class AudioManager {
         const proximity = clamp(1 - Math.max(0, distance) / range, 0, 1);
         const direction = clamp(localX / Math.max(1, distance), -1, 1);
         const rear = clamp(localZ / Math.max(1, distance), 0, 1);
+        if(effect==='ecm-hum'){
+            const [[sample,gain]]=SOUND_EVENTS[effect].layers;
+            this.playWork(sample,intensity*gain*proximity*proximity,direction,distance);
+            return;
+        }
         // Distance dominates at long range; stereo separation becomes clearer
         // as the source gets closer, which matches how cockpit audio behaves.
         this.trigger(effect, clamp(intensity * proximity * proximity, 0.001, 2), direction * (0.3 + proximity * 0.6), Math.max(0.001, distance), proximity, rear, Math.min(0.45, distance / SOUND_SPEED), `far:${effect}`, 1, FAR_SPACING);
@@ -584,7 +589,7 @@ export class AudioManager {
         }
         // Reserve the receiver until the last scheduled pip or break tone ends.
         // A throttled or unloaded cue never occupies the channel.
-        if (!spatial && (event.channel === 'missile-pips' || effect === 'missileBreak')) {
+        if (!spatial && (event.channel === 'missile-pips' || effect === 'missileBreak' || effect === 'lance-freeze')) {
             this.missileCueEndsAt = Math.max(this.missileCueEndsAt, now + longest);
             this.setLockWarble('off');
         }
@@ -612,7 +617,7 @@ export class AudioManager {
             const context = this.context, source = context.createBufferSource(), gain = context.createGain(), panner = context.createStereoPanner();
             source.buffer = buffer; source.loop = true;
             // Stay within the steady working part of the recordings.
-            source.loopStart = id === 'mining' ? .3 : .12; source.loopEnd = buffer.duration - .12;
+            source.loopStart = id === 'mining' ? .3 : .12; source.loopEnd = id==='ecm-loop'?2:buffer.duration-.12;
             gain.gain.value = 0;
             panner.pan.value = clamp(pan, -0.9, 0.9);
             source.connect(gain); gain.connect(panner); panner.connect(distance > 0 ? this.worldBus : this.cockpitBus);

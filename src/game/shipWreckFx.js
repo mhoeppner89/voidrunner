@@ -4,8 +4,7 @@ import {blastHeft} from './explosionFx.js';
 // Hull diagonal (world units) up to which a break-up stays fighter-violent.
 const WRECK_FIGHTER_LENGTH=36;
 
-// Cosmetic only. The hull is clipped once into closed, textured sections;
-// subsequent deaths reuse the buffers. Nothing enters collision or loot stores.
+// Sealed visual and collision sections share their fracture planes and branch IDs.
 const axisY = new THREE.Vector3(0,1,0);
 const isSolid = mesh => mesh.isMesh && mesh.geometry?.attributes.position &&
     (Array.isArray(mesh.material)?mesh.material:[mesh.material]).some(m=>m?.isMeshStandardMaterial);
@@ -61,21 +60,50 @@ function* split(triangles,plane,epsilon,tile){
     }
     closeCut(segments,plane,negative,positive,epsilon*4,tile);return[negative,positive];
 }
-function fractureTree(bounds){
-    const size=bounds.getSize(new THREE.Vector3()),c=bounds.getCenter(new THREE.Vector3()),random=seededRandom(size.toArray().map(n=>n.toFixed(3)).join(':'));
+function fractureTree(bounds,seed){
+    const size=bounds.getSize(new THREE.Vector3()),c=bounds.getCenter(new THREE.Vector3()),random=seededRandom(seed??size.toArray().map(n=>n.toFixed(3)).join(':'));
     const plane=(normal,point)=>{const n=new THREE.Vector3(...normal).normalize();return{n,d:n.dot(point)};};
     const p=(x,y,z)=>new THREE.Vector3(c.x+x*size.x,c.y+y*size.y,c.z+z*size.z);
     // Bow/canopy, offset midship break and separate port/centre/starboard
     // propulsion sections. Slightly oblique planes avoid identical bread slices.
     return {plane:plane([.11,.13,1],p(0,0,-.23+(random()-.5)*.07)),lo:{plane:plane([.12,1,.18],p(0,.015,-.35))},hi:{plane:plane([-.09,-.12,1],p(0,0,.15+(random()-.5)*.08)),lo:{plane:plane([1,.16,-.12],p(-.06+(random()-.5)*.08,0,0))},hi:{plane:plane([1,-.13,.08],p(-.19,0,.35)),hi:{plane:plane([1,.11,-.06],p(.19,0,.35))}}}};
 }
+export function* fractureLeaves(triangles,bounds,seed){
+    const size=bounds.getSize(new THREE.Vector3()),epsilon=Math.max(size.x,size.y,size.z)*1e-6;
+    const tile=Math.max(.1,Math.min(size.x,size.z)*.12),leaves=[];
+    function* visit(tris,node,key,planes){
+        if(!tris.length)return;
+        if(!node){leaves.push({tris,planes,key});return;}
+        const [lo,hi]=yield* split(tris,node.plane,epsilon,tile);
+        yield;
+        yield* visit(lo,node.lo,key*2,[...planes,node.plane]);
+        yield* visit(hi,node.hi,key*2+1,[...planes,node.plane]);
+    }
+    yield* visit(triangles,fractureTree(bounds,seed),1,[]);
+    return leaves;
+}
 function collect(source){
     source.updateWorldMatrix(true,true);
     const inverse=source.matrixWorld.clone().invert(),hull=source.userData.glb?source.children[0]:source,meshes=[],hardware=[],bounds=new THREE.Box3();
-    hull.traverseVisible(mesh=>{if(!isSolid(mesh))return;const matrix=new THREE.Matrix4().multiplyMatrices(inverse,mesh.matrixWorld);
-        for(let p=mesh;p&&p!==hull;p=p.parent)if(p.userData.yaw||p.userData.pitch||/^(?:pod_[0-5]|stack_[0-3]|bay_(?:port|starboard)(?:_damaged)?)$/.test(p.name)||/(?:[_.](?:yaw|pitch)|armament)$/i.test(p.name)){hardware.push({mesh,matrix});return;}
-        if(!mesh.geometry.boundingBox)mesh.geometry.computeBoundingBox();const box=mesh.geometry.boundingBox.clone().applyMatrix4(matrix);bounds.union(box);
-        meshes.push({mesh,matrix});
+    const detached=new Set();
+    hull.traverse(mesh=>{
+        if(!isSolid(mesh))return;
+        let component,attachment=false;
+        for(let p=mesh;p;p=p.parent){
+            const cargo=/^(?:pod_[0-5]|stack_[0-3]|rack_[0-5])$/.test(p.name);
+            if(cargo&&source.userData.fractureBounds){
+                component=p.name;
+                if(!p.visible)detached.add(component);
+            }else if(!p.visible)return;
+            if(p===hull)break;
+            if(p.userData.yaw||p.userData.pitch||/(?:[_.](?:yaw|pitch)|armament)$/i.test(p.name)
+                ||!source.userData.fractureBounds&&(cargo||/^bay_(?:port|starboard)(?:_damaged)?$/.test(p.name)))attachment=true;
+        }
+        const matrix=new THREE.Matrix4().multiplyMatrices(inverse,mesh.matrixWorld);
+        if(attachment){hardware.push({mesh,matrix});return;}
+        if(!mesh.geometry.boundingBox)mesh.geometry.computeBoundingBox();
+        bounds.union(mesh.geometry.boundingBox.clone().applyMatrix4(matrix));
+        meshes.push({mesh,matrix,component});
     });
     // Material sharing is part of the key, but UUIDs are not: livery clones
     // retain the same slot relationships while owning their colour/textures.
@@ -85,7 +113,7 @@ function collect(source){
         slots[i]=mats.map((m,j)=>{if(!ids.has(m)){ids.set(m,materials.length);materials.push({mesh:i,slot:j});}return ids.get(m);});
         return `${mesh.geometry.id}:${matrix.elements.map(n=>Math.round(n*1e5)).join(',')}:${slots[i]}`;
     }).join(';');
-    return{meshes,hardware,bounds,materials,slots,signature};
+    return{meshes,hardware,bounds,materials,slots,signature,detached,fractureBounds:source.userData.fractureBounds,variant:source.userData.variant};
 }
 function* geometryFor(triangles,origin,planes=[],size=new THREE.Vector3(1,1,1)){
     const length=Math.max(size.x,size.y,size.z),tearScale=Math.min(size.x,size.z)*.004;
@@ -134,27 +162,50 @@ function* structureFor(triangles,origin,size){
     if(!positions.length)return null;const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.computeVertexNormals();geometry.computeBoundingSphere();geometry.userData.shared=true;return geometry;
 }
 function* compile(data,owned){
-    const triangles=[],p=new THREE.Vector3(),n=new THREE.Vector3();
+    const components=new Map(),p=new THREE.Vector3(),n=new THREE.Vector3();
     for(let i=0;i<data.meshes.length;i++){const {mesh,matrix}=data.meshes[i],g=mesh.geometry,a=g.attributes,normal=new THREE.Matrix3().getNormalMatrix(matrix),vertices=[];
         for(let j=0;j<a.position.count;j++){
             if(j%2048===0)yield;
             p.fromBufferAttribute(a.position,j).applyMatrix4(matrix);if(a.normal)n.fromBufferAttribute(a.normal,j).applyMatrix3(normal).normalize();else n.set(0,1,0);
             vertices.push({p:p.toArray(),n:n.toArray(),pp:[a.position.getX(j),a.position.getY(j),a.position.getZ(j)],pn:a.normal?[a.normal.getX(j),a.normal.getY(j),a.normal.getZ(j)]:[0,1,0],uv:a.uv?[a.uv.getX(j),a.uv.getY(j)]:[0,0],c:a.color?[a.color.getX(j),a.color.getY(j),a.color.getZ(j)]:[1,1,1]});
         }
+        const component=data.meshes[i].component;
+        if(!components.has(component))components.set(component,[]);
+        const triangles=components.get(component);
         const ranges=g.groups.length?g.groups:[{start:0,count:g.index?.count??a.position.count,materialIndex:0}];
         for(const range of ranges)for(let j=range.start;j<range.start+range.count;j+=3){if(j%3072===0)yield;triangles.push({v:[0,1,2].map(k=>vertices[g.index?g.index.getX(j+k):j+k]),mat:data.slots[i][range.materialIndex??0]??data.slots[i][0]});}
     }
-    const size=data.bounds.getSize(new THREE.Vector3()),epsilon=Math.max(...size.toArray())*1e-6,tile=Math.max(.1,Math.min(size.x,size.z)*.12),leaves=[];
-    function* visit(tris,node,planes=[]){if(!tris.length)return;if(!node){leaves.push({tris,planes});return;}const [lo,hi]=yield* split(tris,node.plane,epsilon,tile);yield;yield* visit(lo,node.lo,[...planes,node.plane]);yield* visit(hi,node.hi,[...planes,node.plane]);}yield* visit(triangles,fractureTree(data.bounds));
-    const sections=[];for(const {tris,planes}of leaves){
+    const size=data.bounds.getSize(new THREE.Vector3()),epsilon=Math.max(...size.toArray())*1e-6;
+    // Clip detachable assemblies separately on the same planes. A missing pod
+    // simply omits its prepared surfaces and cut faces at the next death.
+    const regions=new Map();
+    for(const [component,triangles] of components){
+        const leaves=yield* fractureLeaves(triangles,data.fractureBounds??data.bounds,data.variant);
+        for(const leaf of leaves){
+            if(!regions.has(leaf.key))regions.set(leaf.key,[]);
+            regions.get(leaf.key).push({...leaf,component});
+        }
+    }
+    const sections=[];
+    for(const [key,leaves] of regions){
         yield;
         const box=new THREE.Box3();let mass=0;const a=new THREE.Vector3(),b=new THREE.Vector3();
-        for(const t of tris){for(const v of t.v)box.expandByPoint(p.fromArray(v.p));if(t.mat!==-1){a.fromArray(t.v[1].p).sub(p.fromArray(t.v[0].p));b.fromArray(t.v[2].p).sub(p);mass+=a.cross(b).length()*.5;}}
-        const origin=box.getCenter(new THREE.Vector3()),byMaterial=new Map();
-        for(const t of tris){if(!byMaterial.has(t.mat))byMaterial.set(t.mat,[]);byMaterial.get(t.mat).push(t);}
-        const parts=[];for(const [slot,t]of byMaterial){yield;const geometry=yield* geometryFor(t,origin,planes,size);owned.add(geometry);parts.push({slot,geometry});}
-        yield;const structure=yield* structureFor(tris,origin,size);if(structure){owned.add(structure);parts.push({slot:-2,geometry:structure});}
-        sections.push({origin,mass:Math.max(epsilon,mass),radius:box.getSize(new THREE.Vector3()).length()*.5,parts});
+        for(const {tris} of leaves)for(const t of tris){
+            for(const v of t.v)box.expandByPoint(p.fromArray(v.p));
+            if(t.mat!==-1){a.fromArray(t.v[1].p).sub(p.fromArray(t.v[0].p));b.fromArray(t.v[2].p).sub(p);mass+=a.cross(b).length()*.5;}
+        }
+        const origin=box.getCenter(new THREE.Vector3()),parts=[];
+        for(const {tris,component,planes} of leaves){
+            const byMaterial=new Map();
+            for(const t of tris){if(!byMaterial.has(t.mat))byMaterial.set(t.mat,[]);byMaterial.get(t.mat).push(t);}
+            for(const [slot,t]of byMaterial){
+                yield;const geometry=yield* geometryFor(t,origin,planes,size);
+                owned.add(geometry);parts.push({slot,geometry,component});
+            }
+            yield;const structure=yield* structureFor(tris,origin,size);
+            if(structure){owned.add(structure);parts.push({slot:-2,geometry:structure,component});}
+        }
+        sections.push({key,origin,mass:Math.max(epsilon,mass),radius:box.getSize(new THREE.Vector3()).length()*.5,parts});
     }
     return{sections,size,materials:data.materials};
 }
@@ -213,18 +264,18 @@ export class ShipWreckFactory {
             eased=t=>ramp>0?t-ramp*(1-Math.exp(-t/ramp)):t,spinScale=worldLength<=WRECK_FIGHTER_LENGTH?Math.min(1.4,Math.sqrt(WRECK_FIGHTER_LENGTH/Math.max(worldLength,1))):heft,centre=data.bounds.getCenter(new THREE.Vector3()),parts=[],momentum=new THREE.Vector3();let mass=0;
         for(const section of template.sections){
             const group=new THREE.Group();group.position.copy(section.origin);root.add(group);
-            for(const p of section.parts){const slot=template.materials[p.slot],original=slot?(Array.isArray(data.meshes[slot.mesh].mesh.material)?data.meshes[slot.mesh].mesh.material[slot.slot]:data.meshes[slot.mesh].mesh.material):null;
+            for(const p of section.parts){if(data.detached.has(p.component))continue;const slot=template.materials[p.slot],original=slot?(Array.isArray(data.meshes[slot.mesh].mesh.material)?data.meshes[slot.mesh].mesh.material[slot.slot]:data.meshes[slot.mesh].mesh.material):null;
                 const mesh=new THREE.Mesh(p.geometry,p.slot===-1?interior:p.slot===-2?structureMaterial:damaged(original));mesh.userData.wreckCutFace=p.slot===-1;mesh.raycast=()=>undefined;group.add(mesh);}
             const direction=section.origin.clone().sub(centre);if(direction.lengthSq()<1e-6)direction.set(1,.4,.3);direction.normalize().add(new THREE.Vector3(random()-.5,random()-.5,random()-.5).multiplyScalar(.3)).normalize();
             // A violent break-up: sections leave at about half to one ship
             // length per second, smaller ones faster and tumbling harder
-            // (equal blast energy). Purely visual; loot boxes drift on their own.
+            // (equal blast energy).
             // Heft: fighters (up to 36 units across) keep the violent break-up;
             // heavier hulls slow steeply with size, so a frigate drifts apart.
             const smallness=Math.sqrt(length/Math.max(section.radius,1e-3));
             const speed=length*(.45+random()*.55)*Math.min(2.6,smallness*.6)*heft*(1-.4*settle),velocity=direction.multiplyScalar(speed);
             const spinAxis=new THREE.Vector3(random()-.5,random()-.5,random()-.5).normalize(),spinRate=(.4+random()**2*2.2)*Math.min(3,smallness*.6)*spinScale;
-            const part={group,origin:section.origin,velocity,spinAxis,spinRate,mass:section.mass};parts.push(part);momentum.addScaledVector(velocity,part.mass);mass+=part.mass;
+            const part={key:section.key,group,origin:section.origin,velocity,spinAxis,spinRate,mass:section.mass};parts.push(part);momentum.addScaledVector(velocity,part.mass);mass+=part.mass;
         }
         momentum.divideScalar(Math.max(1e-9,mass));for(const p of parts)p.velocity.sub(momentum);
         // Keep mounted external hardware with the nearest section. Glows,
@@ -239,13 +290,26 @@ export class ShipWreckFactory {
         if(source.userData.glb)for(const extra of source.children.slice(1)){if(extra.name==='drone-docking-ports')continue;extra.traverseVisible(child=>{if(isSolid(child))attach(child,new THREE.Matrix4().multiplyMatrices(inverse,child.matrixWorld));});}
         for(const extra of externalHardware){extra.updateWorldMatrix(true,true);extra.traverseVisible(child=>{if(isSolid(child))attach(child,new THREE.Matrix4().multiplyMatrices(inverse,child.matrixWorld));});}
         root.name=`wreck-${ship.id}`;root.userData.wreckSections=parts;const drift=new THREE.Vector3().fromArray(ship.velocity??[0,0,0]),q=new THREE.Quaternion(),colors=[...materials.values()].filter(m=>m.color).map(m=>[m,m.color.clone()]);let age=0,disposed=false;
-        const effect={object:root,combatWreck:true,life:180,maxLife:180,sections:parts,update(dt){
+        let owners=1;
+        const release=()=>{
+            if(--owners)return;
+            for(const material of materials.values())material.dispose();
+            interior.dispose();structureMaterial.dispose();for(const geometry of ownedHardware)geometry.dispose();
+        };
+        const effect={releaseSection(key,origin,scale=1){
+            const i=parts.findIndex(p=>p.key===key);if(i<0)return;
+            const [part]=parts.splice(i,1),mesh=new THREE.Group();
+            mesh.add(part.group);part.group.scale.setScalar(scale);
+            part.group.position.copy(part.origin).multiplyScalar(scale).sub(origin);
+            owners++;
+            return {mesh,dispose:release};
+        },object:root,combatWreck:true,life:180,maxLife:180,sections:parts,update(dt){
             age+=dt;root.position.addScaledVector(drift,dt);const elapsed=eased(Math.max(0,age-hold));
             for(const p of parts){p.group.position.copy(p.origin).addScaledVector(p.velocity,elapsed);q.setFromAxisAngle(p.spinAxis,p.spinRate*elapsed);p.group.quaternion.copy(q);p.group.scale.setScalar(Math.min(1,Math.max(0,(180-age)/8)));}
             const cooling=Math.exp(-age*.65);interior.emissiveIntensity=Math.exp(-age*1.5)*.25;
             for(const [m,color]of colors)m.color.copy(color).multiplyScalar(.64+cooling*.18);
         },dispose(){
-            if(disposed)return;disposed=true;for(const material of materials.values())material.dispose();interior.dispose();structureMaterial.dispose();for(const geometry of ownedHardware)geometry.dispose();
+            if(disposed)return;disposed=true;release();
         }};effect.update(0);return effect;
     }
     dispose(){

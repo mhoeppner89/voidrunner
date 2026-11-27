@@ -433,4 +433,119 @@ export default {
             return [blend([low, 0.6], [left, 1]), blend([low, 0.6], [right, 1])];
         },
     },
+    // ------------------------------------------------------- new corvettes
+    // Heimdall's rail lance charging (3 s): a capacitor whine climbing three
+    // octaves under pulses that speed up, with arcs crackling in. The last
+    // 1.5 s hold one solid pitch: the aim has frozen and the pilot must break.
+    'lance-whine': {
+        variants: 1, peak: -4, group: 'flight',
+        make: (v, R) => {
+            const T = 3, F = 1.5;
+            const pitch = d.curve(T, (t) => t < F ? 260 * Math.pow(8, Math.pow(t / F, 1.4)) : 2080);
+            const whine = d.lowpass(d.sum(d.osc(T, pitch, 'saw'), d.scale(d.osc(T, d.curve(T, (t) => (t < F ? 260 * Math.pow(8, Math.pow(t / F, 1.4)) : 2080) * 1.5)), 0.35)), 5200, 0.9);
+            let phase = 0;
+            const pulse = d.curve(T, (t) => { if (t >= F) return 1; const u = t / F; phase += (4 + 22 * u * u) / d.SR; return 0.55 + 0.45 * Math.sin(2 * Math.PI * phase); });
+            const swellIn = d.curve(T, (t) => Math.min(1, 0.25 + Math.pow(t / F, 1.3)));
+            const hum = d.mul(d.osc(T, d.curve(T, (t) => t < F ? 55 + 55 * t / F : 110)), d.curve(T, (t) => 0.4 + 0.6 * Math.min(1, t / F)));
+            const arcs = d.mul(d.highpass(d.toMono(scatter(R, T, 46, (R2) => tick(R2, { hz: 3200, ms: 2 }), { shape: 0.6, fall: 0.3 })), 1800), d.curve(T, (t) => Math.pow(Math.min(1, t / F), 2)));
+            const mono = blend([d.mul(d.mul(whine, pulse), swellIn), 0.8], [hum, 0.22], [arcs, 0.4]);
+            return d.fade(d.widen(d.drive(mono, 1.3), R, 0.5), 0.02, 0.01);
+        },
+    },
+    // The lance fires: a rail crack far heavier than a magrail, a long
+    // discharge sweeping down, a low struck-bar ring and a deep slam.
+    'lance-shot': {
+        variants: 2, peak: -1, group: 'flight',
+        make: (v, R) => {
+            const k = v ? 0.92 : 1, T = 2.4;
+            const crack = d.scale(tick(R, { hz: 2200, ms: 5 }), 1.2);
+            const zap = d.mul(d.bandpass(d.noise(0.9, R), d.line(0.9, [[0, 9000], [0.35, 600], [0.9, 160]], 'exp'), 4), d.perc(0.9, 0.0008, 0.18));
+            const ring = strike(R, 2.2, BAR.map((r, i) => ({ f: 150 * k * r, t60: 1.2 / (1 + i * 0.6), gain: 1 / (1 + i * 0.5) })), { hard: 6000 });
+            const whip = d.mul(d.osc(0.14, d.line(0.14, [[0, 4200], [0.14, 120]], 'exp')), d.perc(0.14, 0.0005, 0.035));
+            const slam = thud(2.2, 70 * k, 24, { sweep: 0.08, tau: 0.3, push: 2.4 });
+            const mono = d.drive(blend([crack, 1], [zap, 1], [ring, 0.45], [whip, 0.6], [slam, 0.8]), 1.7);
+            return d.reverb(d.widen(d.fade(d.pad(mono, T), 0.001, 0.6), R, 0.6), { time: 2, mix: 0.24, damp: 0.3, seed: 211 + v });
+        },
+    },
+    // Tacita's jammer near the pilot: a hollow fifth wobbling against itself
+    // with stepped digital hash, like a carrier wave being chewed. Loop, 2 s.
+    'ecm-loop': {
+        variants: 1, peak: -8, group: 'flight', loop: true,
+        make: (v, R) => {
+            const P = 2, T = P + 0.6;
+            const drone = d.curve(P, (t) => (Math.sin(2 * Math.PI * 110 * t + 2.4 * Math.sin(2 * Math.PI * 3 * t)) + 0.6 * Math.sin(2 * Math.PI * 165 * t + 1.8 * Math.sin(2 * Math.PI * 4.5 * t + 1)) + 0.25 * Math.sin(2 * Math.PI * 330.5 * t)) * (0.75 + 0.25 * Math.sin(2 * Math.PI * 1.5 * t)));
+            const side = (seed) => {
+                const raw = d.bandpass(d.noise(T, R, 'white'), d.curve(T, (t) => 1600 + 900 * Math.sin(2 * Math.PI * t / P + seed)), 2.2);
+                let held = 0, next = 0;
+                const crushed = raw.map((x, i) => { if (i >= next) { held = x; next = i + 24 + Math.floor(R.range(0, 40)); } return held; });
+                let gate = 1, until = 0;
+                const chopped = crushed.map((x, i) => { if (i >= until) { gate = R.range(0, 1) < 0.55 ? 1 : 0.15; until = i + Math.floor(d.SR / R.range(9, 22)); } return x * gate; });
+                return d.makeLoop(d.lowpass(chopped, 4200), 0.6);
+            };
+            const low = d.lowpass(d.drive(drone, 1.4), 1400);
+            return [blend([low, 0.8], [side(0), 0.45]), blend([low, 0.8], [side(2.1), 0.45])];
+        },
+    },
+    // The emitter dies: the jamming field folds inward and pops.
+    'ecm-die': {
+        variants: 1, peak: -2, group: 'flight',
+        make: (v, R) => {
+            const T = 1.3;
+            const fall = d.mul(d.fm(T, d.line(T, [[0, 1400], [0.9, 70], [T, 50]], 'exp'), 1.5, d.line(T, [[0, 5], [T, 0.4]])), d.curve(T, (t) => Math.min(1, t / 0.02) * Math.exp(-t / 0.5)));
+            const fizz = d.mul(d.bandpass(d.noise(T, R), d.line(T, [[0, 6000], [T, 500]], 'exp'), 3), d.perc(T, 0.005, 0.3));
+            const pop = d.pad(blend([thud(0.5, 120, 40, { sweep: 0.04, tau: 0.12, push: 2 }), 1], [burst(R, 0.4, { from: 7000, to: 600, tau: 0.08 }), 0.8]), T);
+            const mono = d.fade(blend([fall, 0.8], [fizz, 0.5], [pop, 1]), 0.001, 0.35);
+            return d.reverb(d.widen(mono, R, 0.7), { time: 1.4, mix: 0.25, seed: 223 });
+        },
+    },
+    // ------------------------------------------------------- barrage flak
+    // A pirate rocket leaving its rack: a hollow tube cough, then a ragged,
+    // sputtering motor (irregular chop, not the smooth missile roar) that
+    // falls away as it climbs out. Six of these ripple per salvo.
+    'flak-launch': {
+        variants: 2, peak: -3, group: 'flight',
+        make: (v, R) => {
+            const T = 1.1;
+            const cough = blend([thud(0.3, 96 - v * 8, 48, { sweep: 0.03, tau: 0.06, push: 2 }), 1],
+                [d.mul(d.bandpass(d.noise(0.3, R, 'pink'), 420 + v * 60, 1.4), d.perc(0.3, 0.002, 0.05)), 0.9]);
+            let gate = 1, until = 0;
+            const sputter = d.noise(T, R, 'pink').map((x, i) => { if (i >= until) { gate = R.range(0.25, 1); until = i + Math.floor(d.SR / R.range(24, 46)); } return x * gate; });
+            const motor = d.mul(d.bandpass(sputter, d.line(T, [[0, 700], [0.12, 1500 + v * 150], [T, 650]], 'exp'), 1.1),
+                d.curve(T, (t) => Math.min(1, t / 0.05) * Math.exp(-Math.max(0, t - 0.05) / 0.32)));
+            const fizz = d.mul(d.highpass(d.noise(T, R), 5000), d.perc(T, 0.01, 0.12));
+            const mono = d.drive(blend([d.pad(cough, T), 1], [motor, 0.75], [fizz, 0.2]), 1.6);
+            return d.reverb(d.widen(d.fade(mono, 0.001, 0.25), R, 0.5), { time: 1.2, mix: 0.18, seed: 231 + v });
+        },
+    },
+    // A high-explosive flak burst: a split-second crack, a hard "kraack" of
+    // mid noise and a short punchy body (no sub boom), then fragments and air.
+    // Kept short and dry so a whole salvo reads as staccato bracketing.
+    'flak-burst': {
+        variants: 3, peak: -1, group: 'flight',
+        make: (v, R) => {
+            const T = 1.6;
+            const crack = blend([tick(R, { hz: 3200 + v * 300, ms: 2 }), 1.2],
+                [burst(R, 0.12, { from: 12000, to: 3000, sweep: 0.01, tau: 0.012, attack: 0.0003 }), 1]);
+            const kraack = d.mul(d.bandpass(d.noise(0.5, R), d.line(0.5, [[0, 2600 - v * 200], [0.5, 500]], 'exp'), 0.9), d.perc(0.5, 0.0008, 0.045));
+            const body = thud(0.5, 128 - v * 10, 58, { sweep: 0.025, tau: 0.07, push: 2.4 });
+            const hollow = d.mul(d.bandpass(d.noise(0.6, R, 'pink'), 310 + v * 25, 2), d.perc(0.6, 0.004, 0.09));
+            const frags = scatter(R, 0.9, 10 + v * 3, (r) => d.modal(tick(r, { hz: 1800, ms: 1 }), [{ f: r.range(1800, 5200), t60: r.range(0.01, 0.03) }], 0.05), { span: 0.7, shape: 1.8, spread: 0.9 });
+            const mono = d.highpass(d.drive(blend([crack, 1.3], [kraack, 1.6], [body, 0.4], [hollow, 0.6]), 2.2), 70);
+            const out = d.widen(d.pad(mono, T), R, 0.55);
+            d.place(out, frags, 0.05, 0.35);
+            return d.reverb(d.fade(out, 0.0005, 0.5), { time: 1.5, mix: 0.2, damp: 0.45, seed: 241 + v });
+        },
+    },
+    // Shrapnel from a close burst peppering the hull: a front-loaded spray of
+    // hard metallic pings over a few dull plate knocks.
+    'flak-shrapnel': {
+        variants: 2, peak: -4, group: 'flight',
+        make: (v, R) => {
+            const pings = scatter(R, 0.7, 26 + v * 6, (r) => d.modal(tick(r, { hz: 2400, ms: 1 }),
+                [{ f: r.range(2200, 6800), t60: r.range(0.008, 0.025) }, { f: r.range(900, 1600), t60: 0.015, gain: 0.4 }], 0.04), { span: 0.5, shape: 2.2, spread: 0.85, fall: 1.4 });
+            const knocks = scatter(R, 0.7, 4, (r) => strike(r, 0.12, [{ f: r.range(280, 520), t60: 0.06 }, { f: r.range(700, 1100), t60: 0.04, gain: 0.5 }], { hard: 1800, click: 0.3 }), { span: 0.35, shape: 1.5, spread: 0.6 });
+            d.place(pings, knocks, 0, 0.8);
+            return d.fade(pings, 0.0005, 0.12);
+        },
+    },
 };

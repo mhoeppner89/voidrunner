@@ -278,6 +278,57 @@ export const FORGED_SOUNDS = {
    4
   ]
  },
+ "lance-whine": {
+  "files": [
+   "fx/lance-whine-0.mp3"
+  ],
+  "group": "flight"
+ },
+ "lance-shot": {
+  "files": [
+   "fx/lance-shot-0.mp3",
+   "fx/lance-shot-1.mp3"
+  ],
+  "group": "flight"
+ },
+ "ecm-loop": {
+  "files": [
+   "fx/ecm-loop-0.mp3"
+  ],
+  "group": "flight",
+  "loop": [
+   0.12,
+   2
+  ]
+ },
+ "ecm-die": {
+  "files": [
+   "fx/ecm-die-0.mp3"
+  ],
+  "group": "flight"
+ },
+ "flak-launch": {
+  "files": [
+   "fx/flak-launch-0.mp3",
+   "fx/flak-launch-1.mp3"
+  ],
+  "group": "flight"
+ },
+ "flak-burst": {
+  "files": [
+   "fx/flak-burst-0.mp3",
+   "fx/flak-burst-1.mp3",
+   "fx/flak-burst-2.mp3"
+  ],
+  "group": "flight"
+ },
+ "flak-shrapnel": {
+  "files": [
+   "fx/flak-shrapnel-0.mp3",
+   "fx/flak-shrapnel-1.mp3"
+  ],
+  "group": "flight"
+ },
  "ui-click": {
   "files": [
    "fx/ui-click-0.mp3",
@@ -434,6 +485,20 @@ export const FORGED_SOUNDS = {
  "break-cue": {
   "files": [
    "fx/break-cue-0.mp3"
+  ],
+  "group": "flight"
+ },
+ "lance-lock": {
+  "files": [
+   "fx/lance-lock-0.mp3"
+  ],
+  "group": "flight"
+ },
+ "jam-static": {
+  "files": [
+   "fx/jam-static-0.mp3",
+   "fx/jam-static-1.mp3",
+   "fx/jam-static-2.mp3"
   ],
   "group": "flight"
  },

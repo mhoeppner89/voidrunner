@@ -3,14 +3,16 @@
 import {registerInventoryDefinitions} from './equipmentInventory.js';
 import {restoreNpcDrones} from './npcDrones.js';
 import {applyCapitalSubsystemEffects} from './capitalCombat.js';
+import {restoreHeimdallLasers} from './capitalHulls.js';
+import {capitalCollisionVariant} from './shipCollision.js';
 import {launchCycle} from './arenaBattle.js';
 import {LOCATIONS,spawnClearance} from './data.js';
-import {TRAFFIC_HULLS} from './corvetteMounts.js';
+import {TRAFFIC_HULLS,restorePicketMounts} from './corvetteMounts.js';
 
 const fields = [
     'id','name','role','variant','hullId','faction','guild','livery','instanceId','pilot','task','destination',
     'position','rotation','velocity','portraitIndex','recognitionName','lastResolvedPlayer','playerIntelPosition','hull','maxHull','shield','maxShield','energy','shieldDelay','combatFit',
-    'capitalClass','capitalSpawnKey','capitalMountHull','missingPods','collisionVariant','lostDroneBays',
+    'capitalClass','capitalSpawnKey','capitalMountHull','missingPods','lostDroneBays','ecmStoppedAt',
     'cargo','equipmentRecords','lootKey','repairDronesHeld','hostile','targetId','combatThreatId','combatThreatUntil',
     'frigateEncounterId','launchOwner','formationSlot','formationPoint','formationTrail','convoyEscape','convoyPort',
     'convoyFormed','convoyDistress','scanned','dark','surrendered','poweredDown','standingDown','fleeing','claimed','driveWear','crippled',
@@ -21,6 +23,7 @@ const fields = [
 function checkpointShip(ship) {
     const state={};
     for(const key of fields)if(ship[key]!==undefined)state[key]=ship[key];
+    if(ship.variant==='picket')state.picketLayout=2;
     return {state,leader:ship.convoyLeader?.id,
         lanes:ship.carrierBattle?.lanes?.map(({subsystem,remaining,retryIn})=>({subsystem,remaining,retryIn})),
         drones:ship.droneFleet&&Object.values(ship.droneFleet.unitsById).map(({prevPosition,prevRotation,...unit})=>unit)};
@@ -70,10 +73,16 @@ export function restoreFrigateEncounter(session,legacyRange) {
                 ?session.spawnTrafficCapital(state.variant,state.position,false,state.pilot)
                 :session.spawnShip(state.role,state.position,undefined,state.name,state.pilot,{hullId:state.hullId,faction:state.faction,guild:state.guild});
             Object.assign(ship,structuredClone(state));
+            restoreHeimdallLasers(ship);
+            if(ship.variant==='picket'){
+                ship.capitalMountHull=restorePicketMounts(ship.capitalMountHull,state.picketLayout);
+                ship.combatFit.turrets=restorePicketMounts(ship.combatFit.turrets,state.picketLayout);
+            }
             // A fresh pirate defaults to targeting the player. An explicitly idle escort stays idle.
             ship.targetId=state.targetId;
             if(ship.pendingMugLeaderId)ship.demandUntil=Infinity;
             for(const {item} of ship.equipmentRecords??[])registerInventoryDefinitions({items:{[item.id]:item}});
+            if(TRAFFIC_HULLS[ship.variant])ship.collisionVariant=capitalCollisionVariant(ship.variant,ship.missingPods);
             if(ship.capitalClass)applyCapitalSubsystemEffects(ship);
             if(lanes){
                 const battle=ship.carrierBattle={target:ship,trafficCarrier:ship};

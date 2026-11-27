@@ -1,5 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {t} from '../../src/game/i18n.js';
 import {session} from '../helpers/session.mjs';
 import {updateArenaSweep,SWEEP_GRACE,SWEEP_WARNING,SWEEP_INTERVAL} from '../../src/game/arenaSweep.js';
 
@@ -15,12 +16,15 @@ function hiddenFight(){
 
 test('a hidden pilot gets a warned grace, then range control hands the hunters a snapshot of the position',()=>{
  const {s,a,b,events,sounds,step}=hiddenFight();
+ const cards=[];s.ui.showRangeCue=(...card)=>cards.push(card);
  s.save.player.position=[40,-20,10];
  step(SWEEP_GRACE-SWEEP_WARNING-.1);
  assert.equal(events.length,0,'no warning inside the free part of the grace');
  assert.equal(a.search,undefined);
  step(.2);
  assert.equal(events.length,1);assert.equal(events[0].tone,'warning');
+ assert.deepEqual(cards,[[t('SWEEP {seconds} S',{seconds:SWEEP_WARNING}),'']]);
+ assert.deepEqual(sounds,['rangeTick']);
  step(SWEEP_WARNING);
  assert.equal(events.at(-1).tone,'danger');assert.ok(sounds.includes('scan'));
  for(const ship of [a,b]){

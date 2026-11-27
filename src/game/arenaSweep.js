@@ -71,7 +71,7 @@ export function updateArenaSweep(session, dt) {
     state.hidden += dt;
     if (!state.warned && state.hidden >= state.nextAt - SWEEP_WARNING) {
         state.warned = true;
-        session.ui.pushEvent(t('Range control sweep in {seconds} seconds.', { seconds: SWEEP_WARNING }), 'warning', 2800);
+        session.runRadio(t('Range control sweep in {seconds} seconds.', { seconds: SWEEP_WARNING }), t('SWEEP {seconds} S', { seconds: SWEEP_WARNING }));
     }
     if (state.hidden < state.nextAt)
         return;

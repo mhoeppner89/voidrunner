@@ -353,6 +353,7 @@ button.compact {
 #ordnance-markers i::before { content:''; position:absolute; box-sizing:border-box; }
 #ordnance-markers i.torpedo::before { left:-7px; top:-7px; width:14px; height:14px; border:2px solid #ff5340; transform:rotate(45deg); box-shadow:0 0 0 1px rgba(4,8,16,.7), inset 0 0 0 1px rgba(4,8,16,.7); }
 #ordnance-markers i.missile::before { left:-8px; top:-8px; width:16px; height:16px; border:2px solid #ff8a4a; border-radius:50%; box-shadow:0 0 0 1px rgba(4,8,16,.7), inset 0 0 0 1px rgba(4,8,16,.7); }
+#ordnance-markers i.lance::before { left:-11px; top:-11px; width:22px; height:22px; border:2px dashed #ffbb62; border-radius:50%; }
 #ordnance-markers i.edge { filter:drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000); }
 #ordnance-markers i.edge::before { left:-12px; top:-14px; width:24px; height:20px; background:#ff6a3a; clip-path:polygon(50% 0,100% 100%,50% 68%,0 100%); }
 #ordnance-markers i.inbound::before { animation:ordnance-inbound .5s steps(2,jump-none) infinite alternate; }
@@ -361,6 +362,13 @@ button.compact {
 @media (pointer:coarse) { #ordnance-markers i.torpedo::before { left:-8px; top:-8px; width:16px; height:16px; } }
 /* BREAK flashes over the whole own-ship monitor (user request: on the ship
    monitor, short and quick, not over the 3D view). Below monitor damage. */
+.screen-range { position:absolute; inset:0; z-index:5; container-type:size; display:grid; align-items:center; overflow:hidden; opacity:0; pointer-events:none; }
+.range-band { box-sizing:border-box; display:grid; justify-items:center; gap:min(3px,2cqh); padding:min(6px,4cqh) 0; border-block:2px solid #ffc456; background:#101e32; color:#ffe5a5; box-shadow:0 2px 3px #030810,0 -2px 3px #030810; }
+.range-band b { font:700 min(clamp(16px,2.2vw,30px),15cqw,36cqh)/1 var(--pixel-font); letter-spacing:.04em; white-space:nowrap; }
+.range-band span { font:700 min(17px,10cqw,20cqh)/1 var(--pixel-font); color:#ffc971; white-space:nowrap; }
+.range-band span:empty { display:none; }
+.screen-range.is-on { animation:screen-range 2.25s linear; }
+@keyframes screen-range { 0%,4%,9%,88% { opacity:1; } 5%,8%,100% { opacity:0; } }
 .screen-break { position:absolute; inset:0; z-index:6; display:flex; align-items:center; justify-content:center; background:rgba(150,14,8,.92); opacity:0; pointer-events:none; }
 .screen-break b { font:700 clamp(16px,2.2vw,30px)/1 var(--pixel-font); letter-spacing:.16em; color:#ffe3d8; text-shadow:0 0 6px rgba(255,60,40,.9),0 1px 0 #2a0402; }
 .screen-break.is-on { animation:screen-break .6s steps(1,end); }

@@ -31,10 +31,10 @@ function define(sockets, readout, extents) {
         const deckSystem = extents && (kind === 'generator' || kind === 'torpedo');
         const offset = socket.hitCenterOffset ?? (deckSystem ? [0, socket.side * (socket.hitOffset ?? 3), 0] : [0, 0, 0]);
         const hitCenter = localPosition.map((n, axis) => n + offset[axis]);
-        const lift = markerLift(socket, extents, radius);
+        const lift = socket.markerLift ?? markerLift(socket, extents, radius);
         const markerPosition = localPosition.map((n, axis) => n + normal[axis] * lift);
-        const targetable = kind === 'generator' || kind === 'engine';
-        const compact = targetable ? (kind === 'generator' ? 'SHIELD ' : 'ENGINE ') + serial : undefined;
+        const targetable = kind === 'emitter' || kind === 'generator' || kind === 'engine';
+        const compact = kind === 'emitter' ? 'ECM' : targetable ? (kind === 'generator' ? 'SHIELD ' : 'ENGINE ') + serial : undefined;
         return { ...socket, index, hull, radius, labelKey, compact, normal, localPosition, hitCenter, markerPosition, targetable };
     });
     const engines = mounts.filter(m => m.kind === 'engine');
@@ -47,6 +47,14 @@ export const CAPITAL_HULLS = {
     'concord-cruiser': define(CRUISER_MOUNTS, 'BATTERIES {guns}/4 · PDC {pdc}/6'),
     ...Object.fromEntries(Object.entries(TRAFFIC_HULLS).map(([id,spec])=>[id,define(spec.mounts,spec.readout)])),
 };
+
+// Earlier Heimdall checkpoints stored one dorsal laser in slot five.
+export function restoreHeimdallLasers(ship) {
+    if (ship.variant !== 'siege') return;
+    if (ship.capitalMountHull?.length === 6) ship.capitalMountHull.push(ship.capitalMountHull[5]);
+    const turrets = ship.combatFit?.turrets;
+    if (turrets?.length === 6) turrets.push(turrets[5]);
+}
 
 const classDefaults = { frigate: CAPITAL_HULLS['concord-frigate'], cruiser: CAPITAL_HULLS['concord-cruiser'] };
 export function capitalHull(ship) {

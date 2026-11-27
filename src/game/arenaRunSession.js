@@ -73,7 +73,7 @@ export const ArenaRunMethods={
  preloadRunWaveModels(){
   const r=this.save.arenaRun,wave=RUN_WAVES[r?.wave];if(!wave)return;
   const variants=new Set();
-  for(const spec of [...wave.enemies,wave.launch?.fighter,wave.support?.fighter,wave.objective?.transport].filter(Boolean)){
+  for(const spec of [...wave.enemies,wave.launch?.fighter,wave.objective?.transport].filter(Boolean)){
    const variant=isRunCapital(spec)?spec.hullId:SHIPS[spec.hullId]?.variant??spec.hullId;
    if(variant)variants.add(variant);
   }
@@ -410,13 +410,17 @@ export const ArenaRunMethods={
   }
   const ship=this.spawnShip(role,point.toArray(),undefined,undefined,{tier},{faction,hullId});
   ship.faction=faction;
-  ship.hostile=true;ship.authorizedTarget=true;ship.dark=false;ship.mugCapable=false;ship.targetId='player';ship.arenaRunEnemy=true;ship.noSurrender=true;
+  ship.hostile=true;ship.authorizedTarget=true;ship.dark=false;ship.mugCapable=false;ship.arenaRunEnemy=true;ship.noSurrender=true;
+  const wingTarget=spec.screenWing&&this.ships.find(ally=>ally.arenaRunWingman&&!ally.poweredDown&&ally.hull>0);
+  ship.targetId=wingTarget?.id??'player';
   // Range control briefs an entering contact on the pilot's position: its
   // first search is fresh intel (arenaSweep.js marks it urgent).
   ship.arenaEntryIntelUntil=this.save.world.time+6;
   // The opponent flies its hull's real stock fit unless the wave overrides a
   // mount, so an Arena Run Concord Blade is the same Blade the career spawns.
   ship.combatFit=createEnemyLoadout(ship,index,{...runEnemyFit(spec),missiles:spec.missiles??0});
+  ship.maxHull=ship.hull=ship.combatFit.stats.hull;
+  ship.maxShield=ship.shield=ship.combatFit.stats.shield;
   ship.energy=ship.combatFit.stats.energyCapacity;
   ship.rotation=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),origin.clone().sub(point).normalize()).toArray();
   selectArrival(this,ship);

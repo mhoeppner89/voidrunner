@@ -539,7 +539,7 @@ test('finished short runs keep their totals and active checkpoints migrate into 
  }
 });
 test('the wave before the frigate fully services the ship, and the boss flies with four turrets',()=>{
- storage();const s=runSession(RUN_WAVES.length-2);s.startRunWave();s.tickArenaRun(3);assert.deepEqual(s.ships.map(x=>x.combatFit.hullId),['lancer','vanguard']);
+ storage();const s=runSession(RUN_WAVES.length-2);s.startRunWave();s.tickArenaRun(3);assert.deepEqual(s.ships.map(x=>x.combatFit.hullId),['lancer','vanguard','vanguard','blade']);
  s.save.player.hull=5;finishArenaLevel(s);assert.equal(s.save.arenaRun.wave,RUN_WAVES.length-1);
  // The last advance serviced the pilot before the frigate stage. Complete its
  // required second-wing choice before accepting the normal wave reward.
@@ -593,7 +593,9 @@ test('arena opponents fly the fit their hull authors, and the run ends on the fr
  assert.equal(RUN_WAVES[RUN_WAVES.length-1].enemies[0].role,'frigate','the final wave is the frigate');storage();
  for(let wave=0;wave<RUN_WAVES.length;wave++)for(const [i,spec] of RUN_WAVES[wave].enemies.entries()){
   if(spec.capital)continue;
-  const s=runSession(wave);assert.ok(s.spawnRunEnemy(spec,i),`wave ${wave} enemy ${i}`);const fit=s.ships.at(-1).combatFit;
+  const s=runSession(wave);assert.ok(s.spawnRunEnemy(spec,i),`wave ${wave} enemy ${i}`);const ship=s.ships.at(-1),fit=ship.combatFit;
+  assert.equal(ship.hull,fit.stats.hull);assert.equal(ship.maxHull,fit.stats.hull);
+  assert.equal(ship.shield,fit.stats.shield);assert.equal(ship.maxShield,fit.stats.shield);
   const mounts=HULL_HARDPOINTS[spec.hullId],authoredGuns=runEnemyFit(spec).guns.filter(Boolean);
   assert.equal(authoredGuns.length,mounts.guns.length);assert.equal(fit.racks.length,mounts.launchers.length);
   assert.deepEqual(fit.guns.filter(Boolean),authoredGuns,`wave ${wave} enemy ${i} retains the authored guns in gun slots`);assert.ok(fit.attackOrder.every(index=>fit.weapons[index]));

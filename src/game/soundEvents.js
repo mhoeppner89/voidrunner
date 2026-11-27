@@ -22,6 +22,17 @@
 //   gain     overall trim
 export const SOUND_EVENTS = {
     // ------------------------------------------------------------- weapons
+    'lance-charge': {bus:'world',range:1800,layers:[['lance-whine',.85]]},
+    'lance-freeze': {bus:'cockpit',priority:3,layers:[['break-cue',.8],['lance-lock',.45]]},
+    'lance-fire': {bus:'world',range:2000,layers:[['lance-shot',.95]]},
+    'ecm-hum': {bus:'world',range:650,layers:[['ecm-loop',.42]]},
+    'ecm-collapse': {bus:'world',range:1000,layers:[['ecm-die',.8]]},
+    'radar-jam': {bus:'cockpit',spacing:2,layers:[['jam-static',.55]]},
+    // Barrage flak: a ragged rocket per rack, a staccato HE crack per burst
+    // (no sub boom, so a salvo stays readable), shrapnel on our own hull.
+    'flak-launch': {bus:'world',range:1600,layers:[['flak-launch',.8,{vary:.07}]]},
+    'flak-burst': {bus:'world',range:2200,priority:2,muffle:.15,layers:[['flak-burst',.95,{vary:.07}],['blast-crack',.3,{vary:.08,prox:.45}],['debris-tail',.22,{delay:.08,prox:.6}]]},
+    'flak-shrapnel': {bus:'cockpit',spacing:.12,priority:2,layers:[['flak-shrapnel',.8,{vary:.05}],['rattle',.35,{delay:.02,vary:.06}]]},
     laser: { bus: 'cockpit', room: 0.2, space: 0.1, layers: [['laser', 0.8, { vary: 0.035 }], ['laser-snap', 0.26, { vary: 0.06, prox: 0.9 }], ['energy-tail', 0.36, { vary: 0.08 }], ['thump', 0.22, { vary: 0.05, prox: 0.9 }]] },
     // One original body at a fixed pitch: overlapping emitters must not form chords.
     beam: { bus: 'cockpit', room: 0.16, space: 0.08, layers: [['beam', 0.8]] },
@@ -71,6 +82,7 @@ export const SOUND_EVENTS = {
     // ---------------------------------------------------------- ship systems
     afterburnerOn: { bus: 'cockpit', room: 0.1, space: 0.15, spacing: 0.4, priority: 2, layers: [['ab-ignite', 0.8, { vary: 0.04 }], ['thump', 0.3, { rate: 0.75 }]] },
     afterburnerOff: { bus: 'cockpit', room: 0.1, spacing: 0.4, layers: [['ab-off', 0.8, { vary: 0.05 }]] },
+    rangeTick: { bus: 'cockpit', spacing: 0.2, layers: [['ui-click', 0.35]] },
     scan: { bus: 'cockpit', room: 0.1, space: 0.2, layers: [['scan-ping', 0.9]] },
     dock: { bus: 'cockpit', room: 0.2, space: 0.15, priority: 2, layers: [['dock', 0.85], ['dock-clamp', 0.7]] },
     pickup: { bus: 'cockpit', room: 0.14, layers: [['pickup', 0.5, { vary: 0.05 }], ['pickup-chime', 0.8]] },

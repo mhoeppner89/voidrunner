@@ -289,7 +289,7 @@ function teammateCommitted(session, ship) {
 }
 
 export function planCoverBreak(session, ship, plan, now) {
-    if (!eligible(ship) || !session.activeInstanceId || ship.fieldTactic?.kind || teammateCommitted(session, ship)) return;
+    if (!eligible(ship) || (!session.activeInstanceId && !session.coverSections?.length) || ship.fieldTactic?.kind || teammateCommitted(session, ship)) return;
     const attacker = actorById(session, plan.threatId ?? ship.targetId);
     const motion = approach.set(0,0,0);
     if (attacker?.velocity) motion.fromArray(attacker.velocity);
@@ -359,7 +359,7 @@ export function planTerrainFlank(session, ship, plan, team, target, now) {
 
 function ambusherAvailable(session, ship) {
     if (ship.ambushTried || ship.passPhase >= Math.PI * 2 * .4 || !ship.hostile || ship.targetId !== 'player'
-        || !session.activeInstanceId || !eligible(ship) || ship.arenaRunWingman || ship.fieldTactic?.kind) return false;
+        || (!session.activeInstanceId && !session.coverSections?.length) || !eligible(ship) || ship.arenaRunWingman || ship.fieldTactic?.kind) return false;
     for (const other of session.ships) {
         if (other.fieldTactic?.kind === 'ambush' && activeFieldTactic(session, other)) return false;
     }

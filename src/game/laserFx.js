@@ -246,7 +246,16 @@ export class LaserFx {
         else {
             // Same Blender-authored, textured geometry as the ordnance review.
             const group = new THREE.Group();
-            const body = createOrdnanceModel(projectile.launcherId);
+            const flak=projectile.launcherId==='flak';
+            const body = createOrdnanceModel(flak?'torpedo':projectile.launcherId);
+            if(flak){
+                body.material=body.material.clone();
+                body.material.userData.shared=false;body.material.userData.borrowedTextures=true;
+                body.material.color.setHex(0x58524e);
+                body.scale.setScalar(.65);
+                body.userData.length*=.65;
+                group.add(this.flakTrail());
+            }
             group.add(body);
             const exhaust = new THREE.Group();
             exhaust.name = 'ordnance-exhaust';
@@ -258,7 +267,7 @@ export class LaserFx {
                 depthWrite: false,
             }));
             flare.position.z = body.userData.length*.49;
-            flare.scale.setScalar(projectile.launcherId==='torpedo'?1.6:(projectile.launcherId?.includes('swarm') ? .5 : .8));
+            flare.scale.setScalar(flak?2.8:projectile.launcherId==='torpedo'?1.6:(projectile.launcherId?.includes('swarm') ? .5 : .8));
             exhaust.add(flare);
             // Engine plume: an additive teardrop behind the nozzle —
             // tagged so the frame pass can flicker it. Sized so the
@@ -273,6 +282,29 @@ export class LaserFx {
             exhaust.add(plume);
             mesh = group;
         }
+        return mesh;
+    }
+    // One instanced strip per motor. Each puff recedes along the fixed launch
+    // bearing, widens and fades over 0.55 seconds. No particle objects to tick.
+    flakTrail(){
+        const count=8,g=new THREE.InstancedBufferGeometry();
+        g.setIndex([0,1,2,0,2,3]);
+        g.setAttribute('position',new THREE.Float32BufferAttribute([-1,-1,0,1,-1,0,1,1,0,-1,1,0],3));
+        g.setAttribute('lane',new THREE.InstancedBufferAttribute(Float32Array.from({length:count},(_,i)=>i/count),1));
+        g.instanceCount=count;
+        const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,
+            uniforms:{age:{value:0},smoke:{value:this.cloudTexture('smoke')}},
+            vertexShader:`attribute float lane; uniform float age; varying vec2 puffUV; varying float opacity;
+                void main(){float t=fract(age/.55+lane); float size=.55+2.8*t;
+                vec4 view=modelViewMatrix*vec4(sin(lane*34.)*t,cos(lane*17.)*t,2.+t*49.5,1.);
+                float depth=-view.z;
+                if(depth<15.){gl_Position=vec4(2.,2.,2.,1.);return;}
+                size=min(size,.025*depth/max(projectionMatrix[0][0],projectionMatrix[1][1]));
+                view.xy+=position.xy*size; puffUV=position.xy*.5+.5;
+                opacity=(1.-t)*step(t*.55,age)*smoothstep(15.,30.,depth);gl_Position=projectionMatrix*view;}`,
+            fragmentShader:`uniform sampler2D smoke;varying vec2 puffUV;varying float opacity;
+                void main(){gl_FragColor=vec4(.34,.31,.28,texture2D(smoke,puffUV).a*opacity);}`});
+        const mesh=new THREE.Mesh(g,mat);mesh.name='flak-trail';mesh.frustumCulled=false;
         return mesh;
     }
     sharedAssets() {

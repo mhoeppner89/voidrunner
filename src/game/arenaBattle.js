@@ -26,8 +26,8 @@ export function battleState(wave, index, hard) {
         return {...group,enemies};
     });
     const auxiliary=spec=>hard&&spec?{...spec,tier:promotedTier(spec.tier)}:spec;
-    return {groups,supportFighter:auxiliary(wave.support?.fighter),launchFighter:auxiliary(wave.launch?.fighter),group:0,serial:0,lastArrival:0,interval:index<5?45:60,limit:finalAct?4:3,
-        aceLimit:finalAct?2:Infinity,supportCount:0,nextSupport:wave.support?.every,
+    return {groups,launchFighter:auxiliary(wave.launch?.fighter),group:0,serial:0,lastArrival:0,interval:index<5?45:60,limit:finalAct?4:3,
+        aceLimit:finalAct?2:Infinity,
         thresholds:[60,30,10],outcome:null};
 }
 function fits(session, battle, specs, limit=battle.limit) {
@@ -158,11 +158,11 @@ function publishObjective(session,wave,battle,elapsed) {
 }
 function announce(session,warning,elapsed) {
     if(!warning.announced){
-        if(!session.chatterOpen(true))return;
         warning.at=Math.max(warning.at,elapsed+WARNING);
         warning.announced=true;
-        session.runRadio(warning.line);
-        session.ui.pushEvent(warning.line,'warning',5000,warning.line);
+        const battle=session.runBattle;
+        const title=warning.bay?t('CONTACTS'):t('WAVE {wave}/{total}',{wave:battle.group+1,total:battle.groups.length});
+        session.runRadio(warning.line,title,t('INBOUND {seconds} S',{seconds:WARNING}));
     }
     const point=warning.entry.position;
     if(!session.renderer.camera)return;
@@ -313,11 +313,13 @@ function arrive(session,battle,specs,anchor,bay) {
         const carrier=battle.trafficCarrier;
         specs[0].tier=carrier.observerTeam?carrier.pilot.tier:REGION_TIERS[careerRaidTier(session.careerRegionAt(carrier.position))-1];
     }
+    const screen=specs.some(spec=>spec.hullId==='picket')?[]:null;
     for(const [i,spec] of specs.entries()){
         const carrier=battle.trafficCarrier;
         const ship=carrier?session.spawnShip('escort',plans[i].position,undefined,undefined,
             {tier:spec.tier},{faction:carrier.faction,hullId:spec.hullId}):session.spawnRunShip(spec,battle.serial++,plans[i]);
         if(!ship)return false;
+        screen?.push(ship);
         if(spec.primary)battle.target=ship;
         if(bay){
             ship.launchOwner=battle.target.id;
@@ -332,6 +334,13 @@ function arrive(session,battle,specs,anchor,bay) {
             }
         }
         if(spec.attackObjective){ship.arenaObjectiveAttacker=true;ship.targetId=battle.target?.id;}
+    }
+    if(screen){
+        const picket=screen.find(ship=>ship.variant==='picket');
+        let slot=-1;
+        for(const escort of screen)if(escort!==picket){
+            Object.assign(escort,{convoyLeader:picket,formationPoint:[0,0,0],formationTrail:-85,formationSlot:slot});slot=1;
+        }
     }
     return true;
 }
@@ -397,7 +406,7 @@ export function tickBattle(session,wave,elapsed,dt) {
     }
     let pending=battle.warning;
     if(!pending){
-        let specs,at,line,bay,support=false;
+        let specs,at,line,bay;
         if(group&&fits(session,battle,group.enemies,group.limit)){
             let deadline=battle.lastArrival+battle.interval;
             if(group.at!==undefined)deadline=Math.min(deadline,(battle.primaryAt??0)+group.at);
@@ -407,9 +416,6 @@ export function tickBattle(session,wave,elapsed,dt) {
                 specs=group.enemies;at=Math.max(earliest,elapsed+WARNING);
                 line=t('Group {group}/{total} inbound.',{group:battle.group+1,total:battle.groups.length});
             }
-        }
-        if(wave.support&&alive(battle.target)&&battle.supportCount<wave.support.total&&elapsed>=battle.nextSupport-WARNING&&fits(session,battle,[battle.supportFighter])){
-            support=true;specs=[battle.supportFighter];at=Math.max(battle.nextSupport,elapsed+WARNING);
         }
         if(wave.launch&&launched+2<=wave.launch.cap){
             bay=lanes.find(b=>b.open&&!b.warned&&b.remaining<=WARNING*b.rate);
@@ -421,13 +427,13 @@ export function tickBattle(session,wave,elapsed,dt) {
             if(anchor){
                 line??=t('Reinforcements inbound.');
                 const marked=bay?.socket?anchor:{...anchor,position:[...anchor.position]};
-                pending=battle.warning={specs,at,line,entry:marked,bay,support,limit:bay||support?battle.limit:group.limit};
+                pending=battle.warning={specs,at,line,entry:marked,bay,limit:bay?battle.limit:group.limit};
             }
         }
     }
     if(pending){
-        const {bay,support,specs}=pending;
-        if((bay&&!bay.open)||((bay||support)&&!alive(battle.target))){
+        const {bay,specs}=pending;
+        if(bay&&(!bay.open||!alive(battle.target))){
             battle.warning=null;session.ui.setRunInbound?.(null);
         }else{
             if(bay){
@@ -445,16 +451,13 @@ export function tickBattle(session,wave,elapsed,dt) {
                     }
                     battle.warning=null;session.ui.setRunInbound?.(null);
                 }else if(arrive(session,battle,specs,pending.entry)){
-                    if(support){battle.supportCount++;battle.nextSupport=elapsed+wave.support.every;}
-                    else{battle.group++;battle.lastArrival=elapsed;
-                        const arrival=t('Group {group}/{total}',{group:battle.group,total:battle.groups.length});
-                        session.ui.pushEvent(arrival,'info',4000,arrival);
-                        if(specs.some(s=>s.primary)){
-                            battle.primaryAt=elapsed;
-                            if(wave.support)battle.nextSupport=elapsed+wave.support.every;
-                            if(wave.objective?.seconds)runTransport(session,battle.target,wave.objective.seconds);
-                            if(wave.objective)logObjective(session,t(wave.hint),'info',t(wave.objective.label));
-                        }
+                    battle.group++;battle.lastArrival=elapsed;
+                    const arrival=t('Group {group}/{total}',{group:battle.group,total:battle.groups.length});
+                    session.ui.pushEvent(arrival,'info',4000,arrival);
+                    if(specs.some(s=>s.primary)){
+                        battle.primaryAt=elapsed;
+                        if(wave.objective?.seconds)runTransport(session,battle.target,wave.objective.seconds);
+                        if(wave.objective)logObjective(session,t(wave.hint),'info',t(wave.objective.label));
                     }
                     battle.warning=null;session.ui.setRunInbound?.(null);
                 }

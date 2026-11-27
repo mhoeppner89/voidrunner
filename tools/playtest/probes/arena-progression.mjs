@@ -54,7 +54,11 @@ try {
   for(const level of levels){
    // Compare every moving rock and wreck, including orientation. The same
    // check runs for reordered and repeated levels, e.g. LEVELS=7,4,7 SECONDS=6.
-   const sample=await fresh.evaluateHandle(make=>make());
+   const sample=await fresh.evaluateHandle(async(make,{seed,level})=>{
+    const {seededRandom}=await import('/src/game/random.js');
+    const original=Math.random;Math.random=seededRandom(seed+level*997);
+    try{return make();}finally{Math.random=original;}
+   },{seed,level});
    const terrain=await sample.evaluate(movingTerrainSignature);
    initialTerrain??=terrain;
    if(terrain!==initialTerrain)throw Error('Moving field geometry carried over to level '+level);

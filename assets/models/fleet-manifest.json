@@ -246,6 +246,26 @@
       ]
     },
     {
+      "id": "siege",
+      "variant": "siege",
+      "path": "assets/models/capital/siege.glb",
+      "sha256": "275aa9dcff93a83d66e4979605225faad6da9d3a96dfadc592046b6ddace67df",
+      "category": "capital",
+      "factions": [
+        "alliance"
+      ]
+    },
+    {
+      "id": "picket",
+      "variant": "picket",
+      "path": "assets/models/capital/picket.glb",
+      "sha256": "05bac37884ea801ab2298d7098095f93b6cb1ff94561545e1fcb1f63cad42e43",
+      "category": "capital",
+      "factions": [
+        "concord"
+      ]
+    },
+    {
       "id": "barge",
       "variant": "barge",
       "path": "assets/models/capital/barge.glb",

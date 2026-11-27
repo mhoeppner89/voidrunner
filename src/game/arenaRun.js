@@ -23,7 +23,7 @@ const enemy=(hullId,options={})=>({hullId,...options});
 export const runEnemyFit=(spec)=>{
  const base=HULL_NPC_FITS[spec.hullId]??{};
  const merged={...base};
- for(const key of ['guns','turrets','launchers','launcher','turret','power','drive','defense','utility','missiles'])
+ for(const key of ['guns','turrets','launchers','launcher','turret','power','drive','defense','utility','utilities','missiles'])
   if(spec[key]!==undefined)merged[key]=spec[key];
  return merged;
 };
@@ -33,6 +33,36 @@ const group=(...enemies)=>({enemies});
 const novice=(id,options)=>enemy(id,{tier:'novice',...options});
 const veteran=(id,missiles=0,options)=>enemy(id,{tier:'veteran',missiles,...options});
 const ace=(id,missiles=0,options)=>enemy(id,{tier:'ace',missiles,...options});
+// Fill every physical gun socket. Guards engage the wingman when one is flying.
+const gunBank=(id,lead,other=lead)=>HULL_HARDPOINTS[id].guns.map((_,i)=>i===0?lead:other);
+const fleetGuard=(id,defense='armor-mk2')=>veteran(id,0,{
+ screenWing:true,guns:gunBank(id,'pulse-cannon','mortar'),
+ utilities:['capital-shield-generator',defense,'engine-mk2','armor-mk2'],
+});
+const interceptor=(id,defense='armor-mk2')=>veteran(id,0,{
+ guns:gunBank(id,'ion-blaster'),
+ utilities:[defense,'recovery-shield','armor-mk2','shield-mk2'],
+});
+const ionGuard=(id,defense='armor-mk2')=>veteran(id,0,{
+ screenWing:true,guns:gunBank(id,'ion-blaster','mortar'),
+ utilities:['capital-shield-generator',defense,'engine-mk2','armor-mk2'],
+});
+const patrolGuard=(id,defense='armor-mk2')=>veteran(id,0,{
+ screenWing:true,guns:gunBank(id,'pulse-cannon','mortar'),
+ utilities:[defense,'capital-shield-generator','recovery-shield','armor-mk2'],
+});
+const batteryAce=(id,missiles=0)=>ace(id,missiles,{
+ guns:gunBank(id,'mortar'),
+ utilities:['capital-shield-generator','capital-shield-generator','armor-mk2','engine-mk2'],
+});
+const railAce=(id,missiles=0)=>ace(id,missiles,{
+ guns:gunBank(id,'gauss-cannon','mortar'),
+ utilities:['capital-shield-generator','capital-shield-generator','armor-mk2','engine-mk2'],
+});
+const strikeAce=(id,missiles=0)=>ace(id,missiles,{
+ guns:gunBank(id,'mortar'),
+ utilities:['capital-shield-generator','recovery-shield','armor-mk2','thrusters-mk2'],
+});
 const capital=(id,tier)=>enemy(id,{role:id==='concord-frigate'?'frigate':'capital',capital:true,tier,primary:true});
 const bomber=tier=>enemy('andromeda',{role:'bounty',tier,launchers:['torpedo-launcher','torpedo-launcher','torpedo-launcher'],missiles:3,attackObjective:true});
 const roles={scrapper:'pirate',demon:'pirate',mule:'trader',atlas:'trader',torsas:'trader',prospector:'miner',wayfarer:'escort',speedster:'escort'};
@@ -54,114 +84,96 @@ export const RUN_ACTS=[
     group(balor()),
     {...group(veteran('demon',1,{guns:['pulse-cannon','pulse-cannon','beam-emitter','beam-emitter']})),limit:1}]),
   level("Hit and run","acheron-horizon","Two Loki fighters screen a Red Njord Barrage. Its fire control cannot follow a pilot crossing fast.",[
-    group(veteran('speedster'),novice('speedster')),
-    group(barge(),balor())],{objective:{kind:'destroy',label:'Destroy Barrage',done:'Barrage destroyed',failed:'Barrage escaped'}}),
-  level("Red Njord","redwake-belt","Destroy the Red Njord before more Balors reach the belt.",[
-    group(veteran('scrapper'),novice('speedster')),
-    group(veteran('demon',1),balor()),
-    group(ironjaw(),balor(),veteran('scrapper'))],{objective:{kind:'destroy',label:'Destroy Red Njord',done:'Red Njord destroyed',failed:'Red Njord escaped'},support:{every:45,total:3,fighter:balor()}}),
+    group(novice('speedster')),
+    group(barge(),novice('speedster'))],{objective:{kind:'destroy',label:'Destroy Barrage',done:'Barrage destroyed',failed:'Barrage escaped'}}),
+  level("Red Njord","redwake-belt","Break through the scouts and destroy the Red Njord among its Balor escorts.",[
+    group(veteran('scrapper',1),novice('speedster')),
+    group(veteran('demon',1),balor(),balor()),
+    group(ironjaw(),veteran('scrapper',1),veteran('scrapper',1))],{objective:{kind:'destroy',label:'Destroy Red Njord',done:'Red Njord destroyed',failed:'Red Njord escaped'}}),
  ]},
  {id:'merchants',name:'Free Merchants',faction:'independents',waves:[
   level("Freight lane","foundry-lanes","An Argo and its escort lead the merchant patrol.",[
     group(novice('mule'),veteran('wayfarer',1)),
     group(novice('wayfarer'),veteran('torsas')),
-    group(novice('mule'),novice('wayfarer')),
-    group(novice('wayfarer'))]),
+    group(novice('mule'),novice('wayfarer'),novice('wayfarer'))]),
   level("Claim jumpers","shardbelt-heart","The claims crews call for armed escorts inside the heart tunnel.",[
     group(veteran('prospector'),novice('wayfarer')),
     group(novice('prospector'),veteran('torsas',1)),
-    group(veteran('wayfarer')),
-    group(veteran('prospector'),veteran('wayfarer'))]),
+    group(veteran('prospector'),veteran('wayfarer'),veteran('wayfarer'))]),
   level("Convoy","pale-rings","Break through the convoy screen. Destroy the Njord or both engines before it jumps.",[
-    group(veteran('wayfarer'),novice('speedster')),
-    group(veteran('prospector'),veteran('torsas')),
-    group(veteran('mule'),veteran('wayfarer')),
+    group(veteran('prospector'),veteran('torsas'),veteran('mule')),
     group(capital('drover','novice'),veteran('wayfarer'),veteran('speedster')),
     {...group(veteran('torsas'),novice('wayfarer')),at:40}],{objective:{kind:'stop',label:'Stop the Njord',done:'Njord stopped',failed:'Njord escaped',seconds:150}}),
   level("Brigid","mourning-center","Intercept the Brigid and its escorts. Its drone hangar supplies repairs.",[
-    group(capital('caravan','veteran')),
-    group(veteran('torsas'),veteran('mule',1)),
-    group(veteran('wayfarer'),veteran('wayfarer')),
-    group(veteran('atlas'),veteran('wayfarer',1))]),
+    group(novice('mule'),veteran('torsas')),
+    group(veteran('atlas')),
+    group(capital('caravan','veteran'),novice('wayfarer'))]),
   level("Red Brigid","verge-lanes","Destroy the Red Brigid and its launched Balors. Each intact bay launches fighters.",[
-    group(veteran('demon')),
-    group(novice('speedster'),novice('speedster')),
-    group(capital('rookery','veteran'),veteran('scrapper'),novice('scrapper'))],{faction:'pirates',objective:{kind:'destroy',label:'Destroy carrier',done:'Carrier destroyed',failed:'Carrier escaped',clearLaunches:true},launch:{...ROOKERY_LAUNCH,fighter:veteran(ROOKERY_LAUNCH.fighter)}}),
+    group(veteran('demon'),novice('speedster')),
+    group(capital('rookery','veteran')),
+    {...group(veteran('scrapper'),novice('scrapper')),at:35,hullBelow:.6}],{faction:'pirates',objective:{kind:'destroy',label:'Destroy carrier',done:'Carrier destroyed',failed:'Carrier escaped',clearLaunches:true},launch:{...ROOKERY_LAUNCH,fighter:veteran(ROOKERY_LAUNCH.fighter)}}),
  ]},
  {id:'league',name:'Frontier League',faction:'alliance',waves:[
   level("Patrol shift","acheron-horizon","Intercept the League patrols above Acheron.",[
-    group(veteran('legionary',1),veteran('speedster')),
-    group(veteran('legionary'),veteran('speedster',1)),
-    group(veteran('legionary'),veteran('speedster')),
-    group(novice('legionary'),novice('speedster'),novice('speedster'))]),
+    group(veteran('legionary',1),novice('speedster'),fleetGuard('andromeda')),
+    group(veteran('legionary'),fleetGuard('speedster')),
+    group(fleetGuard('legionary'),fleetGuard('andromeda'),novice('speedster'))]),
   level("Courier run","shardbelt-rim","A Thor reinforces the courier screen at the rim.",[
     group(veteran('legionary',1),veteran('speedster')),
-    group(veteran('andromeda',1),veteran('speedster')),
-    group(veteran('legionary')),
+    group(veteran('andromeda',1),veteran('speedster'),veteran('legionary')),
     group(veteran('andromeda'),veteran('legionary'),veteran('speedster'))]),
   level("Strike","pale-rings","Protect the Njord until it jumps. Intercept the Thor torpedo bombers.",[
     group(bomber('veteran'),veteran('legionary'),veteran('speedster',1)),
     {...group(bomber('ace'),veteran('speedster')),at:40},
     {...group(bomber('veteran'),veteran('legionary'),veteran('legionary',1)),at:80}],{objective:{kind:'defend',label:'Defend Njord',done:'Njord safe',failed:'Njord lost',seconds:150,transport:capital('drover','novice')}}),
-  level("Honorguard","mourning-battleship","Break the guard around the wreck. An Odin ace closes the fight.",[
-    group(veteran('lancer',2),veteran('legionary')),
-    group(veteran('legionary'),veteran('speedster',1)),
-    group(veteran('lancer'),veteran('legionary'),veteran('speedster')),
-    group(ace('astra'))]),
+  level("Honorguard","mourning-battleship","Use the battleship wreck for cover when Heimdall charges its lance.",[
+    group(patrolGuard('lancer'),patrolGuard('legionary'),patrolGuard('andromeda')),
+    {...group(capital('siege','veteran'),veteran('speedster',1)),at:40},
+    {...group(strikeAce('astra'),patrolGuard('legionary')),at:40,hullBelow:.65}]),
   level("Veteran wing","shardbelt-chimney","An Odin opens the attack. Save ordnance for the Artemis ace.",[
-    group(ace('astra',1),veteran('speedster')),
-    group(veteran('legionary',1),veteran('andromeda',1)),
-    group(veteran('lancer',1),veteran('speedster')),
-    group(ace('lancer',2))]),
+    group(strikeAce('astra',1),veteran('speedster'),patrolGuard('legionary')),
+    group(patrolGuard('legionary'),veteran('andromeda',1),patrolGuard('astra')),
+    group(strikeAce('lancer',2),patrolGuard('andromeda'),veteran('speedster'))]),
  ]},
  {id:'concord',name:'Concord Frontier Fleet',faction:'concord',waves:[
-  level("Show of force","verge-lanes","A Mercury ace leads the first pair onto the lanes.",[
-    group(ace('talon',1),veteran('blade',1)),
-    group(veteran('talon'),veteran('talon')),
-    group(novice('talon'),novice('blade')),
-    group(novice('vanguard'),novice('talon'))]),
+  level("Show of force","verge-lanes","A Mercury ace leads the first patrol onto the lanes.",[
+    group(ace('talon',1),veteran('blade',1),fleetGuard('vanguard')),
+    group(veteran('talon'),fleetGuard('vanguard')),
+    group(batteryAce('vanguard'),fleetGuard('talon'),veteran('blade'))]),
   level("Victoria dance","mourning-carrier","Victoria fighters take turns covering the carrier deck.",[
-    group(ace('blade',2),veteran('talon')),
-    group(veteran('blade',1),veteran('talon'),veteran('blade')),
-    group(veteran('blade')),
-    group(veteran('blade'),veteran('blade'),veteran('talon'))]),
-  level("Battery test","acheron-horizon","Mercuries screen the approach of a second Bellona.",[
-    group(ace('vanguard',2),veteran('blade',1)),
-    group(veteran('talon',1),veteran('talon'),novice('talon')),
-    group(veteran('vanguard',2),veteran('talon')),
-    group(veteran('vanguard'),novice('vanguard'),veteran('talon'))]),
-  level("Screened","foundry-lanes","Artemis patrols screen a Victoria ace.",[
-    group(ace('lancer',2),veteran('blade')),
-    group(veteran('talon',1),veteran('lancer')),
-    group(ace('lancer',2),veteran('blade',2),veteran('blade',1)),
-    group(ace('blade',2),veteran('blade',2),veteran('talon',1))]),
+    group(ace('blade',2),interceptor('vanguard'),veteran('blade')),
+    group(veteran('blade',1),interceptor('vanguard'),veteran('blade')),
+    group(veteran('blade'),veteran('blade'),interceptor('vanguard','capital-shield-generator'))]),
+  level("Battery test","acheron-horizon","Victoria fighters screen the Bellona batteries.",[
+    group(railAce('vanguard',2),ionGuard('blade'),ionGuard('vanguard','capital-shield-generator')),
+    group(railAce('vanguard',1),ionGuard('blade'),ionGuard('vanguard','capital-shield-generator')),
+    group(ionGuard('vanguard'),ionGuard('vanguard'),ionGuard('vanguard','capital-shield-generator'))]),
+  level("Screened","foundry-lanes","Break the Tacita screen. Destroy its emitter to restore missile guidance.",[
+    group(ace('lancer',2),ionGuard('blade'),enemy('picket',{capital:true,role:'capital',tier:'veteran'})),
+    group(ace('lancer',2),ionGuard('vanguard','capital-shield-generator'),ionGuard('lancer')),
+    group(ace('blade',2),ionGuard('vanguard','capital-shield-generator'),veteran('talon',1))]),
   level("Heavy metal","pale-rings","Break the fleet screen before the heavy ace pair arrives.",[
-    group(ace('blade',2),veteran('vanguard',1)),
-    group(veteran('talon',1),veteran('lancer',1),novice('vanguard')),
-    group(veteran('vanguard',2),veteran('talon',1),veteran('blade',1)),
-    group(ace('blade'),ace('vanguard',2))]),
+    group(batteryAce('blade',2),fleetGuard('vanguard'),fleetGuard('vanguard','capital-shield-generator')),
+    group(batteryAce('vanguard',2),fleetGuard('vanguard','capital-shield-generator'),fleetGuard('blade')),
+    group(batteryAce('blade',2),ace('vanguard',2),fleetGuard('vanguard','capital-shield-generator'))]),
  ]},
  {id:'capital',name:'Concord Capital',faction:'concord',waves:[
   level("Picket","mourning-battleship","The capital picket sends its aces in succession.",[
-    group(ace('vanguard',2),veteran('talon')),
-    group(ace('lancer',2),veteran('talon',1)),
-    group(novice('talon'),novice('talon'),novice('vanguard'),novice('vanguard')),
-    group(ace('blade',2),veteran('talon'),novice('blade'),novice('talon'))]),
+    group(batteryAce('vanguard',2),fleetGuard('talon'),fleetGuard('vanguard','capital-shield-generator'),fleetGuard('blade')),
+    {...group(capital('picket','veteran'),fleetGuard('lancer','capital-shield-generator'),fleetGuard('vanguard','capital-shield-generator')),at:30},
+    group(batteryAce('blade',2),fleetGuard('vanguard','capital-shield-generator'),fleetGuard('talon'),fleetGuard('vanguard','capital-shield-generator'))]),
   level("Reserves","redwake-belt","Fleet reserves are on station in the belt.",[
-    group(ace('blade',2),veteran('lancer',2)),
-    group(ace('talon',1),veteran('talon'),novice('talon')),
-    group(veteran('vanguard'),novice('vanguard'),novice('blade'),novice('talon')),
-    group(ace('lancer',2),veteran('blade',1),novice('blade'),novice('talon'))]),
+    group(strikeAce('blade',2),patrolGuard('lancer'),patrolGuard('vanguard','capital-shield-generator'),patrolGuard('vanguard')),
+    {...group(strikeAce('talon',1),patrolGuard('vanguard','capital-shield-generator'),patrolGuard('blade','capital-shield-generator')),at:35},
+    group(strikeAce('lancer',2),patrolGuard('blade'),patrolGuard('vanguard','capital-shield-generator'),patrolGuard('talon'))]),
   level("Ace screen","verge-lanes","Pairs of aces hold the Verge lanes.",[
-    group(ace('vanguard',2),veteran('blade',1)),
-    group(ace('talon',1),ace('lancer')),
-    group(veteran('vanguard'),veteran('vanguard'),veteran('talon'),novice('talon')),
-    group(ace('blade',2),ace('vanguard',2),novice('blade'))]),
-  level("Elite guard","mourning-center","A reserve Mercury joins the last pair of aces.",[
-    group(ace('lancer',2),ace('vanguard',2)),
-    group(ace('blade',2),ace('talon',1),novice('vanguard')),
-    group(novice('vanguard'),veteran('blade'),veteran('talon'),novice('talon')),
-    group(ace('lancer',2),veteran('blade',2),veteran('talon',1),veteran('vanguard'))]),
+    group(batteryAce('vanguard',2),fleetGuard('blade'),fleetGuard('vanguard','capital-shield-generator'),fleetGuard('lancer')),
+    {...group(batteryAce('talon',1),fleetGuard('vanguard','capital-shield-generator'),fleetGuard('lancer','capital-shield-generator'),batteryAce('vanguard')),at:30},
+    group(batteryAce('blade',2),batteryAce('vanguard',2),fleetGuard('vanguard','capital-shield-generator'),fleetGuard('talon'))]),
+  level("Elite guard","mourning-center","A reserve Mercury escorts the last Artemis ace.",[
+    group(batteryAce('lancer',2),batteryAce('vanguard',2),fleetGuard('vanguard','capital-shield-generator'),fleetGuard('blade','capital-shield-generator')),
+    {...group(batteryAce('blade',2),batteryAce('talon',1),fleetGuard('vanguard','capital-shield-generator'),fleetGuard('vanguard','capital-shield-generator')),at:30},
+    group(batteryAce('lancer',2),fleetGuard('blade'),fleetGuard('vanguard','capital-shield-generator'),fleetGuard('talon'))]),
   level("The line","shardbelt-rim","Destroy the frigate. More escorts answer as its hull gives way.",[
     group(capital('concord-frigate','ace'),ace('blade',2),ace('blade',2),veteran('vanguard',2),veteran('blade',2)),
     {...group(ace('talon'),ace('talon')),at:60,hullBelow:.6},
@@ -172,8 +184,7 @@ for(const act of RUN_ACTS)act.waves=act.waves.map(wave=>{
  const prepare=spec=>({...spec,faction:wave.faction??act.faction,role:spec.role??roles[spec.hullId]??'patrol'});
  const groups=wave.groups.map(g=>({...g,enemies:g.enemies.map(prepare)}));
  const launch=wave.launch&&{...wave.launch,fighter:prepare(wave.launch.fighter)};
- const support=wave.support&&{...wave.support,fighter:prepare(wave.support.fighter)};
- return Object.freeze({...wave,groups,enemies:groups.flatMap(g=>g.enemies),launch,support,environment:arenaSite(wave.site).environment});
+ return Object.freeze({...wave,groups,enemies:groups.flatMap(g=>g.enemies),launch,environment:arenaSite(wave.site).environment});
 });
 export const RUN_WAVES=RUN_ACTS.flatMap(act=>act.waves);
 export const waveActIndex=(wave)=>RUN_ACTS.findIndex(act=>act.waves.includes(RUN_WAVES[wave]));

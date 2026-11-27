@@ -96,7 +96,7 @@ export function requestFieldRoadmap(session, center, recenter = false) {
         instanceId, spacing, n, center: [snap(center[0]), snap(center[1]), snap(center[2])],
         phase: 'nodes', cursor: 0, portals: portalPoints(instanceId), portalCursor: 0,
         lattice: new Int32Array(n * n * n).fill(-1), positions: [], edgeA: [], edgeB: [],
-        meshFallback: instanceId === 'mourning-line', obstacles: session.activeFieldObstacles(instanceId),
+        meshFallback: instanceId === 'mourning-line', obstacles: session.activeFieldObstacles(instanceId).filter(o=>!o.cover),
         ready: false, buildMs: 0,
     };
     return session.fieldRoadmap;
@@ -107,6 +107,12 @@ export function advanceFieldRoadmap(session, budgetMs = 4) {
     const map = session.fieldRoadmap;
     if (!map || map.ready) return map;
     if (map.instanceId !== session.activeInstanceId) { session.fieldRoadmap = undefined; return undefined; }
+    // The cached graph outlives drifting wreck cover: build it against the
+    // field alone. Live route checks (entry legs, string-pulling) still see cover.
+    session.ignoreCover = true;
+    try { return buildFieldRoadmap(session, map, budgetMs); } finally { session.ignoreCover = false; }
+}
+function buildFieldRoadmap(session, map, budgetMs) {
     const started = performance.now(), deadline = started + budgetMs;
     const scratch = map.scratch ??= { a: new THREE.Vector3(), b: new THREE.Vector3(), c: new THREE.Vector3(), d: new THREE.Vector3(), side: new THREE.Vector3(), up: new THREE.Vector3() };
     const { n, spacing } = map, half = (n - 1) / 2;

@@ -63,6 +63,14 @@ export class OrdnanceMarkers {
             }
             count++;
         }
+        for(const ship of session.ships){
+            if(count===ORDNANCE_MARKER_LIMIT)break;
+            if(!ship.lance?.active||ship.lance.target!=='player'||ship.hull<=0)continue;
+            const entry=this.entries[count],screen=session.renderer.projectToScreen(this.point.fromArray(ship.position),entry.screen);
+            const edge=session.targetEdge(screen,true,entry.edgeOut);
+            entry.kind='lance';entry.inbound=false;entry.lead=false;entry.edge=Boolean(edge);
+            entry.x=edge?.x??screen.x;entry.y=edge?.y??screen.y;entry.angle=edge?.angleDeg??0;count++;
+        }
         this.count = count;
         return count;
     }

@@ -1,3 +1,14 @@
+## 0.8.2pz — Heimdall and Tacita, flak Barrage, three-wave Arena levels, debris cover
+
+- New League corvette: the **Heimdall**, a gauss gun with engines. Three accelerator rods around an open bore; the joints light up one by one while it charges, three lit means BREAK, six lit means it fires a 150-damage shot along its bow. Break across its aim after the BREAK cue, or shoot out its two capacitor drums to silence the gun. A laser turret guards each flank.
+- New Concord corvette: the **Tacita**, an electronic-warfare picket with a big sweeping radar dish. Inside its 400 m field your missile locks take twice as long, missiles lose guidance and radar contacts flicker. Shoot the dish: it stops, droops and goes dark, and the jamming ends. Two lasers forward, two point-defence turrets aft.
+- Both lead tier-2+ career patrols with two escorts and appear in Arena Run levels 14 and 19.
+- The Red Njord Barrage fires real barrages: six unguided high-explosive rockets per salvo, one per intact rack, that burst in a spread around where you would have been, like flak. Hold course and you take several bursts; change course or speed after launch and they miss; rush it and it cannot fire inside 250 m. Big, slow ships suffer most. New launch, burst and shrapnel sounds, and dark flak puffs that hang in the sky.
+- Arena Run levels have at most three waves. Later waves are heavier, so fights still grow longer and harder act by act.
+- Range control no longer talks over the comms bar: wave and sweep warnings flash briefly on your own ship monitor ("WAVE 2/3 · INBOUND 5 S"). BREAK always takes priority, and the warning stays in the log.
+- Ship debris no longer reappears in the next Arena level or after a jump, dock or restart.
+- The biggest wreck sections now drift slowly and work as cover: they stop shots and missiles and block line of sight. Bumping one shoves it away and costs a few points of hull.
+
 ## 0.8.2py — Barrage tracker, corvettes keep moving, rams fixed
 
 - The Red Njord Barrage locks onto fast pilots too, it just takes longer: full lock speed up to 50, four times slower from 100 on. What breaks its lock is crossing its view fast enough, because its fire-control tracker cannot follow: at its 900 m stand-off that takes an afterburner pass, closer in a cruising one, and you have to keep turning around it. The cockpit warning now reads BARRAGE LOCK · CROSS FAST.

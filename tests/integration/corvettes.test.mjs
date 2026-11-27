@@ -26,13 +26,13 @@ function hit(s,ship,m,amount=m.hull){
 }
 
 test('all capital hulls declare their health, labels, sockets, hit areas and selectable systems',()=>{
-    const counts={'concord-frigate':14,'concord-cruiser':14,drover:12,ironjaw:8,barge:11,caravan:14,rookery:13};
+    const counts={'concord-frigate':14,'concord-cruiser':14,drover:12,ironjaw:8,siege:7,picket:8,barge:11,caravan:14,rookery:13};
     for(const [id,count] of Object.entries(counts)){
         const {mounts}=CAPITAL_HULLS[id];assert.equal(mounts.length,count);assert.ok(mounts.length<=CAPITAL_MARKER_COUNT);
         for(const m of mounts){
             assert.ok(m.hull>0&&m.labelKey&&m.radius>0);
             assert.ok(m.localPosition.every(Number.isFinite)&&m.hitCenter.every(Number.isFinite));
-            assert.ok(Math.abs(Math.hypot(...m.normal)-1)<.01);assert.equal(m.targetable,['generator','engine'].includes(m.kind));
+            assert.ok(Math.abs(Math.hypot(...m.normal)-1)<.01);assert.equal(m.targetable,['generator','engine','emitter'].includes(m.kind));
         }
         const s=fixture(),ship=s.spawnCapitalShip(id,[0,0,0],'rook');s.save.player.currentTargetId=ship.id;
         const expected=mounts.filter(m=>m.targetable).map(m=>m.index);

@@ -20,13 +20,21 @@ const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3(), tmpC = new THREE.V
 
 const STREAK_VERTEX = `
 attribute vec2 corner; attribute vec3 dir; attribute vec4 spark;
-uniform float time; uniform float drag; uniform float lag; uniform float widthScale;
+uniform float time; uniform float drag; uniform float lag; uniform float widthScale; uniform float nearClip;
 varying float vHeat; varying float vAlong; varying float vAlive;
 float travel(float t){ return spark.x*(1.0-exp(-drag*t))/drag; }
 void main(){
   float life=spark.y, t=max(0.0,time-spark.z), age=clamp(t/life,0.0,1.0);
   vec4 head=modelViewMatrix*vec4(dir*travel(t),1.0);
   vec4 tail=modelViewMatrix*vec4(dir*travel(max(0.0,t-lag)),1.0);
+  if(nearClip>0.){
+    // Clip both endpoints before perspective division. Crossing the near
+    // plane must never stretch one fragment across the cockpit.
+    if(min(-head.z,-tail.z)<nearClip){gl_Position=vec4(2.,2.,2.,1.);return;}
+    vec2 focal=vec2(projectionMatrix[0][0],projectionMatrix[1][1]);
+    vec2 tip=head.xy/(-head.z), delta=tail.xy/(-tail.z)-tip;
+    tail.xy=(tip+delta*min(1.,.05/max(.00001,length(focal*delta))))*(-tail.z);
+  }
   vec3 axis=head.xyz-tail.xyz;
   vec3 side=cross(axis,head.xyz);
   float sideLength=length(side);
@@ -133,7 +141,7 @@ const color = (hex) => new THREE.Color(hex);
 export function createStreakBurst({
     position = [0, 0, 0], count = 14, direction, speedMin = 18, speedMax = 40, drag = 2.6,
     lifeMin = .25, lifeMax = .55, delay = 0, width = .12, lag = .045, hot = 0xfff1c4, cool = 0xff6a1e, opacity = 1,
-    velocity, random = Math.random,
+    velocity, random = Math.random, nearClip = 0,
 }) {
     const geometry = new THREE.InstancedBufferGeometry();
     geometry.setIndex(QUAD_INDEX);
@@ -154,7 +162,7 @@ export function createStreakBurst({
     geometry.setAttribute('spark', new THREE.InstancedBufferAttribute(sparks, 4));
     geometry.instanceCount = count;
     const uniforms = {
-        time: { value: 0 }, drag: { value: drag }, lag: { value: lag }, widthScale: { value: 1 },
+        time: { value: 0 }, drag: { value: drag }, lag: { value: lag }, widthScale: { value: 1 }, nearClip: { value: nearClip },
         hot: { value: color(hot) }, cool: { value: color(cool) }, opacity: { value: opacity },
     };
     const mesh = new THREE.Mesh(geometry, material('streak', uniforms));

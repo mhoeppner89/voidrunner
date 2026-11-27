@@ -22,9 +22,10 @@ import {FLEET_EQUIPMENT,droneDock} from './fleetEquipmentData.js';
 import {canonicalFaction,preferredNpcHull,FACTION_NAMES} from './factions.js';
 import {CapitalMarkers} from './capitalMarkers.js';
 import {OrdnanceMarkers} from './ordnanceMarkers.js';
-import {capitalHull,capitalMountPosition,capitalReadout} from './capitalHulls.js';
+import {capitalHull,capitalMountPosition,capitalReadout,restoreHeimdallLasers} from './capitalHulls.js';
 import {updateTrafficLaunches} from './arenaBattle.js';
-import {TRAFFIC_HULLS,FRIGATE_TRAFFIC,CORVETTE_TRAFFIC,convoyVariant,raidCorvette,raidCarrier} from './corvetteMounts.js';
+import {advancePicketRotor,capitalRelation,fieldRackProgress,jammed,jammedRound,lockJammed,leavingScreen} from './picketField.js';
+import {TRAFFIC_HULLS,restorePicketMounts,FRIGATE_TRAFFIC,CORVETTE_TRAFFIC,patrolCorvette,convoyVariant,raidCorvette,raidCarrier} from './corvetteMounts.js';
 import {CRUISER_GUN,equipCruiser,updateCruiserAttack,updateCruiserBatteries,damageCruiserMount,segmentCruiserMountHit,cruiserSubsystemExplosionScale} from './cruiserCombat.js';
 import { prepareLocalPursuit, updateLocalPursuit, driveRecoveryRemaining, PLAYER_RADAR_RANGE, PIRATE_ARRIVAL_MIN } from './combatTravel.js';
 import { nearestPlayerBerth, playerBerth, playerBerths, setPlayerBerthResolver, preparePlayerLaunch, stepPlayerDocking } from './playerDocking.js';
@@ -37,11 +38,12 @@ import { segmentMeshHit } from './meshQueries.js';
 import {createMiningContacts,updateMiningContacts} from './miningSurface.js';
 import { DRONE_PORTS } from './droneFlight.js';
 import {updateNpcDrones,droneUnits,damageNpcDrone} from './npcDrones.js';
-import {equipCorvette,applyCapitalSubsystemEffects,updateCorvetteWeapons,capitalSubsystemExplosionScale,frigateHullDamageScale,FRIGATE_HULL,equipFrigate,frigateTorpedoLaneClear,updateCapitalBroadsideAttack,updateFrigateBatteries,damageCapitalMount,segmentCapitalMountHit} from './capitalCombat.js';
+import {updatePatrolCapitalAttack,equipCorvette,applyCapitalSubsystemEffects,updateCorvetteWeapons,capitalSubsystemExplosionScale,frigateHullDamageScale,FRIGATE_HULL,equipFrigate,frigateTorpedoLaneClear,updateCapitalBroadsideAttack,updateFrigateBatteries,damageCapitalMount,segmentCapitalMountHit} from './capitalCombat.js';
 import {observeIncomingFire, updateCombatIntent, combatThrottle, combatTrackingRate, holdingFiringWindow, BURN_RESERVE} from './combatPiloting.js';
 import {planCombatFlight, combatPursuitDirection, friendlyFiringLaneBlocked} from './combatPlanning.js';
 import { combatTargetEligible, tracksActivePlayer } from './combatTargeting.js';
 import {getPdcDefenseChannel} from './pdcFireControl.js';
+import {FLAK} from './bargeLaunchers.js';
 import {MISSILE_PADDING,cockpitLockState,updateMissileWarning,guideMissile,beginRackLock,rackLockProgress,torpedoMobilityFactor,wearFighterDrive,relativeIntercept,closestHullPoint} from './weaponFlight.js';
 import {fieldCombatSteering} from './fieldCombatNav.js';
 import {DEFAULT_NPC_AIM_ERROR,npcTrackedVelocity,npcGunneryProfile,npcTriggerCone,npcTriggerReady,npcShotDirection,recordNpcShot,applyNpcTurnLead} from './npcGunnery.js';
@@ -74,6 +76,7 @@ import { acceptMission, awardCareerProgress, completeBountyMission, completeMiss
 import { RACE_QUEST_ID, createRaceRacers, crossedRaceGate, generateRaceCourse, normalizeRaceRecord, raceCourseUnlocked, racePayout, raceRankLabel, raceRacerTarget, recordRaceResult, stageRaceRacers, updateRaceRacer, advanceRaceRacerGates } from './racing.js';
 import { hashString, hashUnsignedDecimal, mulberrySample, clamp, damp, formatCredits, pick, proceduralCallsign, proceduralVesselName, randomBetween, randomInt, seededRandom } from './random.js';
 import { EntityStore } from './entityStore.js';
+import {spawnCover,advanceCover,bumpCover,WRECK_IMPACT} from './wreckCover.js';
 import { NPC_FIGHTER_SCALE, SpaceRenderer, npcShipScaleForVariant } from './render.js';
 import { saveGame } from './save.js';
 import { beginSortie, finishSortie, markSortieDocked, recordSortieCredit, recordSortieEncounter, recordSortieUpgrade } from './careerMetrics.js';
@@ -196,7 +199,7 @@ const OBSERVER_MAPS = Object.freeze([
 const OBSERVER_SHIP_TYPES = Object.freeze([
     ...PLAYER_FLYABLE_HULLS.map(id => Object.freeze({ id, label: SHIPS[id].name.toUpperCase(), role: observerRoleFor(id), hullId: id, defaultFit: 'varied' })),
     ...Object.entries(CONCORD_CAPITAL_CLASSES).map(([id, name]) => Object.freeze({ id, label: `${name.toUpperCase()} · ${id.toUpperCase()}`, role: 'patrol', capitalVariant: `concord-${id}` })),
-    ...Object.entries(TRAFFIC_HULLS).map(([id,spec])=>Object.freeze({ id, label:id.toUpperCase(), role:spec.role, capitalVariant:id })),
+    ...Object.entries(TRAFFIC_HULLS).map(([id,spec])=>Object.freeze({ id, label:id==='siege'||id==='picket'?spec.name:id.toUpperCase(), role:spec.role, capitalVariant:id })),
 ]);
 const OBSERVER_FITS = Object.freeze(['varied', 'balanced', 'assault', 'support', 'beam']);
 const OBSERVER_AIM_ERROR_MIN = 1;
@@ -778,6 +781,8 @@ const HULL_FLIGHT_STATS = {
     rookery: { speed: 20, afterburnSpeed: 0, turnRate: .15, collisionRadius: 28, hullHalfExtents: [10,7,28] },
     drover: { speed: 25, afterburnSpeed: 0, turnRate: .25, collisionRadius: 14, hullHalfExtents: [5.5,4.3,14] },
     ironjaw: { speed: 30, afterburnSpeed: 0, turnRate: .25, collisionRadius: 15, hullHalfExtents: [6.1,4.3,15.1] },
+    siege: { speed:22, afterburnSpeed:0, turnRate:Math.PI/18, collisionRadius:16, hullHalfExtents:[4.3,5.4,16] },
+    picket: { speed:28, afterburnSpeed:0, turnRate:.25, collisionRadius:12, hullHalfExtents:[4.99,5.97,12] },
     barge: { speed: 25, afterburnSpeed: 0, turnRate: .25, collisionRadius: 14, hullHalfExtents: [5.5,4.6,14] },
     'concord-frigate': { speed: 18, afterburnSpeed: 0, turnRate: 0.12, collisionRadius: 56.5, hullHalfExtents: [18.73, 22.46, 56.45] },
     'concord-cruiser': { speed: 9, afterburnSpeed: 0, turnRate: 0.12, collisionRadius: 282.05, hullHalfExtents: [96.31, 155.54, 282.05] },
@@ -789,7 +794,7 @@ const HULL_FLIGHT_STATS = {
 for(const [variant,profile] of Object.entries(SHIP_COLLIDERS))if(HULL_FLIGHT_STATS[variant]&&variant!=='concord-frigate')HULL_FLIGHT_STATS[variant].hullHalfExtents=profile.extent;
 const PLAYER_HULL_EXTENTS=Object.fromEntries(Object.entries(HULL_FLIGHT_STATS).map(([variant,stats])=>[variant,Object.freeze(stats.hullHalfExtents.map(n=>n*PLAYER_CONTACT_SCALE))]));
 const CAPITAL_CLASS_BY_VARIANT = Object.freeze({
-    drover:'corvette', ironjaw:'corvette', barge:'corvette', caravan:'frigate', rookery:'frigate',
+    drover:'corvette', ironjaw:'corvette', barge:'corvette', siege:'corvette', picket:'corvette', caravan:'frigate', rookery:'frigate',
     'concord-frigate': 'frigate',
     'concord-cruiser': 'cruiser',
     'concord-carrier': 'carrier',
@@ -952,7 +957,7 @@ const segmentShipHullHit = (start,end,ship,halfExtents,padding=0) => {
             || position[2] + radius < minZ || position[2] - radius > maxZ)
             return undefined;
     }
-    const hull=segmentShipColliderHit(start,end,ship.position,ship.rotation,ship.collisionVariant??npcFlightVariant(ship),npcShipScaleForVariant(npcFlightVariant(ship)),padding);
+    const hull=segmentShipColliderHit(start,end,ship.position,ship.rotation,ship.collisionVariant??npcFlightVariant(ship),npcShipScaleForVariant(npcFlightVariant(ship)),padding,undefined,ship.rotorAngle);
     const mount=ship.capitalClass==='cruiser'?segmentCruiserMountHit(start,end,ship,padding):segmentCapitalMountHit(start,end,ship,padding);
     return mount===undefined?hull:hull===undefined?mount:Math.min(hull,mount);
 };
@@ -2358,6 +2363,7 @@ export class GameSession {
         this.setupObserver(this.arena, false);
     }
     setupArena(config, announce = true) {
+        this.clearCombatDebris();
         this.lostTargetId = undefined;
         // Every arena attempt is a clean sortie: restore all weapon pools and
         // clear session-only heat/cooldowns before spawning the player or
@@ -2683,6 +2689,7 @@ export class GameSession {
         }
         if (!force && next === this.activeInstanceId)
             return;
+        if(!this.arena&&next!==this.activeInstanceId)this.clearCombatDebris();
         this.activeInstanceId = next;
         this.renderer.setActiveInstance(next);
         const current = this.getTargetRef(false);
@@ -2789,6 +2796,7 @@ export class GameSession {
         if (!this.active)
             return;
         this.active = false;
+        this.clearCombatDebris();
         this.recallMiningDrones('teardown');
         this.recallPdcDrones('teardown');
         this.renderer?.clearDrones?.();
@@ -3098,7 +3106,7 @@ export class GameSession {
     }
     // Copy current entity transforms into prev* slots so the renderer can
     // interpolate. Zero-allocation: the slots are preallocated per entity.
-    snapshotInterpolationState() {
+    snapshotInterpolationState(dt=0) {
         const player = this.save.player;
         player.prevPosition = player.prevPosition ?? new Float64Array(3);
         player.prevRotation = player.prevRotation ?? new Float64Array(4);
@@ -3109,6 +3117,7 @@ export class GameSession {
             ship.prevRotation = ship.prevRotation ?? new Float64Array(4);
             ship.prevPosition.set(ship.position);
             ship.prevRotation.set(ship.rotation);
+            if(ship.variant==='picket')advancePicketRotor(ship,this.save.world.time+dt,dt,this.save.world.seed);
         }
         for (const projectile of this.projectiles)
             this.projStore.snapshot(projectile.slot);
@@ -3144,8 +3153,9 @@ export class GameSession {
             actions.yaw = 0;
         if (actions.roll === undefined)
             actions.roll = 0;
-        this.snapshotInterpolationState();
+        this.snapshotInterpolationState(dt);
         this.renderer.updateWorld(dt);
+        advanceCover(this,dt,MAX_FIELD_OBSTACLE_RADIUS);
         this.save.world.time += dt;
         this.updateHyperdriveDroneRecovery(dt);
         tickEconomy(this.save.world, dt);
@@ -4466,6 +4476,7 @@ export class GameSession {
             }
             this.autopilot = false;
         };
+        this.resolveCoverContacts(this.save.player,position,velocity,shipQuat,collisionVariant,this.playerHullScale(),hullExtents,contact);
         const dock = this.activeDockObstacle();
         if (dock) {
             const departure = this.departureClearance?.id === dock.id ? this.departureClearance : undefined;
@@ -4510,6 +4521,7 @@ export class GameSession {
             const margin = MAX_FIELD_OBSTACLE_RADIUS + Math.max(...hullExtents);
             const label = this.activeInstanceId === 'shardbelt' ? 'asteroid' : 'wreckage';
             this.forEachHullObstacle(position, margin, SHIP_COLLIDERS[collisionVariant].contactRadius * this.playerHullScale(), obstacle => {
+                if(obstacle.cover)return;
                 const hit=shipVsObstacle(position,shipQuat,collisionVariant,this.playerHullScale(),obstacle,contact);
                 if (hit)
                     resolveContact(label);
@@ -4819,6 +4831,8 @@ export class GameSession {
         const obstacleHit=this.firstObstacleHitInfo(start,end,ownerId);
         let nearest=obstacleHit?.t ?? 1;
         let victim,droneVictim;
+        const owner=this.ships.find(x=>x.id===ownerId);
+        const lance=weapon.id==='lance';
         if(ownerId!=='player') {
             const player=this.save.player;
             const hit=segmentShipColliderHit(start,end,player.position,player.rotation,playerShipVariant(player.shipId));
@@ -4826,25 +4840,30 @@ export class GameSession {
         }
         for(const ship of this.ships) {
             if(ship.id===ownerId || ship.hull<=0 || ship.race)continue;
-            const owner=this.ships.find(x=>x.id===ownerId);
-            if(owner && !this.projectileCanHitShip({ownerId,faction:owner.faction,targetId:owner.targetId},ship))continue;
+            if(!lance && owner && !this.projectileCanHitShip({ownerId,faction:owner.faction,targetId:owner.targetId},ship))continue;
             const hit=segmentShipHullHit(start,end,ship,this.npcHullExtents(ship),0);
             if(hit!==undefined && hit<nearest){nearest=hit;victim=ship;}
         }
-        const units=droneUnits(this),owner=this.ships.find(x=>x.id===ownerId);
+        const units=droneUnits(this);
         for(const id in units){
             const unit=units[id];
-            if(!DRONE_TYPES[unit.type]||unit.hull<=0||!unit.position||unit.state==='stowed'||unit.state==='destroyed'||unit.ownerId===ownerId||!unit.ownerId&&ownerId==='player')continue;
-            if(owner&&unit.ownerId){const carrier=this.ships.find(x=>x.id===unit.ownerId);if(!carrier||!this.projectileCanHitShip({ownerId,faction:owner.faction,targetId:owner.targetId},carrier))continue;}
+            if(!DRONE_TYPES[unit.type]||unit.hull<=0||!unit.position||unit.state==='stowed'||unit.state==='destroyed'||(!lance&&(unit.ownerId===ownerId||!unit.ownerId&&ownerId==='player')))continue;
+            if(!lance&&owner&&unit.ownerId){const carrier=this.ships.find(x=>x.id===unit.ownerId);if(!carrier||!this.projectileCanHitShip({ownerId,faction:owner.faction,targetId:owner.targetId},carrier))continue;}
             const hit=segmentSphereHit(start,end,vec(unit.position),DRONE_TYPES[unit.type].collisionRadius);
             if(hit!==undefined&&hit<nearest){nearest=hit;victim=undefined;droneVictim=unit;}
+        }
+        if(lance&&owner){
+            const firstActor=droneVictim
+                ? (droneVictim.ownerId ? this.ships.find(ship=>ship.id===droneVictim.ownerId) : this.save.player)
+                : victim==='player' ? this.save.player : victim;
+            if(capitalRelation(this,owner,firstActor)>0)return false;
         }
         end.lerpVectors(start,end,nearest);
         const color=weapon.tint??(weapon.kind==='pdc'?(ownerId==='player'?0xdce9ff:0xff8a5b):(ownerId==='player'?0x7cffff:0xff7050));
         const hullHit = tuple(end);
-        const impactActor = victim === 'player' ? this.save.player : victim;
+        const impactActor = victim === 'player' ? this.save.player : victim ?? (!droneVictim && obstacleHit?.obstacle.cover ? obstacleHit.obstacle : undefined);
         if (impactActor && this.renderer.weaponImpact) {
-            const impact = this.renderer.weaponImpact(impactActor, victim === 'player' ? this.playerHullExtents() : this.npcHullExtents(victim), end, start, weapon, color);
+            const impact = this.renderer.weaponImpact(impactActor, victim === 'player' ? this.playerHullExtents() : victim ? this.npcHullExtents(victim) : impactActor.half, end, start, weapon, color);
             if (impact?.isVector3) end.copy(impact);
         } else if (victim || droneVictim || nearest < 1) this.renderer.spawnImpact(hullHit, color, false);
         if(ownerId==='player'&&!victim&&!droneVictim&&obstacleHit?.obstacle?.shape==='wreck-node-mesh')
@@ -4854,6 +4873,7 @@ export class GameSession {
         else if(victim)this.damageShip(victim,weapon.damageFlat,ownerId,hullHit,weapon,start);
         if(weapon.siphon>0&&victim)this.siphonWeaponEnergy(ownerId,(weapon.energyCost??0)*weapon.siphon);
         if(weapon.kind==='pdc')this.renderer.showPdcTracer?.(start,end,color);
+        else if(lance)this.renderer.showCombatBeam?.(ownerId+':rail',start,end,color,undefined,.3,8,this.save.player);
         else this.renderer.showCombatBeam?.(`${ownerId}:${beamId}`,start,end,color,ownerId==='player'?this.save.player:undefined);
     }
     // Siphoning affixes and Quiet Sun return part of a landed shot's energy.
@@ -5123,7 +5143,7 @@ export class GameSession {
             const before=lock.progress;
             const mobility=torpedoMobilityFactor(lock.launcher,p.velocity,target.velocity,direction,distance);
             lock.tooFast=mobility===0&&distance<=lock.launcher.lockRange;
-            lock.progress=rackLockProgress(before,lock.launcher,null,distance,alignment,aspect,dt,mobility);
+            lock.progress=fieldRackProgress(this,p,target,lock,before,lock.launcher,null,distance,alignment,aspect,dt,mobility);
             if(p.launcherFireMode==='together'){
                 if(distance<=lock.launcher.lockRange && !(this.launcherReadyAt?.[`${p.shipId}:${key}`]>this.save.world.time))
                     together=Math.min(together,lock.progress);
@@ -7241,7 +7261,16 @@ export class GameSession {
         }
         return this.beginGalaxyGateTransition(jumpPoint);
     }
+    clearCombatDebris() {
+        if(this.coverSections?.length){
+            this.coverSections.length=0;
+            this.obstacleGridBuiltAt=-Infinity;
+        }
+        this.capitalBlastUntil=0;
+        this.renderer?.clearEffects?.();
+    }
     clearTransientSpace() {
+        this.clearCombatDebris();
         this.frigateTrafficReady=false;
         if(!this.arena)this.save.world.frigateEncounter=null;
         this.lostTargetId = undefined;
@@ -7689,6 +7718,9 @@ export class GameSession {
             // travel) now lives there as updateShipAI, with the task layer feeding
             // travel waypoints and the interaction layer running emergent mugs.
             if((ship.variant==='ironjaw'||ship.variant==='barge')&&ship.convoyLeader?.hull>0&&!ship.targetId)ship.targetId=ship.convoyLeader.targetId;
+            const screenTarget=ship.convoyLeader?.variant==='picket'&&ship.targetId
+                ?ship.targetId==='player'?this.save.player:this.ships.find(actor=>actor.id===ship.targetId):undefined;
+            const regroup=screenTarget&&leavingScreen(ship,screenTarget.position);
             if(ship.arenaExit){
                 ship.destination=ship.arenaExit;
                 this.updateTravelAI(ship,dt);
@@ -7723,8 +7755,8 @@ export class GameSession {
                     ship.targetId=ship.convoyEscape=undefined;ship.stationDockCompleted=ship.convoyPort;
                 }else this.updateTravelAI(ship,dt);
                 if(ship.convoyDistress&&this.chatterOpen()&&this.sayPilotLine(ship,t(ship.variant==='caravan'?'Brigid taking heavy fire. Escorts, cover our turn!':'Convoy under attack. All escorts engage!')))ship.convoyDistress=false;
-            }else if(ship.convoyLeader&&!ship.targetId&&ship.convoyLeader.hull>0&&!ship.surrendered&&!ship.captured
-                &&!(ship.combatThreatUntil>this.save.world.time)){
+            }else if(ship.convoyLeader&&(!ship.targetId||regroup)&&ship.convoyLeader.hull>0&&!ship.surrendered&&!ship.captured
+                &&(regroup||!(ship.combatThreatUntil>this.save.world.time))){
                 this.updateSensorAwareness(ship,dt);
                 const leader=ship.convoyLeader,slot=ship.formationSlot;
                 this.tmpD.set(slot*45,10,ship.formationTrail??55).applyQuaternion(this.tmpQ.fromArray(leader.rotation)).add(this.tmpE.fromArray(leader.position)).toArray(ship.formationPoint);
@@ -7824,18 +7856,18 @@ export class GameSession {
     // up and the previous line has had its full read time (CHATTER_GAP).
     // Every chatter emitter gates on this, so a 3v1 streams one readable
     // line at a time instead of a wall of overlapping callsigns.
-    chatterOpen(rangeControl=false) {
-        const waiting=this.arena?.run && this.save.arenaRun?.phase==='combat' && this.runBattle?.warning;
-        return (rangeControl || !waiting || waiting.announced) && !this.missionCommsActive() && this.save.world.time >= (this.nextChatterAt ?? 0);
+    chatterOpen() {
+        return !this.missionCommsActive() && this.save.world.time >= (this.nextChatterAt ?? 0);
     }
     missionCommsActive() {
         const message = this.ui?.commsMessage;
         return this.storyLineActive() || message?.reserved || message?.story || message?.pinned;
     }
-    runRadio(line) {
-        this.nextChatterAt=this.save.world.time+CHATTER_GAP;
-        this.ui.showPilotLine?.(t('Range control'),line,'ally',5000,false,undefined,undefined,undefined,undefined,true);
-        this.audio?.playComms?.('steady');
+    runRadio(line,title,detail='') {
+        this.ui.showRangeCue?.(title,detail);
+        this.ui.logCommsLine?.(t('Range control'),line,'ally');
+        this.ui.pushEvent(line,'warning',5000,line);
+        this.audio?.play?.('rangeTick');
     }
     tacticalBark(ship, event) {
         const player = this.save.player;
@@ -9317,6 +9349,7 @@ export class GameSession {
             return this.updateTravelAI(ship,dt);
         }
         if(ship.capitalClass==='cruiser')return updateCruiserAttack(this,ship,targetPosition,targetVelocity,dt);
+        if(ship.variant==='siege'||ship.variant==='picket')return updatePatrolCapitalAttack(this,ship,targetPosition,targetVelocity,dt);
         if(ship.capitalClass==='frigate'||ship.variant==='ironjaw'||ship.variant==='barge')return updateCapitalBroadsideAttack(this,ship,targetPosition,targetVelocity,dt);
         const flightStats=this.npcFlightStats(ship);
         if(flightStats)observeIncomingFire(this,ship);
@@ -10090,7 +10123,9 @@ export class GameSession {
                 location.position[0],location.position[1],location.position[2],location.radius*.82,contact)) resolveContact();
         });
         const margin = MAX_FIELD_OBSTACLE_RADIUS + Math.max(hullExtents[0], hullExtents[1], hullExtents[2]);
+        this.resolveCoverContacts(ship,position,velocity,shipQuat,collisionVariant,collisionScale,hullExtents,contact);
         this.forEachHullObstacle(position, margin, SHIP_COLLIDERS[collisionVariant].contactRadius * collisionScale, obstacle => {
+            if(obstacle.cover)return;
             for(let pass=0;pass<(ship.raceHull?3:1);pass++){
                 if(!shipVsObstacle(position,shipQuat,collisionVariant,collisionScale,obstacle,contact))break;
                 resolveContact();
@@ -10116,6 +10151,25 @@ export class GameSession {
     // light ship gets thrown, the heavy one barely moves), both velocities
     // recoil, and a hard ram deals the same environment-style damage both
     // sides would take clipping a rock.
+    resolveCoverContacts(actor,position,velocity,rotation,variant,scale,extents,contact){
+        if(!this.coverSections?.length)return;
+        for(const body of this.coverSections){
+            if(!shipVsObstacle(position,rotation,variant,scale,body,contact))continue;
+            if(actor===this.save.player&&this.autopilot){
+                // Cover drifted into the leg after the route check: drop out at
+                // combat speed before the bounce, never at cruise velocity.
+                this.autopilot=false;this.hyperdriveFx='interrupt';this.hyperdriveFxUntil=this.save.world.time+HYPERDRIVE_INTERRUPT_DURATION;
+                this.snapToCombatSpeed();velocity.fromArray(this.save.player.velocity);
+                this.save.player.throttle=clamp(this.hyperdriveReturnThrottle,0,1);
+                this.setHyperdriveStatus(t('Hyperdrive path obstructed.'),4200);this.audio.play('hyperDrop');
+            }
+            const damage=bumpCover(body,actor,position,velocity,extents,contact,this.save.world.time);
+            if(!damage)continue;
+            if(actor===this.save.player)this.damagePlayer(damage,'wreckage',true,WRECK_IMPACT);
+            else this.damageShip(actor,damage,'environment',undefined,WRECK_IMPACT);
+            if(actor.hull<=0)break;
+        }
+    }
     resolveShipContacts() {
         const player = this.save.player;
         const playerPos = this.tmpP3.set(player.position[0], player.position[1], player.position[2]);
@@ -10359,7 +10413,7 @@ export class GameSession {
         const alignment=forward.dot(dir);
         const aspect=victim?.rotation?aim.scratch.copy(FORWARD).applyQuaternion(aim.rotation.fromArray(victim.rotation)).dot(dir):0;
         const mobility=torpedoMobilityFactor(launcher,ship.velocity,victim?.velocity,dir,distance);
-        fit.lock=rackLockProgress(Math.min(1,fit.lock??0),launcher,ship.pilot?.tier,distance,alignment,aspect,dt,mobility);
+        fit.lock=fieldRackProgress(this,ship,victim,fit,Math.min(1,fit.lock??0),launcher,ship.pilot?.tier,distance,alignment,aspect,dt,mobility);
         if(distance<80 || !fit.lock || this.lineBlocked(start,targetPosition,ship.id)){fit.lock=0;fit.warned=false;return;}
         if(targetId==='player'){
             this.warnPlayerLock(t('MISSILE LOCK — BREAK AWAY'),!fit.warned);
@@ -10486,6 +10540,61 @@ export class GameSession {
         local.applyQuaternion((this.tmpSoundOrientation ??= new THREE.Quaternion()).fromArray(this.save.player.rotation).invert());
         this.audio?.playAtDirection?.(effect, intensity, distance, local.x, local.z);
     }
+    flakEnemy(shot,ship) {
+        if(shot.arenaSide!==undefined && Boolean(ship.arenaRunEnemy)===shot.arenaSide)return false;
+        return this.projectileCanHitShip(shot,ship);
+    }
+    flakBurstDamage(shot,point,actor,extents,isPlayer) {
+        const nearest=this.tmpBlastEnd.fromArray(actor.position);
+        if(nearest.distanceTo(point)>FLAK.radius+Math.max(...extents))return;
+        const distance=closestHullPoint(point,actor,extents,nearest).distanceTo(point);
+        if(distance>FLAK.radius+1e-6)return;
+        const amount=FLAK.damage-(FLAK.damage-FLAK.minimum)*distance/FLAK.radius;
+        if(isPlayer)this.damagePlayer(amount,'blast damage',true,FLAK,undefined,undefined,shot.ownerId);
+        else this.damageShip(actor,amount,shot.ownerId,undefined,FLAK,undefined,true);
+    }
+    burstFlak(shot,point) {
+        shot.life=0;
+        this.renderer.spawnFlakBurst?.(point);
+        this.playWorldSound?.('flak-burst',1,point.x,point.y,point.z);
+        const player=this.save.player,distance=this.tmpBlastEnd.fromArray(player.position).distanceTo(point);
+        if(distance<60 && !this.arena?.observer){
+            this.kickCamera(.22*(1-distance/60));
+            this.audio?.playCockpit?.('flak-shrapnel',1-distance/120);
+        }
+        if(shot.threatensPilot && !this.arena?.observer)
+            this.flakBurstDamage(shot,point,player,this.turretHullExtents(player,'player'),true);
+        for(const ship of this.ships){
+            if(ship.hull<=0||ship.race||ship.id===shot.ownerId||!this.flakEnemy(shot,ship))continue;
+            this.flakBurstDamage(shot,point,ship,this.npcHullExtents(ship),false);
+        }
+    }
+    advanceFlak(shot,start,velocity,dt) {
+        const end=this.tmpP2.copy(start).addScaledVector(velocity,dt);
+        // Bounded lateral drift around the original bearing; no target input.
+        const phase=shot.wobblePhase+2*(shot.flightTime-shot.life);
+        const drift=1.5*(Math.sin(phase)-Math.sin(phase-2*dt));
+        end.x+=drift*shot.wobbleX;end.y+=drift*shot.wobbleY;end.z+=drift*shot.wobbleZ;
+        let hit=this.firstObstacleHitInfo(start,end,shot.ownerId,false,true)?.t??Infinity;
+        const player=this.save.player;
+        if(!this.arena?.observer){
+            if(shot.threatensPilot)hit=Math.min(hit,this.flakProximity(start,end,player));
+            hit=Math.min(hit,segmentShipColliderHit(start,end,player.position,player.rotation,playerShipVariant(player.shipId),1,0)??Infinity);
+        }
+        for(const ship of this.ships){
+            if(ship.id===shot.ownerId||ship.hull<=0||ship.jumpPursuit)continue;
+            if(this.flakEnemy(shot,ship))hit=Math.min(hit,this.flakProximity(start,end,ship));
+            hit=Math.min(hit,segmentShipHullHit(start,end,ship,this.npcHullExtents(ship),0)??Infinity);
+        }
+        if(hit<=1)end.lerp(start,1-hit);
+        this.projStore.setPosV(shot.slot,end);
+        if(hit<=1||shot.life<=0)this.burstFlak(shot,end);
+    }
+    flakProximity(start,end,actor) {
+        const center=this.tmpP4.fromArray(actor.position);
+        if(center.distanceToSquared(start)<=FLAK.proximity**2)return 0;
+        return segmentSphereHit(start,end,center,FLAK.proximity)??Infinity;
+    }
     updateProjectiles(dt) {
         const units = droneUnits(this);
         const player = this.save.player;
@@ -10501,7 +10610,12 @@ export class GameSession {
             projectile.life -= stepDt;
             const start = this.projStore.getPos(projectile.slot, this.tmpP0);
             const velocity = this.projStore.getVel(projectile.slot, this.tmpP1);
+            if(projectile.launcherId==='flak'){
+                this.advanceFlak(projectile,start,velocity,stepDt);
+                continue;
+            }
             const isMissile = projectile.kind === 'missile' || projectile.kind === 'torpedo';
+            if(isMissile&&!projectile.lostTrack&&jammedRound(this,projectile,start))projectile.lostTrack=true;
             if (isMissile && projectile.targetId && !projectile.lostTrack) {
                 let targetPosition,targetVelocity,targetRotation;
                 if (projectile.targetId === 'player') {
@@ -10548,7 +10662,7 @@ export class GameSession {
                 let hitShip;
                 let hitDrone;
                 let hitObstacle;
-                const obstacleResult = this.firstObstacleHitInfo(sweepFrom, end, projectile.ownerId);
+                const obstacleResult = this.firstObstacleHitInfo(sweepFrom, end, projectile.ownerId, false, true);
                 if (obstacleResult !== undefined && obstacleResult.t < bestT) {
                     bestT = obstacleResult.t;
                     hitKind = 'obstacle';
@@ -10618,9 +10732,9 @@ export class GameSession {
                     const playerOrientation = quat(this.save.player.rotation, this.tmpAudioOrientation);
                     const localHit = this.tmpAudioLocal.copy(hitPosition).sub(playerPosition).applyQuaternion(playerOrientation.invert());
                     const impactWeapon = projectile.hitWeapon ?? WEAPONS[projectile.weaponId] ?? (projectile.weaponId===CRUISER_GUN.id ? CRUISER_GUN : LAUNCHERS[projectile.launcherId]);
-                    const impactActor = hitKind === 'player' ? this.save.player : hitKind === 'ship' ? hitShip : null;
+                    const impactActor = hitKind === 'player' ? this.save.player : hitKind === 'ship' ? hitShip : hitObstacle?.cover ? hitObstacle : null;
                     if (impactActor && this.renderer.weaponImpact)
-                        this.renderer.weaponImpact(impactActor, hitKind === 'player' ? this.playerHullExtents() : this.npcHullExtents(hitShip), hitPosition, sweepFrom, impactWeapon, projectile.crit ? 0xfff0b0 : projectile.tint ?? (projectile.kind === 'missile' ? 0xff7a42 : projectile.kind === 'gauss' ? 0xbfe9ff : projectile.kind === 'ion' ? 0x8fe4f0 : projectile.kind === 'mortar' ? 0xffa04d : 0xffcb62), projectile.kind === 'missile' || projectile.kind === 'mortar' || projectile.crit);
+                        this.renderer.weaponImpact(impactActor, hitKind === 'player' ? this.playerHullExtents() : hitShip ? this.npcHullExtents(hitShip) : hitObstacle.half, hitPosition, sweepFrom, impactWeapon, projectile.crit ? 0xfff0b0 : projectile.tint ?? (projectile.kind === 'missile' ? 0xff7a42 : projectile.kind === 'gauss' ? 0xbfe9ff : projectile.kind === 'ion' ? 0x8fe4f0 : projectile.kind === 'mortar' ? 0xffa04d : 0xffcb62), projectile.kind === 'missile' || projectile.kind === 'mortar' || projectile.crit);
                     else this.renderer.spawnImpact(tuple(hitPosition), projectile.kind === 'missile' ? 0xff7a42 : projectile.kind === 'gauss' ? 0xbfe9ff : projectile.kind === 'ion' ? 0x8fe4f0 : projectile.kind === 'mortar' ? 0xffa04d : 0xffcb62, projectile.kind === 'missile' || projectile.kind === 'mortar');
                     if (hitKind === 'player') {
                         this.damagePlayer(projectile.damage, projectile.kind === 'missile' ? 'missile strike' : 'weapons fire', true, impactWeapon, tuple(hitPosition), sweepFrom, projectile.ownerId);
@@ -10799,7 +10913,7 @@ export class GameSession {
         // Range Control owns the escort's allegiance. Damage still wears its
         // systems and hull, but never starts a career crime or convoy response.
         if (ship.arenaFriendlyObjective) {
-            ship.shieldDelay = 4.5;
+            if(weapon!==WRECK_IMPACT)ship.shieldDelay = 4.5;
             if (ship.hull <= 0) this.destroyShip(ship,attackerId,position);
             else if (this.ships.some(source=>source.id===attackerId && source.arenaRunEnemy))
                 ship.targetId = attackerId;
@@ -10836,7 +10950,7 @@ export class GameSession {
             }
         }
         const hullDamaged = remaining > 0;
-        ship.shieldDelay = ship.capitalClass === 'frigate' ? 0 : 4.5;
+        if(weapon!==WRECK_IMPACT)ship.shieldDelay = ship.capitalClass === 'frigate' ? 0 : 4.5;
         if(amount>0&&weapon.range)ship.observedWeaponRange=Math.max(ship.observedWeaponRange??0,weapon.range);
         // Rin is a story companion, not a disposable traffic roll. Damage is
         // real enough to drain shields and force the player to protect them,
@@ -11545,7 +11659,9 @@ export class GameSession {
         const blastPace = ship.capitalClass ? (ship.capitalClass === 'corvette' ? .5 : ship.capitalClass === 'frigate' ? .75 : 1) : 0;
         if (ship.capitalClass) this.capitalBlastUntil = Math.max(this.capitalBlastUntil ?? 0, this.save.world.time + (ship.capitalClass === 'corvette' ? CAPITAL_BLAST_HOLD.corvette : CAPITAL_BLAST_HOLD.large));
         const explosion = this.renderer.spawnExplosion(ship.position, ship.hostile, explosionScale, ship.velocity, {capital: blastPace});
-        const wreckAnchor = this.renderer.spawnShipWreck?.(ship, npcFlightVariant(ship), explosionScale);
+        const variant=npcFlightVariant(ship);
+        const sections=spawnCover(this,ship,variant,npcShipScaleForVariant(variant));
+        const wreckAnchor = this.renderer.spawnShipWreck?.(ship,variant,explosionScale,sections);
         if (explosion && wreckAnchor)
             explosion.followObject = wreckAnchor;
         const blastDirection = (this.audioDirection ??= new THREE.Vector3()).fromArray(ship.position);
@@ -11640,7 +11756,7 @@ export class GameSession {
             }
         }
         this.addPlayerEmission(Math.min(180, 22 + amount * 3.2));
-        this.playerShieldDelay = 5.2;
+        if(weapon!==WRECK_IMPACT)this.playerShieldDelay = 5.2;
         // Hits remain dangerous during spool-up, but do not cancel the escape drive.
         if (!this.autopilot && this.activeRace?.state!=='running') this.snapToCombatSpeed();
         // Continuous beams still get throttled controller feedback; their phone pulses stay suppressed.
@@ -11753,6 +11869,7 @@ export class GameSession {
         this.save.player.hull = stats.hull * 0.35;
         this.save.player.energy = stats.energyCapacity * 0.35;
         clearLauncherMagazines(this.save.player);
+        this.clearCombatDebris();
         this.save.player.dockedAt = dock;
         this.lostTargetId = undefined;
         this.save.player.systemId = location.systemId;
@@ -12313,7 +12430,12 @@ export class GameSession {
         const owner=location?.faction ?? (systemId==='acheron'?'alliance':systemId==='redwake'?'pirates':systemId==='pale-ring'?'independents':'concord');
         const region=careerRegion(systemId,locationId);
         if(role==='bounty')return{faction:'independents',guild:'bounty',hullId:careerCombatHull('independents',role,region,rng)};
-        if(!this.arena&&['patrol','trader'].includes(role)&&rng()<leagueTrafficChance(systemId,locationId))return{faction:'alliance',hullId:careerCombatHull('alliance',role,region,rng)};
+        const league=!this.arena&&['patrol','trader'].includes(role)&&rng()<leagueTrafficChance(systemId,locationId);
+        if(role==='patrol'&&!this.arena&&!isTutorialGuided(this.save)){
+            const faction=league?'alliance':owner,variant=patrolCorvette(faction,region,rng);
+            if(variant&&this.careerFrigateEncounterOpen())return {faction,patrolCapital:variant};
+        }
+        if(league)return{faction:'alliance',hullId:careerCombatHull('alliance',role,region,rng)};
         if(role==='patrol')return{faction:owner,guild:owner==='independents'?'bounty':undefined,hullId:careerCombatHull(owner,role,region,rng)};
         const guild=role==='miner'?'mining':(location?.guilds??[]).find(g=>['merchant','mining','salvage'].includes(g))??'merchant';
         return{faction:'independents',guild,convoy:role==='trader'&&!this.arena&&!isTutorialGuided(this.save)&&convoyVariant(owner,region,rng,this.careerFrigateEncounterOpen())};
@@ -12371,6 +12493,20 @@ export class GameSession {
         return this.careerRegionAt(position).danger;
     }
     spawnShip(role, position, missionId, nameOverride, pilotOverride, fleetOptions = {}) {
+        if(role==='patrol'&&fleetOptions.patrolCapital){
+            const leader=this.spawnTrafficCapital(fleetOptions.patrolCapital,position,true);
+            if(leader){
+                if(!leader.convoyFormed){
+                    leader.convoyFormed=true;
+                    for(const slot of [-1,1]){
+                        const point=this.tmpD.set(slot*55,0,-85).applyQuaternion(this.tmpQ.fromArray(leader.rotation)).add(this.tmpE.fromArray(position));
+                        const escort=this.spawnShip('patrol',point.toArray(),undefined,undefined,undefined,{faction:leader.faction});
+                        Object.assign(escort,{frigateEncounterId:leader.id,convoyLeader:leader,formationSlot:slot,formationTrail:-85,formationPoint:[0,0,0]});
+                    }
+                }
+                return leader;
+            }
+        }
         if(role==='trader'&&fleetOptions.convoy){
             const caravan=fleetOptions.convoy==='caravan';
             const trader=this.spawnTrafficCapital(caravan?'caravan':'drover',position,true);
@@ -12588,8 +12724,10 @@ export class GameSession {
         const ledger = world.capitalTraffic ??= {};
         const record = ledger[key] ??= {};
         record.mounts = ship.capitalMountHull;
+        if(ship.variant==='picket')record.picketLayout=2;
         record.lostDroneBays = ship.lostDroneBays;
         record.missingPods = ship.missingPods ?? 0;
+        if(ship.ecmStoppedAt!==undefined)record.ecmStoppedAt=ship.ecmStoppedAt;
         record.hull = ship.hull;
         record.shield = ship.shield;
         record.cargo = ship.cargo;
@@ -12604,7 +12742,8 @@ export class GameSession {
         const spec=TRAFFIC_HULLS[variant];if(!spec)return;
         const origin=position??this.tmpD.set(0,0,-800).applyQuaternion(this.tmpQ.fromArray(this.save.player.rotation)).add(this.tmpE.fromArray(this.save.player.position)).toArray();
         const key = !traffic || this.arena ? undefined : [this.save.player.systemId,variant,...origin].join(':');
-        if(key&&spec.capitalClass==='frigate'){
+        const checkpointGroup=key&&(spec.capitalClass==='frigate'||spec.role==='patrol');
+        if(checkpointGroup){
             if(!this.frigateTrafficReady&&this.save.world.frigateEncounter?.members.some(member=>member.state.capitalSpawnKey===key))
                 restoreFrigateEncounter(this);
             const existing=this.ships.find(actor=>actor.capitalSpawnKey===key&&actor.hull>0);
@@ -12616,11 +12755,16 @@ export class GameSession {
         ship.variant=variant;ship.capitalClass=spec.capitalClass??'corvette';ship.cargoHolds=spec.cargoHolds;ship.velocity.fill(0);ship.dark=false;ship.smuggling=false;
         equipCorvette(ship);
         if(!this.restoringFrigateEncounter)equipCapitalLoot(this,ship);
-        if(key&&spec.capitalClass==='frigate'){ship.frigateEncounterId=ship.id;this.frigateTrafficReady=true;}
+        if(checkpointGroup){ship.frigateEncounterId=ship.id;this.frigateTrafficReady=true;}
         ship.capitalSpawnKey = key;
         if (saved) {
             ship.capitalMountHull = [...saved.mounts];
+            restoreHeimdallLasers(ship);
             ship.missingPods = saved.missingPods;
+            if(variant==='picket'){
+                ship.capitalMountHull=restorePicketMounts(ship.capitalMountHull,saved.picketLayout);
+                ship.ecmStoppedAt=saved.ecmStoppedAt;
+            }
             ship.repairDronesHeld=capitalHull(ship).mounts.some(m=>m.kind==='hangar'&&!ship.capitalMountHull[m.index]);
             ship.lostDroneBays=saved.lostDroneBays;
             if (ship.missingPods) ship.collisionVariant = capitalCollisionVariant(ship.variant,ship.missingPods);
@@ -12653,6 +12797,11 @@ export class GameSession {
         if(ship.missingPods&bit)return;
         ship.missingPods=(ship.missingPods??0)|bit;
         ship.collisionVariant=capitalCollisionVariant(ship.variant,ship.missingPods);
+        if(m.kind==='emitter'){
+            ship.ecmStoppedAt=this.save.world.time;
+            this.playWorldSound?.('ecm-collapse',1,...ship.position);
+            return;
+        }
         if(m.kind==='bay')return;
         this.renderer.detachCargoPod?.(ship,m);
         if(this.arena||!ship.cargoHolds)return;
@@ -13199,7 +13348,7 @@ export class GameSession {
         return obstacle;
     }
     activeFieldObstacles(instanceId = this.activeInstanceId) {
-        const derelicts=[];
+        const derelicts=instanceId===this.activeInstanceId&&this.coverSections?.length?[...this.coverSections]:[];
         for(const entry of this.renderer?.derelictCollisionObstacles?.values()??[])if(entry.systemId===this.save.player.systemId)derelicts.push(...entry.obstacles);
         if (instanceId === 'shardbelt') {
             // Geometry is shared; query stamps belong to this session's grid.
@@ -13665,13 +13814,13 @@ export class GameSession {
             // storm along weapon lines through the dense wreck field. Boxes use
             // their full corner reach so rotated rocks never let a beam slip
             // past a visible corner.
-            const movingNode = canRefresh && sources[order]?.moving ? sources[order] : undefined;
+            const movingNode = canRefresh && (obstacle.cover ? obstacle : sources[order]?.moving ? sources[order] : undefined);
             // A centre-cell query can miss the plating of a large wreck
             // even with the normal local steering padding.
             const largeIndex = obstacle.radius > (shardbelt ? 240 : 180)
                 ? this.largeSteeringObstacles.push(obstacle) - 1 : -1;
             const keys = movingNode ? [] : undefined;
-            addObstacleToSegmentGrid(segmentGrid, obstacle, size, this.cellKey, keys);
+            if(!obstacle.cover)addObstacleToSegmentGrid(segmentGrid, obstacle, size, this.cellKey, keys);
             if (movingNode)
                 this.fieldGridDrift.entries.push({ node: movingNode, obstacle, centerKey, keys, largeIndex });
         }
@@ -13687,7 +13836,7 @@ export class GameSession {
         let centerCellsChanged = false;
         for (const entry of drift.entries) {
             const before = entry.obstacle;
-            const after = drift.makeObstacle.call(this, entry.node);
+            const after = before.cover ? before : drift.makeObstacle.call(this, entry.node);
             after._gridOrder = before._gridOrder;
             this.gridObstacleList[after._gridOrder] = after;
             // Keep previously returned snapshots valid for pilots that hold
@@ -13704,7 +13853,7 @@ export class GameSession {
             }
             for (const oldKey of entry.keys) removeObstacleFromCell(this.obstacleSegmentGrid, oldKey, before);
             entry.keys.length = 0;
-            addObstacleToSegmentGrid(this.obstacleSegmentGrid, after, size, this.cellKey, entry.keys, true);
+            if(!after.cover)addObstacleToSegmentGrid(this.obstacleSegmentGrid, after, size, this.cellKey, entry.keys, true);
             if (entry.largeIndex >= 0) this.largeSteeringObstacles[entry.largeIndex] = after;
             entry.obstacle = after;
         }
@@ -13774,6 +13923,8 @@ export class GameSession {
         // pre-indexed into every cell their bounding sphere touches, so no
         // neighboring-cell fan-out is needed here.
         this.ensureObstacleGrid();
+        // At most ten moving surfaces. Test their live transforms even between grid refreshes.
+        if(this.coverSections&&!this.ignoreCover)for(const body of this.coverSections)if(callback(body)===true)return true;
         if (this.obstacleSegmentGrid.size === 0)
             return;
         const stamp = ++this.obstacleQueryStamp;
@@ -13960,7 +14111,7 @@ export class GameSession {
         const side = this.coverSide ??= new THREE.Vector3();
         for (const obstacle of obstacles) {
             const radius = obstacle.radius;
-            if (!(radius >= COVER_MIN_RADIUS)) continue;
+            if (!obstacle.cover && radius < COVER_MIN_RADIUS) continue;
             away.set(obstacle.x, obstacle.y, obstacle.z).sub(threatPosition);
             if (away.lengthSq() < 1) continue;
             away.normalize();
@@ -14117,7 +14268,7 @@ export class GameSession {
     firstObstacleHit(start, end, ignoreId) {
         return this.firstObstacleHitInfo(start, end, ignoreId)?.t;
     }
-    firstObstacleHitInfo(start, end, ignoreId, anyHit = false) {
+    firstObstacleHitInfo(start, end, ignoreId, anyHit = false, sweepCover = false) {
         let best;
         let bestObstacle;
         const test = (obstacle) => {
@@ -14150,7 +14301,10 @@ export class GameSession {
             // in open space. Debris pieces keep the box, which mirrors their
             // rendered shape exactly.
             if (obstacle.meshVerts) {
-                const hit = segmentMeshHit(start, end, obstacle, anyHit);
+                // A drifting wreck section moved this step: sweep the segment in
+                // its frame, or a surface that closed on a slow torpedo is missed.
+                const from = sweepCover && obstacle.cover ? (this.coverSweepStart ??= new THREE.Vector3()).copy(start).sub(obstacle.prevPosition).add(obstacle.position) : start;
+                const hit = segmentMeshHit(from, end, obstacle, anyHit);
                 if (hit !== undefined && (best === undefined || hit < best)) {
                     best = hit;
                     bestObstacle = obstacle;
@@ -14181,9 +14335,10 @@ export class GameSession {
             }
         };
         const dock = this.activeDockObstacle();
-        if (dock)
+        if (dock){
             test(dock);
-        else
+            if(this.coverSections&&!this.ignoreCover)for(const body of this.coverSections)if(test(body)===true)break;
+        }else
             this.forEachObstacleAlongSegment(start, end, test);
         return best === undefined ? undefined : { t: best, obstacle: bestObstacle };
     }
@@ -14215,6 +14370,7 @@ export class GameSession {
         this.autopilot = false;
         this.afterburning = false;
         this.save.player.systemId = LOCATIONS[locationId].systemId;
+        this.clearCombatDebris();
         this.save.player.dockedAt = locationId;
         this.lostTargetId = undefined;
         this.save.player.lastDockedAt = locationId;
@@ -15460,6 +15616,7 @@ export class GameSession {
         return screen;
     }
     syncRender(dt, now) {
+        if(this.renderer.coverVisuals?.size)this.renderer.syncCover(clamp(this.simAccumulator/SIM_STEP,0,1),dt);
         if (this.arena?.observer) {
             const focus = this.updateObserverFocus();
             this.renderer.setCockpitVisible(false);
@@ -15666,7 +15823,7 @@ export class GameSession {
                     // pilot remembers the player (spared or escaped). Temperament
                     // stays off the HUD: it reads through behavior and comms.
                     trafficCapital: Boolean(TRAFFIC_HULLS[ship.variant]),
-                    readout: ship.captured || ship.surrendered ? surrenderReadout
+                    readout: lockJammed(this,this.save.player,ship)?t('JAMMED'):ship.captured || ship.surrendered ? surrenderReadout
                         : ship.capitalMountHull && identified ? capitalReadout(ship)
                         : ship.crippled ? t('DRIVE DAMAGED') : !identified
                             ? distance > stats.scanRange
@@ -15694,7 +15851,7 @@ export class GameSession {
                 const unit = this.npcDroneUnits[target.id], owner = this.ships.find(ship => ship.id === unit.ownerId);
                 hudTarget = {kind:'drone', name:target.name, subtitle:owner?.name, hostile:owner?.hostile,
                     relation:owner && this.shipRelation(owner), hull:unit.hull, maxHull:DRONE_TYPES.repair.maxHull,
-                    readout:owner?.name, distance, ...screen};
+                    readout:lockJammed(this,this.save.player,unit)?t('JAMMED'):owner?.name, distance, ...screen};
             }
             else if (target.kind === 'asteroid') {
                 const node = this.asteroids.find((entry) => entry.id === target.id);
@@ -16393,6 +16550,17 @@ export class GameSession {
             if (shot.targetId === 'player' && shot.life > 0 && !shot.lostTrack && (shot.kind === 'missile' || shot.kind === 'torpedo'))
                 add(this.projStore.pos, 'missile', false, 0, false, 0, false, false, shot.slot * 3);
         }
+        if(jammed(this,this.save.player,this.save.player.position)){
+            const phase=Math.floor(this.save.world.time*8);
+            if(!this.radarJammed)this.audio?.playCockpit?.('radar-jam');
+            this.radarJammed=true;
+            for(let i=contacts.length-1;i>=0;i--){
+                const c=contacts[i];
+                if(c.type!=='hostile'&&c.type!=='friendly'&&c.type!=='neutral')continue;
+                if((phase+i*3)%8===0){contacts.splice(i,1);continue;}
+                c.x+=.014*Math.sin(phase*4+i);c.y+=.014*Math.cos(phase+i*3);
+            }
+        }else this.radarJammed=false;
         return contacts;
     }
     zoneLabel(zone) {

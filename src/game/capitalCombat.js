@@ -1,5 +1,5 @@
 import {TRAFFIC_HULLS} from './corvetteMounts.js';
-import {segmentShipColliderHit} from './shipCollision.js';
+import {segmentShipColliderHit,surfaceGroupAt} from './shipCollision.js';
 import {t} from './i18n.js';
 import {friendlyFiringLaneBlocked} from './combatPlanning.js';
 import {combatTargetEligible, tracksActivePlayer} from './combatTargeting.js';
@@ -10,7 +10,9 @@ import {FRIGATE_MOUNTS,FRIGATE_CLEARANCE,FRIGATE_TORPEDO_MOUNTS,FRIGATE_TORPEDO_
 import {FRIGATE_COLLISION_TRIANGLES} from './frigateCollisionData.js';
 import {clearTurretArc,shipBlocksRay,updateAutomaticTurrets} from './turrets.js';
 import {disruptionFactor} from './weaponDamage.js';
-import {relativeIntercept,beginRackLock,rackLockProgress,torpedoMobilityFactor} from './weaponFlight.js';
+import {relativeIntercept,beginRackLock,torpedoMobilityFactor} from './weaponFlight.js';
+import {updateSiegeLance} from './siegeLance.js';
+import {fieldRackProgress} from './picketField.js';
 import {updateBargeLaunchers} from './bargeLaunchers.js';
 // Live capital hulls render at twice their authored scale. PDCs use the same
 // extents through npcHullExtents; main batteries and assembly hits must agree.
@@ -84,9 +86,14 @@ function broadsideBarrelHit(s, mount, segment, padding) {
 export function damageCapitalMount(ship,position,damage){
  if(!ship.capitalMountHull||!position||damage<=0)return -1;
  const s=stateFor(ship);s.local.fromArray(position).sub(s.scratch.fromArray(ship.position)).applyQuaternion(s.inverse.fromArray(ship.rotation).invert());
+ const surface=surfaceGroupAt(ship.variant,s.local,ship.rotorAngle,ship.variant==='picket'&&!ship.capitalMountHull[0]);
  let nearest=1,index=-1;
  for(const m of capitalHull(ship).mounts){
   const i=m.index;if(ship.capitalMountHull[i]<=0)continue;
+  if(m.exportedSurface){
+   if(surface===m.node){index=i;break;}
+   continue;
+  }
   s.lead.fromArray(m.hitCenter);
   const half=m.hitHalfExtents;
   let normalized;
@@ -169,7 +176,7 @@ function updateFrigateTorpedoes(session,ship,dt,targetPosition){
  const aspect=targetActor.rotation?s.scratch.set(0,0,-1).applyQuaternion(s.turn.fromArray(targetActor.rotation)).dot(s.direction):0;
  const previous=fit.lock??0;
  const mobility=torpedoMobilityFactor(launcher,ship.velocity,targetActor.velocity,s.direction,distance);
- fit.lock=rackLockProgress(previous,launcher,ship.pilot?.tier,distance,facing,aspect,dt,mobility);
+ fit.lock=fieldRackProgress(session,ship,targetActor,fit,previous,launcher,ship.pilot?.tier,distance,facing,aspect,dt,mobility);
  if(!fit.lock)return;
  if(targetId==='player')session.warnPlayerLock?.(t('TORPEDO LOCK · EVADE'),!previous);
  if(fit.lock<1||mobility===0||(!ship.capitalDisarmed&&ship.capitalAttack!=='SALVO'))return;
@@ -315,6 +322,10 @@ export function updateCorvetteWeapons(session,ship,dt,targetPosition,targetVeloc
  if(ship.targetId==='player' && !tracksActivePlayer(session,ship))targetPosition=undefined;
  if(targetPosition)s.target.copy(targetPosition);
  updateAutomaticTurrets(session,ship,ship.id,dt);
+ if(ship.variant==='siege')updateSiegeLance(session,ship,targetPosition?s.target:undefined);
+ if(ship.variant==='picket'&&ship.capitalMountHull[0]>0&&now>=(ship.nextHum??0)){
+    session.playWorldSound?.('ecm-hum',.5,...ship.position);ship.nextHum=now+.25;
+ }
  if(ship.variant==='barge')updateBargeLaunchers(session,ship,dt,targetPosition);
  s.q.fromArray(ship.rotation);
  for(const m of capitalHull(ship).mounts){
@@ -338,7 +349,7 @@ export function updateCorvetteWeapons(session,ship,dt,targetPosition,targetVeloc
    aim=flight<=weapon.life&&s.direction.dot(s.normal)>.5;
    if(aim){
     s.lead.add(s.position);s.scratch.copy(s.position).addScaledVector(s.direction,2);s.scratch.addScaledVector(s.local.set(0,1,0).applyQuaternion(s.q),1.3);
-    aim=segmentShipColliderHit(s.scratch,s.lead,ship.position,ship.rotation,ship.collisionVariant??ship.variant,2)===undefined&&!session.lineBlocked(s.position,s.lead,ship.id)
+    aim=segmentShipColliderHit(s.scratch,s.lead,ship.position,ship.rotation,ship.collisionVariant??ship.variant,2,0,undefined,ship.rotorAngle)===undefined&&!session.lineBlocked(s.position,s.lead,ship.id)
       &&!friendlyFiringLaneBlocked(session,ship,s.position,s.direction,s.position.distanceTo(s.lead),ship.targetId);
    }
   }
@@ -353,6 +364,30 @@ export function updateCorvetteWeapons(session,ship,dt,targetPosition,targetVeloc
   session.renderer.spawnMuzzleFlash?.(s.lead.x,s.lead.y,s.lead.z,0xffb366);
   ship.energy-=weapon.energyCost;gun.fireAt=now+weapon.cooldown;
  }
+}
+export function updatePatrolCapitalAttack(session,ship,targetPosition,targetVelocity,dt){
+ const n=navigationFor(ship),range=TRAFFIC_HULLS[ship.variant].preferredRange;
+ n.position.fromArray(ship.position);n.q.fromArray(ship.rotation);
+ n.radial.copy(targetPosition).sub(n.position);
+ const distance=n.radial.length();n.radial.normalize();
+ n.heading.copy(n.radial);
+ const error=distance-range,band=ship.variant==='siege'?200:75;
+ n.desired.copy(n.radial).multiplyScalar(Math.abs(error)>band?Math.sign(error)*ship.speed:0);
+ if(ship.capitalRelocateUntil>session.save.world.time){
+    n.desired.set(1,0,0).applyQuaternion(n.q).multiplyScalar(ship.speed);
+ }
+ const blocked=session.lineBlocked(n.position,targetPosition,ship.id);
+ if(blocked)n.desired.addScaledVector(n.right.set(1,0,0).applyQuaternion(n.q),ship.speed);
+ n.other.copy(n.desired).normalize();
+ const avoid=session.getAvoidanceVector?.(n.position,n.other,150,ship.speed);
+ if(avoid)n.desired.addScaledVector(avoid,ship.speed*3);
+ const traffic=session.getShipAvoidance?.(n.position,n.velocity.fromArray(ship.velocity),ship);
+ if(traffic)n.desired.addScaledVector(traffic,ship.speed);
+ n.desired.clampLength(0,ship.speed);
+ if(!ship.lance?.frozen)n.q.rotateTowards(n.goal.setFromUnitVectors(forward,n.heading),ship.turnRate*dt);
+ n.velocity.fromArray(ship.velocity).lerp(n.desired,1-Math.exp(-dt*1.5));
+ n.position.addScaledVector(n.velocity,dt).toArray(ship.position);n.velocity.toArray(ship.velocity);n.q.toArray(ship.rotation);
+ updateCorvetteWeapons(session,ship,dt,targetPosition,targetVelocity);
 }
 export function updateCapitalBroadsideAttack(session,ship,targetPosition,targetVelocity,dt){
  const s=stateFor(ship),n=navigationFor(ship);
@@ -480,7 +515,7 @@ export function segmentCapitalMountHit(start,end,ship,padding=0){
  let nearest=Infinity;
  for(const m of capitalHull(ship).mounts){
   const i=m.index;if(ship.capitalMountHull[i]<=0)continue;
-  if(m.partBit)continue; // The exported solid, including open launch rails, supplies the actual contact.
+  if(m.partBit||m.exportedSurface)continue; // The exported solid, including open launch rails, supplies the actual contact.
   if(m.barrels)nearest=Math.min(nearest,broadsideBarrelHit(s,m,true,padding));
   s.lead.fromArray(m.hitCenter);
   s.scratch.copy(s.local).sub(s.lead);const half=m.hitHalfExtents;

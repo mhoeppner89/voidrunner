@@ -38,7 +38,7 @@ export class CapitalMarkers {
         for(let i=0;i<checks;i++){
             const e=this.entries[this.cursor];
             if(e.eligible&&e.facing){
-                const hit=segmentShipColliderHit(camera,e.point,this.origin,this.orientation,ship.collisionVariant??ship.variant,2);
+                const hit=segmentShipColliderHit(camera,e.point,this.origin,this.orientation,ship.collisionVariant??ship.variant,2,0,undefined,ship.rotorAngle);
                 e.clear=hit===undefined||((1-hit)*camera.distanceTo(e.point)<.15);
             }
             this.cursor=(this.cursor+1)%mounts.length;

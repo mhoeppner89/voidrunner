@@ -118,10 +118,26 @@ test('an early survivor gate advances timed bombers with at least 15 seconds bet
   const interval=s.save.world.time-t;assert.ok(interval>=15-1e-6&&interval<15.3,'interval '+interval);
  }
 });
-for(const level of [5,10])test('Hard promotes auxiliary fighters on level '+level,()=>{
+test('the timed picket relief joins two survivors and its guards target the pilot if the wing is down',()=>{
+ const s=stage(21),wing=s.ships.find(ship=>ship.arenaRunWingman);
+ const first=opp(s);
+ assert.equal(first.length,4);
+ assert.ok(first.some(ship=>ship.targetId===wing.id));
+ s.powerDownRunWingman(wing);
+ first.slice(2).forEach(ship=>ship.hull=0);
+ const opening=s.save.world.time;
+ until(s,()=>s.runBattle.group===2);
+ const interval=s.save.world.time-opening;
+ assert.ok(interval>=29.9&&interval<30.2);
+ assert.equal(opp(s).filter(ship=>first.includes(ship)).length,2);
+ const guards=opp(s).filter(ship=>!first.includes(ship)&&!ship.capitalClass);
+ assert.equal(guards.length,2);assert.ok(guards.every(ship=>ship.targetId==='player'));
+});
+test('Hard promotes carrier-launched fighters',()=>{
+ const level=10;
  const s=stage(level,true),d=reach(s);opp(s).filter(x=>x!==d).forEach(x=>x.hull=0);
- until(s,()=>level===5?s.runBattle.supportCount>0:opp(s).some(x=>x.arenaLaunched));
- assert.ok(opp(s).filter(x=>x!==d).every(x=>x.pilot.tier===(level===5?'veteran':'ace')));
+ until(s,()=>opp(s).some(x=>x.arenaLaunched));
+ assert.ok(opp(s).filter(x=>x.arenaLaunched).every(x=>x.pilot.tier==='ace'));
 });
 test('moving socket warning reuses its pose and its Three.js scratch objects',()=>{
  const s=stage(10),d=reach(s),b=s.runBattle,wave={...RUN_WAVES[9],launch:{...RUN_WAVES[9].launch,every:25,sockets:{port:{game_position:[-10,0,-12],direction_game:[-1,0,0]}},bays:[{subsystem:'bay_port',socket:'port'}]}};
@@ -131,6 +147,8 @@ test('moving socket warning reuses its pose and its Three.js scratch objects',()
  const step=()=>{s.save.world.time+=1/60;tickBattle(s,wave,elapsed+=1/60,1/60);};
  for(let i=0;i<30*60&&!b.warning?.bay;i++)step();
  assert.ok(b.warning?.bay);
+ // Exclude the authored escort warning that preceded the carrier launch.
+ markers.clear();
  const original=b.warning.entry,position=original.position,before=position[0],vectors=new Set(),rotations=new Set();
  const watch=(type,set)=>{const fn=type.prototype.fromArray;type.prototype.fromArray=function(...args){set.add(this);return fn.apply(this,args);};return ()=>{type.prototype.fromArray=fn;};};
  const restoreV=watch(T.Vector3,vectors),restoreQ=watch(T.Quaternion,rotations);

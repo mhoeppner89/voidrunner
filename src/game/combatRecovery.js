@@ -26,7 +26,8 @@ export function planShieldRecovery(session,ship,plan,target,now,distance){
   }
  }
  const critical=ship.shield<ship.maxShield*(novice?.35:ace?.2:.25)*(timid?1.4:aggressive?.75:1);
- const inField=session.activeInstanceId && now>=(ship.nextCoverBreak??0);
+ const hasCover=session.activeInstanceId || session.coverSections?.length;
+ const inField=hasCover && now>=(ship.nextCoverBreak??0);
  const underFire=inField && ship.shieldDelay>0 && ship.shield<ship.maxShield*.6;
  const finishable=target&&target.shield<1&&target.hull<=(target.maxHull??hull?.hull??0)*.4&&ship.hull>ship.maxHull*.4;
  if(!r.active&&now>=r.readyAt&&r.attempts<(ace?2:1)&&plan.visible&&target&&!target.combatPlan?.recovery?.active&&!finishable&&!ship.fleeing&&!ship.holdFire&&(critical||underFire)){
@@ -36,7 +37,7 @@ export function planShieldRecovery(session,ship,plan,target,now,distance){
   }
   // Let the search finish before spending this withdrawal on a range break.
   if(ship.coverSearch?.pending)return r;
-  const direct=!session.activeInstanceId&&(!r.speedAdvantage||timid)?session.findCoverPoint(plan.position,r.threat,true):undefined;
+  const direct=!hasCover&&(!r.speedAdvantage||timid)?session.findCoverPoint(plan.position,r.threat,true):undefined;
   const cover=routed?r.cover.fromArray(routed.route.at(-1)):direct;
   const exitReady=distance>120&&(plan.nose.dot(plan.direct)<-.25||plan.travel.dot(plan.direct)<-stats.maxSpeed*.4||distance>clamp((ship.observedWeaponRange??400)+80,380,750));
   if(critical&&r.speedAdvantage&&exitReady||cover){

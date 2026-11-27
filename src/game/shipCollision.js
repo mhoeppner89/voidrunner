@@ -1,3 +1,4 @@
+import {Triangle,Vector3} from 'three';
 import {SHIP_COLLISION_DATA} from './shipCollisionData.js';
 import {segmentMeshHit,prepareMeshQueryIndex} from './meshQueries.js';
 import {prepareSurfaceMeshIndex} from './surfaceMeshCandidates.js';
@@ -28,20 +29,60 @@ export const SHIP_COLLIDERS=Object.fromEntries(Object.entries(SHIP_COLLISION_DAT
 // Only a pod loss changes this shape. All ships with the same remaining hold
 // share one prepared collision profile for shots, physical contact and HUD sightlines.
 const cargoParts=new Map();
+function collisionPart(variant,name){
+    const key=variant+'/'+name;
+    if(!cargoParts.has(key))cargoParts.set(key,decodeProfile(SHIP_COLLISION_DATA[variant].parts[name]));
+    return cargoParts.get(key);
+}
+const picketBody=collisionPart('picket','body'),picketMast=collisionPart('picket','emitter');
+const picketRotor=collisionPart('picket','emitter_rotor');
+const picketRanges={};
+let firstVertex=0;
+for(const [name,end] of Object.entries(SHIP_COLLISION_DATA.picket.groupEnds)){
+    picketRanges[name]={start:firstVertex,end};
+    firstVertex=end;
+}
+const face=new Triangle(),hitPoint=new Vector3(),closest=new Vector3();
+// Weapon hits arrive in flight units. The bake preserves each assembly’s
+// contiguous vertex range even after spatially reordering its triangles.
+const rotorPoint=new Vector3(),rotorPivot=SHIP_COLLISION_DATA.picket.rotorPivot;
+// Test against the immutable shipping mesh by turning the query back about
+// the authored vertical bearing. The pivot and rays are both in bake units.
+function rotorLocal(input,out,c,s){
+    const x=input.x-rotorPivot[0],z=input.z-rotorPivot[2];
+    out.x=rotorPivot[0]+c*x-s*z;out.y=input.y;out.z=rotorPivot[2]+s*x+c*z;
+}
+export function surfaceGroupAt(variant,local,angle=0,emitterOffline=false){
+    const ends=SHIP_COLLISION_DATA[variant]?.groupEnds;
+    if(!ends)return;
+    const hull=SHIP_COLLIDERS[variant],v=hull.meshVerts,idx=hull.meshIndices;
+    hitPoint.copy(local).multiplyScalar(.5);
+    const radar=variant==='picket';
+    if(radar)rotorLocal(hitPoint,rotorPoint,Math.cos(angle),Math.sin(angle));
+    let best=.5*.5,vertex=-1;
+    for(let i=0;i<idx.length;i+=3){
+        face.a.fromArray(v,3*idx[i]);face.b.fromArray(v,3*idx[i+1]);face.c.fromArray(v,3*idx[i+2]);
+        const vi=idx[i],rotor=radar&&vi>=picketRanges.emitter_rotor.start&&vi<picketRanges.emitter_rotor.end;
+        if(emitterOffline&&(rotor||vi>=picketRanges.emitter.start&&vi<picketRanges.emitter.end))continue;
+        const point=rotor?rotorPoint:hitPoint;
+        face.closestPointToPoint(point,closest);
+        const d=closest.distanceToSquared(point);
+        if(d<best){best=d;vertex=idx[i];}
+    }
+    if(vertex>=0)for(const name in ends)if(vertex<ends[name])return name==='emitter_rotor'?'emitter':name;
+}
 export const droverCollisionVariant=missing=>capitalCollisionVariant('drover',missing);
 export function capitalCollisionVariant(variant,missing){
     if(!missing)return variant;
     const key=variant+'-pods-'+missing;
     if(SHIP_COLLIDERS[key])return key;
     const groups=SHIP_COLLISION_DATA[variant].parts,vertices=[],indices=[],boxes=[];
-    for(const [name,data] of Object.entries(groups)){
+    for(const name of Object.keys(groups)){
         if(name.startsWith('bay_')){
             const lost=Boolean(missing&(name.startsWith('bay_port')?1:2));
             if(lost!==name.endsWith('_damaged'))continue;
-        }else if(name!=='body'&&(missing&(1<<Number(name.split('_')[1]))))continue;
-        const partKey=variant+'/'+name;
-        if(!cargoParts.has(partKey))cargoParts.set(partKey,decodeProfile(data));
-        const part=cargoParts.get(partKey),offset=vertices.length/3;
+        }else if(name==='emitter'||name==='emitter_rotor'){if(missing&1)continue;}else if(name!=='body'&&(missing&(1<<Number(name.split('_')[1]))))continue;
+        const part=collisionPart(variant,name),offset=vertices.length/3;
         for(const v of part.meshVerts)vertices.push(v);
         for(const i of part.meshIndices)indices.push(offset+i);
         for(const v of part.boxes)boxes.push(v);
@@ -56,29 +97,44 @@ export function capitalCollisionVariant(variant,missing){
 const localStart={x:0,y:0,z:0},localEnd={x:0,y:0,z:0},rotated={x:0,y:0,z:0};
 function rotate(x,y,z,qx,qy,qz,qw,out){const tx=2*(qy*z-qz*y),ty=2*(qz*x-qx*z),tz=2*(qx*y-qy*x);out.x=x+qw*tx+qy*tz-qz*ty;out.y=y+qw*ty+qz*tx-qx*tz;out.z=z+qw*tz+qx*ty-qy*tx;return out;}
 const rayObstacle={x:0,y:0,z:0,losRadius:0,meshVerts:null,meshIndices:null,box:{qx:0,qy:0,qz:0,qw:1}};
-export function segmentShipColliderHit(start,end,position,rotation,variant,scale=1,padding=0,stats){
+export function segmentShipColliderHit(start,end,position,rotation,variant,scale=1,padding=0,stats,rotorAngle=0){
     const p=SHIP_COLLIDERS[variant]??SHIP_COLLIDERS.kestrel;
     rotate(start.x-position[0],start.y-position[1],start.z-position[2],-rotation[0],-rotation[1],-rotation[2],rotation[3],localStart);
     rotate(end.x-position[0],end.y-position[1],end.z-position[2],-rotation[0],-rotation[1],-rotation[2],rotation[3],localEnd);
     localStart.x/=scale;localStart.y/=scale;localStart.z/=scale;localEnd.x/=scale;localEnd.y/=scale;localEnd.z/=scale;
     const pad=padding/scale;
-    if(Math.max(localStart.x,localEnd.x)<p.min[0]-pad||Math.min(localStart.x,localEnd.x)>p.max[0]+pad
-        ||Math.max(localStart.y,localEnd.y)<p.min[1]-pad||Math.min(localStart.y,localEnd.y)>p.max[1]+pad
-        ||Math.max(localStart.z,localEnd.z)<p.min[2]-pad||Math.min(localStart.z,localEnd.z)>p.max[2]+pad)return undefined;
+    if(variant==='picket'&&rotorAngle){
+        const c=Math.cos(rotorAngle),s=Math.sin(rotorAngle);
+        rotorLocal(localStart,rotorStartPoint,c,s);
+        rotorLocal(localEnd,rotorEndPoint,c,s);
+        const body=localSegmentHit(picketBody,pad,stats),mast=localSegmentHit(picketMast,pad,stats);
+        const moving=localSegmentHit(picketRotor,pad,stats,rotorStartPoint,rotorEndPoint);
+        const nearest=Math.min(body??Infinity,mast??Infinity,moving??Infinity);
+        return nearest===Infinity?undefined:nearest;
+    }
+    return localSegmentHit(p,pad,stats);
+}
+const rotorStartPoint=new Vector3(),rotorEndPoint=new Vector3();
+function localSegmentHit(p,pad,stats,start=localStart,end=localEnd){
+    if(Math.max(start.x,end.x)<p.min[0]-pad||Math.min(start.x,end.x)>p.max[0]+pad
+        ||Math.max(start.y,end.y)<p.min[1]-pad||Math.min(start.y,end.y)>p.max[1]+pad
+        ||Math.max(start.z,end.z)<p.min[2]-pad||Math.min(start.z,end.z)>p.max[2]+pad)return undefined;
     rayObstacle.meshVerts=p.meshVerts;rayObstacle.meshIndices=p.meshIndices;rayObstacle.losRadius=p.radius+pad;
-    let hit=segmentMeshHit(localStart,localEnd,rayObstacle,false,stats);
+    let hit=segmentMeshHit(start,end,rayObstacle,false,stats);
     if(hit!==undefined||pad<=0)return hit;
     // Four offset rays provide the existing small projectile contact margin.
     // They still hit real triangles: padding never turns an engine gap solid.
-    const dx=localEnd.x-localStart.x,dy=localEnd.y-localStart.y,dz=localEnd.z-localStart.z,len=Math.hypot(dx,dy,dz);
+    const dx=end.x-start.x,dy=end.y-start.y,dz=end.z-start.z,len=Math.hypot(dx,dy,dz);
     if(len<1e-12)return undefined;
     let ux=-dz,uy=0,uz=dx,ul=Math.hypot(ux,uz);if(ul<1e-12){ux=1;uz=0;ul=1;}
     ux/=ul;uz/=ul;const vx=dy*uz/len,vy=(dz*ux-dx*uz)/len,vz=-dy*ux/len;
-    const sx=localStart.x,sy=localStart.y,sz=localStart.z,ex=localEnd.x,ey=localEnd.y,ez=localEnd.z;
+    const sx=start.x,sy=start.y,sz=start.z,ex=end.x,ey=end.y,ez=end.z;
     for(let i=0;i<4;i++){const sign=i%2?1:-1,x=sign*pad*(i<2?ux:vx),y=sign*pad*(i<2?uy:vy),z=sign*pad*(i<2?uz:vz);
-        localStart.x=sx+x;localStart.y=sy+y;localStart.z=sz+z;localEnd.x=ex+x;localEnd.y=ey+y;localEnd.z=ez+z;
-        const t=segmentMeshHit(localStart,localEnd,rayObstacle,false,stats);if(t!==undefined&&(hit===undefined||t<hit))hit=t;
-    }return hit;
+        start.x=sx+x;start.y=sy+y;start.z=sz+z;end.x=ex+x;end.y=ey+y;end.z=ez+z;
+        const t=segmentMeshHit(start,end,rayObstacle,false,stats);if(t!==undefined&&(hit===undefined||t<hit))hit=t;
+    }
+    start.x=sx;start.y=sy;start.z=sz;end.x=ex;end.y=ey;end.z=ez;
+    return hit;
 }
 // Review/test query for the same solid boxes used by hard contacts.
 export function segmentShipContactHullHit(start,end,position,rotation,variant,scale=1){

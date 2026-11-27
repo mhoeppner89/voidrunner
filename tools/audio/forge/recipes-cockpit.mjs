@@ -189,6 +189,28 @@ export default {
             return sequence(0.4, [[reed(NOTE.A4, 0.1), 0, 0.85], [reed(NOTE.E5, 0.26), 0.11, 1]])[0];
         },
     },
+    // Heimdall's aim has frozen on you: a hard E6 over A5 pulsing four times
+    // a second through the 1.5 s before the lance fires. Sits under BREAK.
+    'lance-lock': {
+        variants: 1, peak: -12, group: 'flight', mono: true,
+        make: () => {
+            const T = 1.46, dyad = blend([beep(NOTE.A5, T, { attack: 0.004, release: 0.004 }), 0.7], [beep(NOTE.E6, T, { attack: 0.004, release: 0.004 }), 1]);
+            return d.mul(dyad, d.curve(T, (t) => (t % 0.25) < 0.17 ? 1 : 0.25));
+        },
+    },
+    // Radar hash while jammed: a short chopped burst of static with a
+    // falling blip, three takes so repeats never stutter identically.
+    'jam-static': {
+        variants: 3, peak: -15, group: 'flight', mono: true,
+        make: (v, R) => {
+            const T = [0.32, 0.26, 0.4][v];
+            const raw = d.bandpass(d.noise(T, R), R.range(1800, 2600), 1.4);
+            let gate = 1, until = 0;
+            const chopped = raw.map((x, i) => { if (i >= until) { gate = R.range(0, 1) < 0.6 ? 1 : 0; until = i + Math.floor(d.SR / R.range(30, 60)); } return x * gate; });
+            const blip = d.mul(d.osc(0.12, d.line(0.12, [[0, NOTE.E6], [0.12, NOTE.A4]], 'exp'), 'square'), d.perc(0.12, 0.002, 0.04));
+            return blend([d.mul(chopped, d.curve(T, (t) => Math.min(1, t / 0.01) * Math.min(1, (T - t) / 0.05))), 1], [d.lowpass(blip, 3000), 0.35]);
+        },
+    },
     // Lock building: one pip per third, rising A-C-D by playback rate in
     // the events. Lock resolves to the fifth and octave above.
     'rack-search': {

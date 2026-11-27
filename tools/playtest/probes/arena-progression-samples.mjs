@@ -24,6 +24,8 @@ export async function progressionSampleFactory(seed){
   const dispose=renderer.dispose;
   renderer.dispose=()=>{};
   try{previous.dispose();}finally{renderer.dispose=dispose;}
+  // A reserved objective transmission belongs to the previous sortie.
+  ui.clearPilotLine();
   const save=newArenaRun(false,seed);
   previous=new SampleSession(save,ui,()=>{},save.arena);
   cancelAnimationFrame(previous.frameId);

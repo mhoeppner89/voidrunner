@@ -14,10 +14,11 @@ for(const [variant,config] of Object.entries(GLB_SHIP_CONFIG)){
  const path=config.path??`assets/models/ships/${config.file}`,bytes=await readFile(path);
  const root=await buildGlbScene(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength));
  root.rotation.y=config.yaw;root.scale.setScalar(config.scale*(config.baseScale??1));root.updateMatrixWorld(true);
- const components=config.collisionSource?JSON.parse(await readFile(config.collisionSource,'utf8')).groups:null;
- const pods=components?Object.keys(components).filter(k=>/^(pod_|stack_|bay_|rack_)/.test(k)):[];
+ const source=config.collisionSource?JSON.parse(await readFile(config.collisionSource,'utf8')):null;
+ const components=source?.groups;
+ const pods=components?Object.keys(components).filter(k=>/^(pod_|stack_|bay_|rack_|emitter(?:_rotor)?$)/.test(k)):[];
  for(const part of (pods.length?[null,'body',...pods]:[null])){
- const vertices=[],indices=[],unique=new Map(),point=new T.Vector3();
+ const vertices=[],indices=[],unique=new Map(),point=new T.Vector3(),groupEnds={};
  if(components){
   for(const [name,group] of Object.entries(components)){
    if(!part&&name.endsWith('_damaged'))continue;
@@ -25,6 +26,7 @@ for(const [variant,config] of Object.entries(GLB_SHIP_CONFIG)){
    const offset=vertices.length/3;
    for(const point of group.vertices)for(const coordinate of point)vertices.push(coordinate/2);
    for(const face of group.triangles)for(const index of face)indices.push(offset+index);
+   if(!part&&(variant==='siege'||variant==='picket'))groupEnds[name]=vertices.length/3;
   }
  }else root.traverse(mesh=>{if(!mesh.isMesh)return;const p=mesh.geometry.attributes.position,index=mesh.geometry.index,count=index?.count??p.count;
   for(let i=0;i<count;i++){point.fromBufferAttribute(p,index?index.getX(i):i).applyMatrix4(mesh.matrixWorld);
@@ -73,6 +75,8 @@ for(const [variant,config] of Object.entries(GLB_SHIP_CONFIG)){
  const sha256=createHash('sha256').update(bytes).digest('hex');
  const IndexType=verts.length/3<=65535?Uint16Array:Uint32Array;
  const data={min,max,extent,grid,sha256,indexBytes:IndexType.BYTES_PER_ELEMENT,vertices:encode(verts),indices:encode(new IndexType(ordered)),boxes:encode(new Float32Array(boxes))};
+ if(Object.keys(groupEnds).length)data.groupEnds=groupEnds;
+ if(!part&&source?.rotor_pivot)data.rotorPivot=source.rotor_pivot.map(n=>n/2);
  if(part){(packed[variant].parts??={})[part]=data;continue;}
  packed[variant]=data;
  report.push({variant,path,sha256,triangles:ordered.length/3,vertices:verts.length/3,boxes:boxes.length/6,grid,extent});

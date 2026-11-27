@@ -35,7 +35,34 @@ const bargeRacks=Array.from({length:6},(_,i)=>{
 const bargeDish={node:'fire_control',kind:'dish',label:'FIRE CONTROL',hull:90,normal:up,position:[0,9.2,toFlight(6)],
     hitShape:'box',hitHalfExtents:[2.8,2.2,2.8],hitCenterOffset:[0,-.9,0]};
 const lifted=mount=>({...mount,position:[mount.position[0],mount.position[1]+BARGE_LIFT,mount.position[2]]});
+function moduleMount(node,label,position,half,hull,normal=up){
+    return {node,kind:node,label,position,normal,hull,hitShape:'box',hitHalfExtents:half,markerLift:half[1]+.15,exportedSurface:true};
+}
+function drive(name,position,radius){
+    return {node:'engine_'+name,kind:'engine',label:name.toUpperCase()+' ENGINE',position,normal:aft,hull:120,
+        hitShape:'cylinder',hitHalfLength:5,hitRadius:radius,hitCenterOffset:[0,0,-5],exhaustRadius:radius*.8,exportedSurface:true};
+}
+export function patrolCorvette(faction,region,rng){
+    const variant=faction==='alliance'?'siege':faction==='concord'?'picket':undefined;
+    return variant&&careerRaidTier(region)>=2&&rng()<.10?variant:undefined;
+}
+function picketSeat(node,kind,label,position){
+    return {...seat(node,kind,label,position),restDirection:[0,0,-1]};
+}
 export const CORVETTES={
+    siege:{name:'Heimdall',shield:250,hull:800,speed:22,turn:Math.PI/18,preferredRange:1200,role:'patrol',faction:'alliance',
+        mounts:[moduleMount('capacitor','LANCE CAPACITOR',[0,7,12.25],[3.47,3.98,7.96],120),
+            moduleMount('rangefinder','RANGEFINDER',[0,10.21,23.9],[.8,.49,1.1],80),
+            moduleMount('generator','SHIELD GENERATOR',[0,-4,12.8],[6.55,2.11,10.3],100,down),
+            drive('port',[-5.43,-1.47,32],2.92),drive('starboard',[5.43,-1.47,32],2.92),
+            seat('mount_laser_port','laser','PORT LASER',[-6.72,3.23,17.8]),
+            seat('mount_laser_starboard','laser','STARBOARD LASER',[6.72,3.23,17.8])],readout:'TURRETS {turrets}/2'},
+    picket:{name:'Tacita',shield:300,hull:600,speed:28,turn:.25,preferredRange:700,role:'patrol',faction:'concord',
+        mounts:[{...moduleMount('emitter','ECM EMITTER',[0,8.54,12.96],[4.3,2.9,4.3],150),markerLift:3.7,partBit:1},
+            moduleMount('generator','SHIELD GENERATOR',[0,5.12,11],[3.53,1,5.5],100),
+            drive('port',[-5.42,3.46,24],2.17),drive('starboard',[5.42,3.46,24],2.17),
+            picketSeat('mount_laser_port','laser','PORT LASER',[-3.35,3.96,-5.70]),picketSeat('mount_laser_starboard','laser','STARBOARD LASER',[3.35,3.96,-5.70]),
+            picketSeat('mount_pdc_port','pdc','PORT PDC',[-8.45,3.90,7.83]),picketSeat('mount_pdc_starboard','pdc','STARBOARD PDC',[8.45,3.90,7.83])],readout:'TURRETS {turrets}/4'},
     drover:{name:'MV Njord',cargoHolds:6,shield:300,hull:900,speed:25,role:'trader',faction:'independents',mounts:[bridge,dorsal,seat('mount_laser_ventral','laser','VENTRAL LASER',[0,-3.36,-2.45614],down),generator,...engines,...pods],
         readout:'TURRETS {turrets}/3 · PODS {pods}/6'},
     // standoffCruise: share of top speed a corvette keeps on its broadside
@@ -43,7 +70,7 @@ export const CORVETTES={
     ironjaw:{name:'Red Njord',shield:200,hull:1200,speed:30,standoffCruise:.5,role:'escort',faction:'pirates',mounts:[bridge,dorsal,...broadsides,generator,...engines,booster],
         readout:'GUNS {guns}/2 · TURRETS {turrets}/2'},
     // Missile artillery: shells the pilot from range; a fast crossing pass
-    // breaks its lock and a rush draws one snap canister (bargeLaunchers.js).
+    // breaks its lock and a rush draws one snap volley (bargeLaunchers.js).
     // It crawls while locking and relocates at full speed after each salvo.
     barge:{name:'Red Njord Barrage',shield:200,hull:700,speed:25,standoffCruise:.3,role:'escort',faction:'pirates',preferredRange:900,
         mounts:[bargeDish,{...lifted(dorsal)},lifted(generator),...engines.map(lifted),...bargeRacks],
@@ -90,3 +117,9 @@ export function convoyVariant(owner,region,rng,allowFrigate=true){
 }
 export function convoyTraffic(owner,rng){return owner==='independents'&&rng()<CORVETTE_TRAFFIC.convoyChance;}
 export function raidCorvette(region,rng){return (region.piratePressure??1)>0&&careerRaidTier(region)>=CORVETTE_TRAFFIC.minRaidTier&&rng()<CORVETTE_TRAFFIC.raidChance;}
+
+// The original Tacita carried a centre engine and one ventral PDC. Carry its
+// damage to the surviving systems and both replacement defence mounts.
+export function restorePicketMounts(values,layout) {
+    return layout===2?values:[...values.slice(0,4),values[5],values[6],values[7],values[7]];
+}
