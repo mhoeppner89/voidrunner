@@ -16,7 +16,9 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Pinned: Playwright 1.57 cannot install Chromium on ubuntu-latest (26.04),
+    # which the download-budget check needs.
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
