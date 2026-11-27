@@ -167,6 +167,9 @@ export class ControllerUI {
         if (now - (this.lastPoll ?? 0) < 32 || document.hidden) return;
         this.lastPoll = now;
         const pad = connectedGamepad(this.padIndex);
+        // The settings panel starts with the disconnected message. Revisit it
+        // on disconnect or during assignment, without polling the DOM in flight.
+        if (!pad && this.padIndex === undefined && !this.bindingCapture && !this.bindingTest) return;
         if (!pad) {
             if(this.bindingCapture?.padId||this.bindingTest)this.cancelBinding(t('Controller disconnected. Assignment cancelled.'));
             this.armed = false;

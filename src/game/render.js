@@ -1,3 +1,4 @@
+import {finishStartupWork, yieldStartup} from './startupWork.js';
 import { shieldBypassFor } from './weaponDamage.js';
 import {SYSTEM_STAR_PROFILE,SPACE_EXPOSURE,applySpaceLighting,createSpaceEnvironment} from './spaceLighting.js';
 import {stabilizeMaterialNormals} from './materialNormals.js';
@@ -21,7 +22,7 @@ import { createShipExplosion, createHullDebris } from './explosionFx.js';
 import {derelictSurfaceObstacles,createDerelictVents,createDriveLeak} from './derelictFx.js';
 import {fractureBounds} from './wreckCover.js';
 import {ShipWreckFactory} from './shipWreckFx.js';
-import { isAppleTouchDevice, skipHiddenWorldMatrices, markAttributeSpan, configureShaderDiagnostics, prepareRenderScene, freezeStaticTransforms, waitForRenderWork } from './renderWork.js';
+import { isAppleTouchDevice, skipHiddenWorldMatrices, markAttributeSpan, configureShaderDiagnostics, prepareSceneTextures, prepareRenderScene, freezeStaticTransforms, waitForRenderWork } from './renderWork.js';
 import { DRONE_PORTS } from './droneFlight.js';
 import {cockpitDamageStage} from './cockpitDamage.js';
 import {createGraveyardPlating,prepareGraveyardModel,arrangeGraveyardModel,batchGraveyardModelAsync,clipWreckSections,createCollisionWreck,installWreckDrawRanges} from './graveyardArt.js';
@@ -256,6 +257,11 @@ const ENGINE_FLARE_SIZE = 0.9;
 const ENGINE_FLARE_SIZE_ATLAS = 1.6;
 const ENGINE_FLARE_HOSTILE_BOOST = 1.12;
 const ENGINE_FLARE_BURNING_BOOST = 1.45;
+// Distance from the camera at which an NPC's hull model starts downloading.
+const STATION_ASSET_IDS = ['helix', 'rook', 'cairn', 'argent', 'gatehouse-twelve',
+    'blackglass', 'cinder', 'torchwell', 'nacre', 'shepherd',
+    'haven', 'league-yard', 'cinderfall'];
+const GLB_FETCH_FIGHTER = 2500, GLB_FETCH_CAPITAL = 6000;
 export class SpaceRenderer {
     container;
     scene = new THREE.Scene();
@@ -400,7 +406,12 @@ export class SpaceRenderer {
     fillLight;
     sunLight;
     rimLight;
-    constructor(container, seed, asteroids, graveyard, wreckNodes, quality, systemId = 'helios-verge', regionalFields = new Map(), initialShipVariants = []) {
+    constructor(container, seed, asteroids, graveyard, wreckNodes, quality, systemId, regionalFields, initialShipVariants, staged = false) {
+        const work = this.buildScene(container, seed, asteroids, graveyard, wreckNodes, quality, systemId, regionalFields, initialShipVariants);
+        if (staged) this.scenePreparation = work;
+        else finishStartupWork(work);
+    }
+    *buildScene(container, seed, asteroids, graveyard, wreckNodes, quality, systemId = 'helios-verge', regionalFields = new Map(), initialShipVariants = []) {
         this.container = container;
         this.asteroids = asteroids;
         this.regionalFields = regionalFields;
@@ -449,6 +460,7 @@ export class SpaceRenderer {
         // station and wreck descendant to multiply matrices on every pass.
         this.scene.matrixAutoUpdate = false;
         this.locationRoot.matrixAutoUpdate = false;
+        this.dynamicRoot.matrixAutoUpdate = false;
         this.locationRoot.name = 'persistent-locations';
         Object.keys(LOCATIONS).forEach((id) => {
             const root = new THREE.Group();
@@ -466,14 +478,20 @@ export class SpaceRenderer {
         this.createStarfield(seed, this.sceneQuality);
         this.createNebulae(seed, this.sceneQuality);
         this.createFieldDust(seed, this.sceneQuality);
-        this.createLocations();
+        yield;
+        yield* this.createLocations();
         this.createLandingGuide();
+        skipHiddenWorldMatrices(this.landingGuideRoot);
         // Other systems stay resident for fast jumps, but contribute no pixels.
         for (const root of this.locationMeshes.values()) { root.updateMatrix(); root.matrixAutoUpdate=false; skipHiddenWorldMatrices(root); }
+        yield;
         this.createAsteroids();
+        yield;
         this.createGraveyard();
         this.createWreckNodes();
+        yield;
         this.createHyperdriveFx(this.sceneQuality);
+        yield;
         this.createCockpit();
         skipHiddenWorldMatrices(this.hyperdriveFxRoot);
         skipHiddenWorldMatrices(this.cockpit);
@@ -1440,17 +1458,21 @@ export class SpaceRenderer {
             child.userData.targetId = id;
         });
     }
-    createLocations() {
+    *createLocations() {
         this.createPlanet('vesper', 0xa85f36, 0x281611, 0xd78a54, false);
         // Azure is a space-age water world: deep blue ocean, a few small
         // archipelagos, white storm clouds — not the teal gas-giant look it
         // previously read as from space.
+        yield;
         this.createPlanet('azure', 0x1e5d8f, 0x081e33, 0x79c8ea, true);
+        yield;
         this.createHelixStation();
+        yield;
         this.createRookStation();
         for (const id of Object.keys(LOCATIONS)) {
             if (this.locationMeshes.has(id) || id === 'shardbelt' || id === 'mourning-line')
                 continue;
+            yield;
             this.createGenericLocation(id);
         }
     }
@@ -1530,14 +1552,12 @@ export class SpaceRenderer {
         this.locationRoot.add(group);
         this.locationMeshes.set(id, group);
     }
-    ensureStationModels(systemId = this.systemId) {
+    ensureStationModels(systemId = this.systemId, stationId) {
         this.stationModelLoads ??= new Map();
         this.stationColliders ??= new Map();
         this.stationDockObstacles ??= new Map();
-        for (const id of ['helix', 'rook', 'cairn', 'argent', 'gatehouse-twelve',
-            'blackglass', 'cinder', 'torchwell', 'nacre', 'shepherd',
-            'haven', 'league-yard', 'cinderfall']) {
-            if (LOCATIONS[id].systemId !== systemId) continue;
+        for (const id of STATION_ASSET_IDS) {
+            if ((stationId && stationId !== id) || LOCATIONS[id].systemId !== systemId) continue;
             if (this.stationModelLoads.has(id)) continue;
             const root = this.locationMeshes.get(id);
             if (!root) continue;
@@ -1615,7 +1635,7 @@ export class SpaceRenderer {
             });
             this.stationModelLoads.set(id, pending);
         }
-        return Promise.all(this.stationModelLoads.values());
+        return stationId ? this.stationModelLoads.get(stationId) : Promise.all(this.stationModelLoads.values());
     }
     createJumpPointVisual(id, location, accent, secondary, rng) {
         const landmark = new THREE.Group();
@@ -1634,7 +1654,7 @@ export class SpaceRenderer {
             depthWrite: false,
             fog: false,
         });
-        landmark.add(createJumpGateStructure(radius, accent));
+        landmark.add(freezeStaticTransforms(createJumpGateStructure(radius, accent)));
         const innerRing = new THREE.Mesh(new THREE.TorusGeometry(radius * 0.535, radius * 0.018, 8, 72), energizedMaterial);
         landmark.add(innerRing);
 
@@ -1667,14 +1687,15 @@ export class SpaceRenderer {
 
         // Six moving charge blocks give the aperture a clear sense of direction
         // without filling its traversable centre with another solid object.
-        const spinner = new THREE.Group();
         const chargeGeometry = new THREE.BoxGeometry(radius * 0.09, radius * 0.035, radius * 0.045);
-        for (let index = 0; index < 6; index += 1) {
-            const angle = index / 6 * Math.PI * 2;
-            const charge = new THREE.Mesh(chargeGeometry, energizedMaterial);
+        const spinner = new THREE.InstancedMesh(chargeGeometry, energizedMaterial, 6);
+        const charge = new THREE.Object3D();
+        for (let index = 0; index < spinner.count; index += 1) {
+            const angle = index / spinner.count * Math.PI * 2;
             charge.position.set(Math.cos(angle) * radius * 0.54, Math.sin(angle) * radius * 0.54, radius * 0.035);
             charge.rotation.z = angle + Math.PI / 2;
-            spinner.add(charge);
+            charge.updateMatrix();
+            spinner.setMatrixAt(index, charge.matrix);
         }
         landmark.add(spinner);
         const beaconTexture = this.radialTexture('#ffffff', cssHex(accent.getHex()));
@@ -2125,6 +2146,25 @@ export class SpaceRenderer {
                 break;
         }
         station.userData.detailMeshes = station.children.length;
+        // Beacons, beams and plating repeat the same local geometry. The
+        // fallback is rigid, so keep their finished transforms per instance.
+        const batches = new Map();
+        for (const mesh of station.children) {
+            const key = mesh.geometry.id + '/' + mesh.material.id;
+            if (!batches.has(key)) batches.set(key, []);
+            batches.get(key).push(mesh);
+        }
+        for (const meshes of batches.values()) {
+            if (meshes.length < 2) continue;
+            const first = meshes[0];
+            const instances = new THREE.InstancedMesh(first.geometry, first.material, meshes.length);
+            for (let i = 0; i < meshes.length; i++) {
+                meshes[i].updateMatrix();
+                instances.setMatrixAt(i, meshes[i].matrix);
+                station.remove(meshes[i]);
+            }
+            station.add(instances);
+        }
         station.userData.highDetail = true;
         return station;
     }
@@ -2638,6 +2678,7 @@ export class SpaceRenderer {
             const shape = Number(shapeStr);
             const material = materialByKind[kind];
             const mesh = new THREE.InstancedMesh(geometries[shape % geometries.length], material, entries.length);
+            mesh.matrixAutoUpdate = false; // Instance transforms carry the motion.
             mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
             mesh.frustumCulled = false;
             mesh.name = `shardbelt-asteroids-${kind}`;
@@ -2764,6 +2805,7 @@ export class SpaceRenderer {
                 side: THREE.DoubleSide,
             });
             const mesh = new THREE.InstancedMesh(getGraveyardGeometry(kind), material, pieces.length);
+            mesh.matrixAutoUpdate = false; // Instance transforms carry the motion.
             mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
             mesh.frustumCulled = false;
             mesh.name = `graveyard-${key}`;
@@ -2890,7 +2932,7 @@ export class SpaceRenderer {
         this.updateGraveyardModelVisibility();
     }
     updateWreckCache(now, calm) {
-        if (this.wreckCacheDone) return;
+        if (this.wreckCacheDone && this.backgroundStationsReady === this.systemId) return;
         const connection = globalThis.navigator?.connection;
         const idle = calm && !this.disposed && !modelLoaderBusy() && !modelNetworkBusy() && !this.graveyardStreaming &&
             navigator.onLine && navigator.serviceWorker?.controller && !connection?.saveData &&
@@ -2905,6 +2947,28 @@ export class SpaceRenderer {
         }
         this.wreckCacheAfter ??= now + 5000;
         if (now < this.wreckCacheAfter || this.wreckCachePort) return;
+        if (this.backgroundStationLoad) return;
+        if (this.backgroundStationsReady !== this.systemId && this.stationColliders?.size) {
+            let nearest, distance = Infinity, localReady = false;
+            for (const id of STATION_ASSET_IDS) {
+                const location = LOCATIONS[id];
+                if (location.systemId !== this.systemId) continue;
+                if (this.stationColliders.has(id)) { localReady = true; continue; }
+                if (this.stationModelLoads?.has(id)) return;
+                const [x,y,z] = location.position, camera = this.camera.position;
+                const squared = (x-camera.x)**2 + (y-camera.y)**2 + (z-camera.z)**2;
+                if (squared < distance) { nearest = id; distance = squared; }
+            }
+            if (localReady && nearest) {
+                this.backgroundStationLoad = this.ensureStationModels(this.systemId, nearest).finally(() => {
+                    this.backgroundStationLoad = undefined;
+                    this.wreckCacheAfter = performance.now() + (this.stationColliders.has(nearest) ? 5000 : 30000);
+                });
+                return;
+            }
+            if (localReady) this.backgroundStationsReady = this.systemId;
+        }
+        if (this.wreckCacheDone) return;
         this.wreckCacheQueue ??= [...new Set(GRAVEYARD_MODEL_WRECKS.map(w => fieldModelURL(w.file)))];
         const channel = new MessageChannel();
         this.wreckCacheCancelling = false;
@@ -3045,6 +3109,7 @@ export class SpaceRenderer {
             const damaged=face>=0;
             const mesh = new THREE.InstancedMesh(damaged?getDamagedWreckNodeGeometry(Number(geometryIndex),face):geometries[Number(geometryIndex)], damaged?damagedMaterials[tier]:(tier === 'tech' ? techMaterial : bulkMaterial), entries.length);
             mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(entries.length * 3), 3).setUsage(THREE.DynamicDrawUsage);
+            mesh.matrixAutoUpdate = false; // Instance transforms carry the motion.
             mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
             mesh.frustumCulled = false;
             mesh.name = `wreck-nodes-${key}`;
@@ -3054,6 +3119,7 @@ export class SpaceRenderer {
             let plate;
             if(damaged){
                 plate=new THREE.InstancedMesh(loosePlate,tier==='tech'?techMaterial:bulkMaterial,entries.length);
+                plate.matrixAutoUpdate = false;
                 plate.instanceMatrix.setUsage(THREE.DynamicDrawUsage);plate.frustumCulled=false;
                 plate.name='opened-wreck-loose-plate';root?.add(plate);
             }
@@ -3847,8 +3913,16 @@ export class SpaceRenderer {
         entities.forEach((entity) => {
             let mesh = this.shipMeshes.get(entity.id);
             const variant = shipVariantForEntity(entity);
-            if (GLB_SHIP_CONFIG[variant] && !this.glbShipModels.has(variant) && !this.glbShipLoading.has(variant))
-                this.ensureGlbShipModel(variant);
+            // Fetch a hull only once it can matter on screen: the locked target
+            // always, fighters within 2.5 km, capital hulls within 6 km. A far
+            // NPC used to pull a 22 MB hull over mobile data; until its model
+            // arrives it keeps the voxel placeholder (swapped in place below).
+            if (GLB_SHIP_CONFIG[variant] && !this.glbShipModels.has(variant) && !this.glbShipLoading.has(variant)) {
+                const camera = this.camera?.position, p = entity.position;
+                const reach = entity.capitalClass ? GLB_FETCH_CAPITAL : GLB_FETCH_FIGHTER;
+                const near = !camera || !p || (p[0] - camera.x) ** 2 + (p[1] - camera.y) ** 2 + (p[2] - camera.z) ** 2 < reach * reach;
+                if (near || entity.id === this.targetId) this.ensureGlbShipModel(variant);
+            }
             // A race grid can supply an explicit hull variant even though the
             // entity role remains `trader`. Reconcile a changed variant just
             // like a newly spawned entity so a recycled id cannot keep the old
@@ -4909,6 +4983,8 @@ export class SpaceRenderer {
         this.targetId = targetId;
         this.selectedAsteroidId = asteroidId;
         this.selectedWreckId = wreckId;
+        if (LOCATIONS[locationId]?.kind === 'station' && this.selectedLocationId !== locationId)
+            void this.ensureStationModels(this.systemId, locationId);
         this.selectedLocationId = locationId;
         this.selectedPickupId = pickupId;
         this.updateAsteroidInstances();
@@ -5340,7 +5416,7 @@ export class SpaceRenderer {
         if(this.systemId && this.systemId!==systemId)this.clearEffects();
         this.systemId = SYSTEM_RENDER_STYLE[systemId] ? systemId : 'helios-verge';
         const style = SYSTEM_RENDER_STYLE[this.systemId];
-        this.ensureStationModels(this.systemId);
+
         for (const [id, material] of this.worldSurfaceMaterials ?? []) this.applyWorldSurface(material, id);
         this.renderer.setClearColor(style.clear, 1);
         if (this.scene.fog) {
@@ -5373,6 +5449,7 @@ export class SpaceRenderer {
         this.setActiveInstance(undefined);
     }
     setActiveInstance(id) {
+        if (LOCATIONS[id]?.kind === 'station') void this.ensureStationModels(this.systemId, id);
         this.activeInstanceId = LOCATIONS[id]?.systemId === this.systemId ? id : undefined;
         this.instanceRoots.forEach((root, rootId) => {
             root.visible = rootId === this.activeInstanceId && LOCATIONS[rootId]?.systemId === this.systemId;
@@ -5867,7 +5944,6 @@ export class SpaceRenderer {
         const embedded=this.shipMeshes?.get(actor?.id)?.userData.embeddedTurrets?.[mountIndex];
         if(embedded){
             if(actor.variant==='picket')setFrigateComponentDamage(embedded,actor.capitalMountHull[mountIndex],capitalHull(actor).mounts[mountIndex].hull);
-            embedded.updateWorldMatrix(true,false);
             const local=embedded.userData.local.copy(direction).applyQuaternion(embedded.getWorldQuaternion(embedded.userData.inverse).invert());
             embedded.userData.yaw.rotation.y=Math.atan2(-local.x,-local.z);
             embedded.userData.pitch.rotation.x=Math.atan2(local.y,Math.hypot(local.x,local.z));return;
@@ -6642,7 +6718,85 @@ export class SpaceRenderer {
             if(attach&&root.parent===this.scene)this.scene.remove(root);
         }
     }
-    async prepareActiveScene({timeoutMs = SHADER_WARMUP_TIMEOUT_MS, assetTimeoutMs = 8000} = {}) {
+    async compileFlightMaterials(sceneTarget) {
+        const renderer = this.renderer, stages = [];
+        const prepare = (object, camera, target, lightingScene = object) => {
+            const previous = renderer.getRenderTarget();
+            try {
+                renderer.setRenderTarget(target);
+                stages.push(typeof renderer.compileAsync === 'function'
+                    ? renderer.compileAsync(object, camera, lightingScene)
+                    : Promise.resolve(renderer.compile(object, camera, lightingScene)));
+            } finally {
+                renderer.setRenderTarget(previous);
+            }
+        };
+        // Three compiles each renderable independently. Pass the original
+        // objects (instancing and skinning affect shaders) and the actual
+        // lighting scene. Restrict traversal to this slice without reparenting.
+        const drawables = [];
+        this.scene.traverse(object => { if (object.material) drawables.push(object); });
+        const batch = new THREE.Group();
+        batch.traverse = visitor => batch.children.forEach(visitor);
+        batch.traverseVisible = batch.traverse;
+        const regions = [...(this.instanceRoots?.values() ?? [])];
+        let deadline = performance.now() + 8;
+        try {
+            for (const shadowed of [false, true]) {
+                for (let start = 0; start < Math.max(1, drawables.length); start += 32) {
+                    if (performance.now() >= deadline) {
+                        await yieldStartup();
+                        deadline = performance.now() + 8;
+                    }
+                    if (this.disposed || this.contextLost) return;
+                    const visibility = regions.map(root => root.visible);
+                    const shadows = renderer.shadowMap?.enabled, type = renderer.shadowMap?.type;
+                    const castShadow = this.sunLight?.castShadow;
+                    try {
+                        for (const root of regions) root.visible = true;
+                        if (renderer.shadowMap) {
+                            renderer.shadowMap.enabled = shadowed;
+                            if (shadowed) renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                        }
+                        if (this.sunLight) this.sunLight.castShadow = shadowed;
+                        batch.children = drawables.slice(start, start + 32);
+                        prepare(batch, this.camera, sceneTarget, this.scene);
+                    } finally {
+                        regions.forEach((root, i) => { root.visible = visibility[i]; });
+                        if (renderer.shadowMap) {
+                            renderer.shadowMap.enabled = shadows;
+                            renderer.shadowMap.type = type;
+                        }
+                        if (this.sunLight) this.sunLight.castShadow = castShadow;
+                    }
+                }
+            }
+            // These passes are outside the main scene. Auto quality can
+            // enable bloom later, so a scene-only warmup misses them.
+            if (this.bloomQuad) {
+                const material = this.bloomQuad.material;
+                try {
+                    for (const [next, target] of [
+                        [this.bloomBrightMaterial, this.bloomBlurTargets[0]],
+                        [this.bloomBlurMaterial, this.bloomBlurTargets[1]],
+                        [this.bloomCompositeMaterial, null],
+                    ]) {
+                        this.bloomQuad.material = next;
+                        prepare(this.bloomQuad, this.bloomCamera, target);
+                    }
+                }
+                finally { this.bloomQuad.material = material; }
+            }
+            if(this.pixelQuad)prepare(this.pixelQuad,this.pixelCamera,null);
+            if (!this.isIOS && this.ringVolumeEnabled) {
+                if (this.ringVolume?.mesh) prepare(this.ringVolume.mesh, this.bloomCamera, this.bloomSceneTarget);
+                if (this.ringParticles?.mesh) prepare(this.ringParticles.mesh, this.camera, this.bloomSceneTarget);
+            }
+        } finally {
+            await Promise.all(stages);
+        }
+    }
+    async prepareActiveScene({timeoutMs = SHADER_WARMUP_TIMEOUT_MS, assetTimeoutMs = 350} = {}) {
         if (this.disposed || this.contextLost)
             return;
         let timeoutId;
@@ -6676,58 +6830,7 @@ export class SpaceRenderer {
                 this.ensurePixelPipeline();
                 sceneTarget = this.pixelSceneTarget;
             }
-            const previousTarget = this.renderer.getRenderTarget();
-            const environmentVisibility=[...(this.instanceRoots?.values()??[])].map(root=>[root,root.visible]);
-            const shadows=this.renderer.shadowMap?.enabled,shadowType=this.renderer.shadowMap?.type,castShadow=this.sunLight?.castShadow;
-            let compile;
-            try {
-                const prepare = (object, camera, target) => {
-                    this.renderer.setRenderTarget(target);
-                    return typeof this.renderer.compileAsync === 'function'
-                        ? this.renderer.compileAsync(object, camera)
-                        : Promise.resolve(this.renderer.compile(object, camera));
-                };
-                // Environment visibility and directional shadows alter every
-                // lit material's program key. Prepare both combinations while
-                // loading, without rendering hidden locations during flight.
-                for(const[root]of environmentVisibility)root.visible=true;
-                const stages=[];
-                for(const shadowed of [false,true]){
-                    if(this.renderer.shadowMap)this.renderer.shadowMap.enabled=shadowed;
-                    if(shadowed&&this.renderer.shadowMap)this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-                    if(this.sunLight)this.sunLight.castShadow=shadowed;
-                    stages.push(prepare(this.scene, this.camera, sceneTarget));
-                }
-                // These passes are outside the main scene. Auto quality can
-                // enable bloom later, so a scene-only warmup misses them.
-                if (this.bloomQuad) {
-                    const material = this.bloomQuad.material;
-                    try {
-                        for (const [next, target] of [
-                            [this.bloomBrightMaterial, this.bloomBlurTargets[0]],
-                            [this.bloomBlurMaterial, this.bloomBlurTargets[1]],
-                            [this.bloomCompositeMaterial, null],
-                        ]) {
-                            this.bloomQuad.material = next;
-                            stages.push(prepare(this.bloomQuad, this.bloomCamera, target));
-                        }
-                    }
-                    finally { this.bloomQuad.material = material; }
-                }
-                if(this.pixelQuad)stages.push(prepare(this.pixelQuad,this.pixelCamera,null));
-                if (!this.isIOS && this.ringVolumeEnabled) {
-                    if (this.ringVolume?.mesh) stages.push(prepare(this.ringVolume.mesh, this.bloomCamera, this.bloomSceneTarget));
-                    if (this.ringParticles?.mesh) stages.push(prepare(this.ringParticles.mesh, this.camera, this.bloomSceneTarget));
-                }
-                compile = Promise.all(stages);
-            }
-            finally {
-                this.renderer.setRenderTarget(previousTarget);
-                for(const[root,visible]of environmentVisibility)root.visible=visible;
-                if(this.renderer.shadowMap)this.renderer.shadowMap.enabled=shadows;
-                if(this.renderer.shadowMap)this.renderer.shadowMap.type=shadowType;
-                if(this.sunLight)this.sunLight.castShadow=castShadow;
-            }
+            const compile = this.compileFlightMaterials(sceneTarget);
             // Keep resources alive until Three finishes its readiness polling,
             // even when the loading-screen timeout wins the race.
             this.pendingShaderCompiles ??= new Set();
@@ -6750,6 +6853,8 @@ export class SpaceRenderer {
                 // Compilation does not upload geometry or off-camera maps.
                 // One tiny hidden draw uploads those buffers during loading,
                 // without rasterizing a full-resolution view of every field.
+                if (this.renderer.initTexture && !await prepareSceneTextures(this.renderer, this.scene, () => this.disposed || this.contextLost)) return;
+                await yieldStartup();
                 this.prepareSceneBuffers();
                 await waitForRenderWork(this.renderer,{timeoutMs,shouldCancel:()=>this.disposed||this.contextLost});
             }

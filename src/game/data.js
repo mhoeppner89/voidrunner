@@ -390,22 +390,28 @@ export const DEFAULT_DOCK_LOCATION_BY_SYSTEM = Object.freeze({
     redwake: 'cinder',
     'pale-ring': 'nacre',
 });
-export const locationIdsForSystem = (systemId) => Object.values(LOCATIONS)
-    .filter((location) => location.systemId === systemId)
-    .map((location) => location.id);
-export const navLocationIdsForSystem = locationIdsForSystem;
-export const dockLocationIdsForSystem = (systemId) => locationIdsForSystem(systemId)
-    .filter((id) => LOCATIONS[id].dockRadius && Object.values(LOCATIONS[id].services ?? {}).some(Boolean));
-export const marketLocationIdsForSystem = (systemId) => dockLocationIdsForSystem(systemId)
-    .filter((id) => LOCATIONS[id].services?.market);
-export const activityLocationIdsForSystem = (systemId) => locationIdsForSystem(systemId)
-    .filter((id) => ['field', 'graveyard', 'rings'].includes(LOCATIONS[id].kind));
 export const DOCK_LOCATION_IDS = Object.freeze(Object.keys(LOCATIONS).filter((id) =>
     LOCATIONS[id].dockRadius && Object.values(LOCATIONS[id].services ?? {}).some(Boolean)));
 export const MARKET_LOCATION_IDS = Object.freeze(DOCK_LOCATION_IDS.filter((id) => LOCATIONS[id].services?.market));
 export const MISSION_LOCATION_IDS = Object.freeze(DOCK_LOCATION_IDS.filter((id) =>
     LOCATIONS[id].services?.missions || LOCATIONS[id].services?.race));
 export const NAV_LOCATION_IDS = Object.freeze(Object.keys(LOCATIONS));
+// Preserve catalogue order and return an independent list to each caller.
+function locationsBySystem(ids) {
+    const groups = new Map();
+    for (const id of ids) {
+        const system = LOCATIONS[id].systemId;
+        if (!groups.has(system)) groups.set(system, []);
+        groups.get(system).push(id);
+    }
+    return system => groups.get(system)?.slice() ?? [];
+}
+export const locationIdsForSystem = locationsBySystem(NAV_LOCATION_IDS);
+export const navLocationIdsForSystem = locationIdsForSystem;
+export const dockLocationIdsForSystem = locationsBySystem(DOCK_LOCATION_IDS);
+export const marketLocationIdsForSystem = locationsBySystem(MARKET_LOCATION_IDS);
+export const activityLocationIdsForSystem = locationsBySystem(NAV_LOCATION_IDS.filter(id =>
+    ['field', 'graveyard', 'rings'].includes(LOCATIONS[id].kind)));
 export const EQUIPMENT = {
     'engine-mk2': {
         id: 'engine-mk2',

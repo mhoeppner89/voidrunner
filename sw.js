@@ -2,16 +2,10 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v710-0-8-2qb-flak-bursts';
+const CACHE = 'voidrunner-v711-0-8-2qc-streamed-assets';
 
-// Keep only the title/dock shell's static module graph here. Mission data and
-// cockpit silhouettes use their lightweight modules; the flight session,
-// renderer, voxel builder, collision, Three.js, GLB loader, and ship showroom
-// are loaded on demand after a sortie or shipyard interaction. This keeps the
-// title screen bootable offline without precaching optional art or models.
-// Drone data and service quotes are shell dependencies. Flight-only
-// Drone modules are precached below; other flight modules are cached on first request
-// with game.js, preserving the lazy flight module graph.
+// Static title imports and the first room for an offline return. Flight code
+// and optional models enter the release cache when a session requests them.
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -26,20 +20,6 @@ const CORE_ASSETS = [
   './src/game/haptics.js',
   './src/game/controllerUi.js',
   './src/game/retroDisplay.js',
-  './src/game/arenaBattle.js',
-  './src/game/terrainManeuvers.js',
-  './src/game/pilotJudgment.js',
-  './src/game/pixelResolve.js',
-  './src/game/illustratedLighting.js',
-  './src/game/materialNormals.js',
-  './src/game/concourseShip.js',
-  './src/game/concourseReflection.js',
-  './src/game/concourseDeck.js',
-  './src/game/concourseLayouts.js',
-  './src/game/concourseFinish.js',
-  './src/game/planetTransit.js',
-  './src/game/stationTransit.js',
-  './src/game/spaceLighting.js',
   './src/game/stationOrientation.js',
   './src/game/interfaceTerms.js',
   './src/game/transitAudio.js',
@@ -58,13 +38,8 @@ const CORE_ASSETS = [
   './src/game/raceHulls.js',
   './src/game/racePilot.js',
   './src/game/flightDynamics.js',
-  './src/game/raceContact.js',
-  './src/game/raceTactics.js',
   './src/game/combatTactics.js',
   './src/game/enemyLoadouts.js',
-  './src/game/npcGunnery.js',
-  './src/game/turretClearance.js',
-  './src/game/turrets.js',
   './src/game/weaponDamage.js',
   './src/game/weaponFlight.js',
   './src/game/cockpitDamage.js',
@@ -85,23 +60,8 @@ const CORE_ASSETS = [
   './src/game/cockpits/torsas.js',
   './src/game/fleetPaintCatalog.js',
   './src/game/fleetEquipmentData.js',
-  './src/game/fleetTurretClearance.js',
-  './src/game/fleetPaint.js',
   './src/game/paintDesign.js',
-  './src/game/customShipPaint.js',
   './src/game/shipPaintMaskCatalog.js',
-  './src/game/independentPaints.js',
-  './src/game/wayfarerLiveries.js',
-  './src/game/explosionFx.js',
-  './src/game/impactFx.js',
-  './src/game/shipWreckFx.js',
-  './src/game/wreckCover.js',
-    './src/game/graveyardArt.js',
-  './src/game/capitalEngineExhaust.js',
-  './src/game/battleshipModels.js',
-  './src/game/battleshipModelData.js',
-  './src/game/carrierModels.js',
-  './src/game/carrierModelData.js',
   './src/game/soundBank.js',
   './src/game/soundBankManifest.js',
   './src/game/soundEvents.js',
@@ -113,84 +73,41 @@ const CORE_ASSETS = [
   './src/game/musicSpace.js',
   './src/game/musicFlight.js',
   './src/game/musicDocked.js',
-  './src/game/repairSites.js',
-  './src/game/repairDrones.js',
-  './src/game/capitalCombat.js',
-  './src/game/npcDrones.js',
   './src/game/frigateMounts.js',
   './src/game/capitalHulls.js',
-  './src/game/capitalMarkers.js',
   './src/game/ordnanceMarkers.js',
-  './src/game/bargeLaunchers.js',
-  './src/game/siegeLance.js',
-  './src/game/picketField.js',
-  './assets/models/capital/siege.glb',
-  './assets/models/capital/picket.glb',
   './src/game/capitalMarkerCount.js',
   './src/game/corvetteMounts.js',
-  './src/game/frigateComponents.js',
-  './src/game/frigateCollisionData.js',
-  './src/game/cruiserCombat.js',
-  './src/game/cruiserModels.js',
   './src/game/cruiserModelData.js',
-  './src/game/cruiserCollisionData.js',
   './src/game/audio.js',
   './src/game/arenaRun.js',
   './src/game/wingOrders.js',
   './src/game/shipPool.js',
   './src/game/turretLayouts.js',
-  './src/game/turretModels.js',
-  './src/game/turretModelData.js',
-  './src/game/ordnanceModels.js',
-  './src/game/ordnanceModelData.js',
-  './assets/models/ordnance/ordnance-atlas.png',
   './src/game/pdcFireControl.js',
   './src/game/combatResources.js',
   './src/game/data.js',
   './src/game/factions.js',
   './src/game/careerDanger.js',
   './src/game/leagueContent.js',
-  './src/game/blackHole.js',
-  './src/game/jumpGate.js',
-  './src/game/stationOccupants.js',
-    './src/game/shipLivery.js',
-    './src/game/stationDocks.js',
-    './src/game/stationTraffic.js',
-    './src/game/stationCollision.js',
-    './src/game/collisionSat.js',
-    './src/game/shipCollisionData.js',
-    './src/game/unpackWreckProfiles.js',
-    './src/game/shipCollision.js',
-    './src/game/shipLanding.js',
-    './src/game/meshQueries.js',
-    './src/game/surfaceMeshCandidates.js',
-    './src/game/playerDocking.js',
-    './src/game/combatTravel.js',
-    './src/game/stationActivity.js',
+  './src/game/stationDocks.js',
+  './src/game/stationTraffic.js',
+  './src/game/playerDocking.js',
+  './src/game/combatTravel.js',
   './src/game/droneData.js',
   './src/game/droneMining.js',
-  './src/game/dronePdc.js',
   './src/game/droneService.js',
-  './src/game/droneSystem.js',
-  './src/game/droneFlight.js',
-  './src/game/miningSurface.js',
   './src/game/economy.js',
   './src/game/galaxy.js',
   './src/game/galaxyContent.js',
   './src/game/i18n-de.js',
-    './src/game/equipmentNaming.js',
+  './src/game/equipmentNaming.js',
   './src/game/i18n.js',
   './src/game/localContracts.js',
   './src/game/missionWorldData.js',
   './src/game/asteroidFieldLayout.js',
   './src/game/asteroidRoutes.js',
-  './src/game/asteroidTerrain.js',
-  './src/game/asteroidMaterials.js',
   './src/game/combatTargeting.js',
-  './src/game/combatPiloting.js',
-  './src/game/combatPlanning.js',
-  './src/game/combatAwareness.js',
-  './src/game/combatRecovery.js',
   './src/game/missions.js',
   './src/game/missionOfferRefresh.js',
   './src/game/outfitting.js',
@@ -199,67 +116,53 @@ const CORE_ASSETS = [
   './src/game/equipmentUi.js',
   './src/game/arenaRunView.js',
   './src/game/arenaSites.js',
-  './src/game/arenaStaging.js',
-  './src/game/arenaSweep.js',
   './src/game/fieldRoadmap.js',
   './src/game/itemIcons.js',
   './src/game/itemSprites.js',
   './src/game/equipmentStatPresentation.js',
   './src/game/careerLoot.js',
-  './src/game/frigateEncounters.js',
   './src/game/explorationData.js',
-  './src/game/exploration.js',
   './src/game/distressData.js',
-  './src/game/distressEvents.js',
-  './src/game/derelictFx.js',
   './src/game/lootVisuals.js',
   './src/game/pilots.js',
   './src/game/quests.js',
   './src/game/random.js',
   './src/game/racing.js',
-  './src/game/raceNavigation.js',
   './src/game/save.js',
   './src/game/careerMetrics.js',
   './src/game/playerStrength.js',
-  './src/game/sensors.js',
   './src/game/shipProfiles.js',
   './src/game/shipTopDownProfile.js',
   './src/game/shipStats.js',
   './src/game/shipTrade.js',
   './src/game/tutorialCampaign.js',
   './src/game/tutorialText.js',
-  './src/game/tutorialRuntime.js',
   './src/game/ui.js',
   './src/game/uiIcons.js',
   './src/game/canvasSizeCache.js',
   './src/game/weapons.js',
   './art/title-cockpit.webp',
-  // A new career must have its actual first-room artwork when offline,
-  // rather than only a cached shell with broken image placeholders.
   './art/locations/simplified/helix-hd-v1.webp',
   './art/locations/simplified/bar-helix-hd-v1.webp',
   './art/locations/simplified/market-helix-hd-v1.webp',
   './art/portraits/simplified/mara-vek-hd-v2.webp',
   './art/portraits/simplified/rin-vek-hd-v1.webp',
   './assets/models/ships/wayfarer.glb',
+  './vendor/meshoptimizer-0.24.0/meshopt_decoder.module.js',
 ];
 
-// Cache core files independently. A transient failure for one request must
-// not turn an otherwise valid worker install into a failed install. The
-// network-first fetch path below will fill any missing entry on the next load.
 const cacheCoreAssets = async () => {
   const cache = await caches.open(CACHE);
-  await Promise.all(CORE_ASSETS.map(async (asset) => {
-    try {
-      const response = await fetch(asset, { cache: 'no-cache' });
-      if (response.ok && !(isArtAsset({ url: new URL(asset, self.location.href).href }) && isHtmlResponse(response)))
-        await cache.put(asset, response);
-    }
-    catch {
-      // Keep installing. Offline fallback remains available for files that
-      // did succeed, and a later online request can populate this entry.
-    }
-  }));
+  // Leave connections available for title controls and the pilot's next action.
+  for (let i = 0; i < CORE_ASSETS.length; i += 4) {
+    await Promise.all(CORE_ASSETS.slice(i, i + 4).map(async asset => {
+      try {
+        const response = await fetch(asset, {cache: 'no-cache', priority: 'low'});
+        if (response.ok && !(isArtAsset({url: new URL(asset, self.location.href).href}) && isHtmlResponse(response)))
+          await cache.put(asset, response);
+      } catch { /* The next online request retries a missing entry. */ }
+    }));
+  }
 };
 
 self.addEventListener('install', (event) => {
@@ -280,13 +183,30 @@ self.addEventListener('activate', (event) => {
 // authoritative for this release: the cache name changes on deploy, and a
 // background revalidation here would duplicate the GLB/image warmup requests
 // issued by the title shell.
-const IMMUTABLE_ART = /\.(?:png|jpe?g|webp|gif|svg|avif|ico|woff2?|ttf|otf|glb(?:\.gz)?)$/i;
+const IMMUTABLE_ART = /\.(?:png|jpe?g|webp|gif|svg|avif|ico|woff2?|ttf|otf|mp3|ogg|glb(?:\.gz)?)$/i;
 const isSameOrigin = (request) => new URL(request.url).origin === self.location.origin;
 const isArtAsset = (request) => IMMUTABLE_ART.test(new URL(request.url).pathname);
 // Some static hosts return their HTML entry page with status 200 for missing
 // assets. Such a response cannot be decoded as art and must not become an
 // authoritative cache hit for the rest of the release.
 const isHtmlResponse = (response) => /\b(?:text\/html|application\/xhtml\+xml)\b/i.test(response.headers.get('content-type') ?? '');
+
+// Under quota pressure discard the oldest optional art first. Keep opening
+// assets, code, visited cockpits and ship textures available for offline resume.
+const corePaths = new Set(CORE_ASSETS.map(path => new URL(path, self.location.href).pathname));
+let lastStorageCheck = 0;
+async function trimOptionalArt(cache) {
+  const now = Date.now();
+  if (now - lastStorageCheck < 60000 || !self.navigator?.storage?.estimate) return;
+  lastStorageCheck = now;
+  const {usage, quota} = await self.navigator.storage.estimate();
+  if (!quota || usage < quota * 0.85) return;
+  const optional = (await cache.keys()).filter(request => {
+    const path = new URL(request.url).pathname;
+    return !corePaths.has(path) && /\/(?:models\/wrecks|art\/(?:locations|portraits))\//.test(path);
+  });
+  for (const old of optional.slice(0, Math.ceil(optional.length / 3))) await cache.delete(old);
+}
 
 // Return the response immediately while exposing the cache-write promise
 // separately. Fetch handlers register that promise with waitUntil(), so the
@@ -297,7 +217,10 @@ const cacheResponse = (request, response) => {
   try {
     const copy = response.clone();
     const persistence = caches.open(CACHE)
-      .then((cache) => cache.put(request, copy))
+      .then(async cache => {
+        if (isArtAsset(request)) await trimOptionalArt(cache).catch(() => {});
+        await cache.put(request, copy);
+      })
       .catch(() => undefined);
     return { response, persistence };
   }
@@ -384,35 +307,19 @@ self.addEventListener('fetch', (event) => {
     return;
 
   saveDataRequested = request.headers?.get('Save-Data') === 'on';
-  if (isArtAsset(request)) {
+  // The worker and module cache are release-versioned together.
+  const pathname = new URL(request.url).pathname;
+  if (isArtAsset(request) || /\/(?:src|vendor)\/.*\.(?:js|css)$/.test(pathname)) {
     const cache = cacheFirst(request);
     event.waitUntil(cache.lifetime);
     event.respondWith(cache.response);
     return;
   }
 
-  // HTML, JavaScript, CSS, and non-core modules remain network-first with
-  // explicit revalidation, so a deploy is visible on the next load. Cached
-  // shell/module responses keep the game usable when the network is absent.
+  // Navigations discover updates and retain a readable offline fallback.
   const network = fetchAndCache(request);
   event.waitUntil(network.lifetime);
-  event.respondWith((async () => {
-    // A mobile connection can remain half-open indefinitely. For code already
-    // cached by this release, stop waiting after a short interval; an uncached
-    // response still waits for the network instead of returning a fake module.
-    if (new URL(request.url).pathname.endsWith('.js')) {
-      const pending = Symbol('network pending');
-      let timer;
-      const first = await Promise.race([network.response, new Promise(resolve => { timer = setTimeout(() => resolve(pending), 4000); })]);
-      clearTimeout(timer);
-      if (first !== pending) return first ?? (await offlineFallback(request));
-      try {
-        const cached = await (await caches.open(CACHE)).match(request);
-        if (cached?.ok) return cached;
-      } catch { /* Keep waiting for the network when the cache is unavailable. */ }
-    }
-    return (await network.response) ?? (await offlineFallback(request));
-  })());
+  event.respondWith(network.response.then(response => response ?? offlineFallback(request)));
 });
 
 // The flight loop grants one transfer at a time and withdraws it on combat or
@@ -434,6 +341,7 @@ self.addEventListener('message', event => {
       if (!await cache.match(file)) {
         const response = await fetch(file, {priority:'low', signal:controller.signal});
         if (!response.ok || isHtmlResponse(response)) return;
+        await trimOptionalArt(cache).catch(() => {});
         await cache.put(file, response);
       }
       saved = true;

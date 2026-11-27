@@ -36,8 +36,13 @@ jobs:
         with:
           path: .workbench/hull-delivery
           key: hulls-${{ runner.os }}-${{ hashFiles('assets/models/ships/lancer.glb', 'assets/models/ships/torsas.glb', 'tools/assets/pack-hull-textures.py', 'tools/assets/requirements.txt', '.github/workflows/pages.yml') }}
+      - run: npm ci
       - name: Package game runtime
         run: npm run build
+      - name: Verify cold first-flight download budget
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:downloads
       - name: Upload game runtime
         uses: actions/upload-pages-artifact@v3
         with:

@@ -1,3 +1,4 @@
+import {finishStartupWork,runStartupWork} from './startupWork.js';
 import * as THREE from 'three';
 import { generateShardbeltDeposits } from './asteroidFieldLayout.js';
 import { LOCATIONS } from './data.js';
@@ -285,7 +286,7 @@ const scaledColliderMesh = (profileName, sectionIndex, profile, scale) => {
     return cached;
 };
 
-const buildGraveyardModelColliders = () => {
+function* buildGraveyardModelColliders() {
     const center = new THREE.Vector3(...LOCATIONS['mourning-line'].position);
     const configQuaternion = new THREE.Quaternion();
     const sectionCenter = new THREE.Vector3();
@@ -296,7 +297,8 @@ const buildGraveyardModelColliders = () => {
     for (const wreck of GRAVEYARD_MODEL_WRECKS) {
         const profiles = GRAVEYARD_COLLISION_PROFILES[wreck.modelKey??wreck.class] ?? [];
         configQuaternion.setFromEuler(new THREE.Euler(...wreck.rotation, 'XYZ'));
-        profiles.forEach((profile, sectionIndex) => {
+        for (const [sectionIndex, profile] of profiles.entries()) {
+            yield;
             const mesh = scaledColliderMesh(wreck.modelKey??wreck.class, sectionIndex, profile, wreck.scale);
             const delta = wreckSectionDelta(wreck, profile.name);
             sectionQuaternion.setFromEuler(new THREE.Euler(...(delta?.rotation ?? [0, 0, 0]), 'XYZ'));
@@ -321,14 +323,16 @@ const buildGraveyardModelColliders = () => {
                 minReach: mesh.minReach,
                 surfaceOnly: profile.surfaceOnly === true,
             }));
-        });
+        }
     }
     return Object.freeze(colliders);
 };
 
 // Every collider is a simplified copy of the rendered surface. A torn opening
 // therefore stays empty instead of being filled by a convex wrapper.
-export const GRAVEYARD_MODEL_COLLIDERS = buildGraveyardModelColliders();
+export const GRAVEYARD_MODEL_COLLIDERS = typeof window === 'undefined'
+    ? finishStartupWork(buildGraveyardModelColliders())
+    : await runStartupWork(buildGraveyardModelColliders());
 export const GRAVEYARD_MODEL_COLLIDER_MAX_RADIUS = GRAVEYARD_MODEL_COLLIDERS.reduce((largest, collider) => Math.max(largest, collider.collisionRadius), 0);
 // Open graveyard forms keep their real profile in the simulation too. A box
 // around a ring or engine would fill the visible hole and turn it into an
@@ -788,7 +792,8 @@ function wreckWallProbe(profile) {
     };
 }
 
-export const generateGraveyardPieces = (seed) => {
+export const generateGraveyardPieces = seed => finishStartupWork(buildGraveyardPieces(seed));
+export function* buildGraveyardPieces(seed) {
     const rng = seededRandom(`${seed}:graveyard-pieces`);
     const center = LOCATIONS['mourning-line'].position;
     const pieces = [];
@@ -962,14 +967,23 @@ export const generateGraveyardPieces = (seed) => {
     // mix contains torn plates, I-beams, severed spars and engine shrouds;
     // retrying rejected candidates keeps the density stable after the race
     // corridors and all fourteen authored wrecks have been reserved.
+    yield;
     addFragmentStream({ prefix: 'carrier-wake', origin: [-650, 850, -1850], direction: [0.16, -0.04, 1], length: 2650, spread: [500, 330, 280], count: 38, kinds: ['panel', 'panel', 'girder', 'panel', 'spine', 'spine', 'panel'], zone: 'carrier-hangar', route: 'upper-hangar-run' });
+    yield;
     addFragmentStream({ prefix: 'impact-port', origin: [350, -700, 1900], direction: [-0.86, 0.26, -0.3], length: 2700, spread: [400, 340, 330], count: 28, kinds: ['panel', 'panel', 'girder', 'panel', 'panel', 'engine', 'spine', 'panel'], zone: 'battleship-breach', route: 'lower-breach-crossing' });
+    yield;
     addFragmentStream({ prefix: 'impact-starboard', origin: [350, -700, 1900], direction: [0.84, -0.28, 0.34], length: 2700, spread: [400, 330, 330], count: 28, kinds: ['panel', 'girder', 'girder', 'panel', 'panel', 'engine', 'spine', 'panel'], zone: 'battleship-breach', route: 'lower-breach-crossing' });
+    yield;
     addFragmentStream({ prefix: 'cruiser-alpha-shatter', origin: [2850, 850, -1500], direction: [0.55, 0.18, -0.82], length: 1550, spread: [240, 200, 220], count: 20, kinds: ['panel', 'girder', 'panel', 'panel', 'spine', 'spine', 'panel'], zone: 'cruiser-alpha' });
+    yield;
     addFragmentStream({ prefix: 'cruiser-beta-shatter', origin: [-3000, -650, 1200], direction: [-0.62, -0.1, 0.78], length: 1550, spread: [240, 200, 220], count: 20, kinds: ['panel', 'girder', 'panel', 'panel', 'spine', 'spine', 'panel'], zone: 'cruiser-beta' });
+    yield;
     addFragmentStream({ prefix: 'frigate-alpha-wake', origin: [-2200, 1300, -850], direction: [-0.68, 0.18, -0.65], length: 1450, spread: [210, 190, 190], count: 16, kinds: ['panel', 'girder', 'panel', 'spine', 'panel'], zone: 'frigate-alpha', route: 'port-frigate-tunnel' });
+    yield;
     addFragmentStream({ prefix: 'frigate-beta-wake', origin: [1900, -1400, 100], direction: [0.62, -0.18, 0.78], length: 1450, spread: [210, 190, 190], count: 16, kinds: ['panel', 'girder', 'panel', 'engine', 'spine', 'panel'], zone: 'frigate-beta', route: 'starboard-frigate-tunnel' });
+    yield;
     addFragmentStream({ prefix: 'escort-crossfire', origin: [-2000, -1250, 2800], direction: [1, -0.1, 0.06], length: 5300, spread: [190, 170, 160], count: 22, kinds: ['panel', 'panel', 'girder', 'girder', 'panel', 'spine', 'spine', 'panel'], zone: 'outer-wake' });
+    yield;
     addFragmentStream({ prefix: 'outer-wake', origin: [0, 250, 3000], direction: [0.04, 0.08, 1], length: 2200, spread: [620, 420, 380], count: 24, kinds: ['panel', 'girder', 'panel', 'panel', 'spine', 'spine', 'panel'], zone: 'outer-wake', route: 'outer-wake-run', finish: 'distant' });
     // Dense local pockets, rather than another uniform layer across the
     // field. Independent RNG leaves existing debris and salvage identities alone.
@@ -983,6 +997,7 @@ export const generateGraveyardPieces = (seed) => {
     for(const [id,anchor,spread]of clouds) {
         let accepted=0;
         for(let attempt=0;accepted<96&&attempt<6000;attempt++) {
+            if (attempt % 32 === 0) yield;
             const local=anchor.map((v,i)=>v+randomBetween(cloudRandom,-spread[i],spread[i]));
             if(Math.hypot(...local.map((v,i)=>(v-anchor[i])/spread[i]))>1)continue;
             const kind=pick(cloudRandom,['panel','panel','panel','girder','spine']);
@@ -1021,6 +1036,7 @@ export const generateGraveyardPieces = (seed) => {
     // lane. They belong to each hull, unlike the old freestanding torus hoops.
     // They use the same transformed triangle geometry for collision.
     for(const wreck of GRAVEYARD_MODEL_WRECKS.filter(w=>w.interior)) {
+        yield;
         const bay=wreck.interior, rotation=new THREE.Quaternion().setFromEuler(new THREE.Euler(...wreck.rotation));
         const transform=p=>new THREE.Vector3(...p).multiplyScalar(wreck.scale).applyQuaternion(rotation).add(new THREE.Vector3(...wreck.local));
         const strut=(id,a,b,width)=>{
@@ -1085,6 +1101,7 @@ export const generateGraveyardPieces = (seed) => {
     // Cores stay inside the central portion of each torn section, with conduits
     // and transverse ribs visible at the break. No new fly-through route here.
     for(const wreck of GRAVEYARD_MODEL_WRECKS)for(const [i,profile]of GRAVEYARD_COLLISION_PROFILES[wreck.modelKey??wreck.class].entries()) {
+        yield;
         if(profile.name===wreck.interior?.sectionName)continue;
         const [hx,hy,hz]=profile.halfExtents,centre=profile.center;
         const probe = wreckWallProbe(profile);
@@ -1106,6 +1123,7 @@ export const generateGraveyardPieces = (seed) => {
     // Fine fragments around the torn bridge support accompany the retained
     // source-model chunks. Their spread stays above the exploration lanes.
     for(const wreck of GRAVEYARD_MODEL_WRECKS.filter(w=>!['wayfarer','talon'].includes(w.class))){
+        yield;
         const small=wreck.class==='frigate',count=wreck.class==='battleship'?28:small?8:24;
         const random=seededRandom(`${seed}:${wreck.id}:command-breakup`),rotation=new THREE.Euler(...wreck.rotation);
         const base=wreck.class==='battleship'?[.43,.32,0]:wreck.class==='carrier'?[.31,.25,0]:wreck.class==='cruiser'?[.16,.39,0]:[.31,.18,0];

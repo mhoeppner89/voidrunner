@@ -107,16 +107,28 @@ export async function loadGlb(url, imageBatch, options) {
     activeLoads++;
     try {
         // Previously cached full models can still serve an offline visit.
-        const arrayBuffer = options?.packed && typeof DecompressionStream === 'function'
+        const arrayBuffer = options?.packed
             ? await fetchModelBytes(url + '.gz').catch(() => fetchModelBytes(url))
             : await fetchModelBytes(url);
-        return await buildGlbScene(arrayBuffer, imageBatch, {...options, reuseImages:true});
+        return await buildGlbScene(arrayBuffer, imageBatch, {...options, modelURL:url, reuseImages:true});
     } finally { activeLoads--; }
 }
 
-export async function buildGlbScene(arrayBuffer, imageBatch, { omitDetailMaps = false, reuseImages = false } = {}) {
+export async function buildGlbScene(arrayBuffer, imageBatch, { omitDetailMaps = false, reuseImages = false, modelURL } = {}) {
     const { json, bin } = parseContainer(arrayBuffer);
-    const dataView = new DataView(bin.buffer, bin.byteOffset, bin.byteLength);
+    const views = (json.bufferViews ?? []).map(view => bin.subarray(view.byteOffset ?? 0, (view.byteOffset ?? 0) + view.byteLength));
+    if (json.extensionsRequired?.includes('EXT_meshopt_compression')) {
+        const {MeshoptDecoder} = await import('../../vendor/meshoptimizer-0.24.0/meshopt_decoder.module.js');
+        await MeshoptDecoder.ready;
+        for (const [index, view] of json.bufferViews.entries()) {
+            const ext = view.extensions?.EXT_meshopt_compression;
+            if (!ext) continue;
+            const bytes = new Uint8Array(view.byteLength);
+            MeshoptDecoder.decodeGltfBuffer(bytes, ext.count, ext.byteStride,
+                bin.subarray(ext.byteOffset, ext.byteOffset + ext.byteLength), ext.mode);
+            views[index] = bytes;
+        }
+    }
 
     // Apple station materials discard normal and roughness/metalness maps.
     // A packed image can also supply ambient occlusion or colour, so resolve
@@ -135,9 +147,9 @@ export async function buildGlbScene(arrayBuffer, imageBatch, { omitDetailMaps = 
     const sources = [];
     for (const [index, image] of (json.images ?? []).entries()) {
         if (requiredImages && !requiredImages.has(index)) continue;
-        const bufferView = json.bufferViews[image.bufferView];
-        const offset = bufferView.byteOffset ?? 0;
-        const bytes = bin.subarray(offset, offset + bufferView.byteLength);
+        const bytes = image.uri
+            ? new Uint8Array(await fetchModelBytes(new URL(image.uri, new URL(modelURL, document.baseURI))))
+            : views[image.bufferView];
         sources[index] = await decodeImageSource(bytes, image.mimeType ?? 'image/png', imageBatch, reuseImages);
     }
     const wrapping = (value) => value === 33071 ? THREE.ClampToEdgeWrapping : value === 33648 ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping;
@@ -248,7 +260,8 @@ export async function buildGlbScene(arrayBuffer, imageBatch, { omitDetailMaps = 
         const readAccessor = (index) => {
             const accessor = json.accessors[index];
             const bufferView = json.bufferViews[accessor.bufferView];
-            const byteOffset = (bufferView.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
+            const bin = views[accessor.bufferView];
+            const byteOffset = accessor.byteOffset ?? 0;
             const componentSize = COMPONENT_SIZE[accessor.componentType] ?? 4;
             const itemSize = TYPE_COUNT[accessor.type] ?? 1;
             const stride = bufferView.byteStride ?? componentSize * itemSize;
@@ -263,6 +276,7 @@ export async function buildGlbScene(arrayBuffer, imageBatch, { omitDetailMaps = 
                 out.set(new out.constructor(bin.buffer, absoluteOffset, out.length));
                 return out;
             }
+            const dataView = new DataView(bin.buffer, bin.byteOffset, bin.byteLength);
             const readers = {5120:o=>dataView.getInt8(o),5121:o=>dataView.getUint8(o),5122:o=>dataView.getInt16(o,true),5123:o=>dataView.getUint16(o,true),5125:o=>dataView.getUint32(o,true),5126:o=>dataView.getFloat32(o,true)};
             const reader = readers[accessor.componentType];
             for (let i = 0; i < accessor.count; i += 1) {

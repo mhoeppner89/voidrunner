@@ -111,15 +111,23 @@ export class AudioManager {
     missileCueEndsAt = 0;
     pinkBuffer;
 
-    async enable() {
-        if (this.enabled) {
-            await this.context?.resume();
+    async enable(firstPaint) {
+        if (this.context) {
+            await Promise.all([this.context.resume(), this.mixReady]);
             return;
         }
         const AudioContextCtor = window.AudioContext ?? window.webkitAudioContext;
-        if (!AudioContextCtor)
-            return;
+        if (!AudioContextCtor) return;
         const context = this.context = new AudioContextCtor({ latencyHint: 'interactive' });
+        // iOS needs resume in the input gesture. Preparing the noise, music
+        // tables and two reverbs can continue after the loading cover paints.
+        const resumed = context.resume();
+        this.mixReady = this.buildMix(context, firstPaint);
+        await Promise.all([resumed, this.mixReady]);
+    }
+
+    async buildMix(context, firstPaint) {
+        if (firstPaint) await firstPaint();
         const gain = (value, ...targets) => {
             const node = context.createGain();
             node.gain.value = value;
@@ -169,11 +177,15 @@ export class AudioManager {
         const preDelay = context.createDelay(0.2);
         preDelay.delayTime.value = 0.03;
         const convolver = context.createConvolver();
-        convolver.buffer = this.createImpulseResponse(2.8, 2.4, 1.1);
+        const tail = this.createImpulseResponse(2.8, 2.4, 1.1);
+        if (firstPaint) await new Promise(resolve => setTimeout(resolve, 0));
+        convolver.buffer = tail;
         const lowCut = context.createBiquadFilter();
         lowCut.type = 'highpass'; lowCut.frequency.value = 130;
         this.reverbInput.connect(preDelay); preDelay.connect(convolver); convolver.connect(lowCut);
         lowCut.connect(gain(0.36, this.mixBus));
+
+        if (firstPaint) await new Promise(resolve => setTimeout(resolve, 0));
 
         // Short cockpit room: early reflections off the canopy and consoles.
         this.roomSend = gain(1);
@@ -191,11 +203,7 @@ export class AudioManager {
         this.ambience = new AmbienceAudio(this);
         this.music = new MusicDirector(this);
         this.enabled = true;
-        // Interface and flight sounds first; percussion only if music is on.
-        this.samplesReady = this.bank.load('ui').then(() => this.bank.load('flight'));
-        if (this.musicVolume > 0.01) void this.bank.load('music');
-        if (this.stationMode) void this.bank.load('dock');
-        await context.resume();
+        this.loadAudibleBanks();
     }
 
     // Linear up to half scale, then a tanh knee. Defined over ±2 so hot
@@ -231,6 +239,18 @@ export class AudioManager {
         return impulse;
     }
 
+    loadAudibleBanks() {
+        if (!this.bank) return;
+        if (this.musicVolume > 0.01) void this.bank.load('music');
+        if (this.effectsVolume <= 0) return;
+        const ui = this.bank.load('ui');
+        if (this.stationMode) {
+            void this.bank.load('dock');
+        } else {
+            this.samplesReady ??= ui.then(() => this.bank?.load('flight'));
+        }
+    }
+
     setVolumes(music, effects) {
         this.musicVolume = clamp(music, 0, 1);
         this.effectsVolume = clamp(effects, 0, 1);
@@ -241,7 +261,7 @@ export class AudioManager {
         this.musicReverbGain?.gain.setTargetAtTime(musicLevel, now, 0.04);
         this.effectsGain?.gain.setTargetAtTime(this.effectsVolume, now, 0.04);
         this.effectsReverbGain?.gain.setTargetAtTime(this.effectsVolume, now, 0.04);
-        if (this.musicVolume > 0.01) void this.bank?.load('music');
+        this.loadAudibleBanks();
     }
 
     // An Arena wave is a new fight: it gets its own combat piece.
@@ -261,8 +281,8 @@ export class AudioManager {
             this.missileWarning = undefined;
             this.stopWork();
             this.engine?.silence();
-            void this.bank?.load('dock');
         }
+        this.loadAudibleBanks();
     }
 
     cinematicSound(event, phase, kind, progress = 0, pan = 0) {

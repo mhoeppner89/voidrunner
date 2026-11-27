@@ -215,12 +215,17 @@ const DOCK_ART_BY_LOCATION = Object.freeze({
         market: './art/locations/simplified/acheron-cinderfall-market.webp',
     }),
 });
+// Room backdrops cover the whole viewport. Keep the full plate on dense phones.
+const compactScreen = globalThis.document?.documentElement?.hasAttribute('data-packed-models') &&
+    globalThis.matchMedia?.('(pointer: coarse)').matches && Math.min(innerWidth, innerHeight) <= 520;
+const roomDirectory = compactScreen && Math.max(innerWidth, innerHeight) * devicePixelRatio <= 960 ? 'compact' : 'simplified';
+const portraitDirectory = compactScreen ? 'compact' : 'simplified';
 const ACTIVE_DOCK_ART_BY_LOCATION = Object.freeze(Object.fromEntries(
     Object.entries(DOCK_ART_BY_LOCATION).map(([locationId, screens]) => [
         locationId,
         Object.freeze(Object.fromEntries(Object.entries(screens).map(([screen, path]) => [
             screen,
-            `./art/locations/simplified/${path.split('/').at(-1).replace(/\.png$/i, '.webp')}`,
+            `./art/locations/${roomDirectory}/${path.split('/').at(-1).replace(/\.png$/i, '.webp')}`,
         ]))),
     ]),
 ));
@@ -262,19 +267,19 @@ const ORIGINAL_NPC_PORTRAIT_BY_ID = Object.freeze({
 const ACTIVE_NPC_PORTRAIT_BY_ID = Object.freeze({
     ...Object.fromEntries(Object.entries(ORIGINAL_NPC_PORTRAIT_BY_ID).map(([personId, path]) => [
         personId,
-        `./art/portraits/simplified/${path.split('/').at(-1).replace(/\.(png|webp)$/i, '.webp')}`,
+        `./art/portraits/${portraitDirectory}/${path.split('/').at(-1).replace(/\.(png|webp)$/i, '.webp')}`,
     ])),
-    'paul': './art/portraits/simplified/pavel-orn-hd-v1.webp',
-    'haven-factor': './art/portraits/simplified/haven-factor-portrait.webp',
-    'league-yard-factor': './art/portraits/simplified/unity-yard-factor-portrait.webp',
-    'cinderfall-factor': './art/portraits/simplified/cinderfall-factor-portrait.webp',
+    'paul': `./art/portraits/${portraitDirectory}/pavel-orn-hd-v1.webp`,
+    'haven-factor': `./art/portraits/${portraitDirectory}/haven-factor-portrait.webp`,
+    'league-yard-factor': `./art/portraits/${portraitDirectory}/unity-yard-factor-portrait.webp`,
+    'cinderfall-factor': `./art/portraits/${portraitDirectory}/cinderfall-factor-portrait.webp`,
 });
 const NPC_PORTRAIT_BY_ID = ACTIVE_NPC_PORTRAIT_BY_ID;
 const ENCOUNTER_PORTRAITS_BY_FACTION = Object.freeze(Object.fromEntries(
     ['concord', 'alliance', 'independents', 'pirates'].map((faction) => [
         faction,
         Object.freeze(Array.from({ length: 6 }, (_, index) =>
-            `./art/portraits/simplified/encounters/${faction}/pilot-${String(index + 1).padStart(2, '0')}.webp`)),
+            `./art/portraits/${portraitDirectory}/encounters/${faction}/pilot-${String(index + 1).padStart(2, '0')}.webp`)),
     ]),
 ));
 const FULL_DOCK_SERVICES = Object.freeze({ ordnance: true, repair: true, market: true, bar: true, shipyard: true, outfitting: true, missions: true });
@@ -480,7 +485,7 @@ const radarWarpFraction = (fraction, combat, scan, scanDisplay = 0.7, combatDisp
     return scanDisplay + (fraction - scan) * ((1 - scanDisplay) / (1 - scan));
 };
 
-const GAME_VERSION = '0.8.2qb';
+const GAME_VERSION = '0.8.2qc';
 const shipRoleLabel = role => ({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role] ?? role);
 // Local art review flags. `dev-dock` opens any concourse directly and
 // `dev-ship` selects the initial hull, so visual checks do not require a
@@ -882,10 +887,6 @@ const COCKPIT_LAYOUT_BY_SHIP = Object.freeze({
     },
 });
 const FLIGHT_SCREEN_ART = Object.freeze(['./art/sky/milky-way-wide-alpha-v3.webp']);
-const OUTFITTING_SCREEN_ART = Object.freeze([
-    './art/outfitting/v2/dealer-workshop-backdrop-v2.png',
-    './art/portraits/simplified/dealer-mechanic-portrait-v2.webp',
-]);
 const OUTFIT_CATEGORY_KEYS = Object.freeze({ turrets:'TURRETS',power:'POWER',guns: 'Gun', launchers: 'Missile', drive: 'DRIVE', defense: 'DEFENSE', utility: 'UTILITY' });
 const OUTFIT_CATEGORY_TO_KEY = Object.freeze({ gun: 'guns', launcher: 'launchers', drive: 'drive', defense: 'defense', utility: 'utility' });
 const OUTFIT_DEALER_CATEGORIES = Object.freeze({
@@ -1206,21 +1207,11 @@ export class GameUI {
         const art = ACTIVE_DOCK_ART_BY_LOCATION[locationId];
         if (!location || !art)
             return [];
-        const urls = [...Object.values(art)];
+        const urls = [art.concourse];
         // The owned hull is a live model. Ship portraits no longer belong to
         // the concourse image/decode bundle.
-        for (const person of location.people ?? []) {
-            const portrait = NPC_PORTRAIT_BY_ID[person.id];
-            if (portrait)
-                urls.push(portrait);
-        }
         if (tutorialCampaignSummary(this.save)?.active)
             urls.push(NPC_PORTRAIT_BY_ID['rin-vek']);
-        // Commodity and equipment symbols are inline vectors, so their old
-        // artwork no longer needs decoding or warming before opening a shop.
-        if (hasLocationService(locationId, 'outfitting')) {
-            urls.push(...OUTFITTING_SCREEN_ART);
-        }
         return [...new Set(urls.filter(Boolean))];
     }
     preloadLocationAssets(locationId, { slot = 'location-next', priority = 'low', shipId = this.save?.player?.shipId } = {}) {
@@ -1236,6 +1227,11 @@ export class GameUI {
         return ready;
     }
     predictLocationAssets(locationId, shipId = this.save?.player?.shipId) {
+        const connection = globalThis.navigator?.connection;
+        if (connection?.saveData || /(^|-)2g$/.test(connection?.effectiveType ?? '')) {
+            this.clearWarmImageSlot('location-next');
+            return Promise.resolve(false);
+        }
         // Reuse the dormant dock renderer's single station assembly during
         // approach/hyperdrive. Do not create another WebGL context or render
         // a hidden film while the pilot is flying.
@@ -1244,7 +1240,8 @@ export class GameUI {
         return this.preloadLocationAssets(locationId, { slot: 'location-next', priority: 'low', shipId });
     }
     preloadSessionAssets(save, { priority = 'high', includeLocation = true } = {}) {
-        const shipId = COCKPIT_ART_BY_SHIP[save?.player?.shipId] ? save.player.shipId : 'wayfarer';
+        const owned = save?.player?.shipId;
+        const shipId = hasPaintedCockpit(owned) || COCKPIT_ART_BY_SHIP[owned] ? owned : 'wayfarer';
         const cockpitArt = hasPaintedCockpit(shipId) ? paintedCockpitAssets(shipId) : [COCKPIT_ART_BY_SHIP[shipId]];
         const jobs = [this.preloadImageSet('flight-core', [...cockpitArt, ...FLIGHT_SCREEN_ART], { priority })];
         if (!includeLocation) {

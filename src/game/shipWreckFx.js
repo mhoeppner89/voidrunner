@@ -10,15 +10,6 @@ const isSolid = mesh => mesh.isMesh && mesh.geometry?.attributes.position &&
     (Array.isArray(mesh.material)?mesh.material:[mesh.material]).some(m=>m?.isMeshStandardMaterial);
 const interpolate = (a,b,t) => ({p:a.p.map((x,i)=>x+(b.p[i]-x)*t),n:a.n.map((x,i)=>x+(b.n[i]-x)*t),uv:a.uv.map((x,i)=>x+(b.uv[i]-x)*t),c:a.c.map((x,i)=>x+(b.c[i]-x)*t),pp:(a.pp??a.p).map((x,i)=>x+((b.pp??b.p)[i]-x)*t),pn:(a.pn??a.n).map((x,i)=>x+((b.pn??b.n)[i]-x)*t)});
 const distance = (v,plane) => v.p[0]*plane.n.x+v.p[1]*plane.n.y+v.p[2]*plane.n.z-plane.d;
-function clip(vertices,distances,positive) {
-    const out=[];
-    for(let i=0;i<vertices.length;i++){
-        const a=vertices[i],b=vertices[(i+1)%vertices.length],da=distances[i],db=distances[(i+1)%vertices.length];
-        if(positive?da>=0:da<=0)out.push(a);
-        if((da<0&&db>0)||(da>0&&db<0))out.push(interpolate(a,b,da/(da-db)));
-    }
-    return out;
-}
 const fan=(out,vertices,mat)=>{for(let i=1;i+1<vertices.length;i++)out.push({v:[vertices[0],vertices[i],vertices[i+1]],mat});};
 function closeCut(segments,plane,negative,positive,epsilon,tile) {
     const nodes=new Map(),key=p=>p.map(x=>Math.round(x/epsilon)).join(',');
@@ -50,12 +41,29 @@ function closeCut(segments,plane,negative,positive,epsilon,tile) {
 function* split(triangles,plane,epsilon,tile){
     const negative=[],positive=[],segments=[];
     let processed=0;
-    for(const t of triangles){if(++processed%512===0)yield;const ds=t.v.map(v=>distance(v,plane));
-        if(ds.every(d=>d>=-epsilon)){positive.push(t);continue;}
-        if(ds.every(d=>d<=epsilon)){negative.push(t);continue;}
-        const snapped=ds.map(d=>Math.abs(d)<epsilon?0:d);
-        const lo=clip(t.v,snapped,false),hi=clip(t.v,snapped,true);fan(negative,lo,t.mat);fan(positive,hi,t.mat);
-        const cut=[];for(let i=0;i<3;i++){if(snapped[i]===0)cut.push(t.v[i].p);const j=(i+1)%3;if(snapped[i]*snapped[j]<0)cut.push(interpolate(t.v[i],t.v[j],snapped[i]/(snapped[i]-snapped[j])).p);}
+    for(const t of triangles){
+        if(++processed%512===0)yield;
+        const a=distance(t.v[0],plane),b=distance(t.v[1],plane),c=distance(t.v[2],plane);
+        if(a>=-epsilon&&b>=-epsilon&&c>=-epsilon){positive.push(t);continue;}
+        if(a<=epsilon&&b<=epsilon&&c<=epsilon){negative.push(t);continue;}
+        const snapped=[a,b,c].map(d=>Math.abs(d)<epsilon?0:d);
+        const lo=[],hi=[],cut=[];
+        for(let i=0;i<3;i++){
+            const j=(i+1)%3,da=snapped[i],db=snapped[j],vertex=t.v[i];
+            if(da<=0)lo.push(vertex);
+            if(da>=0)hi.push(vertex);
+            if(da===0)cut.push(vertex.p);
+            if((da<0&&db>0)||(da>0&&db<0)){
+                // Both clipped polygons have the same edge vertex. Fracture
+                // passes only read these attributes after interpolation.
+                const hit=interpolate(vertex,t.v[j],da/(da-db));
+                lo.push(hit);hi.push(hit);
+                // The cap owns its vertex independently of the exterior.
+                cut.push(hit.p.slice());
+            }
+        }
+        fan(negative,lo,t.mat);
+        fan(positive,hi,t.mat);
         if(cut.length===2)segments.push(cut);
     }
     closeCut(segments,plane,negative,positive,epsilon*4,tile);return[negative,positive];
@@ -117,21 +125,39 @@ function collect(source){
 }
 function* geometryFor(triangles,origin,planes=[],size=new THREE.Vector3(1,1,1)){
     const length=Math.max(size.x,size.y,size.z),tearScale=Math.min(size.x,size.z)*.004;
-    const positions=[],normals=[],uvs=[],colors=[],paintPositions=[],paintNormals=[];
-    let processed=0;
+    const count=triangles.length*3;
+    const positions=new Float32Array(count*3),normals=new Float32Array(count*3),colors=new Float32Array(count*3);
+    const paintPositions=new Float32Array(count*3),paintNormals=new Float32Array(count*3),uvs=new Float32Array(count*2);
+    let index=0,processed=0;
     for(const t of triangles){
+        const recess=t.mat===-1?length*.012:0;
         for(const v of t.v){
-            const near=Math.min(...planes.map(plane=>Math.abs(distance(v,plane)))),edge=Math.max(0,1-near/(length*.018));
+            let near=Infinity;
+            for(const plane of planes)near=Math.min(near,Math.abs(distance(v,plane)));
+            const edge=Math.max(0,1-near/(length*.018));
             const tear=near<length*1e-5?Math.sin((v.p[0]*4.7+v.p[1]*3.3+v.p[2]*4.1)/Math.max(.01,tearScale*30))*tearScale:0;
-            // Matching edge noise crumples the shared tear, while the back plate
-            // sits inside the hull rather than sealing it with a flat painted lid.
-            const recess=t.mat===-1?length*.012:0;
-            positions.push(v.p[0]+tear*.35-v.n[0]*recess-origin.x,v.p[1]+tear*.8-v.n[1]*recess-origin.y,v.p[2]+tear*.45-v.n[2]*recess-origin.z);
-            normals.push(...v.n);paintPositions.push(...(v.pp??v.p));paintNormals.push(...(v.pn??v.n));uvs.push(...v.uv);colors.push(...v.c.map(c=>c*(t.mat>=0?1-edge*.72:1)));
+            const offset=index*3,shade=t.mat>=0?1-edge*.72:1;
+            // The torn silhouette and recessed plate share the original paint coordinates.
+            positions[offset]=v.p[0]+tear*.35-v.n[0]*recess-origin.x;
+            positions[offset+1]=v.p[1]+tear*.8-v.n[1]*recess-origin.y;
+            positions[offset+2]=v.p[2]+tear*.45-v.n[2]*recess-origin.z;
+            normals.set(v.n,offset);
+            paintPositions.set(v.pp??v.p,offset);
+            paintNormals.set(v.pn??v.n,offset);
+            uvs.set(v.uv,index*2);
+            for(let c=0;c<3;c++)colors[offset+c]=v.c[c]*shade;
+            index++;
         }
         if((++processed&255)===0)yield;
     }
-    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(normals,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));g.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));g.setAttribute('wreckSourcePosition',new THREE.Float32BufferAttribute(paintPositions,3));g.setAttribute('wreckSourceNormal',new THREE.Float32BufferAttribute(paintNormals,3));g.computeBoundingSphere();g.userData.shared=true;return g;
+    const g=new THREE.BufferGeometry();
+    g.setAttribute('position',new THREE.BufferAttribute(positions,3));
+    g.setAttribute('normal',new THREE.BufferAttribute(normals,3));
+    g.setAttribute('uv',new THREE.BufferAttribute(uvs,2));
+    g.setAttribute('color',new THREE.BufferAttribute(colors,3));
+    g.setAttribute('wreckSourcePosition',new THREE.BufferAttribute(paintPositions,3));
+    g.setAttribute('wreckSourceNormal',new THREE.BufferAttribute(paintNormals,3));
+    g.computeBoundingSphere();g.userData.shared=true;return g;
 }
 // Extruded cut rims and transverse internal frames. Bars are clipped to the
 // actual cross-section, including separated engine nacelles and thin wings.
@@ -173,7 +199,16 @@ function* compile(data,owned){
         if(!components.has(component))components.set(component,[]);
         const triangles=components.get(component);
         const ranges=g.groups.length?g.groups:[{start:0,count:g.index?.count??a.position.count,materialIndex:0}];
-        for(const range of ranges)for(let j=range.start;j<range.start+range.count;j+=3){if(j%3072===0)yield;triangles.push({v:[0,1,2].map(k=>vertices[g.index?g.index.getX(j+k):j+k]),mat:data.slots[i][range.materialIndex??0]??data.slots[i][0]});}
+        for(const range of ranges){
+            const mat=data.slots[i][range.materialIndex??0]??data.slots[i][0];
+            for(let j=range.start;j<range.start+range.count;j+=3){
+                if(j%3072===0)yield;
+                const first=g.index?g.index.getX(j):j;
+                const second=g.index?g.index.getX(j+1):j+1;
+                const third=g.index?g.index.getX(j+2):j+2;
+                triangles.push({v:[vertices[first],vertices[second],vertices[third]],mat});
+            }
+        }
     }
     const size=data.bounds.getSize(new THREE.Vector3()),epsilon=Math.max(...size.toArray())*1e-6;
     // Clip detachable assemblies separately on the same planes. A missing pod

@@ -22,8 +22,10 @@ function surface(body){
     for(let i=0;i<3;i++)p.add(a.fromArray(body.meshVerts,body.meshIndices[i]*3));
     return p.divideScalar(3).applyQuaternion(body.rotation).add(body.position);
 }
-test('device-independent cover counts follow section size and hull class, including lost pods',()=>{
-    for(const [id,kind,count] of [['andromeda',null,1],['talon',null,0],['drover','corvette',4],['barge','corvette',4],['caravan','frigate',6],['concord-cruiser','cruiser',6]]){
+// User bug (0.8.2qc): pilots flew through fighter debris because only box volume
+// 1,000+ sections were solid. Every visible chunk of 50+ is solid now.
+test('device-independent cover counts make every visible chunk solid, including lost pods',()=>{
+    for(const [id,kind,count] of [['andromeda',null,6],['speedster',null,5],['talon',null,3],['legionary',null,5],['drover','corvette',7],['barge','corvette',7],['caravan','frigate',7],['concord-cruiser','cruiser',7]]){
         const s=world();s.renderer.qualityMode='low';s.renderer.touchDevice=true;
         assert.equal(wreck(s,id,kind).length,count,id);
     }
@@ -42,7 +44,7 @@ test('moving sections block real visibility and absorb gunfire on the clipped me
     s.projStore.setPos(slot,0,0,0);s.projStore.setVel(slot,end.x,end.y,end.z);
     s.projectiles.push(shot);s.updateProjectiles(1);
     assert.equal(shot.life,0);assert.equal(impacts,1);
-    assert.equal(s.coverSections.length,4);
+    assert.equal(s.coverSections.length,7);
 });
 test('an off-centre ship contact recoils, scuffs plating once and leaves shield recovery alone',()=>{
     const s=world(),[b]=wreck(s),actor=s.save.player;
@@ -73,17 +75,17 @@ test('career retires sections at 3 km or ten minutes and serializes only career 
     }finally{globalThis.window=old;}
     bodies[0].position.x=3100;bodies[1].age=600;
     advanceCover(s,1/60,400);
-    assert.equal(s.coverSections.length,2);
+    assert.equal(s.coverSections.length,bodies.length-2);
     s.arena={};s.coverSections[0].age=601;s.coverSections[1].position.x=5000;
-    advanceCover(s,1/60,400);assert.equal(s.coverSections.length,2);
+    advanceCover(s,1/60,400);assert.equal(s.coverSections.length,bodies.length-2);
 });
-test('ten active sections protect nearby cover and retire the oldest distant body',()=>{
+test('twenty-four active sections protect nearby cover and retire the oldest distant body',()=>{
     const s=world(),near=wreck(s,'ironjaw','corvette',{position:[0,0,0]});
-    const far=wreck(s,'caravan','frigate',{position:[0,0,-400]});
-    assert.equal(s.coverSections.length,10);
+    const far=[...wreck(s,'caravan','frigate',{position:[0,0,-400]}),...wreck(s,'rookery','frigate',{position:[0,0,-800]}),...wreck(s,'barge','corvette',{position:[0,0,-1200]})];
+    assert.equal(s.coverSections.length,24);
     wreck(s,'andromeda',null);
     assert.ok(far[0].retired);assert.ok(near.every(b=>!b.retired));
-    assert.equal(s.coverSections.length,10);
+    assert.equal(s.coverSections.length,24);
 });
 test('restaging an Arena site removes debris, attached effects and frees their resources',()=>{
     const s=world(),r=Object.create(SpaceRenderer.prototype);

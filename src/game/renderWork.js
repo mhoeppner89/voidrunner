@@ -80,11 +80,7 @@ export function configureShaderDiagnostics(renderer) {
     renderer.debug.checkShaderErrors = new URLSearchParams(globalThis.location?.search ?? '').has('debug-shaders');
 }
 
-// Prepare the exact render-target/lighting variant before its animation clock
-// starts. Restore the target before awaiting the driver, so cancellation or a
-// concurrently visible view cannot inherit a temporary framebuffer.
-export async function prepareRenderScene(renderer, scene, camera, target, {timeoutMs = 2500, shouldCancel = () => false, lightingScene = scene, appleDriver = isAppleTouchDevice()} = {}) {
-    if (shouldCancel()) return false;
+export function prepareSceneTextures(renderer, scene, shouldCancel = () => false) {
     const textures = new Set();
     scene.traverse(object => {
         for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
@@ -92,16 +88,26 @@ export async function prepareRenderScene(renderer, scene, camera, target, {timeo
             for (const value of Object.values(material)) if (value?.isTexture) textures.add(value);
         }
     });
-    let uploadDeadline = performance.now() + 3;
-    for (const texture of textures) {
-        if (shouldCancel()) return false;
-        renderer.initTexture?.(texture);
-        if (performance.now() >= uploadDeadline) {
-            await yieldRenderSetup();
-            uploadDeadline = performance.now() + 3;
+    const pending = textures.values();
+    function upload() {
+        const deadline = performance.now() + 3;
+        for (const texture of pending) {
+            if (shouldCancel()) return false;
+            renderer.initTexture?.(texture);
+            if (performance.now() >= deadline) return yieldRenderSetup().then(upload);
         }
+        return !shouldCancel();
     }
+    return upload();
+}
+
+// Prepare the exact render-target/lighting variant before its animation clock
+// starts. Restore the target before awaiting the driver, so cancellation or a
+// concurrently visible view cannot inherit a temporary framebuffer.
+export async function prepareRenderScene(renderer, scene, camera, target, {timeoutMs = 2500, shouldCancel = () => false, lightingScene = scene, appleDriver = isAppleTouchDevice()} = {}) {
     if (shouldCancel()) return false;
+    const uploaded = prepareSceneTextures(renderer, scene, shouldCancel);
+    if (uploaded === false || (uploaded !== true && !await uploaded)) return false;
     const previous = renderer.getRenderTarget();
     let programs;
     try {

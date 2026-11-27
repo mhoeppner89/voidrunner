@@ -102,3 +102,16 @@ test('full-resolution shipping hulls stay within their transfer budgets and keep
         });
     }
 });
+
+test('older WebKit can read the shipping wreck without native gzip streams',async t=>{
+    const {gzipSync}=await import('node:zlib');
+    const glb=Buffer.alloc(12);glb.write('glTF');glb.writeUInt32LE(2,4);glb.writeUInt32LE(12,8);
+    t.mock.method(globalThis,'fetch',async()=>new Response(gzipSync(glb)));
+    const descriptor=Object.getOwnPropertyDescriptor(globalThis,'DecompressionStream');
+    Object.defineProperty(globalThis,'DecompressionStream',{value:undefined,configurable:true});
+    try {
+        assert.deepEqual(Buffer.from(await fetchModelBytes('legacy.glb.gz')),glb);
+    } finally {
+        Object.defineProperty(globalThis,'DecompressionStream',descriptor);
+    }
+});

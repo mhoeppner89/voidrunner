@@ -12,7 +12,7 @@ import {fleetPaintPath} from '../../src/game/fleetPaintCatalog.js';
 const base=(process.env.VR_BASE_URL??'http://127.0.0.1:4192').replace(/\/$/,'');
 const hulls=(process.env.VR_COCKPIT_HULLS??process.env.VR_COCKPIT_HULL??'wayfarer').split(',');
 for(const hull of hulls){
-const cockpitAssets=paintedCockpitAssets(hull).map(url=>'assets/'+new URL(url).pathname.split('/assets/').at(-1));
+const sourceCockpitAssets=paintedCockpitAssets(hull).map(url=>'assets/'+new URL(url).pathname.split('/assets/').at(-1));
 const modelAssets=[`assets/models/ships/${hull}.glb`,...(hull==='scrapper'?['concord','alliance','independents'].map(paint=>fleetPaintPath(hull,paint)):[])];
 const out=`output/offline-startup/${hull}`;await mkdir(out,{recursive:true});
 const currentCache=(await readFile(new URL('../../sw.js',import.meta.url),'utf8')).match(/const CACHE = '([^']+)'/)[1];
@@ -30,6 +30,8 @@ for(const [name,engine,device] of profiles){
   page.on('requestfailed',request=>{const entry={phase,url:request.url(),error:request.failure()?.errorText};failedRequests.push(entry);console.error(name,'request failed',JSON.stringify(entry));});
   await page.addInitScript(()=>{localStorage.setItem('void-privateer-settings-v1',JSON.stringify({music:0,effects:0}));const C=window.AudioContext??window.webkitAudioContext;if(C)C.prototype.resume=async function(){await this.suspend();};});
   await page.goto(`${origin.url}/game.html`);await page.waitForFunction(()=>window.__VOID_PRIVATEER__?.newGame);
+  const packed=await page.evaluate(()=>document.documentElement.hasAttribute('data-packed-models'));
+  const cockpitAssets=packed?sourceCockpitAssets.map(file=>file.replace(/\.png$/,'.webp')):sourceCockpitAssets;
   await page.waitForFunction(()=>navigator.serviceWorker.controller);
   await page.reload();await page.waitForFunction(()=>window.__VOID_PRIVATEER__?.newGame);
   await page.locator('[data-ui-command="new"]').click();await page.locator('[data-ui-command="confirm-new-career"]').click();

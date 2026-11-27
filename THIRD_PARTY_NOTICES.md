@@ -16,3 +16,7 @@ All game-specific code, procedural geometry, interface art, names, dialogue, and
 ## Void VGA bitmap font
 
 Derived from Daniel Hepper’s public-domain font8x8 collection (Marcel Sondaar / IBM VGA sources): https://github.com/dhepper/font8x8. Original bitmap headers, font generator and license are included under tools/assets/font8x8 and assets/fonts/LICENSE-font8x8.txt.
+
+## Model delivery
+
+The packaged game uses the MIT-licensed meshoptimizer 0.24.0 decoder by Arseny Kapoulkine and contributors. Older browsers use the MIT-licensed fflate 0.8.2 gzip decoder by Arjun Barrett. The distributions include their license files under `vendor/meshoptimizer-0.24.0` and `vendor/fflate-0.8.2`.

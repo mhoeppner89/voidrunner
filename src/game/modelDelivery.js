@@ -3,6 +3,13 @@
 // read, the browser's HTTP cache may supply subsequent reads in this page.
 const pending = new Map();
 const downloaded = new Set();
+
+async function inflateModel(response) {
+    if (typeof DecompressionStream === 'function')
+        return new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+    const {gunzipSync} = await import('../../vendor/fflate-0.8.2/browser.js');
+    return gunzipSync(new Uint8Array(await response.arrayBuffer())).buffer;
+}
 export const modelNetworkBusy = () => pending.size > 0;
 
 export function fetchModelBytes(url, priority = 'auto') {
@@ -16,7 +23,7 @@ export function fetchModelBytes(url, priority = 'auto') {
             // Content-Encoding have already let fetch decode this body.
             const packed = key.endsWith('.glb.gz') && !response.headers.get('content-encoding')?.toLowerCase().split(/,\s*/).includes('gzip');
             const bytes = packed
-                ? await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
+                ? await inflateModel(response)
                 : await response.arrayBuffer();
             if (key.endsWith('.glb.gz') && (bytes.byteLength < 12 || new DataView(bytes).getUint32(0,true) !== 0x46546c67))
                 throw new Error(`Invalid packed GLB ${key}`);
@@ -29,5 +36,5 @@ export function fetchModelBytes(url, priority = 'auto') {
 
 export function fieldModelURL(file) {
     return globalThis.document?.documentElement?.hasAttribute('data-packed-models')
-        && typeof DecompressionStream === 'function' ? file + '.gz' : file;
+        ? file + '.gz' : file;
 }

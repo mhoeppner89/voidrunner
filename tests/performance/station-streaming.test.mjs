@@ -255,3 +255,37 @@ test('Apple parallel warmups wait for the most recent submission before querying
  assert.ok(await prepare());
  assert.equal(calls.length,4,'ready programs need no further driver queries');
 });
+
+test('quiet station streaming waits for first flight, honors data saving and loads the nearest model alone', async t => {
+    const previous = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+    t.after(() => previous ? Object.defineProperty(globalThis, 'navigator', previous) : delete globalThis.navigator);
+    const connection = { saveData: false, effectiveType: '4g' };
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: {connection, onLine:true, serviceWorker:{controller:{}}} });
+    const {LOCATIONS} = await import('../../src/game/data.js');
+    const renderer = Object.create(SpaceRenderer.prototype), requests = [];
+    let complete;
+    Object.assign(renderer, {
+        systemId: LOCATIONS.helix.systemId, stationColliders: new Map([['helix', {}]]),
+        camera: {position: new THREE.Vector3(...LOCATIONS.rook.position)}, wreckCacheDone: true,
+        ensureStationModels(system, id) {
+            requests.push(id);
+            return new Promise(resolve => { complete = () => { renderer.stationColliders.set(id, {}); resolve(); }; });
+        },
+    });
+    for (const restricted of ['saveData', '2g']) {
+        connection.saveData = restricted === 'saveData';
+        connection.effectiveType = restricted === '2g' ? '2g' : '4g';
+        renderer.updateWreckCache(10000, true);
+        renderer.updateWreckCache(16000, true);
+        assert.deepEqual(requests, []);
+    }
+    connection.effectiveType = '4g';
+    renderer.updateWreckCache(17000, false);
+    renderer.updateWreckCache(21999, true);
+    assert.deepEqual(requests, []);
+    renderer.updateWreckCache(22000, true);
+    renderer.updateWreckCache(28500, true);
+    assert.deepEqual(requests, ['rook']);
+    complete();
+    await renderer.backgroundStationLoad;
+});

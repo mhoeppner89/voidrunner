@@ -1,5 +1,4 @@
 import {fetchModelBytes} from './game/modelDelivery.js';
-import {paintedCockpitAssets} from './game/cockpitDefinitions.js';
 import { normalizeControllerBindings } from './game/controllerBindings.js';
 import {newArenaRun,readArenaRun,writeArenaRun,arenaRecord} from './game/arenaRun.js';
 import { AudioManager } from './game/audio.js';
@@ -25,10 +24,6 @@ const loadGameSession = () => {
     gameSessionModulePromise ??= import('./game/game.js');
     return gameSessionModulePromise;
 };
-const settleWithin = (promise, timeoutMs, fallback, rejectOnTimeout = false) => new Promise((resolve, reject) => {
-    const timer = setTimeout(() => rejectOnTimeout ? reject(new Error('Flight code did not finish loading.')) : resolve(fallback), timeoutMs);
-    Promise.resolve(promise).then(value => { clearTimeout(timer); resolve(value); }, error => { clearTimeout(timer); reject(error); });
-});
 const nextPaint = () => new Promise((resolve) => {
     const timer=setTimeout(resolve,250);
     // A single RAF callback runs before paint; wait for the next one so the
@@ -94,23 +89,7 @@ const facingNegativeZ = (x, y, z) => {
     qw /= qLength;
     return [qx, qy, qz, qw];
 };
-const SHIP_WARM_ASSETS = Object.freeze({
-    mule: ['./assets/models/ships/mule.glb', ...paintedCockpitAssets('mule')],
-    demon: ['./assets/models/ships/demon.glb', ...paintedCockpitAssets('demon')],
-    scrapper: ['./assets/models/ships/scrapper.glb', ...paintedCockpitAssets('scrapper')],
-    speedster: ['./assets/models/ships/speedster.glb', ...paintedCockpitAssets('speedster')],
-    legionary: ['./assets/models/ships/legionary.glb', ...paintedCockpitAssets('legionary')],
-    andromeda: ['./assets/models/ships/andromeda.glb', ...paintedCockpitAssets('andromeda')],
-    torsas: ['./assets/models/ships/torsas.glb', ...paintedCockpitAssets('torsas')],
-    astra: ['./assets/models/ships/astra.glb', './assets/remaster/cockpit-astra-sprite-v2.png'],
-    // Warm the approved starter frame and its anchored hand strip before flight.
-    wayfarer: ['./assets/models/ships/wayfarer.glb', ...paintedCockpitAssets('wayfarer')],
-    vanguard: ['./assets/models/ships/vanguard.glb', './assets/remaster/cockpit-vanguard-sprite-v7.png'],
-    talon: ['./assets/models/ships/talon.glb', ...paintedCockpitAssets('talon')],
-    prospector: ['./assets/models/ships/prospector.glb', ...paintedCockpitAssets('prospector')],
-    lancer: ['./assets/models/ships/lancer.glb', './assets/remaster/cockpit-lancer-sprite-v2.png'],
-    atlas: ['./assets/models/ships/atlas.glb', './assets/remaster/cockpit-atlas-sprite-v4.png'],
-});
+const ownedModelURL = shipId => `./assets/models/ships/${Object.hasOwn(SHIPS, shipId) ? shipId : 'wayfarer'}.glb`;
 const warmedBinaries = new Map();
 const warmBinary = (url, priority = 'low') => {
     let pending = warmedBinaries.get(url);
@@ -127,13 +106,11 @@ const warmLikelyFlightAssets = async () => {
     if (sessionStarting || session?.renderer || connection?.saveData || /(^|-)2g$/.test(connection?.effectiveType ?? '') || document.visibilityState !== 'visible')
         return;
     const warmSave = cachedSave ?? { player: { shipId: 'wayfarer', dockedAt: 'helix', navTargetId: 'shardbelt' } };
-    const shipId = warmSave.player?.shipId && SHIP_WARM_ASSETS[warmSave.player.shipId] ? warmSave.player.shipId : 'wayfarer';
-    const [model] = SHIP_WARM_ASSETS[shipId];
     // Warm only what the next screen can display. Importing the flight runtime
     // here also parses the multi-megabyte graveyard collision profile while
     // the player is still on the title screen.
     await Promise.allSettled([
-        warmBinary(model),
+        warmBinary(ownedModelURL(warmSave.player?.shipId)),
         ui.preloadSessionAssets(warmSave, { priority: 'low' }),
     ]);
 };
@@ -163,10 +140,15 @@ const beginSession = (mode, arena, tutorial = true) => {
     // Resume audio inside the original tap/click task, then paint the loading
     // veil before generating a new career or its mission offers.
     const audioManager = new AudioManager();
-    void audioManager.enable();
+    audioManager.setVolumes(titleSettings.music, titleSettings.effects);
     ui.setLoading(true, t(mode === 'arena' ? 'PREPARING FLIGHT' : mode === 'observer' ? 'PREPARING OBSERVER' : 'LOADING CAREER'));
+    const paint = nextPaint();
+    void audioManager.enable(() => paint).catch(error => console.warn('Audio startup was interrupted.', error));
     const starting = (async () => {
-        await nextPaint();
+        // The generated audio buffers consume random numbers. Finish the mix
+        // before generating the same seeded career/arena as synchronous boot.
+        await Promise.allSettled([paint, audioManager.mixReady]);
+        await new Promise(resolve => setTimeout(resolve, 0));
         const save = arena?.run ? (arena.resume?readArenaRun():newArenaRun(Boolean(arena.hard&&arenaRecord().unlockedHard)))
             : LANDING_PREVIEW_ID && mode !== 'arena' && mode !== 'observer' ? createNewSave(undefined, { tutorial: false })
                 : mode === 'new' || mode === 'arena' || mode === 'observer' ? createNewSave(DRONE_TEST_MODE ? 4242 : undefined, { tutorial: mode === 'new' && tutorial && !DRONE_TEST_MODE })
@@ -271,15 +253,14 @@ const beginSession = (mode, arena, tutorial = true) => {
         // flat equipment list.
         cachedSave = save;
         saveGame(save);
-        const shipId = SHIP_WARM_ASSETS[save.player.shipId] ? save.player.shipId : 'wayfarer';
         // Asset warm-up is opportunistic. It must not be part of session boot:
         // iOS Safari can leave an explicit image decode pending, and a slow
         // GLB/image request must never keep the loading veil on screen.
         void Promise.allSettled([
-            warmBinary(SHIP_WARM_ASSETS[shipId][0], 'high'),
+            warmBinary(ownedModelURL(save.player.shipId), 'high'),
             ui.preloadSessionAssets(save, { priority: 'high', includeLocation: mode !== 'arena' && mode !== 'observer' }),
         ]);
-        const gameModule = await settleWithin(loadGameSession(), 20000, undefined, true);
+        const gameModule = await loadGameSession();
         // Build the immutable asteroid surface in small slices while the
         // loading veil is visible. The renderer and collision code reuse the
         // exact same cached terrain once the session is constructed.
@@ -296,7 +277,8 @@ const beginSession = (mode, arena, tutorial = true) => {
                 saveGame(cachedSave);
             }
             showTitleScreen();
-        }, mode === 'arena' || mode === 'observer' ? arena : null, false, audioManager);
+        }, mode === 'arena' || mode === 'observer' ? arena : null, false, audioManager, true);
+        await nextSession.ready;
         session = nextSession;
         if (!arena && save.player.dockedAt) {
             if (!await nextSession.prepareDockedFlightRuntime({ showLoading: false }))
@@ -304,7 +286,8 @@ const beginSession = (mode, arena, tutorial = true) => {
         }
         else if (nextSession.renderer)
             await nextSession.prepareFlightScene();
-        if (!arena && save.player.dockedAt) await ui.prepareDockView();
+        // The concourse publishes its model when ready. Its network request
+        // must not hold the start button or opening story behind the loading veil.
         if (mode === 'new' && tutorialCampaignSummary(save)?.active) ui.showStory();
         if(save.player.swarmRefund>0){
             const count=save.player.swarmRefund;

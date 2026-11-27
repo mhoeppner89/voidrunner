@@ -1,3 +1,12 @@
+## 0.8.2qc — Much smaller downloads, smoother phones, solid debris
+
+- The game downloads about a third as much before your first flight (about 14 MB instead of 42 MB on a phone) and starts in about 15 seconds on fast 4G instead of 50. Return visits load from the device with no download. Ships, stations, room art and audio now load when they are nearby or selected; the rest streams in during quiet flight, never with data saver on or on 2G. Cockpit art and hull textures keep their full quality.
+- Phones use far less graphics memory (about 70 MB instead of 316 MB in career flight), and the long freeze while loading is gone.
+- Busy fights, asteroid fields and big wreck fields run more steadily; the first explosion, flak burst, lance shot and jamming no longer hitch.
+- Distant stations show a much lighter stand-in until their full model arrives.
+- Ship debris is solid: every visible chunk of a destroyed ship, fighters included, now blocks shots and ships (before, only the largest pieces did).
+- Launching no longer waits for every station in the system to load.
+
 ## 0.8.2qb — Every flak rocket explodes, and hurts
 
 - Each Barrage rocket is now heard: bursts that went off in the same instant used to merge into one sound. Every burst plays a full explosion under its crack and boom.

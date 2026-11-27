@@ -9,7 +9,9 @@ const profiles=new Map();
 const axis=new T.Vector3(),delta=new T.Quaternion(),normal=new T.Vector3(),arm=new T.Vector3();
 const terrainContact={},inverse=new T.Quaternion();
 let terrainScratch=new Float32Array(0);
-const SPIN=Math.PI/30, DRIFT=4, LIMIT=10, BUMP_SPEED=150;
+// User bug (0.8.2qc): fighter debris was cosmetic because only box volume
+// 1,000+ sections were solid. Every visible chunk (>= MIN_VOLUME) is solid now.
+const SPIN=Math.PI/30, DRIFT=4, LIMIT=24, BUMP_SPEED=150, MIN_VOLUME=50, PER_SHIP=7;
 export const WRECK_IMPACT=Object.freeze({shieldBypass:1});
 
 export function fractureBounds(variant,scale){
@@ -57,13 +59,13 @@ function retire(session,index){
 export function spawnCover(session,ship,variant,scale){
     if(!SHIP_COLLIDERS[variant])return [];
     const shapes=sectionProfiles(variant,ship.collisionVariant??variant,scale);
-    const limit=ship.capitalClass==='corvette'?4:ship.capitalClass?6:1;
+    const limit=PER_SHIP;
     const active=session.coverSections??=[],added=[];
     const player=new T.Vector3(...session.save.player.position),q=new T.Quaternion(...ship.rotation);
     const length=fractureBounds(variant,scale).getSize(axis).length(),heft=Math.min(1,(36/length)**1.75);
     const random=seededRandom(ship.id+':wreck-motion');
     for(const shape of shapes){
-        if(added.length>=limit||shape.volume<1000)break;
+        if(added.length>=limit||shape.volume<MIN_VOLUME)break;
         if(active.length>=LIMIT){
             const i=active.findIndex(b=>b.position.distanceTo(player)>b.radius+100);
             if(i<0)break;

@@ -1,3 +1,4 @@
+import {finishStartupWork,runStartupWork} from './startupWork.js';
 import {Triangle,Vector3} from 'three';
 import {SHIP_COLLISION_DATA} from './shipCollisionData.js';
 import {segmentMeshHit,prepareMeshQueryIndex} from './meshQueries.js';
@@ -25,7 +26,16 @@ function decodeProfile(data){
     const contactRadius=Math.hypot(Math.max(Math.abs(root.minX),Math.abs(root.maxX)),Math.max(Math.abs(root.minY),Math.abs(root.maxY)),Math.max(Math.abs(root.minZ),Math.abs(root.maxZ)));
     return {extent:data.extent,min:data.min,max:data.max,sha256:data.sha256,meshVerts,meshIndices,boxes,...tree,radius:Math.hypot(...data.extent),contactRadius};
 }
-export const SHIP_COLLIDERS=Object.fromEntries(Object.entries(SHIP_COLLISION_DATA).map(([id,data])=>[id,decodeProfile(data)]));
+function* buildShipColliders() {
+    const colliders = {};
+    for (const [id, data] of Object.entries(SHIP_COLLISION_DATA)) {
+        colliders[id] = decodeProfile(data);
+        yield;
+    }
+    return colliders;
+}
+export const SHIP_COLLIDERS = typeof window === 'undefined'
+    ? finishStartupWork(buildShipColliders()) : await runStartupWork(buildShipColliders());
 // Only a pod loss changes this shape. All ships with the same remaining hold
 // share one prepared collision profile for shots, physical contact and HUD sightlines.
 const cargoParts=new Map();

@@ -1,3 +1,4 @@
+import {finishStartupWork, runStartupWork} from './startupWork.js';
 import { normalizeControllerBindings } from './controllerBindings.js';
 import { Haptics } from './haptics.js';
 import { connectedGamepad } from './gamepad.js';
@@ -44,6 +45,8 @@ import {planCombatFlight, combatPursuitDirection, friendlyFiringLaneBlocked} fro
 import { combatTargetEligible, tracksActivePlayer } from './combatTargeting.js';
 import {getPdcDefenseChannel} from './pdcFireControl.js';
 import {FLAK} from './bargeLaunchers.js';
+// Launch waits at most this long for the local station's collider.
+const LAUNCH_STATION_WAIT_MS = 3000;
 const FLAK_STILL=Object.freeze([0,0,0]);
 import {MISSILE_PADDING,cockpitLockState,updateMissileWarning,guideMissile,beginRackLock,rackLockProgress,torpedoMobilityFactor,wearFighterDrive,relativeIntercept,closestHullPoint} from './weaponFlight.js';
 import {fieldCombatSteering} from './fieldCombatNav.js';
@@ -98,7 +101,7 @@ import { deliverMiningPayload, destroyMiningUnit, finishMiningRecall, miningRese
 import { createMiningDroneSystem } from './droneSystem.js';
 import { createPdcDroneController, destroyPdcDrone } from './dronePdc.js';
 import { quoteDroneService, commitDroneService } from './droneService.js';
-import { asteroidCollisionMesh, asteroidCollisionRadius, ASTEROID_COLLISION_FACTOR, generateAsteroidField, generateGraveyardPieces, generateRegionalAsteroidField, generateWreckNodes, graveyardCollisionMesh, graveyardZoneAt, graveyardZoneLabel, GRAVEYARD_GEOMETRY_PROFILES, GRAVEYARD_MODEL_COLLIDERS, GRAVEYARD_MODEL_COLLIDER_MAX_RADIUS, GRAVEYARD_MODEL_WRECKS, REGIONAL_ASTEROID_FIELD_IDS, wreckNodeCollisionMesh, wreckNodeCollisionRadius } from './worldData.js';
+import { asteroidCollisionMesh, asteroidCollisionRadius, ASTEROID_COLLISION_FACTOR, generateAsteroidField, buildGraveyardPieces, generateRegionalAsteroidField, generateWreckNodes, graveyardCollisionMesh, graveyardZoneAt, graveyardZoneLabel, GRAVEYARD_GEOMETRY_PROFILES, GRAVEYARD_MODEL_COLLIDERS, GRAVEYARD_MODEL_COLLIDER_MAX_RADIUS, GRAVEYARD_MODEL_WRECKS, REGIONAL_ASTEROID_FIELD_IDS, wreckNodeCollisionMesh, wreckNodeCollisionRadius } from './worldData.js';
 import { steerToward } from './npcNav.js';
 import { steerRacePilot } from './raceNavigation.js';
 import { PILOT_LINES, pilotMod, rollPilot, TIER_LABELS } from './pilots.js';
@@ -1398,7 +1401,12 @@ export class GameSession {
     // live game — headless combat probes build sessions via Object.create and
     // never set this, so their pirates always fight straight (see shipAI.js).
     emergentMugs = true;
-    constructor(save, ui, onQuit, arena = null, tiltPermission = undefined, audioManager = undefined) {
+    constructor(save, ui, onQuit, arena, tiltPermission, audioManager, staged = false) {
+        const work = this.buildSession(save, ui, onQuit, arena, tiltPermission, audioManager);
+        if (staged) this.ready = runStartupWork(work);
+        else finishStartupWork(work);
+    }
+    *buildSession(save, ui, onQuit, arena = null, tiltPermission = undefined, audioManager = undefined) {
         this.arena = arena;
         this.ui = ui;
         this.onQuit = onQuit;
@@ -1448,7 +1456,9 @@ export class GameSession {
         this.ui.attachSave(save);
         this.asteroids = generateAsteroidField(save.world.seed, save.world.depletedAsteroids, save.world.scannedNodes);
         this.regionalFields = new Map(REGIONAL_ASTEROID_FIELD_IDS.map((id) => [id, generateRegionalAsteroidField(save.world.seed, id)]));
-        this.graveyard = generateGraveyardPieces(save.world.seed);
+        yield;
+        this.graveyard = yield* buildGraveyardPieces(save.world.seed);
+        yield;
         this.initializeExploration();
         this.initializeDistress();
         this.wreckNodes = generateWreckNodes(save.world.seed, save.world.depletedWrecks, save.world.scannedNodes);
@@ -1477,7 +1487,8 @@ export class GameSession {
             this.tutorialAmbientAfter = save.world.time + 12;
         }
         if (needsFlightRuntime)
-            this.initializeFlightRuntime();
+            yield* this.buildFlightRuntime();
+        yield;
         if (!arena && save.world.pendingJump)
             this.finishGalaxyJump(save.world.pendingJump, false, false);
         if (arena) {
@@ -1513,11 +1524,18 @@ export class GameSession {
         if (typeof document !== 'undefined') document.addEventListener?.('visibilitychange', this.onPageVisibilityChange);
         this.frameId = requestAnimationFrame(this.frame);
     }
-    initializeFlightRuntime() {
+    initializeFlightRuntime(staged = false) {
+        const work = this.buildFlightRuntime();
+        return staged ? runStartupWork(work) : finishStartupWork(work);
+    }
+    *buildFlightRuntime() {
         if (this.renderer)
             return this.renderer;
         const initialVariant = playerShipVariant(this.save.player.shipId);
-        this.renderer = new SpaceRenderer(this.ui.viewport, this.save.world.seed, this.asteroids, this.graveyard, this.wreckNodes, this.save.settings.quality, this.save.player.systemId, this.regionalFields, [initialVariant]);
+        const renderer = new SpaceRenderer(this.ui.viewport, this.save.world.seed, this.asteroids, this.graveyard, this.wreckNodes, this.save.settings.quality, this.save.player.systemId, this.regionalFields, [initialVariant], true);
+        yield* renderer.scenePreparation;
+        delete renderer.scenePreparation;
+        this.renderer = renderer;
         this.renderer.setSystem?.(this.save.player.systemId);
         if (this.renderer.isIOS && this.save.settings.quality === 'high')
             this.qualityScale = this.renderer.lastQualityScale;
@@ -12811,7 +12829,8 @@ export class GameSession {
                 ship.fleeing = saved.fleeing;
             }
         }
-        this.renderer.ensureGlbShipModel?.(variant);
+        // The hull model streams from syncShips once it is within range or
+        // targeted (render.js GLB_FETCH_*); Arena preloads its level's hulls.
         return ship;
     }
     corvetteSubsystemDestroyed(ship,index){
@@ -12894,9 +12913,8 @@ export class GameSession {
         if(capitalClass==='frigate')equipFrigate(ship);
         if(capitalClass==='cruiser')equipCruiser(ship);
         equipCapitalLoot(this,ship);
-        // Begin the lazy fetch as soon as the landmark is authorized. The
-        // correctly scaled voxel silhouette covers only the short load window.
-        this.renderer.ensureGlbShipModel?.(variant);
+        // The model streams from syncShips within 6 km or when targeted; the
+        // correctly scaled voxel silhouette covers the load window.
         return ship;
     }
     alertPatrols(position) {
@@ -14451,7 +14469,7 @@ export class GameSession {
                 await new Promise((resolve) => requestAnimationFrame(() => resolve()));
                 if (!this.active)
                     return false;
-                this.initializeFlightRuntime();
+                await this.initializeFlightRuntime(true);
                 this.ensureInitialTraffic();
                 this.updateActiveInstance(true);
                 this.restoreTutorialRuntime();
@@ -14493,7 +14511,17 @@ export class GameSession {
                 return false;
             }
             const location = LOCATIONS[locationId];
-            if (stationApproach(locationId)) await this.renderer.ensureStationModels(location.systemId);
+            // The launch berth needs only this station's collider. Start the
+            // system's other stations streaming, but never hold the launch on
+            // them (slow-4G baseline: waiting for every station and its parked
+            // hulls blew the startup timeout).
+            // Without a collider yet, the authored berth (fittedPlayerBerths' own
+            // fallback) launches the ship and the collider attaches when it lands.
+            if (stationApproach(locationId)) {
+                this.renderer.ensureStationModels(location.systemId, locationId);
+                const local = this.renderer.stationModelLoads?.get(locationId);
+                if (local) await Promise.race([local, new Promise(resolve => setTimeout(resolve, LAUNCH_STATION_WAIT_MS))]);
+            }
             // The prior sortie remains open while the pilot reviews the debrief and
             // pays for service. Close it only after those dock-side transactions,
             // then start a fresh ledger for the departure now being prepared.

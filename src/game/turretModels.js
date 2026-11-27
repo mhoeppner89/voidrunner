@@ -4,6 +4,8 @@ import {TURRET_MODEL_DATA} from './turretModelData.js';
 // Blender-authored meshes shared across instances; each instance owns only pivots.
 const templates = new Map();
 const frigateMaterials=new WeakMap();
+const unpaintedTurrets=new WeakMap();
+const atlasGeometries=new Map();
 // Each face uses a 56px panel inside the hull's existing 64px atlas tiles.
 function armorUV(part,kind,index,geometry){
     const p=geometry.attributes.position,uv=new Float32Array(p.count*2),min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
@@ -30,15 +32,51 @@ export function paintFrigateTurret(root,hullMaterial){
     let material=frigateMaterials.get(hullMaterial.map);
     if(!material){material=hullMaterial.clone();material.name='Concord turret armor · shared hull atlas';material.userData.shared=true;material.userData.borrowedTextures=true;stabilizeMaterialNormals(material);frigateMaterials.set(hullMaterial.map,material);}
     root.traverse(o=>{if(!o.isMesh)return;if(o.userData.damageMaterial){o.userData.damageMaterial.dispose();delete o.userData.damageMaterial;}o.material=material;o.userData.healthyMaterial=material;});
+    // With one hull atlas, pigment boundaries need no separate draws. The
+    // connector remains independent because it has a different seat transform.
+    const unpainted = unpaintedTurrets.get(root);
+    if (unpainted) {
+        for (const [pivot, meshes] of unpainted.parts) {
+            const key = unpainted.kind + ':' + pivot;
+            if (!atlasGeometries.has(key))
+                atlasGeometries.set(key, joinGeometries(meshes.map(mesh => mesh.geometry)));
+            meshes[0].geometry = atlasGeometries.get(key);
+            for (let i = 1; i < meshes.length; i++) meshes[i].removeFromParent();
+        }
+        delete root.userData.visualParts;
+        unpaintedTurrets.delete(root);
+    }
     root.userData.armorAtlas=hullMaterial.map;delete root.userData.healthFraction;
 }
-// A short tapered seat bridges the turret foot to the fitted hull surface.
-// The slightly wider hull-side end follows the curved lower wings without
-// changing the approved turret pivot or its firing axis.
-const supportGeometry = new THREE.CylinderGeometry(.42,.48,1,12);
-supportGeometry.userData.shared=true;
-export function createTurretModel(kind, size, pedestal=0, footprintScale=1) {
-    if (!templates.has(kind)) templates.set(kind, TURRET_MODEL_DATA[kind].map((part,index) => {
+function joinGeometries(parts) {
+    if (parts.length === 1) return parts[0];
+    const geometry = new THREE.BufferGeometry();
+    const count = parts.reduce((n, part) => n + part.attributes.position.count, 0);
+    for (const [name, sample] of Object.entries(parts[0].attributes)) {
+        const values = new Float32Array(count * sample.itemSize);
+        let offset = 0;
+        for (const part of parts) {
+            const src = part.attributes[name].array;
+            values.set(src, offset);
+            offset += src.length;
+        }
+        geometry.setAttribute(name, new THREE.BufferAttribute(values, sample.itemSize));
+    }
+    const indices = [];
+    let offset = 0;
+    for (const part of parts) {
+        for (const vertex of part.index.array) indices.push(offset + vertex);
+        offset += part.attributes.position.count;
+    }
+    geometry.setIndex(indices);
+    geometry.userData.shared = true;
+    return geometry;
+}
+
+// Parts with identical paint that turn about the same pivot can use one draw.
+function buildTurretTemplate(kind) {
+    const batches = new Map();
+    for (const [index, part] of TURRET_MODEL_DATA[kind].entries()) {
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.Float32BufferAttribute(part.positions, 3));
         geometry.setAttribute('normal', new THREE.Float32BufferAttribute(part.normals, 3));
@@ -52,14 +90,33 @@ export function createTurretModel(kind, size, pedestal=0, footprintScale=1) {
         }
         geometry.setIndex(indices);
         armorUV(part,kind,index,geometry);
-        const material = new THREE.MeshStandardMaterial({color:new THREE.Color(...part.color),metalness:.75,roughness:.4});
-        geometry.userData.shared=true;material.userData.shared=true;
-        return {...part,geometry,material};
-    }));
+        const key = part.part + ':' + part.color.join(',');
+        if (!batches.has(key)) batches.set(key, {part:part.part, color:part.color, geometries:[]});
+        batches.get(key).geometries.push(geometry);
+    }
+    return Array.from(batches.values(), batch => {
+        const geometry = joinGeometries(batch.geometries);
+        const material = new THREE.MeshStandardMaterial({color:new THREE.Color(...batch.color),metalness:.75,roughness:.4});
+        geometry.userData.shared = material.userData.shared = true;
+        return {part:batch.part, geometry, material};
+    });
+}
+
+// A short tapered seat bridges the turret foot to the fitted hull surface.
+// The slightly wider hull-side end follows the curved lower wings without
+// changing the approved turret pivot or its firing axis.
+const supportGeometry = new THREE.CylinderGeometry(.42,.48,1,12);
+supportGeometry.userData.shared=true;
+export function createTurretModel(kind, size, pedestal=0, footprintScale=1) {
+    if (!templates.has(kind)) templates.set(kind, buildTurretTemplate(kind));
     const root = new THREE.Group(), yaw = new THREE.Group(), pitch = new THREE.Group();
     root.name = `${kind}-${size}`; root.userData.pedestal=pedestal;root.userData.footprintScale=footprintScale; root.add(yaw); yaw.add(pitch);
+    const parts = new Map();
+    unpaintedTurrets.set(root, {kind, parts});
     for (const part of templates.get(kind)) {
         const mesh = new THREE.Mesh(part.geometry, part.material);
+        if (!parts.has(part.part)) parts.set(part.part, []);
+        parts.get(part.part).push(mesh);
         if(part.part==='base'){
             mesh.userData.turretBaseFoot=true;
             mesh.scale.x=mesh.scale.z=footprintScale;
