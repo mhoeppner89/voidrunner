@@ -5605,7 +5605,7 @@ export class SpaceRenderer {
     }
     prepareFlakBursts() {
         if(this.flakBursts)return;
-        this.flakBursts=Array.from({length:8},(_,i)=>{
+        this.flakBursts=Array.from({length:12},(_,i)=>{
             const burst=createShipExplosion([0,0,0],2,{variant:'flak',seed:i+1});
             burst.age=0;
             return burst;

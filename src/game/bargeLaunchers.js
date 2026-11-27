@@ -16,7 +16,8 @@ import {t} from './i18n.js';
 
 export const BARGE=Object.freeze({
     every:15, warning:3, ripple:.15, snapCount:3,
-    lockTime:4, lockRange:1200, minRange:250,
+    // User (0.8.2qb): it locks and fires from 100 on, not 250.
+    lockTime:4, lockRange:1200, minRange:100,
     snapRange:600, snapRearm:800, snapSpeed:45, abortReload:5,
     // Lock rate against target speed: full up to 50, a quarter from 100 on.
     lockFullSpeed:50, lockSlowSpeed:100, lockSlowFactor:4,
@@ -27,7 +28,7 @@ export const BARGE=Object.freeze({
 });
 // Pirate fire control: one re-lead at correctAt of the flight, turning at
 // most correctTurn, then straight again; the BREAK cue follows that update.
-export const FLAK=Object.freeze({id:'flak',speed:90,damage:45,radius:70,minimum:10,
+export const FLAK=Object.freeze({id:'flak',speed:90,damage:90,radius:70,minimum:20,
     proximity:45,spread:6*Math.PI/180,jitter:.4,correctAt:.4,correctTurn:10*Math.PI/180,lockRange:BARGE.lockRange,lockTime:BARGE.lockTime});
 const BLIND=Object.freeze({...FLAK,lockRange:BARGE.lockRange/2,lockTime:BARGE.lockTime*2});
 

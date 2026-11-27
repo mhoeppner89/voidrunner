@@ -1,3 +1,10 @@
+## 0.8.2qb — Every flak rocket explodes, and hurts
+
+- Each Barrage rocket is now heard: bursts that went off in the same instant used to merge into one sound. Every burst plays a full explosion under its crack and boom.
+- Flak bursts are twice the size: a bigger fireball, smoke clouds up to 56 m across that hang for up to 4 s, and denser shrapnel.
+- Flak deals double damage (90 at the centre, 20 at the edge). Holding course through a salvo is now very dangerous; breaking on the BREAK cue still avoids it entirely.
+- The Barrage locks on and fires from 100 m out (was 250 m), so rushing it means getting really close.
+
 ## 0.8.2qa — A Barrage worth fearing; two guns, two sounds
 
 - The Red Njord Barrage's flak is a real danger now: rockets scatter wider, and halfway through their flight its pirate fire control re-aims each one once at where you are now. Bursts are bigger (70 m blast) and go off within 45 m of a ship. Hold your course and a salvo hurts badly; break when BREAK sounds, just after that re-aim, and it misses. Slow, big ships still eat the whole salvo.

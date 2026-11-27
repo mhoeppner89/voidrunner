@@ -103,6 +103,8 @@ A Drover on a jump run keeps at least half cruise while either engine works. On 
 
 Tune group contents against these measurements. Check that pressure builds through each act, that levels 6, 11, 16 and 21 give the pilot a breather, and that each finale deals the most damage in its act. Level 25 should deal the most damage of the run.
 
+**Level 4 exception (user, 0.8.2qb):** the Barrage's flak deals double damage. The progression probe's pilot never reacts to BREAK, so at ordinary health it dies on level 4 on all three seeds (endurance still clears, absorbing about 630–670). A pilot who breaks on the cue takes no flak damage. The user chose to keep level 4 as a skill check, so Act I's zero-loss target does not apply to it.
+
 ## Three-group measurements
 
 Every entry compares the previous build with the three-wave roster. Duration and incoming damage are medians across three seeds per level, or 15 sorties per act. The last row also shows Act V without the finale. Peak hostiles include capitals and carrier launches. Ordinary-health losses count pilot deaths.

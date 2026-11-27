@@ -31,7 +31,8 @@ export const SOUND_EVENTS = {
     // Barrage flak: a ragged rocket per rack, a staccato HE crack per burst
     // (no sub boom, so a salvo stays readable), shrapnel on our own hull.
     'flak-launch': {bus:'world',range:1600,layers:[['flak-launch',.8,{vary:.07}]]},
-    'flak-burst': {bus:'world',range:2600,priority:2,muffle:.3,duck:[.82,.08,.6],layers:[['flak-burst',1,{vary:.07}],['blast-crack',.35,{vary:.08,prox:.4}],['sub-boom',.6,{vary:.06,prox:.3}],['debris-tail',.3,{delay:.1,prox:.55}],['shockwave',.4,{delay:.18,prox:.75}]]},
+    // farSpacing 0: every rocket is its own blast, even when several burst in one frame.
+    'flak-burst': {bus:'world',range:2600,priority:2,farSpacing:0,muffle:.3,duck:[.82,.08,.6],layers:[['explosion',.8,{vary:.1,rate:1.15}],['flak-burst',.85,{vary:.07}],['blast-crack',.35,{vary:.08,prox:.4}],['sub-boom',.6,{vary:.06,prox:.3}],['debris-tail',.3,{delay:.1,prox:.55}],['shockwave',.4,{delay:.18,prox:.75}]]},
     'flak-shrapnel': {bus:'cockpit',spacing:.12,priority:2,layers:[['flak-shrapnel',.8,{vary:.05}],['rattle',.35,{delay:.02,vary:.06}]]},
     laser: { bus: 'cockpit', room: 0.2, space: 0.1, layers: [['laser', 0.8, { vary: 0.035 }], ['laser-snap', 0.26, { vary: 0.06, prox: 0.9 }], ['energy-tail', 0.36, { vary: 0.08 }], ['thump', 0.22, { vary: 0.05, prox: 0.9 }]] },
     // One original body at a fixed pitch: overlapping emitters must not form chords.

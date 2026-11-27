@@ -518,7 +518,8 @@ export class AudioManager {
         }
         // Distance dominates at long range; stereo separation becomes clearer
         // as the source gets closer, which matches how cockpit audio behaves.
-        this.trigger(effect, clamp(intensity * proximity * proximity, 0.001, 2), direction * (0.3 + proximity * 0.6), Math.max(0.001, distance), proximity, rear, Math.min(0.45, distance / SOUND_SPEED), `far:${effect}`, 1, FAR_SPACING);
+        // Events that are separate physical blasts (flak) opt out of the collapse.
+        this.trigger(effect, clamp(intensity * proximity * proximity, 0.001, 2), direction * (0.3 + proximity * 0.6), Math.max(0.001, distance), proximity, rear, Math.min(0.45, distance / SOUND_SPEED), `far:${effect}`, 1, SOUND_EVENTS[effect]?.farSpacing ?? FAR_SPACING);
     }
 
     // Builds one voice: layers → gain → (distance filter) → (pan) → bus,

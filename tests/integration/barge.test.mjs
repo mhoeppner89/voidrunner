@@ -102,6 +102,7 @@ test('a rush draws one snap volley per approach',()=>{
     s.save.player.velocity=[-70,0,0];run(s,ship,5);assert.equal(warheads(s).length,6,'rearmed after leaving');
 });
 test('inside the minimum range the racks stay silent',()=>{
+    assert.equal(BARGE.minRange,100);
     const {s,ship}=stage();pilot(s,BARGE.minRange-20,[0,0,0]);
     run(s,ship,20);assert.equal(warheads(s).length,0);assert.equal(ship.combatFit.lock,0);
 });
@@ -216,19 +217,20 @@ test('timed, proximity and terrain bursts respect the earliest hit and damage ne
     const hits=[];s.damageShip=(target,amount)=>hits.push([target.id,amount]);
     s.burstFlak(rocket(1),new THREE.Vector3(0,0,-1));
     assert.deepEqual(hits.map(([id])=>id),['near','halfway','edge']);
-    const expected=[45,27.5,10];
+    const expected=[90,55,20];
     for(const [i,[,amount]] of hits.entries())assert.ok(Math.abs(amount-expected[i])<1e-6);
 });
 
 test('a single BREAK falls inside the measured evasion window in the fixed-step trials',()=>{
     const steady=flakPanel('straight'),jink=flakPanel('break'),drover=flakPanel('drover'),rush=flakPanel('rush');
-    assert.ok(steady.damage>=100&&steady.damage<=140);
+    // User: double damage (0.8.2qb). Holding course now costs ~265 per salvo.
+    assert.ok(steady.damage>=230&&steady.damage<=300);
     // BREAK follows the mid-course re-lead (40% of a ~10 s flight).
     assert.equal(jink.cues,1);assert.ok(jink.firstCue>4&&jink.firstCue<4.6);
     assert.ok(jink.damage<=30);
     // The re-led snap volley can clip a rushing pilot, but rushing stays the answer.
-    assert.ok(rush.damage<=20);
-    assert.ok(drover.damage>=165);
+    assert.ok(rush.damage<=40);
+    assert.ok(drover.damage>=300);
 });
 
 test('each flak rocket re-leads once mid-flight, turning at most correctTurn, and retimes its fuze',()=>{
