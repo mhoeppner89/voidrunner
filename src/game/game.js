@@ -44,6 +44,7 @@ import {planCombatFlight, combatPursuitDirection, friendlyFiringLaneBlocked} fro
 import { combatTargetEligible, tracksActivePlayer } from './combatTargeting.js';
 import {getPdcDefenseChannel} from './pdcFireControl.js';
 import {FLAK} from './bargeLaunchers.js';
+const FLAK_STILL=Object.freeze([0,0,0]);
 import {MISSILE_PADDING,cockpitLockState,updateMissileWarning,guideMissile,beginRackLock,rackLockProgress,torpedoMobilityFactor,wearFighterDrive,relativeIntercept,closestHullPoint} from './weaponFlight.js';
 import {fieldCombatSteering} from './fieldCombatNav.js';
 import {DEFAULT_NPC_AIM_ERROR,npcTrackedVelocity,npcGunneryProfile,npcTriggerCone,npcTriggerReady,npcShotDirection,recordNpcShot,applyNpcTurnLead} from './npcGunnery.js';
@@ -4883,9 +4884,11 @@ export class GameSession {
         const ship=this.ships.find(s=>s.id===ownerId),cap=ship?.combatFit?.stats?.energyCapacity;
         if(ship&&Number.isFinite(ship.energy)&&cap)ship.energy=Math.min(cap,ship.energy+amount);
     }
-    spawnPlayerGunProjectile(weapon,direction,x,y,z,velocity,targetId,mountId) {
+    pulsePlayerGun(weapon) {
         const heavy = weapon.kind === 'gauss' || weapon.kind === 'mortar';
         this.haptics?.pulse(heavy ? 65 : 35, heavy ? .22 : .04, weapon.kind === 'beam' ? .1 : .22);
+    }
+    spawnPlayerGunProjectile(weapon,direction,x,y,z,velocity,targetId,mountId) {
         return this.spawnGunProjectile('player',weapon,new THREE.Vector3(x,y,z),direction,velocity,targetId,mountId);
     }
     spawnGunProjectile(ownerId,weapon,start,direction,velocity,targetId,mountId) {
@@ -4973,6 +4976,7 @@ export class GameSession {
                 player.ammo[weapon.ammoId] -= 1;
             this.gunCooldown = weapon.cooldown * disruption;
             this.addPlayerEmission(weapon.kind === 'mortar' ? 190 : 95);
+            this.pulsePlayerGun(weapon);
             this.audio.play(weapon.audioKey, weapon.kind === 'gauss' ? 0.85 : 0.72);
             return;
         }
@@ -4987,8 +4991,9 @@ export class GameSession {
                 if(loadout.fireGroups.assignments[spec.guns[i].id]==='B')rateB+=rate;else rateA+=rate;
             }
         }
-        let fired = false;
-        let slowestCooldown = 0;
+        const firedGuns = this.firedGunSounds ??= [];
+        firedGuns.length = 0;
+        let firedCount = 0;
         let firstWeapon;
         for (let offset=0;offset<spec.guns.length;offset++) {
             const index=((this.gunFairStart??0)+offset)%spec.guns.length, mount=spec.guns[index];
@@ -5017,7 +5022,6 @@ export class GameSession {
                 const rng=this.mountedScatterRandom(this.projectileCounter,mount.id);
                 const up = this.tmpP4.copy(UP).applyQuaternion(orientation);
                 const pelletCount = weapon.pellets ?? 7;
-                this.haptics?.pulse(35, .04, .22);
                 for (let pellet = 0; pellet < pelletCount; pellet += 1) {
                     const pelletDirection = this.spreadDirection(direction, right, up, weapon.spreadRad ?? 0, rng, this.tmpP0);
                     const muzzleX = anchorX + pelletDirection.x * 0.35;
@@ -5044,12 +5048,12 @@ export class GameSession {
                 this.groupFireAt[groupKey]=this.save.world.time+interval;
             }
             this.gunFairNext=(index+1)%spec.guns.length;
-            fired = true;
+            firedGuns[index] = weapon;
+            firedCount++;
             firstWeapon ??= weapon;
-            slowestCooldown = Math.max(slowestCooldown, weapon.cooldown);
         }
         this.gunFairStart=this.gunFairNext??0;
-        if (!fired) {
+        if (!firedCount) {
             const weapon = this.currentWeapon();
             if (weapon?.ammoId && (player.ammo[weapon.ammoId] ?? 0) <= 0)
                 this.setOwnMonitorStatus(t('{weapon} EMPTY — SWAP', { weapon: t(weapon.nameKey) }), 1600);
@@ -5059,9 +5063,15 @@ export class GameSession {
         }
         this.gunCooldown = 0;
         this.addPlayerEmission(firstWeapon?.kind === 'mortar' ? 190 : firstWeapon?.kind === 'pdc' ? 70 : 105);
-        if (firstWeapon && this.save.world.time >= (this.nextGunAudioAt ?? 0)) {
-            this.nextGunAudioAt=this.save.world.time+0.1;
-            this.audio.play(firstWeapon.audioKey, firstWeapon.kind === 'gauss' ? 0.85 : firstWeapon.kind === 'mortar' ? 0.95 : 0.72);
+        this.pulsePlayerGun(firstWeapon);
+        const anchors = SHIP_MOUNT_ANCHORS[player.shipId]?.guns;
+        const trim = firedCount > 1 ? 0.794 : 1; // -2 dB per voice in a chord.
+        for (let i = 0; i < firedGuns.length; i++) {
+            const weapon = firedGuns[i];
+            if (!weapon) continue;
+            const level = weapon.kind === 'gauss' ? 0.85 : weapon.kind === 'mortar' ? 0.95 : 0.72;
+            const pan = firedCount > 1 ? 0.3 * Math.sign(anchors?.[i]?.[0] ?? 0) : 0;
+            this.audio.play(weapon.audioKey, level * trim, pan, 0, false, spec.guns[i].id);
         }
     }
     // Transient target-monitor status: missile and target-cycle errors land on
@@ -10569,7 +10579,28 @@ export class GameSession {
             this.flakBurstDamage(shot,point,ship,this.npcHullExtents(ship),false);
         }
     }
+    // One pirate fire-control update: re-lead on the target's current course,
+    // scattered again, turning at most FLAK.correctTurn; the fuze is retimed.
+    correctFlak(shot,start,velocity) {
+        shot.corrected=true;
+        const target=shot.targetId==='player'?this.save.player:this.ships.find(ship=>ship.id===shot.targetId&&ship.hull>0);
+        if(!target?.position)return;
+        const aim=this.tmpFlakAim??=new THREE.Vector3(),from=this.tmpFlakFrom??=new THREE.Vector3(),side=this.tmpFlakSide??=new THREE.Vector3(),up=this.tmpFlakUp??=new THREE.Vector3();
+        const time=relativeIntercept(start,target.position,FLAK_STILL,target.velocity,FLAK.speed,aim);
+        if(!Number.isFinite(time)||aim.lengthSq()<1e-9)return;
+        aim.normalize();
+        up.set(0,Math.abs(aim.y)<.9?1:0,Math.abs(aim.y)<.9?0:1);side.crossVectors(aim,up).normalize();up.crossVectors(side,aim);
+        const angle=Math.random()*2*Math.PI,radius=Math.sqrt(Math.random())*Math.tan(FLAK.spread);
+        aim.addScaledVector(side,radius*Math.cos(angle)).addScaledVector(up,radius*Math.sin(angle)).normalize();
+        from.copy(velocity).normalize();
+        const turn=from.angleTo(aim);
+        if(turn>FLAK.correctTurn){side.crossVectors(from,aim).normalize();aim.copy(from).applyAxisAngle(side,FLAK.correctTurn);}
+        velocity.copy(aim).multiplyScalar(FLAK.speed);this.projStore.setVelV(shot.slot,velocity);
+        const elapsed=shot.flightTime-shot.life;
+        shot.life=Math.max(.01,time+(shot.fuseJitter??0));shot.flightTime=elapsed+shot.life;
+    }
     advanceFlak(shot,start,velocity,dt) {
+        if(!shot.corrected&&shot.correctAt!==undefined&&shot.flightTime-shot.life>=shot.correctAt)this.correctFlak(shot,start,velocity);
         const end=this.tmpP2.copy(start).addScaledVector(velocity,dt);
         // Bounded lateral drift around the original bearing; no target input.
         const phase=shot.wobblePhase+2*(shot.flightTime-shot.life);

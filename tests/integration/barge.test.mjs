@@ -205,24 +205,48 @@ test('timed, proximity and terrain bursts respect the earliest hit and damage ne
     assert.ok(Math.abs(blasts[0][2]+.9)<1e-7);
     s.firstObstacleHitInfo=()=>({t:.25});shot=rocket(1);s.advanceFlak(shot,point,velocity,STEP);
     assert.ok(Math.abs(blasts[1][2]+.375)<1e-7);
-    s.firstObstacleHitInfo=()=>undefined;p.position=[0,0,-31];p.rotation=[0,0,0,1];
+    s.firstObstacleHitInfo=()=>undefined;p.position=[0,0,-1-FLAK.proximity];p.rotation=[0,0,0,1];
     const actor=(id,faction,x)=>({id,faction,hull:100,rotation:[0,0,0,1],position:[x,0,-1]});
-    s.ships=[ship,actor('near','independents',0),actor('edge','independents',51),actor('outside','independents',52),actor('ally',ship.faction,0)];
+    s.ships=[ship,actor('near','independents',0),actor('halfway','independents',36),actor('edge','independents',71),actor('outside','independents',72),actor('ally',ship.faction,0)];
     // Place NPCs after the proximity crossing to measure a single blast's falloff.
     const group=s.ships;s.ships=[ship];s.damagePlayer=()=>{};s.kickCamera=()=>{};
     shot=rocket(1);s.advanceFlak(shot,point,velocity,STEP);assert.equal(shot.life,0);
     assert.ok(Math.abs(blasts[2][2]+1)<1e-7);
     s.ships=group;s.npcHullExtents=()=>[1,1,1];
-    const hits=[];s.damageShip=(target,amount)=>hits.push([target.id,Math.round(amount)]);
+    const hits=[];s.damageShip=(target,amount)=>hits.push([target.id,amount]);
     s.burstFlak(rocket(1),new THREE.Vector3(0,0,-1));
-    assert.deepEqual(hits,[['near',40],['edge',10]]);
+    assert.deepEqual(hits.map(([id])=>id),['near','halfway','edge']);
+    const expected=[45,27.5,10];
+    for(const [i,[,amount]] of hits.entries())assert.ok(Math.abs(amount-expected[i])<1e-6);
 });
 
 test('a single BREAK falls inside the measured evasion window in the fixed-step trials',()=>{
     const steady=flakPanel('straight'),jink=flakPanel('break'),drover=flakPanel('drover'),rush=flakPanel('rush');
-    assert.ok(steady.damage>=60&&steady.damage<=100);
-    assert.equal(jink.cues,1);assert.ok(jink.firstCue>3.5&&jink.firstCue<4.2);
-    assert.ok(jink.damage<=20&&rush.damage<=20&&drover.damage>=120);
+    assert.ok(steady.damage>=100&&steady.damage<=140);
+    // BREAK follows the mid-course re-lead (40% of a ~10 s flight).
+    assert.equal(jink.cues,1);assert.ok(jink.firstCue>4&&jink.firstCue<4.6);
+    assert.ok(jink.damage<=30);
+    // The re-led snap volley can clip a rushing pilot, but rushing stays the answer.
+    assert.ok(rush.damage<=20);
+    assert.ok(drover.damage>=165);
+});
+
+test('each flak rocket re-leads once mid-flight, turning at most correctTurn, and retimes its fuze',()=>{
+    const {s,ship}=stage(),p=s.save.player;
+    s.firstObstacleHitInfo=()=>undefined;s.renderer.spawnFlakBurst=()=>{};
+    p.position=[300,0,-900];p.velocity=[40,0,0];
+    const slot=s.projStore.alloc(),start=new THREE.Vector3(0,0,-300),velocity=new THREE.Vector3(0,0,-90);
+    s.projStore.setPosV(slot,start);s.projStore.setVelV(slot,velocity);
+    const shot={slot,life:6,flightTime:10,correctAt:4,fuseJitter:0,ownerId:ship.id,faction:ship.faction,targetId:'player',
+        threatensPilot:true,wobbleX:0,wobbleY:0,wobbleZ:0,wobblePhase:0};
+    const before=velocity.clone();
+    s.advanceFlak(shot,start.clone(),velocity,STEP);
+    assert.equal(shot.corrected,true);
+    assert.ok(before.angleTo(velocity)<=FLAK.correctTurn+1e-6,'turn is capped');
+    assert.ok(before.angleTo(velocity)>FLAK.correctTurn*.5,'it really turns toward the new lead');
+    assert.ok(Math.abs(shot.flightTime-shot.life-4)<1e-6,'elapsed flight time is preserved');
+    const life=shot.life;s.advanceFlak(shot,start.clone(),velocity,STEP);
+    assert.ok(Math.abs(life-shot.life)<1e-9,'no second correction');
 });
 
 test('a long but reachable flak intercept uses the full flight time',()=>{

@@ -90,17 +90,20 @@ export function createShipExplosion(position, scale = 1, { velocity, variant, se
                     vec4 origin=modelViewMatrix[3];
                     float depth=max(0.,-origin.z);
                     float focal=max(projectionMatrix[0][0],projectionMatrix[1][1]);
-                    // The entire puff fits inside a ten-unit radius and a small
-                    // fraction of the viewport, including its drifting lobes.
-                    float shrink=min(1.,.075*depth/(10.*focal));
+                    // The fire reaches 15 units; the cooling lobes expand to 28.
+                    // Keep the angular cap throughout both phases.
+                    float cooling=smoothstep(.3,1.4,age);
+                    float extent=mix(15.,28.,cooling);
+                    float shrink=min(1.,.075*depth/(extent*focal));
                     if(flash>.5){
-                        radius=min(2.+2.*clamp(age/.1,0.,1.),.065*depth/focal);
+                        radius=min(14.+6.*clamp(age/.1,0.,1.),.065*depth/focal);
                         view=origin;
                     }else{
-                        float driftRadius=(2.+.5*params.x)*spread;
+                        float bloom=1.-exp(-age*16.);
+                        float driftRadius=(.28+.07*params.x)*extent*bloom;
                         view=origin;
                         view.xyz+=mat3(modelViewMatrix)*drift*(driftRadius*shrink/worldScale);
-                        radius=(2.+3.8*spread)*shrink;
+                        radius=extent*(.20+.25*bloom)*shrink*started;
                         visibility=smoothstep(15.,60.,depth);
                     }
                 }else radius*=worldScale;
@@ -136,8 +139,10 @@ export function createShipExplosion(position, scale = 1, { velocity, variant, se
                 vec3 color=mix(smoke,fire,smoothstep(.12,.55,h));
                 if(flak>.5){
                     vec3 charcoal=vec3(.015,.010,.007)*(.6+n);
-                    float ember=(1.-smoothstep(.02,.30,age))*(1.-smoothstep(.05,.85,r));
-                    color=charcoal+vec3(.32,.061,.009)*ember;
+                    float tongue=1.-smoothstep(.28,.9,r+(n-.5)*.9);
+                    float flame=(1.-smoothstep(.13,.48,age))*tongue;
+                    vec3 hot=mix(vec3(.68,.055,.008),vec3(1.,.42,.035),n);
+                    color=mix(charcoal,hot,flame);
                 }
                 float fade=(1.-smoothstep(1.3*soot,2.5*soot,age))*smoothstep(0.,.08,age);
                 gl_FragColor=vec4(color,density*fade*.86*visibility);
@@ -151,7 +156,7 @@ export function createShipExplosion(position, scale = 1, { velocity, variant, se
     // pattern scaled up.
     const heft = blastHeft(scale, FIGHTER_BLAST, .75);
     const parts = [
-        createStreakBurst({ count: flak ? 14 : kind === 'breach' ? 48 : 40, speedMin: 18 * heft, speedMax: 58 * heft, drag: 1.4, lifeMin: .45 * pace.value, lifeMax: 1.1 * pace.value, width: flak ? .08 : .15, lag: flak ? .035 : .06, nearClip: flak ? 15 : 0,
+        createStreakBurst({ count: flak ? 26 : kind === 'breach' ? 48 : 40, speedMin: (flak ? 32 : 18) * heft, speedMax: (flak ? 82 : 58) * heft, drag: 1.4, lifeMin: .45 * pace.value, lifeMax: 1.1 * pace.value, width: flak ? .08 : .15, lag: flak ? .035 : .06, nearClip: flak ? 15 : 0,
             hot: flak ? 0xffa148 : 0xfffbe8, cool: kind === 'breach' ? 0x5aa8ff : 0xff6a1e, random, delay: flak ? .07 : (i) => centres[i % centres.length][3] }),
     ];
     if(!flak)parts.push(

@@ -104,3 +104,18 @@ test('big hulls hold together a moment, then ease apart; their blast burns longe
  const spread=calm=>{const d=createHullDebris([0,0,0],2,[0,0,0],calm),m=d.object.children[0],matrix=new T.Matrix4(),p=new T.Vector3();d.update(1);let sum=0;for(let i=0;i<m.count;i++){m.getMatrixAt(i,matrix);sum+=p.setFromMatrixPosition(matrix).length();}return sum;};
  assert.ok(spread(1)<spread(0)*.6);
 });
+
+test('flak bursts pool a cloud and 26 fast streaks with close-camera clipping',async()=>{
+ const {createShipExplosion}=await import('../../src/game/explosionFx.js');
+ const burst=createShipExplosion([0,0,0],2,{variant:'flak',seed:1});
+ try{
+  const [cloud,streaks]=burst.object.children;
+  assert.equal(burst.object.children.length,2);
+  assert.ok(burst.life>=2.5);
+  assert.equal(cloud.material.uniforms.flak.value,1);
+  assert.equal(streaks.geometry.instanceCount,26);
+  assert.equal(streaks.material.uniforms.nearClip.value,15);
+  const speed=streaks.geometry.getAttribute('spark');
+  assert.ok(Math.max(...Array.from({length:speed.count},(_,i)=>speed.getX(i)))>60);
+ }finally{burst.dispose();}
+});

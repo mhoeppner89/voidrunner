@@ -25,8 +25,10 @@ export const BARGE=Object.freeze({
     // After a full salvo the barge relocates at full speed for this long.
     relocate:6,
 });
-export const FLAK=Object.freeze({id:'flak',speed:90,damage:40,radius:50,minimum:10,
-    proximity:30,spread:3.9*Math.PI/180,jitter:.4,lockRange:BARGE.lockRange,lockTime:BARGE.lockTime});
+// Pirate fire control: one re-lead at correctAt of the flight, turning at
+// most correctTurn, then straight again; the BREAK cue follows that update.
+export const FLAK=Object.freeze({id:'flak',speed:90,damage:45,radius:70,minimum:10,
+    proximity:45,spread:6*Math.PI/180,jitter:.4,correctAt:.4,correctTurn:10*Math.PI/180,lockRange:BARGE.lockRange,lockTime:BARGE.lockTime});
 const BLIND=Object.freeze({...FLAK,lockRange:BARGE.lockRange/2,lockTime:BARGE.lockTime*2});
 
 const ZERO=[0,0,0];
@@ -75,13 +77,16 @@ function fireNext(session,ship,s,victim){
         s.right.crossVectors(s.shot,s.up).normalize();s.up.crossVectors(s.right,s.shot);
         const angle=Math.random()*2*Math.PI,radius=Math.sqrt(Math.random())*Math.tan(FLAK.spread);
         s.shot.addScaledVector(s.right,radius*Math.cos(angle)).addScaledVector(s.up,radius*Math.sin(angle)).normalize().multiplyScalar(FLAK.speed);
-        const slot=session.projStore.alloc(),life=Math.max(.01,time+(2*Math.random()-1)*FLAK.jitter);
+        const fuseJitter=(2*Math.random()-1)*FLAK.jitter;
+        const slot=session.projStore.alloc(),life=Math.max(.01,time+fuseJitter);
         session.projStore.setPosV(slot,s.muzzle);session.projStore.snapshot?.(slot);session.projStore.setVelV(slot,s.shot);
         const salvo=s.volley;
         salvo.interceptTime??=time;
+        // Remaining time at which BREAK sounds: just after the mid-course re-lead.
+        salvo.cueAt??=time*(1-FLAK.correctAt)-.2;
         session.projectiles.push({id:`p-${++session.projectileCounter}`,kind:'missile',launcherId:'flak',ownerId:ship.id,slot,
             salvo:salvo.id,flakVolley:salvo,life,damage:FLAK.damage,hitWeapon:FLAK,faction:ship.faction,targetId:ship.targetId,
-            arenaSide:ship.arenaRunEnemy,threatensPilot:ship.hostile||ship.targetId==='player',flightTime:life,wobblePhase:angle,
+            arenaSide:ship.arenaRunEnemy,threatensPilot:ship.hostile||ship.targetId==='player',flightTime:life,fuseJitter,correctAt:time*FLAK.correctAt,wobblePhase:angle,
             wobbleX:s.right.x,wobbleY:s.right.y,wobbleZ:s.right.z});
         session.renderer?.spawnMuzzleFlash?.(s.muzzle.x,s.muzzle.y,s.muzzle.z,0xff8532);
         session.playWorldSound?.('flak-launch',1,s.muzzle.x,s.muzzle.y,s.muzzle.z);

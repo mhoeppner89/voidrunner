@@ -475,7 +475,7 @@ export class AudioManager {
     }
 
     // Own-ship and interface playback: full detail, no distance.
-    play(effect, intensity = 1, pan = 0, distance = 0, cockpit = false) {
+    play(effect, intensity = 1, pan = 0, distance = 0, cockpit = false, sourceChannel) {
         if (!this.context || !this.effectsGain || !this.enabled || this.effectsVolume <= 0.001)
             return;
         if (!Number.isFinite(intensity) || intensity <= 0) return;
@@ -487,7 +487,7 @@ export class AudioManager {
         }
         // Events naming a shared channel space against each other (launch and
         // approach warnings use one pip sample and must never stack).
-        const channel = SOUND_EVENTS[effect]?.channel ?? (cockpit ? `cockpit:${effect}` : effect);
+        const channel = SOUND_EVENTS[effect]?.channel ?? sourceChannel ?? (cockpit ? `cockpit:${effect}` : effect);
         this.trigger(effect, clamp(intensity * (cockpit ? 1.25 : 1), 0.001, 2), pan, distance, 1, 0, 0, channel);
         // Story beats also land in the score.
         if (effect === 'threat' || effect === 'kill') this.music?.stinger(effect);

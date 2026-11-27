@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {session} from '../helpers/session.mjs';
 import {loadoutFor,HULL_HARDPOINTS,normalizeOutfitting} from '../../src/game/outfitting.js';
+import {createEquipmentRecord} from '../../src/game/equipmentInventory.js';
 import {hydrateSave} from '../../src/game/save.js';
 function fixture(mode='together',hull='wayfarer'){
  const s=session(),p=s.save.player;s.persistSave=()=>{};p.shipId=hull;const fit=loadoutFor(p);fit.guns=['pulse-cannon','pulse-cannon'];fit.launchers=['seeker-launcher'];fit.fireGroups.assignments[`${hull}-gun-0`]='A';fit.fireGroups.assignments[`${hull}-gun-1`]='A';fit.fireGroups.activeGroup='A';fit.fireGroups.firingModes={A:mode,B:'together'};
@@ -42,4 +43,48 @@ test('mid-wave control changes update Arena retry preferences without replacing 
  const {s,p}=fixture();s.arena={run:true};const checkpoint=JSON.parse(JSON.stringify(p));checkpoint.hull=123;checkpoint.energy=45;s.save.arenaRun={phase:'combat',checkpoint};p.hull=7;p.energy=3;
  assert.ok(s.setWeaponGroup('wayfarer-gun-1','B'));assert.ok(s.setGroupFireMode('B','alternating'));
  assert.equal(checkpoint.outfitting.loadouts.wayfarer.fireGroups.assignments['wayfarer-gun-1'],'B');assert.equal(checkpoint.outfitting.loadouts.wayfarer.fireGroups.firingModes.B,'alternating');assert.equal(checkpoint.hull,123);assert.equal(checkpoint.energy,45);
+});
+
+test('paired guns play from their mount sides with one recoil pulse and emission',()=>{
+ const {s,fit}=fixture();
+ fit.guns=['pulse-cannon','gauss-cannon'];
+ const voices=[],pulses=[],emissions=[];
+ s.audio.play=(...args)=>voices.push(args);
+ s.haptics={pulse:(...args)=>pulses.push(args)};
+ s.addPlayerEmission=value=>emissions.push(value);
+ s.firePlayerGuns();
+ s.firePlayerGuns();
+ assert.deepEqual(voices.map(([id,,pan,,,mount])=>[id,pan,mount]),[
+  ['laser',-.3,'wayfarer-gun-0'],['gauss',.3,'wayfarer-gun-1'],
+ ]);
+ for (const [id,level] of voices) {
+  const solo=id==='gauss'?.85:.72;
+  assert.ok(Math.abs(20*Math.log10(level/solo)+2)<.02);
+ }
+ assert.equal(pulses.length,1);
+ assert.equal(emissions.length,1);
+});
+
+test('each alternating shot gets a voice even within the former 100 ms gate',()=>{
+ const {s,p,fit,shots}=fixture('alternating');
+ fit.guns=fit.guns.map(()=>createEquipmentRecord('pulse-cannon',{rarity:'uncommon',affixes:['rapid'],rolls:[1]}).id);
+ const voices=[];
+ s.audio.play=(id,level,pan,distance,cockpit,mount)=>voices.push({time:s.save.world.time,mount});
+ for(let tick=0;tick<60;tick++){
+  s.save.world.time=tick/60;
+  p.energy=100;
+  s.firePlayerGuns();
+ }
+ assert.ok(shots.length>5);
+ assert.ok(shots.some((shot,i)=>i && shot.time-shots[i-1].time<.1));
+ assert.deepEqual(voices,shots);
+});
+
+test('a single mounted gun plays at its original level and centre pan',()=>{
+ const {s,fit}=fixture();
+ fit.guns[1]=null;
+ const voices=[];
+ s.audio.play=(...args)=>voices.push(args);
+ s.firePlayerGuns();
+ assert.deepEqual(voices.map(args=>args.slice(0,3)),[['laser',.72,0]]);
 });

@@ -80,10 +80,10 @@ export function updateMissileWarning(flight,projectiles,store,player,latency=0){
         if(time<nearest){nearest=time;urgent=shot;}
     }
     if(!urgent)return;
-    // The flak trials allow a break from ignition to about two seconds
-    // before interception. Split that window before adding pilot reaction.
+    // Flak re-leads once mid-flight, so a break only counts after that update:
+    // the cue sounds just after it (the volley stores the remaining time).
     const volley=urgent.flakVolley;
-    const cueAt=volley ? (volley.interceptTime+2)/2+BREAK_REACTION+latency : breakCueTime(urgent.hitWeapon)+latency;
+    const cueAt=volley ? volley.cueAt+latency : breakCueTime(urgent.hitWeapon)+latency;
     if(nearest>cueAt)return;
     flight.missileCommitted=true;
     if(urgent.breakCued||volley?.cued)return;

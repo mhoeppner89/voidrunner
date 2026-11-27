@@ -1,3 +1,9 @@
+## 0.8.2qa — A Barrage worth fearing; two guns, two sounds
+
+- The Red Njord Barrage's flak is a real danger now: rockets scatter wider, and halfway through their flight its pirate fire control re-aims each one once at where you are now. Bursts are bigger (70 m blast) and go off within 45 m of a ship. Hold your course and a salvo hurts badly; break when BREAK sounds, just after that re-aim, and it misses. Slow, big ships still eat the whole salvo.
+- Bigger, heavier flak bursts: an orange-red fireball, more shrapnel, larger dark puffs, and a deep boom and rolling rumble under the crack. The rocket launch has more thump too.
+- Firing two guns now sounds like two guns: each gun plays its own shot, panned to its side of the ship, instead of one sound for the whole volley.
+
 ## 0.8.2pz — Heimdall and Tacita, flak Barrage, three-wave Arena levels, debris cover
 
 - New League corvette: the **Heimdall**, a gauss gun with engines. Three accelerator rods around an open bore; the joints light up one by one while it charges, three lit means BREAK, six lit means it fires a 150-damage shot along its bow. Break across its aim after the BREAK cue, or shoot out its two capacitor drums to silence the gun. A laser turret guards each flank.

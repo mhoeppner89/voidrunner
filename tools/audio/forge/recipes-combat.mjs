@@ -506,34 +506,36 @@ export default {
         variants: 2, peak: -3, group: 'flight',
         make: (v, R) => {
             const T = 1.1;
-            const cough = blend([thud(0.3, 96 - v * 8, 48, { sweep: 0.03, tau: 0.06, push: 2 }), 1],
+            const cough = blend([thud(0.5, 88 - v * 8, 40, { sweep: 0.04, tau: 0.11, push: 2.4 }), 1.3],
                 [d.mul(d.bandpass(d.noise(0.3, R, 'pink'), 420 + v * 60, 1.4), d.perc(0.3, 0.002, 0.05)), 0.9]);
             let gate = 1, until = 0;
             const sputter = d.noise(T, R, 'pink').map((x, i) => { if (i >= until) { gate = R.range(0.25, 1); until = i + Math.floor(d.SR / R.range(24, 46)); } return x * gate; });
             const motor = d.mul(d.bandpass(sputter, d.line(T, [[0, 700], [0.12, 1500 + v * 150], [T, 650]], 'exp'), 1.1),
                 d.curve(T, (t) => Math.min(1, t / 0.05) * Math.exp(-Math.max(0, t - 0.05) / 0.32)));
             const fizz = d.mul(d.highpass(d.noise(T, R), 5000), d.perc(T, 0.01, 0.12));
-            const mono = d.drive(blend([d.pad(cough, T), 1], [motor, 0.75], [fizz, 0.2]), 1.6);
+            const mono = d.drive(blend([d.pad(cough, T), 1.1], [motor, 0.75], [fizz, 0.2]), 1.6);
             return d.reverb(d.widen(d.fade(mono, 0.001, 0.25), R, 0.5), { time: 1.2, mix: 0.18, seed: 231 + v });
         },
     },
-    // A high-explosive flak burst: a split-second crack, a hard "kraack" of
-    // mid noise and a short punchy body (no sub boom), then fragments and air.
-    // Kept short and dry so a whole salvo reads as staccato bracketing.
+    // A rocket's high-explosive warhead going off: the split-second crack and
+    // mid "kraack" still lead (so a salvo reads as separate bursts), but now
+    // over a chesty boom, a fireball whoomph and a rolling rumble tail.
     'flak-burst': {
         variants: 3, peak: -1, group: 'flight',
         make: (v, R) => {
-            const T = 1.6;
+            const T = 2.8;
             const crack = blend([tick(R, { hz: 3200 + v * 300, ms: 2 }), 1.2],
                 [burst(R, 0.12, { from: 12000, to: 3000, sweep: 0.01, tau: 0.012, attack: 0.0003 }), 1]);
-            const kraack = d.mul(d.bandpass(d.noise(0.5, R), d.line(0.5, [[0, 2600 - v * 200], [0.5, 500]], 'exp'), 0.9), d.perc(0.5, 0.0008, 0.045));
-            const body = thud(0.5, 128 - v * 10, 58, { sweep: 0.025, tau: 0.07, push: 2.4 });
-            const hollow = d.mul(d.bandpass(d.noise(0.6, R, 'pink'), 310 + v * 25, 2), d.perc(0.6, 0.004, 0.09));
-            const frags = scatter(R, 0.9, 10 + v * 3, (r) => d.modal(tick(r, { hz: 1800, ms: 1 }), [{ f: r.range(1800, 5200), t60: r.range(0.01, 0.03) }], 0.05), { span: 0.7, shape: 1.8, spread: 0.9 });
-            const mono = d.highpass(d.drive(blend([crack, 1.3], [kraack, 1.6], [body, 0.4], [hollow, 0.6]), 2.2), 70);
-            const out = d.widen(d.pad(mono, T), R, 0.55);
-            d.place(out, frags, 0.05, 0.35);
-            return d.reverb(d.fade(out, 0.0005, 0.5), { time: 1.5, mix: 0.2, damp: 0.45, seed: 241 + v });
+            const kraack = d.mul(d.bandpass(d.noise(0.6, R), d.line(0.6, [[0, 2400 - v * 200], [0.6, 420]], 'exp'), 0.9), d.perc(0.6, 0.0008, 0.07));
+            const boom = d.lowpass(d.drive(d.mul(d.osc(1.4, d.curve(1.4, (t) => 38 + (96 - v * 8 - 38) * Math.exp(-t / 0.09))), d.perc(1.4, 0.002, 0.34)), 2.6), 260);
+            const whoomph = d.mul(d.lowpass(d.noise(1.6, R, 'brown'), d.line(1.6, [[0, 700], [0.25, 260], [1.6, 90]], 'exp'), 0.9), d.perc(1.6, 0.012, 0.42));
+            const rumble = d.mul(d.lowpass(d.noise(T, R, 'brown'), d.line(T, [[0, 220], [T, 55]], 'exp')), d.curve(T, (t) => Math.min(1, t / 0.08) * Math.exp(-t / 1.0)));
+            const frags = scatter(R, 1.6, 16 + v * 4, (r) => d.modal(tick(r, { hz: 1800, ms: 1 }), [{ f: r.range(900, 5200), t60: r.range(0.01, 0.05) }], 0.07), { span: 1.4, shape: 2, spread: 0.9, fall: 1.4 });
+            const front = d.drive(blend([crack, 1.2], [kraack, 1.3]), 2);
+            const mono = d.highpass(d.drive(blend([d.pad(front, T), 1.8], [d.pad(boom, T), 1.1], [d.pad(whoomph, T), 0.9], [d.pad(d.highpass(kraack, 900), T), 1.1], [rumble, 0.6]), 1.8), 28);
+            const out = d.widen(mono, R, 0.6, 160);
+            d.place(out, frags, 0.08, 0.32);
+            return d.reverb(d.fade(out, 0.0005, 0.8), { time: 2.2, mix: 0.22, damp: 0.5, seed: 241 + v });
         },
     },
     // Shrapnel from a close burst peppering the hull: a front-loaded spray of

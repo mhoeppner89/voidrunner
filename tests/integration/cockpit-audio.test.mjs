@@ -98,6 +98,14 @@ test('cues throttle before creating audio nodes and release every node they made
  assert.equal(a.activeVoices,0);assert.equal(a.effectReleases.size,0);assert.ok(disconnected>0);
 });
 
+test('the mixer preserves mount channels and centres a non-finite pan',()=>{
+ const a=new AudioManager(),calls=[];
+ Object.assign(a,{context:{currentTime:0},enabled:true,effectsGain:{},trigger:(...args)=>calls.push(args)});
+ a.play('laser',.72,-.3,0,false,'wayfarer-gun-0');
+ a.play('laser',.72,NaN,0,false,'wayfarer-gun-1');
+ assert.deepEqual(calls.map(args=>[args[2],args[7]]),[[-.3,'wayfarer-gun-0'],[0,'wayfarer-gun-1']]);
+});
+
 test('distant fire is panned, delayed by range and dropped beyond earshot',()=>{
  const a=new AudioManager(),calls=[];Object.assign(a,{context:{currentTime:0},enabled:true,effectsVolume:1,effectsGain:{},trigger:(...args)=>calls.push(args)});
  a.playAtDirection('explosion',1,5000,10,0);assert.equal(calls.length,0,'out of range');
