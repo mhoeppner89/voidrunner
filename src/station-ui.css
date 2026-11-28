@@ -1276,8 +1276,8 @@
 #arena-panel .run-section-head > span:first-child::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 10px; vertical-align: 1px; background: var(--sx-led-on); box-shadow: 0 0 6px var(--sx-led-on); }
 
 /* pick cards (rewards, hulls, wingmen) */
-#arena-panel .run-offers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; flex: 1 0 auto; align-items: stretch; }
-#arena-panel .run-offer {
+:is(#arena-panel, #multiplayer-panel) .run-offers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; flex: 1 0 auto; align-items: stretch; }
+:is(#arena-panel, #multiplayer-panel) .run-offer {
   position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 12px; min-width: 0; min-height: 0; height: auto; padding: 16px; margin: 0;
   font: 500 14px/1.35 var(--ui-text-font); letter-spacing: 0; text-transform: none; text-align: left; white-space: normal; color: var(--sx-text); cursor: pointer;
   background: linear-gradient(180deg, color-mix(in srgb, var(--item-color, var(--sx-cyan)) 9%, transparent), transparent 46%), rgba(1, 5, 14, 0.72);
@@ -1285,10 +1285,10 @@
   box-shadow: 0 0 0 1px #000, 0 10px 24px rgba(0, 0, 0, 0.35);
   transition: transform 0.12s, border-color 0.12s, box-shadow 0.12s;
 }
-#arena-panel .run-offer:hover:not(:disabled) { transform: translateY(-2px); border-color: color-mix(in srgb, var(--item-color, var(--sx-cyan)) 60%, transparent); border-top-color: var(--item-color, var(--sx-cyan)); }
-#arena-panel .run-offer:focus-visible { outline: 2px solid var(--sx-gold); outline-offset: 3px; }
+:is(#arena-panel, #multiplayer-panel) .run-offer:hover:not(:disabled) { transform: translateY(-2px); border-color: color-mix(in srgb, var(--item-color, var(--sx-cyan)) 60%, transparent); border-top-color: var(--item-color, var(--sx-cyan)); }
+:is(#arena-panel, #multiplayer-panel) .run-offer:focus-visible { outline: 2px solid var(--sx-gold); outline-offset: 3px; }
 #arena-panel .run-offer:is([data-rarity="epic"], [data-rarity="named"]) { box-shadow: 0 0 0 1px #000, 0 10px 24px rgba(0, 0, 0, 0.35), inset 0 0 30px -10px var(--item-color); }
-#arena-panel .run-offer.is-selected { border-color: var(--item-color, var(--sx-gold)); box-shadow: 0 0 0 1px #000, 0 0 0 3px color-mix(in srgb, var(--item-color, var(--sx-gold)) 70%, transparent), 0 0 30px color-mix(in srgb, var(--item-color, var(--sx-gold)) 30%, transparent), inset 0 0 30px -10px var(--item-color, var(--sx-gold)); }
+:is(#arena-panel, #multiplayer-panel) .run-offer.is-selected { border-color: var(--item-color, var(--sx-gold)); box-shadow: 0 0 0 1px #000, 0 0 0 3px color-mix(in srgb, var(--item-color, var(--sx-gold)) 70%, transparent), 0 0 30px color-mix(in srgb, var(--item-color, var(--sx-gold)) 30%, transparent), inset 0 0 30px -10px var(--item-color, var(--sx-gold)); }
 #arena-panel .run-selected-mark { display: none; position: absolute; top: -12px; right: 12px; z-index: 2; width: 26px; height: 26px; place-items: center; font: 700 15px/1 var(--ui-text-font); color: var(--sx-gold-ink); background: var(--item-color, var(--sx-gold)); box-shadow: 0 0 0 2px #000, 0 0 12px var(--item-color, var(--sx-gold)); }
 #arena-panel .run-offer.is-selected .run-selected-mark { display: grid; }
 /* A legendary card carries a slow light sweep. */
@@ -1304,7 +1304,7 @@
 #arena-panel .run-art-plate.is-small .item-icon { width: 32px; height: 32px; }
 #arena-panel .run-art-plate.is-service { color: var(--sx-phosphor); }
 #arena-panel .run-art-plate.is-empty { color: var(--sx-text-3); border-style: dashed; border-color: var(--sx-line-2); }
-#arena-panel .run-tier { position: absolute; right: 2px; bottom: 2px; padding: 2px 4px; font: 400 11px/1 var(--pixel-font); font-style: normal; color: var(--item-color, var(--sx-text-2)); background: rgba(3, 10, 28, 0.85); }
+:is(#arena-panel, #multiplayer-panel) .run-tier { position: absolute; right: 2px; bottom: 2px; padding: 2px 4px; font: 400 11px/1 var(--pixel-font); font-style: normal; color: var(--item-color, var(--sx-text-2)); background: rgba(3, 10, 28, 0.85); }
 #arena-panel .run-art-plate.is-small .run-tier { display: none; }
 #arena-panel .run-offer-title { display: grid; gap: 4px; min-width: 0; }
 #arena-panel .run-item-label { font: 700 17px/1.2 var(--ui-text-font); color: var(--item-color, var(--sx-text)); overflow-wrap: anywhere; }
@@ -1367,26 +1367,26 @@
 #arena-panel .run-service-blurb { font: 500 15px/1.45 var(--ui-text-font); color: var(--sx-text-2); }
 
 /* hull and wingman picks */
-#arena-panel .run-hull-card { --item-color: var(--sx-cyan); }
-#arena-panel .run-hull-head { display: grid; gap: 4px; }
-#arena-panel .run-hull-name { font: 400 22px/1 var(--pixel-font); color: var(--sx-text); }
-#arena-panel .run-hull-role { font: 700 11px/1.2 var(--ui-text-font); letter-spacing: 0.14em; text-transform: uppercase; color: var(--sx-text-3); }
-#arena-panel .run-pilot { font: 600 14px/1.2 var(--ui-text-font); color: var(--sx-phosphor); }
-#arena-panel .run-hull-plate { position: relative; display: grid; place-items: center; flex: 1 1 170px; min-height: 150px; padding: 12px; overflow: hidden; color: var(--sx-cyan);
+:is(#arena-panel, #multiplayer-panel) .run-hull-card { --item-color: var(--sx-cyan); }
+:is(#arena-panel, #multiplayer-panel) .run-hull-head { display: grid; gap: 4px; }
+:is(#arena-panel, #multiplayer-panel) .run-hull-name { font: 400 22px/1 var(--pixel-font); color: var(--sx-text); }
+:is(#arena-panel, #multiplayer-panel) .run-hull-role { font: 700 11px/1.2 var(--ui-text-font); letter-spacing: 0.14em; text-transform: uppercase; color: var(--sx-text-3); }
+:is(#arena-panel, #multiplayer-panel) .run-pilot { font: 600 14px/1.2 var(--ui-text-font); color: var(--sx-phosphor); }
+:is(#arena-panel, #multiplayer-panel) .run-hull-plate { position: relative; display: grid; place-items: center; flex: 1 1 170px; min-height: 150px; padding: 12px; overflow: hidden; color: var(--sx-cyan);
   background: radial-gradient(closest-side, rgba(105, 228, 242, 0.14), transparent), linear-gradient(0deg, rgba(112, 214, 200, 0.08) 1px, transparent 1px) 0 0 / 16px 16px, linear-gradient(90deg, rgba(112, 214, 200, 0.08) 1px, transparent 1px) 0 0 / 16px 16px, #01050b;
   border: 1px solid #000; box-shadow: inset 0 0 0 1px var(--sx-line-2); }
-#arena-panel .run-hull-image { position: absolute; inset: 12px; display: block; width: calc(100% - 24px); height: calc(100% - 24px); filter: drop-shadow(0 0 6px rgba(105, 228, 242, 0.35)); }
-#arena-panel .run-hull-plate .run-tier { right: 6px; bottom: 6px; font-size: 13px; color: var(--sx-gold); }
-#arena-panel .run-bars { display: grid; gap: 7px; }
-#arena-panel .run-bar { display: grid; grid-template-columns: minmax(70px, 34%) minmax(0, 1fr) auto; align-items: center; gap: 10px; }
-#arena-panel .run-bar small { font: 700 10px/1.2 var(--ui-text-font); letter-spacing: 0.12em; text-transform: uppercase; color: var(--sx-text-3); overflow-wrap: anywhere; }
-#arena-panel .run-bar > i { position: relative; height: 6px; background: rgba(255, 255, 255, 0.07); }
-#arena-panel .run-bar > i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--v); background: linear-gradient(90deg, var(--sx-phosphor-dim), var(--sx-phosphor)); box-shadow: 0 0 6px rgba(124, 239, 184, 0.4); }
-#arena-panel .run-bar b { min-width: 54px; font: 400 14px/1 var(--pixel-font); color: var(--sx-text); text-align: right; }
-#arena-panel .run-mount-counts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; margin-top: auto; background: var(--sx-line); border: 1px solid var(--sx-line); }
-#arena-panel .run-mount-counts i { display: grid; gap: 3px; justify-items: center; padding: 7px 4px; font-style: normal; background: rgba(1, 5, 12, 0.9); }
-#arena-panel .run-mount-counts b { font: 400 18px/1 var(--pixel-font); color: var(--sx-text); }
-#arena-panel .run-mount-counts small { font: 700 9px/1.1 var(--ui-text-font); letter-spacing: 0.1em; text-transform: uppercase; color: var(--sx-text-3); text-align: center; overflow-wrap: anywhere; }
+:is(#arena-panel, #multiplayer-panel) .run-hull-image { position: absolute; inset: 12px; display: block; width: calc(100% - 24px); height: calc(100% - 24px); filter: drop-shadow(0 0 6px rgba(105, 228, 242, 0.35)); }
+:is(#arena-panel, #multiplayer-panel) .run-hull-plate .run-tier { right: 6px; bottom: 6px; font-size: 13px; color: var(--sx-gold); }
+:is(#arena-panel, #multiplayer-panel) .run-bars { display: grid; gap: 7px; }
+:is(#arena-panel, #multiplayer-panel) .run-bar { display: grid; grid-template-columns: minmax(70px, 34%) minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+:is(#arena-panel, #multiplayer-panel) .run-bar small { font: 700 10px/1.2 var(--ui-text-font); letter-spacing: 0.12em; text-transform: uppercase; color: var(--sx-text-3); overflow-wrap: anywhere; }
+:is(#arena-panel, #multiplayer-panel) .run-bar > i { position: relative; height: 6px; background: rgba(255, 255, 255, 0.07); }
+:is(#arena-panel, #multiplayer-panel) .run-bar > i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--v); background: linear-gradient(90deg, var(--sx-phosphor-dim), var(--sx-phosphor)); box-shadow: 0 0 6px rgba(124, 239, 184, 0.4); }
+:is(#arena-panel, #multiplayer-panel) .run-bar b { min-width: 54px; font: 400 14px/1 var(--pixel-font); color: var(--sx-text); text-align: right; }
+:is(#arena-panel, #multiplayer-panel) .run-mount-counts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; margin-top: auto; background: var(--sx-line); border: 1px solid var(--sx-line); }
+:is(#arena-panel, #multiplayer-panel) .run-mount-counts i { display: grid; gap: 3px; justify-items: center; padding: 7px 4px; font-style: normal; background: rgba(1, 5, 12, 0.9); }
+:is(#arena-panel, #multiplayer-panel) .run-mount-counts b { font: 400 18px/1 var(--pixel-font); color: var(--sx-text); }
+:is(#arena-panel, #multiplayer-panel) .run-mount-counts small { font: 700 9px/1.1 var(--ui-text-font); letter-spacing: 0.1em; text-transform: uppercase; color: var(--sx-text-3); text-align: center; overflow-wrap: anywhere; }
 
 /* ready room: loadout, ship readout, next wave, wing orders */
 #arena-panel .run-ready { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; align-items: start; }
@@ -1694,6 +1694,72 @@
 }
 .match-shop-row small { display: block; }
 .match-shop-slots { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+.match-bots { display: grid; gap: 6px; margin-top: 12px; }
+.match-bots h3 { margin: 0; color: var(--sx-cyan); font: 700 12px/1.2 var(--ui-text-font); letter-spacing: .08em; text-transform: uppercase; }
+.match-bot-add, .match-bot-row { display: grid; align-items: center; gap: 6px; }
+.match-bot-add { grid-template-columns: minmax(0, 1fr) auto; }
+.match-bot-row { grid-template-columns: minmax(0, 1fr) minmax(80px, 23%) auto; padding: 5px 0; border-top: 1px solid #273e4e; }
+.match-bot-row.has-team { grid-template-columns: minmax(0, 1fr) minmax(80px, 21%) minmax(80px, 25%) auto; }
+.match-bot-row small { display: block; color: #abc2ce; font-size: 12px; overflow-wrap: anywhere; }
+
+/* Multiplayer opening loadout uses the Arena hull plates and equipment art. */
+.match-ready { color: var(--sx-phosphor); }
+#multiplayer-panel[data-screen="loadout"] .match-card { width: min(100%, 900px); }
+#multiplayer-panel .match-hulls { padding: 4px; }
+#multiplayer-panel .match-hulls .run-hull-card.is-selected { --item-color: var(--sx-phosphor); }
+#multiplayer-panel .match-hulls .run-hull-role { letter-spacing: .08em; min-height: 2.4em; }
+#multiplayer-panel .match-hulls .run-hull-plate { flex: 1 1 136px; min-height: 115px; }
+.match-hull-points { color: var(--sx-gold); font: 400 15px/1.2 var(--pixel-font); }
+.match-loadout-score { margin-inline-end: auto; display: flex; flex-wrap: wrap; gap: 3px 9px; align-items: baseline; }
+.match-loadout-score b { color: var(--sx-gold); font: 400 15px/1.2 var(--pixel-font); }
+.match-gear-pickers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.match-gear-group { display: grid; gap: 5px; }
+.match-gear-group h3 { margin: 0 0 3px; color: var(--sx-cyan); font: 700 12px/1.2 var(--ui-text-font); letter-spacing: .08em; text-transform: uppercase; }
+.match-gear-option {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 9px;
+  min-height: 45px;
+  padding: 3px 8px 3px 4px;
+  border: 1px solid var(--sx-line-2);
+  background: #102637;
+  color: var(--sx-text);
+  text-align: start;
+  font: 500 15px/1.15 var(--ui-text-font);
+}
+#multiplayer-panel .match-gear-option { font-family: var(--ui-text-font); letter-spacing: 0; text-transform: none; }
+.match-gear-option:hover, .match-gear-option[aria-pressed="true"] { border-color: var(--sx-phosphor); background: #173b41; }
+.match-gear-option[aria-pressed="true"]::after { content: "✓"; color: var(--sx-phosphor); }
+.match-gear-option small { display: block; margin-top: 2px; color: var(--sx-text-2); font-size: 12px; }
+.match-gear-icon { display: grid; place-items: center; height: 36px; color: var(--sx-text-3); background: #081620; }
+.match-gear-image { width: 33px; height: 33px; }
+.match-fit-readout { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 12px 0 0; background: var(--sx-line-2); border: 1px solid var(--sx-line-2); }
+.match-fit-readout div { display: grid; gap: 4px; padding: 6px 8px; background: #101e2c; }
+.match-fit-readout dt { color: var(--sx-text-2); font-size: 11px; }
+.match-fit-readout dd { margin: 0; color: var(--sx-phosphor); font: 400 15px/1.2 var(--pixel-font); }
+
+@media (max-height: 540px) {
+  #multiplayer-panel .match-hulls { gap: 8px; }
+  #multiplayer-panel .match-hulls .run-hull-card { gap: 5px; padding: 7px; }
+  #multiplayer-panel .match-hulls .run-hull-name { font-size: 17px; }
+  #multiplayer-panel .match-hulls .run-hull-plate { min-height: 56px; flex-basis: 58px; padding: 4px; }
+  #multiplayer-panel .match-hulls .run-hull-image { inset: 4px; width: calc(100% - 8px); height: calc(100% - 8px); }
+  #multiplayer-panel .match-hulls .run-bars { gap: 3px; }
+  #multiplayer-panel .match-hulls .run-bar { grid-template-columns: minmax(39px, 33%) minmax(0, 1fr) auto; gap: 4px; }
+  #multiplayer-panel .match-hulls .run-bar b { min-width: 30px; font-size: 12px; }
+  .match-fit-readout { margin-top: 7px; }
+  .match-fit-readout div { gap: 2px; padding: 3px 6px; }
+  .match-fit-readout dt { font-size: 10px; line-height: 1.1; }
+  .match-fit-readout dd { font-size: 14px; line-height: 1.05; }
+  .match-gear-option { min-height: 40px; font-size: 13px; }
+  .match-gear-icon { height: 30px; }
+  .match-gear-image { width: 29px; height: 29px; }
+}
+@media (max-width: 520px) {
+  #multiplayer-panel .match-hulls, .match-gear-pickers { grid-template-columns: 1fr; }
+  .match-fit-readout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-height: 500px) {
   .match-card header, .match-card footer, .match-scroll { padding: 8px 12px; }
   .match-message { padding-inline: 12px; }

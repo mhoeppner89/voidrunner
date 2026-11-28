@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { startWithConfirmedLoadouts } from '../helpers/multiplayer.mjs';
 import test from 'node:test';
 import { Quaternion, Vector3 } from 'three';
 import { ARENA_SITES } from '../../src/game/arenaSites.js';
@@ -20,7 +21,7 @@ test('all multiplayer Arena sites admit four pilots and respawns and enforce the
         for (const id of ids.slice(1)) assert.ok(match.addPlayer(id, id).ok);
         assert.ok(match.selectStarter(ids[1], 'scrapper').ok);
         assert.ok(match.selectStarter(ids[2], 'speedster').ok);
-        assert.ok(match.start(ids[0]).ok);
+        assert.ok(startWithConfirmedLoadouts(match).ok);
         const world = new MatchWorld(match, session, noop, noop);
         const obstacles = site.instanceId ? session.activeFieldObstacles(site.instanceId) : [];
         for (const actor of world.actors()) world.spawn(actor);
@@ -76,7 +77,7 @@ test('all multiplayer Arena sites admit four pilots and respawns and enforce the
 test('four-pilot snapshots read live rack counts without resolving the full fit again', () => {
     const match = createMultiplayerMatch({ hostId: ids[0], seed: 718 });
     for (const id of ids.slice(1)) match.addPlayer(id);
-    match.start(ids[0]);
+    startWithConfirmedLoadouts(match);
     const session = { save: { player: { position: [0, 0, 0] } }, siteSpotClear: () => true };
     const world = new MatchWorld(match, session, noop, noop);
     const expected = [];
@@ -93,4 +94,72 @@ test('four-pilot snapshots read live rack counts without resolving the full fit 
     const snapshot = world.snapshot();
     assert.deepEqual(snapshot.actors.map(actor => actor.rack), expected);
     assert.equal(outfitReads, 0);
+});
+
+test('respawns rotate away from a camper and the recently used firing area', () => {
+    function deployment(seed) {
+        const match = createMultiplayerMatch({ hostId: 'host', seed });
+        match.addPlayer('camper');
+        assert.ok(startWithConfirmedLoadouts(match).ok);
+        const session = { save: { player: { position: [0, 0, 0] } }, siteSpotClear: () => true };
+        const world = new MatchWorld(match, session, noop, noop);
+        const [pilot, camper] = world.actors();
+        assert.ok(world.spawn(pilot) && world.spawn(camper));
+        const first = new Vector3().fromArray(pilot.position);
+        first.toArray(camper.position);
+        const positions = [pilot.position];
+        for (let life = 2; life < 8; life++) {
+            world.recordDeath('host', 'camper', life - 1);
+            const next = match.respawn('host').actor;
+            assert.ok(world.spawn(next));
+            const point = new Vector3().fromArray(next.position);
+            assert.ok(point.distanceTo(first) > 650, 'the camper has no close shot at the redeploying pilot');
+            assert.ok(point.distanceTo(new Vector3().fromArray(positions.at(-1))) > 300, 'the last spawn is not immediately reused');
+            positions.push(next.position);
+        }
+        return positions;
+    }
+    const sample = deployment(718);
+    assert.ok(new Set(sample.map(position => position.join(','))).size >= 4);
+    assert.deepEqual(sample, deployment(718));
+    assert.notDeepEqual(sample, deployment(941));
+});
+
+test('team deployment favors a covered wing position without moving into hostile range', () => {
+    const match = createMultiplayerMatch({ hostId: 'host', settings: { mode: 'teams', siteId: 'shardbelt-rim' } });
+    for (const id of ['enemy', 'wing', 'enemy-wing']) match.addPlayer(id);
+    assert.ok(startWithConfirmedLoadouts(match).ok);
+    const session = { save: { player: { position: [0, 0, 0] } }, activeFieldObstacles: () => [],
+        siteSpotClear: () => true, lineBlocked: (_, point) => point.z > 0 };
+    const world = new MatchWorld(match, session, noop, noop);
+    for (const actor of world.actors()) assert.ok(world.spawn(actor));
+    const [host, enemy, wing, enemyWing] = world.actors();
+    enemy.position = [0, 0, 0];
+    enemyWing.position = [0, 0, -120];
+    wing.position = [720, 0, 0];
+    const coveredWing = new Vector3(460, 0, 180);
+    world.spawnOptions = [new Vector3(220, 0, 0), new Vector3(-900, 0, 0), new Vector3(460, 0, -160), coveredWing];
+    world.recordDeath(host.id, enemy.id, host.life);
+    const next = match.respawn(host.id).actor;
+    assert.equal(world.chooseSpawn(next), coveredWing);
+    session.siteSpotClear = () => false;
+    assert.equal(world.spawn(next), false, 'a blocked site never falls back inside the terrain');
+});
+
+test('2v2 openings group each wing with room to maneuver and separate the opposing wings', () => {
+    for (const seed of [175, 718, 941]) {
+        const match = createMultiplayerMatch({ hostId: 'host', seed, settings: { mode: 'teams' } });
+        for (const id of ['enemy', 'wing', 'enemy-wing']) match.addPlayer(id);
+        assert.ok(startWithConfirmedLoadouts(match).ok);
+        const session = { save: { player: { position: [0, 0, 0] } }, siteSpotClear: () => true };
+        const world = new MatchWorld(match, session, noop, noop);
+        const actors = world.actors();
+        for (const actor of actors) assert.ok(world.spawn(actor));
+        for (const actor of actors) {
+            for (const other of actors.filter(other => other !== actor)) {
+                const gap = Math.hypot(...actor.position.map((value, i) => value - other.position[i]));
+                assert.ok(actor.team === other.team ? gap > 120 && gap < 520 : gap > 650, `seed ${seed}, gap ${gap}`);
+            }
+        }
+    }
 });

@@ -1,3 +1,13 @@
+## 0.8.2qi — Multiplayer bots
+
+- Fill open seats with Brick, Latch, or Wisp. Set each bot to Novice, Veteran, or Ace and assign teams in team deathmatch. A single human can play against bots.
+- Bots fly and fire under the same match rules as human pilots. They use death credits for character-specific equipment and hull upgrades before relaunching.
+
+## 0.8.2qh — Multiplayer deployment
+
+- Choose a Tier 1 hull and fit a starter gun and system before confirming the loadout. The host starts after every pilot is ready.
+- Vary multiplayer deployments and relaunches using enemy distance, cover, recent spawn locations and nearby allies.
+
 ## 0.8.2qg — Flight performance and room recovery
 
 - Build the same NPC routes with fewer terrain calculations and avoid temporary vectors in Career location checks.

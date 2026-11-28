@@ -1,9 +1,10 @@
 import { ARENA_SITE_IDS } from '../arenaSites.js';
 import { SHIPS } from '../data.js';
+import { BOT_CHARACTERS, BOT_DIFFICULTIES } from './botProfiles.js';
 import { createPilotFitting, MULTIPLAYER_STARTER_IDS } from './pilotFitting.js';
 import {
     MULTIPLAYER_DEATH_CREDITS, multiplayerKillPoints, multiplayerScorePreview, multiplayerShopFor,
-    purchaseMultiplayerEquipment, purchaseMultiplayerHull, stockMultiplayerFit,
+    purchaseMultiplayerEquipment, purchaseMultiplayerHull, starterMultiplayerFit, STARTER_GEAR,
 } from './matchShop.js';
 
 export { MULTIPLAYER_DEATH_CREDITS, MULTIPLAYER_STARTER_IDS };
@@ -33,7 +34,8 @@ function settingsWithPatch(settings, patch) {
 
 function clearPilotRound(pilot) {
     pilot.shipId = pilot.starterShipId;
-    pilot.outfitting = stockMultiplayerFit(pilot.shipId);
+    pilot.outfitting = starterMultiplayerFit(pilot.shipId, pilot.starterGear);
+    pilot.starterReady = Boolean(pilot.bot);
     pilot.ownedFits = new Map([[pilot.shipId, pilot.outfitting]]);
     pilot.spareEquipment = new Map();
     pilot.paidMounts = new Set();
@@ -64,6 +66,8 @@ function pilotSnapshot(pilot) {
     const { id, name, slot, team, starterShipId, shipId, credits, score, kills, deaths, connected, alive, life } = pilot;
     return {
         id, name, slot, team, starterShipId, shipId, credits, score, kills, deaths, connected, alive, life,
+        starterGear: { ...pilot.starterGear }, starterReady: pilot.starterReady,
+        ...(pilot.bot ? { bot: { ...pilot.bot } } : {}),
         ...multiplayerScorePreview(multiplayerKillPoints(shipId, pilot.outfitting)),
     };
 }
@@ -87,17 +91,52 @@ class MultiplayerMatch {
     }
 
     addPlayer(id, name) {
+        if (!validPlayerId(id) || id.startsWith('bot:')) return fail('invalid-player');
+        return this.addPilot(id, name);
+    }
+
+    addPilot(id, name, bot) {
         if (this.phase !== 'lobby') return fail('lobby-closed');
-        if (!validPlayerId(id)) return fail('invalid-player');
         if (this.players.has(id)) return fail('already-joined');
         const used = new Set(Array.from(this.players.values(), pilot => pilot.slot));
         const slot = slots.find(value => !used.has(value));
         if (slot === undefined) return fail('lobby-full');
         const team = this.settings.mode === 'teams' ? this.availableTeam() : null;
-        const pilot = { id, name: pilotName(name, slot), slot, team, connected: true, starterShipId: MULTIPLAYER_STARTER_IDS[0] };
+        const character = bot && BOT_CHARACTERS[bot.characterId];
+        const pilot = { id, name: pilotName(name, slot), slot, team, connected: true, bot,
+            starterShipId: character?.starterShipId ?? MULTIPLAYER_STARTER_IDS[0],
+            starterGear: { guns: null, utility: null, ...character?.starterGear } };
         clearPilotRound(pilot);
         this.players.set(id, pilot);
         return pass();
+    }
+
+    addBot(hostId, characterId) {
+        if (hostId !== this.hostId) return fail('host-only');
+        if (typeof characterId !== 'string' || !Object.hasOwn(BOT_CHARACTERS, characterId)) return fail('unknown-bot');
+        return this.addPilot(`bot:${characterId}`, BOT_CHARACTERS[characterId].name, { characterId, difficulty: 'veteran' });
+    }
+
+    removeBot(hostId, id) {
+        if (hostId !== this.hostId) return fail('host-only');
+        if (this.phase !== 'lobby') return fail('lobby-closed');
+        if (!this.players.get(id)?.bot) return fail('unknown-bot');
+        return this.removePlayer(id);
+    }
+
+    setBotDifficulty(hostId, id, difficulty) {
+        if (hostId !== this.hostId) return fail('host-only');
+        if (this.phase !== 'lobby') return fail('lobby-closed');
+        const bot = this.players.get(id)?.bot;
+        if (!bot || !BOT_DIFFICULTIES.includes(difficulty)) return fail('unknown-bot');
+        bot.difficulty = difficulty;
+        return pass();
+    }
+
+    setBotTeam(hostId, id, team) {
+        if (hostId !== this.hostId) return fail('host-only');
+        if (!this.players.get(id)?.bot) return fail('unknown-bot');
+        return this.setTeam(id, team);
     }
 
     removePlayer(id) {
@@ -130,6 +169,10 @@ class MultiplayerMatch {
         return [...this.players.values()].filter(pilot => pilot.connected);
     }
 
+    connectedHumans() {
+        return this.connectedPlayers().filter(pilot => !pilot.bot);
+    }
+
     availableTeam() {
         const members = this.connectedPlayers();
         const red = members.filter(pilot => pilot.team === 'red').length;
@@ -156,8 +199,30 @@ class MultiplayerMatch {
         const pilot = this.players.get(id);
         if (!pilot?.connected) return fail('unknown-player');
         if (!MULTIPLAYER_STARTER_IDS.includes(shipId)) return fail('invalid-starter');
+        if (pilot.starterShipId === shipId) return pass();
         pilot.starterShipId = shipId;
         clearPilotRound(pilot);
+        return pass();
+    }
+
+    selectStarterGear(id, slot, itemId) {
+        if (this.phase !== 'lobby') return fail('lobby-closed');
+        const pilot = this.players.get(id);
+        if (!pilot?.connected) return fail('unknown-player');
+        if (typeof slot !== 'string' || !Object.hasOwn(STARTER_GEAR, slot)
+            || (itemId !== null && !STARTER_GEAR[slot].includes(itemId)))
+            return fail('invalid-starter-gear');
+        if (pilot.starterGear[slot] === itemId) return pass();
+        pilot.starterGear[slot] = itemId;
+        clearPilotRound(pilot);
+        return pass();
+    }
+
+    confirmStarter(id) {
+        if (this.phase !== 'lobby') return fail('lobby-closed');
+        const pilot = this.players.get(id);
+        if (!pilot?.connected) return fail('unknown-player');
+        pilot.starterReady = true;
         return pass();
     }
 
@@ -173,17 +238,21 @@ class MultiplayerMatch {
         return pass();
     }
 
-    canStart() {
-        if (this.phase !== 'lobby') return false;
+    hasEnoughPilots() {
         const members = this.connectedPlayers();
         if (this.settings.mode === 'ffa') return members.length >= 2;
         return MULTIPLAYER_TEAMS.every(team => members.filter(pilot => pilot.team === team).length === 2);
     }
 
+    canStart() {
+        return this.phase === 'lobby' && this.hasEnoughPilots() && this.connectedPlayers().every(pilot => pilot.starterReady);
+    }
+
     start(id) {
         if (id !== this.hostId) return fail('host-only');
         if (this.phase !== 'lobby') return fail('lobby-closed');
-        if (!this.canStart()) return fail('not-enough-pilots');
+        if (!this.hasEnoughPilots()) return fail('not-enough-pilots');
+        if (!this.canStart()) return fail('loadouts-not-ready');
         this.phase = 'playing';
         this.round += 1;
         this.remainingSeconds = this.settings.durationMinutes * 60;
@@ -297,7 +366,8 @@ class MultiplayerMatch {
         players.sort((a, b) => a.slot - b.slot);
         return {
             hostId: this.hostId, seed: this.seed, round: this.round, phase: this.phase,
-            settings: { ...this.settings }, players, remainingSeconds: this.remainingSeconds, canStart: this.canStart(),
+            settings: { ...this.settings }, players, remainingSeconds: this.remainingSeconds,
+            canStart: this.canStart(), hasEnoughPilots: this.hasEnoughPilots(),
             standings: { players: [...players].sort((a, b) => b.score - a.score), teams: this.teamStandings() },
             result: this.result && {
                 reason: this.result.reason, winnerIds: [...this.result.winnerIds], winnerTeams: [...this.result.winnerTeams],
@@ -309,6 +379,6 @@ class MultiplayerMatch {
 export function createMultiplayerMatch({ hostId, hostName, settings = {}, seed = 1 } = {}) {
     const configured = settings && typeof settings === 'object' && !Array.isArray(settings)
         && settingsWithPatch(DEFAULT_MULTIPLAYER_SETTINGS, settings);
-    if (!validPlayerId(hostId) || !configured) return null;
+    if (!validPlayerId(hostId) || hostId.startsWith('bot:') || !configured) return null;
     return new MultiplayerMatch(hostId, hostName, configured, seed);
 }

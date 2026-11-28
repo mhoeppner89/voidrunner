@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { startWithConfirmedLoadouts } from '../helpers/multiplayer.mjs';
 import { test } from 'node:test';
 import { ARENA_SITE_IDS } from '../../src/game/arenaSites.js';
 import { SHIPS } from '../../src/game/data.js';
@@ -39,7 +40,7 @@ test('only the host configures the lobby and each pilot can select a stock Tier 
     assert.ok(hestiaPoints > balorPoints);
     for (const shipId of MULTIPLAYER_STARTER_IDS) assert.equal(match.selectStarter(GUEST, shipId).ok, true);
     assert.equal(match.start(GUEST).code, 'host-only');
-    const { actors } = match.start(HOST);
+    const { actors } = startWithConfirmedLoadouts(match);
     const actor = actors.find(actor => actor.id === GUEST);
     assert.equal(actors.length, 4);
     assert.equal(actor.shipId, 'speedster');
@@ -55,7 +56,7 @@ test('only the host configures the lobby and each pilot can select a stock Tier 
 
 test('each death grants credits once and weighted kill points stay banked when a pilot upgrades', () => {
     const match = twoPilotMatch();
-    const { actors: [host, guest] } = match.start(HOST);
+    const { actors: [host, guest] } = startWithConfirmedLoadouts(match);
     const { pointsPerKill: startingPoints } = match.snapshot().players[0];
     assert.equal(match.shopFor(HOST), null);
     assert.equal(match.buyEquipment(HOST, 'shield-mk2', 'utility', 0).code, 'shop-closed');
@@ -94,9 +95,45 @@ test('each death grants credits once and weighted kill points stay banked when a
     assert.equal(match.players.get(HOST).credits, purchase.credits);
 });
 
+test('confirmed opening fits gate deployment, use eligible equipment and carry their initial kill value', () => {
+    const match = twoPilotMatch();
+    assert.equal(match.start(HOST).code, 'loadouts-not-ready');
+    assert.ok(match.confirmStarter(HOST).ok);
+    assert.ok(match.confirmStarter(GUEST).ok);
+    assert.ok(match.canStart());
+    assert.equal(match.selectStarterGear(GUEST, { toString: null }, 'ripper').code, 'invalid-starter-gear');
+    assert.equal(match.selectStarterGear(GUEST, '__proto__', 'constructor').code, 'invalid-starter-gear');
+    assert.equal(match.selectStarterGear(GUEST, 'guns', 'pvp-pulse-cannon-t2').code, 'invalid-starter-gear');
+    assert.equal(match.selectStarterGear(GUEST, 'utility', 'ripper').code, 'invalid-starter-gear');
+    const stockPoints = match.snapshot().players[1].pointsPerKill;
+    assert.ok(match.selectStarter(GUEST, 'scrapper').ok);
+    assert.ok(match.selectStarterGear(GUEST, 'guns', 'ripper').ok);
+    assert.ok(match.selectStarterGear(GUEST, 'utility', 'capacitor-bank').ok);
+    assert.equal(match.snapshot().players[1].starterReady, false);
+    assert.equal(match.start(HOST).code, 'loadouts-not-ready');
+    assert.ok(match.confirmStarter(GUEST).ok);
+    const preview = match.snapshot().players[1];
+    assert.ok(preview.pointsPerKill < stockPoints);
+    assert.equal(preview.credits, 0);
+    const { actors: [, first] } = match.start(HOST);
+    assert.equal(first.outfitting.loadouts.scrapper.guns[0], 'ripper');
+    assert.equal(first.outfitting.loadouts.scrapper.utility[0], 'capacitor-bank');
+    assert.ok(first.energy > SHIPS.scrapper.energyCapacity);
+    assert.equal(match.selectStarterGear(GUEST, 'utility', null).code, 'lobby-closed');
+    assert.equal(match.recordDeath(HOST, GUEST).points, preview.pointsPerKill);
+    assert.equal(match.recordDeath(GUEST, HOST).credits, MULTIPLAYER_DEATH_CREDITS);
+    assert.equal(match.respawn(GUEST).actor.outfitting.loadouts.scrapper.guns[0], 'ripper');
+
+    match.tick(300);
+    assert.ok(match.returnToLobby(HOST).ok);
+    assert.deepEqual(match.snapshot().players[1].starterGear, preview.starterGear);
+    assert.equal(match.snapshot().players[1].starterReady, false);
+    assert.equal(match.start(HOST).code, 'loadouts-not-ready');
+});
+
 test('the shop fits only matching equipment tiers and keeps paid hulls and gear between lives', () => {
     const match = twoPilotMatch();
-    match.start(HOST);
+    startWithConfirmedLoadouts(match);
     match.recordDeath(HOST, GUEST);
     const firstShop = match.shopFor(HOST);
     assert.deepEqual(new Set(firstShop.hulls.map(hull => hull.tier)), new Set([1, 2, 3]));
@@ -134,7 +171,7 @@ test('the shop fits only matching equipment tiers and keeps paid hulls and gear 
 
 test('displaced purchases become counted spares shared across hulls, while stock stays hull-bound', () => {
     const match = twoPilotMatch();
-    match.start(HOST);
+    startWithConfirmedLoadouts(match);
     const { points: banked } = match.recordDeath(GUEST, HOST);
     match.respawn(GUEST);
     for (let life = 1; life <= 3; life++) {
@@ -189,13 +226,13 @@ test('2v2 requires two pilots on each team and never awards friendly or self kil
     assert.equal(match.setTeam('wing', null).ok, true);
     assert.equal(match.start(HOST).code, 'not-enough-pilots');
     assert.equal(match.setTeam('wing', 'red').ok, true);
-    match.start(HOST);
+    startWithConfirmedLoadouts(match);
     assert.equal(match.canDamage(HOST, 'wing'), false);
     assert.equal(match.canDamage(HOST, GUEST), true);
     match.tick(300);
     match.returnToLobby(HOST);
     match.configure(HOST, { friendlyFire: true });
-    match.start(HOST);
+    startWithConfirmedLoadouts(match);
     const { pointsPerKill: startingPoints } = match.snapshot().players[0];
     assert.equal(match.canDamage(HOST, 'wing'), true);
     assert.equal(match.canDamage(HOST, HOST), false);
@@ -217,7 +254,7 @@ test('round timing, departures and rematch reset are host-owned and scoped to th
     const match = twoPilotMatch({ durationMinutes: 10 });
     match.selectStarter(HOST, 'scrapper');
     match.addPlayer('other');
-    match.start(HOST);
+    startWithConfirmedLoadouts(match);
     assert.equal(match.tick(NaN), false);
     assert.equal(match.tick(599), false);
     assert.equal(match.snapshot().remainingSeconds, 1);
@@ -239,7 +276,7 @@ test('round timing, departures and rematch reset are host-owned and scoped to th
     assert.equal(match.snapshot().players[0].credits, 0);
     assert.equal(match.snapshot().players[0].deaths, 0);
     match.addPlayer(GUEST);
-    match.start(HOST);
+    startWithConfirmedLoadouts(match);
     assert.equal(match.snapshot().round, 2);
     assert.equal(match.recordDeath(HOST, GUEST, { round: 1 }).code, 'stale-life');
     assert.equal(match.tick(600), true);

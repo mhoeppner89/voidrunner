@@ -64,6 +64,12 @@ extension Smoke {
             """)
         if role == "host" {
             _ = js(game, "document.querySelector('[data-match-action=host]').click()")
+            wait("host lobby") { js(game, "!!document.querySelector('[data-match-action=open-loadout]')") as? Bool == true }
+            _ = js(game, """
+                document.querySelector('[data-match-action=open-loadout]').click();
+                document.querySelector('[data-match-action=loadout-equipment]').click();
+                document.querySelector('[data-match-action=confirm-loadout]').click();
+                """)
             print("Hosting \(room). Join this room on the remaining devices."); fflush(stdout)
             wait("all pilots in host lobby", timeout: timeout) {
                 js(game, """
@@ -89,6 +95,11 @@ extension Smoke {
                 js(game, "JSON.parse(render_game_to_text()).screen === 'lobby'") as? Bool == true
             }
             let roster = js(game, "document.querySelector('.match-table')?.innerText")
+            _ = js(game, """
+                document.querySelector('[data-match-action=open-loadout]').click();
+                document.querySelector('[data-match-action=loadout-equipment]').click();
+                document.querySelector('[data-match-action=confirm-loadout]').click();
+                """)
             print("Mac guest roster: \(roster ?? ""). Start the round on the phone."); fflush(stdout)
         }
         let traffic = role == "host" ? "qaPackets.sentWorld >= 3 && qaPackets.receivedInput >= 3 && qaPackets.peersWithInput >= \(pilotCount - 1)"

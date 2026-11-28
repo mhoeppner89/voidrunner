@@ -91,14 +91,14 @@ extension Smoke {
         """
         _ = js(game, choose)
         var guest: Nearby!
-        var joined = false, welcomed = false, worldFrames = 0
+        var joined = false, welcomed = false, confirmedFit = false, worldFrames = 0
         var readyRound: Int?
         let session = UUID().uuidString
         func command(_ type: String, _ fields: [String: Any] = [:]) {
             guest.command(fields.merging(["session": session, "type": type]) { _, new in new })
         }
         func send(_ fields: [String: Any]) {
-            let data = try! JSONSerialization.data(withJSONObject: fields.merging(["v": 1]) { _, new in new })
+            let data = try! JSONSerialization.data(withJSONObject: fields.merging(["v": 3]) { _, new in new })
             command("send", ["peerId": "host", "payload": String(decoding: data, as: UTF8.self)])
         }
         guest = Nearby { event, done in
@@ -118,6 +118,10 @@ extension Smoke {
                 if message["type"] as? String == "state", let state = message["state"] as? [String: Any] {
                     let players = state["players"] as? [[String: Any]] ?? []
                     welcomed = players.contains { $0["name"] as? String == pilot }
+                    if welcomed && !confirmedFit {
+                        confirmedFit = true
+                        send(["type": "command", "action": "confirm-loadout"])
+                    }
                     if state["phase"] as? String == "playing", let round = state["round"] as? Int, round != readyRound {
                         readyRound = round
                         send(["type": "ready", "round": round])
@@ -139,6 +143,11 @@ extension Smoke {
         command("browse")
         wait("room advertisement") { visibleToNewPilots }
         wait("Bonjour discovery and guest roster") { welcomed }
+        _ = js(game, """
+            document.querySelector('[data-match-action=open-loadout]').click();
+            document.querySelector('[data-match-action=loadout-equipment]').click();
+            document.querySelector('[data-match-action=confirm-loadout]').click();
+            """)
         wait("host roster") {
             js(game, "document.querySelector('#multiplayer-panel').textContent.includes('\(pilot)') && !document.querySelector('[data-match-action=start]').disabled") as? Bool == true
         }

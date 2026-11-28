@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { startWithConfirmedLoadouts } from '../helpers/multiplayer.mjs';
 import test from 'node:test';
 import { Quaternion, Vector3 } from 'three';
 import { createMultiplayerMatch } from '../../src/game/multiplayer/matchRules.js';
@@ -14,7 +15,7 @@ function stagedMatch(session, siteId, teams = false) {
     const match = createMultiplayerMatch({ hostId: 'host', seed, settings: { siteId, mode: teams ? 'teams' : 'ffa' } });
     const guests = teams ? ['guest', 'wingman', 'wingman-2'] : ['guest'];
     for (const id of guests) assert.ok(match.addPlayer(id, id).ok);
-    assert.ok(match.start('host').ok);
+    assert.ok(startWithConfirmedLoadouts(match).ok);
     const events = [];
     const world = new MatchWorld(match, session, batch => events.push(...batch), () => {
         // A bad host coordinate reaches peers as null in a JSON snapshot.

@@ -1,21 +1,26 @@
 import { t } from '../i18n.js';
+import { SHIPS } from '../data.js';
 import { createMultiplayerMatch } from './matchRules.js';
-import { createStarterPilotFitting } from './pilotFitting.js';
+import { starterMultiplayerFit } from './matchShop.js';
+import { createPilotFitting } from './pilotFitting.js';
 import { PeerLink, roomTokenFromUrl } from './peerLink.js';
 import { NativeLink, nativeBridgeAvailable } from './nativeLink.js';
 import { MatchWorld } from './matchWorld.js';
 import { MatchFlight } from './matchFlight.js';
 import { MultiplayerView, matchClock } from './multiplayerView.js';
 
-const PROTOCOL = 1;
+const PROTOCOL = 3;
 const HOST = 'host';
 const COMMAND_ERRORS = {
     'not-enough-pilots': 'More pilots are needed to start.',
+    'loadouts-not-ready': 'Waiting for every pilot to confirm their loadout.',
     'team-full': 'That team already has two pilots.',
     'lobby-closed': 'This round has already started.',
     'lobby-full': 'All four pilot seats are booked.',
+    'unknown-bot': 'That bot or difficulty is unavailable.',
     'insufficient-credits': 'You need more credits for this upgrade.',
     'shop-closed': 'The shop opens after your ship is lost.',
+    'no-clear-spawn': 'No clear spawn is available. Try relaunching again.',
 };
 
 export class Multiplayer {
@@ -51,7 +56,11 @@ export class Multiplayer {
     }
 
     back() {
-        if (this.screen === 'score') {
+        if (this.screen === 'loadout') {
+            this.screen = 'lobby';
+            this.status = '';
+            this.render();
+        } else if (this.screen === 'score') {
             this.screen = 'flight';
             this.render();
         } else if (this.screen === 'join' && !this.link && !this.roomToken) {
@@ -79,6 +88,25 @@ export class Multiplayer {
             return;
         }
         if (action === 'leave') return this.leave();
+        if (action === 'open-loadout' && this.screen === 'lobby') {
+            this.screen = 'loadout';
+            this.loadoutStage = 'hull';
+            this.status = '';
+            return this.render();
+        }
+        if (this.screen === 'loadout') {
+            if (action === 'loadout-equipment' || action === 'loadout-hull') {
+                this.loadoutStage = action === 'loadout-equipment' ? 'equipment' : 'hull';
+                return this.render();
+            }
+            if (action === 'starter') return this.command(action, { shipId: args.matchId });
+            if (action === 'starter-gear') return this.command(action, { slot: args.matchSlot, itemId: args.matchId || null });
+            if (action === 'confirm-loadout') {
+                this.screen = 'lobby';
+                this.render();
+                return this.command(action);
+            }
+        }
         if (action === 'show-join') {
             this.screen = 'join';
             this.status = '';
@@ -103,12 +131,22 @@ export class Multiplayer {
             return this.render();
         }
         if (action === 'setting') {
-            const { key, value } = args;
-            if (key === 'starter') return this.command('starter', { shipId: value });
+            const { key, value, id } = args;
             if (key === 'team') return this.command('team', { team: value || null });
+            if (key === 'bot-difficulty') return this.command('bot-difficulty', { id, difficulty: value });
+            if (key === 'bot-team') return this.command('bot-team', { id, team: value || null });
+            if (key === 'bot-character') {
+                this.botCharacter = value;
+                return;
+            }
             const typed = key === 'durationMinutes' ? Number(value) : key === 'friendlyFire' ? value === 'true' : value;
             return this.command('configure', { patch: { [key]: typed } });
         }
+        if (action === 'add-bot' && this.screen === 'lobby') {
+            const characterId = this.view.panel.querySelector('[data-match-setting="bot-character"]')?.value;
+            return this.command(action, { characterId });
+        }
+        if (action === 'remove-bot') return this.command(action, { id: args.matchId });
         if (action === 'buy-hull') return this.command(action, { shipId: args.matchId });
         if (action === 'buy-equipment') return this.command(action, { itemId: args.matchId, slot: args.matchSlot, index: Number(args.matchIndex) });
         if (['start', 'rematch', 'respawn'].includes(action)) return this.command(action);
@@ -243,8 +281,12 @@ export class Multiplayer {
 
     receive(id, message) {
         if (message.v !== PROTOCOL) {
-            if (this.host) this.send(id, { type: 'error', text: t('Reload both devices to the same build.') });
-            return;
+            const text = t('Reload both devices to the same build.');
+            if (this.host) {
+                this.send(id, { v: message.v, type: 'error', text });
+                return;
+            }
+            message = { type: 'error', text };
         }
         if (this.host) {
             if (message.type === 'hello') {
@@ -256,7 +298,7 @@ export class Multiplayer {
                 }
                 this.send(id, { type: 'assign', id });
                 this.distributeState();
-            } else if (this.match.players.get(id)?.connected) {
+            } else if (this.match.players.get(id)?.connected && !this.match.players.get(id).bot) {
                 if (message.type === 'command') this.handleCommand(id, message.action, message.args ?? {});
                 if (message.type === 'ready' && message.round === this.match.round) this.markReady(id);
                 if (message.type === 'leave') this.link.disconnect(id);
@@ -297,15 +339,28 @@ export class Multiplayer {
     handleCommand(id, action, args) {
         const { match } = this;
         let result;
+        let spawnPoint;
         switch (action) {
             case 'configure': result = match.configure(id, args.patch); break;
             case 'starter': result = match.selectStarter(id, args.shipId); break;
+            case 'starter-gear': result = match.selectStarterGear(id, args.slot, args.itemId); break;
+            case 'confirm-loadout': result = match.confirmStarter(id); break;
             case 'team': result = match.setTeam(id, args.team); break;
+            case 'add-bot': result = match.addBot(id, args.characterId); break;
+            case 'remove-bot': result = match.removeBot(id, args.id); break;
+            case 'bot-difficulty': result = match.setBotDifficulty(id, args.id, args.difficulty); break;
+            case 'bot-team': result = match.setBotTeam(id, args.id, args.team); break;
             case 'start': result = match.start(id); break;
             case 'rematch': result = match.returnToLobby(id); break;
             case 'buy-hull': result = match.buyHull(id, args.shipId); break;
             case 'buy-equipment': result = match.buyEquipment(id, args.itemId, args.slot, args.index); break;
-            case 'respawn': result = this.live && match.respawn(id); break;
+            case 'respawn': {
+                const pilot = match.players.get(id);
+                if (!this.live || !match.canRefit(pilot)) break;
+                spawnPoint = this.world.chooseSpawn({ id, team: pilot.team, variant: SHIPS[pilot.shipId].variant });
+                result = spawnPoint ? match.respawn(id) : { ok: false, code: 'no-clear-spawn' };
+                break;
+            }
             default: return;
         }
         if (!result?.ok) {
@@ -318,7 +373,7 @@ export class Multiplayer {
         }
         if (action === 'start') this.ready = new Set();
         if (action === 'respawn') {
-            this.world.spawn(result.actor);
+            this.world.spawn(result.actor, spawnPoint);
             this.sendFit(id);
         }
         this.distributeState();
@@ -344,7 +399,7 @@ export class Multiplayer {
         this.remainingSeconds = state.remainingSeconds;
         if (state.phase === 'lobby') {
             if (previous?.phase !== 'lobby' && this.flight) this.clearFlight();
-            this.screen = 'lobby';
+            if (previous?.phase !== 'lobby' || this.screen !== 'loadout') this.screen = 'lobby';
             if (!this.native && this.host && previous?.phase === 'ended' && !this.roomUrl) void this.openRoomLink(this.link);
         } else if (state.phase === 'ended') {
             this.live = false;
@@ -359,7 +414,8 @@ export class Multiplayer {
     }
 
     async prepareRound(state) {
-        const fit = createStarterPilotFitting(this.localPilot().starterShipId);
+        const { starterShipId, starterGear } = this.localPilot();
+        const fit = createPilotFitting(starterShipId, starterMultiplayerFit(starterShipId, starterGear));
         const flight = new MatchFlight(this);
         this.flight = flight;
         this.screen = 'preparing';
@@ -391,7 +447,14 @@ export class Multiplayer {
         flight.attach(session);
         if (this.host) {
             this.world = new MatchWorld(this.match, session, events => this.sendEvents(events), force => this.publishWorld(force));
-            for (const actor of this.world.actors()) this.world.spawn(actor);
+            for (const actor of this.world.actors()) {
+                if (this.world.spawn(actor)) continue;
+                this.leave();
+                this.screen = 'disconnected';
+                this.status = t('Could not find a clear launch position.');
+                this.render();
+                return;
+            }
             this.loadTimeout = setTimeout(() => this.dropUnready(), 90_000);
             this.markReady(HOST);
         } else this.send(HOST, { type: 'ready', round: state.round });
@@ -400,10 +463,11 @@ export class Multiplayer {
     markReady(id) {
         if (this.match.phase !== 'playing' || !this.ready || this.live) return;
         this.ready.add(id);
-        if (!this.world || !this.match.connectedPlayers().every(pilot => this.ready.has(pilot.id))) return;
+        const humans = this.match.connectedHumans();
+        if (!this.world || !humans.every(pilot => this.ready.has(pilot.id))) return;
         clearTimeout(this.loadTimeout);
         this.live = true;
-        for (const pilot of this.match.connectedPlayers()) this.sendFit(pilot.id);
+        for (const pilot of humans) this.sendFit(pilot.id);
         this.publishWorld(true);
         if (!this.live) return;
         let last = performance.now();
@@ -416,7 +480,7 @@ export class Multiplayer {
 
     dropUnready() {
         if (!this.live && this.match?.phase === 'playing')
-            for (const pilot of this.match.connectedPlayers()) if (!this.ready.has(pilot.id)) this.link.disconnect(pilot.id, 'Arena loading timed out.');
+            for (const pilot of this.match.connectedHumans()) if (!this.ready.has(pilot.id)) this.link.disconnect(pilot.id, 'Arena loading timed out.');
     }
 
     sendFit(id) {

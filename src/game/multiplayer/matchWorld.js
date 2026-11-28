@@ -1,8 +1,11 @@
 import { Quaternion, Vector3 } from 'three';
 import { arenaSite } from '../arenaSites.js';
+import { SHIPS } from '../data.js';
+import { seededRandom } from '../random.js';
 import { SHIP_COLLIDERS, shipVsObstacle, shipVsShip } from '../shipCollision.js';
 import { GRAVEYARD_MODEL_COLLIDER_MAX_RADIUS } from '../worldData.js';
 import { applyPilotWeaponHit } from './combatDamage.js';
+import { BOT_REFIT_SECONDS, MatchBot, refitMatchBot } from './matchBots.js';
 import { createMatchCombat, initPilotCombat, stepMatchCombat } from './matchCombat.js';
 import { stepPilotFlight } from './pilotFlight.js';
 import { acceptPilotInput, createPilotInput, takePilotActions } from './pilotInput.js';
@@ -12,6 +15,10 @@ export const ARENA_LIMIT = 1700;
 const FIELD_REACH = Math.max(380, Math.ceil(GRAVEYARD_MODEL_COLLIDER_MAX_RADIUS + 4));
 const FORWARD = new Vector3(0, 0, -1);
 const ENVIRONMENT = Object.freeze({});
+const SPAWN_COVER_RANGE = 1050;
+const SPAWN_ENEMY_GAP = 430;
+const SPAWN_WEAPON_RANGE = 650;
+const SPAWN_WING_DISTANCE = 270;
 
 function contactRadius(actor) {
     return (SHIP_COLLIDERS[actor.variant] ?? SHIP_COLLIDERS.kestrel).contactRadius * (actor.scale ?? 1);
@@ -26,6 +33,9 @@ export class MatchWorld {
         this.tick = 0;
         this.accumulator = 0;
         this.inputs = new Map();
+        this.bots = new Map();
+        this.botRespawns = new Map();
+        this.rosterDirty = false;
         this.site = arenaSite(match.settings.siteId);
         this.center = new Vector3().fromArray(session.save.player.position);
         this.position = new Vector3();
@@ -36,6 +46,9 @@ export class MatchWorld {
         this.normal = new Vector3();
         this.contact = {};
         this.events = [];
+        this.spawnRandom = seededRandom(`${match.seed}:${match.round}:${match.settings.siteId}`);
+        this.lastSpawn = new Map();
+        this.lastDeath = new Map();
         this.combat = createMatchCombat({
             seed: match.seed,
             terrainHit: (from, to) => this.site.instanceId ? session.firstObstacleHitInfo(from, to) : undefined,
@@ -45,58 +58,86 @@ export class MatchWorld {
     }
 
     makeSpawnOptions() {
-        const { center, session, site } = this;
+        const { center, session } = this;
         const entries = (session.arenaStage?.entries ?? []).map(entry => new Vector3().fromArray(entry.position));
         const options = [center.clone(), ...entries];
-        this.landmarkStarts = ['tunnel', 'bay'].includes(site.stage)
-            ? options.filter(point => point.distanceToSquared(center) < (ARENA_LIMIT - 80) ** 2)
-            : [];
-        // Give open sites symmetric starts and add extra clear points at
-        // crowded sites for respawns away from the current fight.
-        const obstacles = site.instanceId ? session.activeFieldObstacles(site.instanceId) : [];
-        for (const radius of [430, 640, 800]) {
-            for (let i = 0; i < 8; i++) {
-                const angle = (i + .5) * Math.PI / 4;
-                const point = center.clone().add(new Vector3(Math.cos(angle) * radius, (i % 2 - .5) * 120, Math.sin(angle) * radius));
-                if (session.siteSpotClear(site, point, obstacles)) options.push(point);
+        for (const radius of [350, 550, 800, 1050, 1300]) {
+            const offset = this.spawnRandom() * Math.PI * 2;
+            for (let i = 0; i < 12; i++) {
+                const angle = offset + i * Math.PI / 6;
+                const elevation = (i % 3 - 1) * .24 + (this.spawnRandom() - .5) * .16;
+                options.push(center.clone().add(new Vector3(Math.cos(angle) * radius, elevation * radius, Math.sin(angle) * radius)));
             }
         }
-        return options.filter(point => point.distanceToSquared(center) < (ARENA_LIMIT - 80) ** 2);
+        return options;
     }
 
-    spawn(actor) {
-        const others = this.actors().filter(other => other !== actor && this.inputs.has(other.id));
-        let point;
-        let bestCandidate;
-        let best = -Infinity;
-        const seat = this.match.players.get(actor.id).slot;
-        const obstacles = this.site.instanceId ? this.session.activeFieldObstacles(this.site.instanceId) : [];
-        if (actor.life === 1) {
-            point = this.landmarkStarts.find(candidate => this.session.siteSpotClear(this.site, candidate, obstacles)
-                && others.every(other => this.position.fromArray(other.position).distanceToSquared(candidate) >= 190 ** 2));
+    chooseSpawn(actor) {
+        const others = this.actors().filter(other => other.id !== actor.id && this.inputs.has(other.id));
+        const allies = [], enemies = [];
+        const radius = contactRadius(actor);
+        for (const other of others) {
+            const position = new Vector3().fromArray(other.position);
+            const projected = position.clone().addScaledVector(new Vector3().fromArray(other.velocity), .75);
+            const pilot = { position, projected, gap: radius + contactRadius(other) + 32 };
+            (actor.team && actor.team === other.team ? allies : enemies).push(pilot);
         }
-        for (let i = 0; !point && i < this.spawnOptions.length; i++) {
-            const candidate = this.spawnOptions[(i + seat * 5) % this.spawnOptions.length];
-            if (!this.session.siteSpotClear(this.site, candidate, obstacles)) continue;
-            const separation = Math.min(800, ...others.map(other => this.position.fromArray(other.position).distanceTo(candidate)));
-            // Prioritize a safe distance from other ships and keep the next
-            // engagement within reach of the center.
-            const score = separation - Math.abs(candidate.distanceTo(this.center) - 360) * .32;
-            if (score > best) {
+        const avoidSpawn = this.lastSpawn.get(actor.id);
+        const avoidDeath = this.lastDeath.get(actor.id);
+        const occupied = [...allies, ...enemies];
+        let bestCandidate;
+        let bestDanger = Infinity;
+        let best = -Infinity;
+        const obstacles = this.site.instanceId ? this.session.activeFieldObstacles(this.site.instanceId) : [];
+        const blocked = (from, to) => this.site.instanceId && this.session.lineBlocked(from, to);
+        for (const candidate of this.spawnOptions) {
+            const centerDistance = candidate.distanceTo(this.center);
+            if (centerDistance > ARENA_LIMIT - Math.max(80, radius)) continue;
+            if (occupied.some(pilot => candidate.distanceToSquared(pilot.position) < pilot.gap ** 2)) continue;
+            if (!this.session.siteSpotClear(this.site, candidate, obstacles, Math.max(36, radius + 12))) continue;
+
+            let nearestEnemy = Infinity, nearestVisible = Infinity;
+            for (const enemy of enemies) {
+                const distance = candidate.distanceTo(enemy.position);
+                nearestEnemy = Math.min(nearestEnemy, distance, candidate.distanceTo(enemy.projected));
+                if (distance <= SPAWN_COVER_RANGE && !blocked(enemy.position, candidate))
+                    nearestVisible = Math.min(nearestVisible, distance);
+            }
+            // An ally or a recent-spawn preference cannot draw a pilot into a
+            // worse threat band. Cover matters even when distances are similar.
+            const danger = nearestEnemy < SPAWN_ENEMY_GAP ? 2 : nearestVisible < SPAWN_WEAPON_RANGE ? 1 : 0;
+            if (danger > bestDanger) continue;
+            const wingDistance = Math.min(...allies.map(ally => candidate.distanceTo(ally.position)));
+            const score = Math.min(nearestEnemy, 950) * .42 + Math.min(nearestVisible, SPAWN_COVER_RANGE) * .35
+                - (allies.length ? Math.abs(Math.min(wingDistance, 1600) - SPAWN_WING_DISTANCE) * .36 : 0)
+                - Math.abs(centerDistance - 590) * .20
+                - (avoidSpawn ? Math.max(0, 520 - candidate.distanceTo(avoidSpawn)) * .58 : 0)
+                - (avoidDeath ? Math.max(0, 520 - candidate.distanceTo(avoidDeath)) * .45 : 0)
+                + this.spawnRandom() * 95;
+            if (danger < bestDanger || score > best) {
                 bestCandidate = candidate;
+                bestDanger = danger;
                 best = score;
             }
         }
-        point ??= bestCandidate ?? this.center;
+        return bestCandidate;
+    }
+
+    spawn(actor, point = this.chooseSpawn(actor)) {
+        if (!point) return false;
+        this.lastSpawn.set(actor.id, point);
         point.toArray(actor.position);
         this.normal.copy(this.center).sub(point);
         if (this.normal.lengthSq() < 1) this.normal.copy(FORWARD);
         this.rotation.setFromUnitVectors(FORWARD, this.normal.normalize()).toArray(actor.rotation);
         actor.scale = 1;
         initPilotCombat(actor);
+        const bot = this.match.players.get(actor.id)?.bot;
+        if (bot) this.bots.set(actor.id, new MatchBot(actor, bot, `${this.match.seed}:${this.match.round}`, ARENA_LIMIT));
         // Continue rejecting stale packets across respawns and accept input
         // only with the life number of this actor.
         this.inputs.set(actor.id, createPilotInput());
+        return true;
     }
 
     actors() {
@@ -106,7 +147,7 @@ export class MatchWorld {
     receiveInput(id, packet) {
         const actor = this.match.players.get(id)?.actor;
         const input = this.inputs.get(id);
-        if (!input || !actor || packet?.life !== actor.life) return;
+        if (!input || !actor || this.bots.has(id) || packet?.life !== actor.life) return;
         acceptPilotInput(input, packet, this.tick);
     }
 
@@ -121,7 +162,9 @@ export class MatchWorld {
         const ended = this.match.tick(seconds);
         if (ended || Math.floor(this.tick / 3) !== previousBatch) {
             this.flushEvents();
-            this.publish(ended);
+            const force = ended || this.rosterDirty;
+            this.rosterDirty = false;
+            this.publish(force);
         }
     }
 
@@ -130,12 +173,13 @@ export class MatchWorld {
         const time = this.tick * MATCH_STEP;
         this.session.save.world.time = time;
         this.session.renderer.updateWorld(MATCH_STEP);
+        if (this.botRespawns.size) this.relaunchBots(time);
         const actors = this.actors();
         const actions = new Map();
         for (const actor of actors) {
             const input = this.inputs.get(actor.id);
             if (!input) continue;
-            const command = takePilotActions(input, this.tick);
+            const command = this.bots.get(actor.id)?.actions(this, actors, time) ?? takePilotActions(input, this.tick);
             actions.set(actor.id, command);
             stepPilotFlight(actor, actor.stats, command, MATCH_STEP);
             this.resolveTerrain(actor, time);
@@ -143,7 +187,7 @@ export class MatchWorld {
         this.resolveShipContacts(actors, time);
         const events = stepMatchCombat(this.combat, actors.filter(actor => actor.hull > 0), actions, time, MATCH_STEP);
         for (const event of events) {
-            if (event.killed) this.recordDeath(event.targetId, event.ownerId, event.targetLife);
+            if (event.killed) this.recordDeath(event.targetId, event.ownerId, event.targetLife, event.ownerLife);
             this.events.push(event);
         }
     }
@@ -154,15 +198,40 @@ export class MatchWorld {
         this.onEvents(events);
     }
 
-    recordDeath(victimId, killerId, victimLife) {
-        const result = this.match.recordDeath(victimId, killerId, { victimLife, round: this.match.round });
+    recordDeath(victimId, killerId, victimLife, killerLife) {
+        const result = this.match.recordDeath(victimId, killerId, { victimLife, killerLife, round: this.match.round });
         if (!result?.ok) return;
         this.inputs.delete(victimId);
+        if (this.bots.delete(victimId)) this.botRespawns.set(victimId, { due: this.tick * MATCH_STEP + BOT_REFIT_SECONDS });
+        this.lastDeath.set(victimId, new Vector3().fromArray(result.actor.position));
         this.events.push({
             type: 'death', targetId: victimId, ownerId: result.killerId, points: result.points,
             credits: result.credits, position: [...result.actor.position],
             variant: result.actor.variant, rotation: [...result.actor.rotation], velocity: [...result.actor.velocity],
         });
+    }
+
+    relaunchBots(time) {
+        for (const [id, respawn] of this.botRespawns) {
+            if (time < respawn.due) continue;
+            const pilot = this.match.players.get(id);
+            if (!pilot?.bot || !this.match.canRefit(pilot)) {
+                this.botRespawns.delete(id);
+                continue;
+            }
+            if (!respawn.refitted) {
+                refitMatchBot(this.match, pilot);
+                respawn.refitted = true;
+            }
+            const point = this.chooseSpawn({ id, team: pilot.team, variant: SHIPS[pilot.shipId].variant });
+            if (!point) {
+                respawn.due = time + .5;
+                continue;
+            }
+            this.spawn(this.match.respawn(id).actor, point);
+            this.botRespawns.delete(id);
+            this.rosterDirty = true;
+        }
     }
 
     resolveTerrain(actor, time) {

@@ -101,6 +101,15 @@ try {
     await emit(guest, guestSession, 'message', {peerId: 'host', payload: state.payload});
     await lobby(guest).getByRole('cell', {name: 'Lumen You'}).waitFor();
     await lobby(host).getByText('Lumen', {exact: true}).waitFor();
+    assert.ok(await action(host, 'start').isDisabled());
+    for (const page of [host, guest]) {
+        await action(page, 'open-loadout').click();
+        await action(page, 'loadout-equipment').click();
+        await action(page, 'confirm-loadout').click();
+    }
+    const ready = await command(guest, 'send', {peerId: 'host'}, 'command');
+    assert.equal(ready.packet.action, 'confirm-loadout');
+    await emit(host, hostSession, 'message', {peerId, payload: ready.payload});
     assert.ok(await action(host, 'start').isEnabled());
 
     const additionalGuests = [['pilot-b', 'Vela'], ['pilot-c', 'Tallis']];

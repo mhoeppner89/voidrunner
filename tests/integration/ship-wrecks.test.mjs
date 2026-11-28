@@ -17,10 +17,11 @@ test('multiplayer wreck follows the death packet even after a snapshot removes t
     const victim = {...actor, position: [...actor.position], variant: 'kestrel', rotation: [0, 1, 0, 0]};
     const world = Object.assign(Object.create(MatchWorld.prototype), {
         match: {round: 1, recordDeath: () => ({ok: true, actor: victim, killerId: 'guest', points: 1})},
-        inputs: new Map(), events: [],
+        inputs: new Map(), bots: new Map(), lastDeath: new Map(), events: [],
     });
     world.recordDeath(victim.id, 'guest', 1);
     victim.position.fill(0);
+    assert.deepEqual(world.lastDeath.get(victim.id).toArray(), actor.position);
     const [event] = world.events;
     assert.deepEqual(event.position, actor.position);
     assert.notEqual(event.rotation, victim.rotation);

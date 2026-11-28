@@ -62,6 +62,22 @@ export function stockMultiplayerFit(shipId) {
     return outfit;
 }
 
+export const STARTER_GEAR = Object.freeze({
+    guns: Object.freeze(['beam-emitter', 'pulse-cannon', 'ripper']),
+    utility: Object.freeze(['capacitor-bank', 'recovery-shield', 'thrusters-mk2']),
+});
+
+export function starterMultiplayerFit(shipId, gear) {
+    const outfit = stockMultiplayerFit(shipId);
+    const loadout = outfit.loadouts[shipId];
+    for (const [slot, choices] of Object.entries(STARTER_GEAR)) {
+        const id = gear?.[slot];
+        if (choices.includes(id) && itemFitsMount(id, HULL_HARDPOINTS[shipId][slot][0]))
+            loadout[slot][0] = id;
+    }
+    return outfit;
+}
+
 const stockFits = new Map(hulls.map(ship => [ship.id, stockMultiplayerFit(ship.id).loadouts[ship.id]]));
 function gearCombatValue(id) {
     const item = shopItems.get(id);

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { startWithConfirmedLoadouts } from '../helpers/multiplayer.mjs';
 import test from 'node:test';
 import { createMultiplayerMatch } from '../../src/game/multiplayer/matchRules.js';
 import { Multiplayer } from '../../src/game/multiplayer/multiplayer.js';
@@ -26,14 +27,14 @@ test('disconnecting during a four-pilot roster update keeps the seat open on eve
     for (const state of [room.state, ...lastState.values()])
         assert.deepEqual(state.players.map(p => p.id), ['host', 'a', 'c']);
     room.link.peerIds.push('d');
-    room.receive('d', { v: 1, type: 'hello', name: 'Replacement' });
+    room.receive('d', { v: 3, type: 'hello', name: 'Replacement' });
     assert.equal(room.state.players.find(p => p.id === 'd').slot, 2);
     assert.equal(room.state.players.length, 4);
 });
 
 test('a round ending while the host loads disposes the late session and keeps the result', async () => {
     const room = host(['a']);
-    room.match.start('host');
+    startWithConfirmedLoadouts(room.match);
     room.state = room.match.snapshot();
     let finishLoad;
     room.startFlight = () => new Promise(resolve => { finishLoad = resolve; });
@@ -58,7 +59,7 @@ test('a round ending while the host loads disposes the late session and keeps th
 
 test('a slow peer leaving on the opening snapshot does not restart an ended round clock', () => {
     const room = host(['a']);
-    room.match.start('host');
+    startWithConfirmedLoadouts(room.match);
     room.state = room.match.snapshot();
     room.screen = 'preparing';
     room.ready = new Set(['a']);
@@ -78,11 +79,33 @@ test('a slow peer leaving on the opening snapshot does not restart an ended roun
     }
 });
 
+test('a mixed room waits for human peers to load and sends fitting packets only to humans', () => {
+    const room = host(['a']);
+    assert.ok(room.match.addBot('host', 'brick').ok);
+    assert.ok(startWithConfirmedLoadouts(room.match).ok);
+    room.ready = new Set();
+    room.world = {};
+    const fits = [], published = [];
+    room.sendFit = id => fits.push(id);
+    room.publishWorld = force => published.push(force);
+    try {
+        room.markReady('host');
+        assert.notEqual(room.live, true);
+        assert.deepEqual(published, []);
+        room.markReady('a');
+        assert.equal(room.live, true);
+        assert.deepEqual(fits, ['host', 'a']);
+        assert.deepEqual(published, [true]);
+    } finally {
+        room.stopClock();
+    }
+});
+
 test('a rematch requested during a cancelled load waits for a fresh session before declaring ready', async () => {
     const room = host(['a']);
     room.host = false;
     room.localId = 'a';
-    room.match.start('host');
+    startWithConfirmedLoadouts(room.match);
     room.state = room.match.snapshot();
     const messages = [];
     room.link.send = (id, message) => messages.push(message);
@@ -100,7 +123,7 @@ test('a rematch requested during a cancelled load waits for a fresh session befo
     room.applyState(room.match.snapshot());
     room.match.returnToLobby('host');
     room.applyState(room.match.snapshot());
-    assert.ok(room.match.start('host').ok);
+    assert.ok(startWithConfirmedLoadouts(room.match).ok);
     room.state = room.match.snapshot();
     const nextLoad = room.prepareRound(room.state);
     const firstSession = { save: { player: { position: [0, 0, 0] } } };

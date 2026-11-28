@@ -12,7 +12,7 @@ import {equipmentIcon} from './itemIcons.js';
 import {uiIcon} from './uiIcons.js';
 import {DRONE_TYPES} from './droneData.js';
 import {magazineLabel,equipmentStatChanges} from './equipmentStatPresentation.js';
-import {shipTopDownProfile,shipProfilePath} from './shipTopDownProfile.js';
+import {renderHullCard} from './hullCardView.js';
 import {HARDPOINT_SPECS,LOADOUT_KEYS,OUTFIT_ITEMS,itemFitsMount,loadoutFor} from './outfitting.js';
 import {getLanguage,t} from './i18n.js';
 
@@ -20,22 +20,6 @@ const esc=value=>String(value??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;
 const ROMAN=['','I','II','III'];
 const CATEGORY={gun:'Gun',launcher:'Launcher',turret:'Turret',drone:'Drone'};
 const SERVICES=['repair','rearm','resupply'];
-const shipRole=role=>({allrounder:'All-rounder',industrial:'Industrial freighter',interceptor:'Interceptor',fighter:'Fighter',bomber:'Bomber',transport:'Transport'}[role]??role);
-// Hull bars compare against the strongest hull in the whole roster, so a
-// tier III pick visibly outclasses tier I across runs.
-let rosterMax;
-const hullMaxima=()=>rosterMax??=Object.values(SHIPS).reduce((m,h)=>({shield:Math.max(m.shield,h.shield),hull:Math.max(m.hull,h.hull),speed:Math.max(m.speed,h.maxSpeed),power:Math.max(m.power,h.reactorOutput??0),turn:Math.max(m.turn,h.angularAcceleration??0)}),{shield:1,hull:1,speed:1,power:1,turn:1});
-
-// The drawn silhouette's own bounds (profile.min/max describe the source grid).
-const profileBox=profile=>{
- let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
- const add=(x,z)=>{minX=Math.min(minX,x);maxX=Math.max(maxX,x);minZ=Math.min(minZ,z);maxZ=Math.max(maxZ,z);};
- for(const c of [...(profile.contours??[]),...(profile.details??[])])for(const [x,z] of c.points)add(x,z);
- for(const [x1,z1,x2,z2] of profile.edges??[]){add(x1,z1);add(x2,z2);}
- if(!Number.isFinite(minX))return [profile.minX,profile.minZ,profile.maxX-profile.minX,profile.maxZ-profile.minZ];
- const pad=Math.max(maxX-minX,maxZ-minZ)*.06;
- return [minX-pad,minZ-pad,maxX-minX+pad*2,maxZ-minZ+pad*2];
-};
 // Sustained damage per second of one mount (bursts, pellets, crit cadence).
 const sustainedDps=w=>{
  if(!w||w.ordnanceId)return undefined;
@@ -167,16 +151,8 @@ export function renderArenaRun(ui,save){
   const hulls=isHull?(r.hullOffers?.length?r.hullOffers:runHullOffers(save)):[];
   const candidates=isHull?[]:(r.wingmanOffers?.length?r.wingmanOffers:runWingmanOffers(save));
   const currentWing=r.wingmen?.[stage.wingIndex],upgrading=stage.type==='wingman-upgrade'&&currentWing?.alive!==false&&Boolean(currentWing);
-  const max=hullMaxima();
-  const bar=(label,value,limit,shown)=>`<span class="run-bar"><small>${esc(t(label))}</small><i style="--v:${Math.max(4,Math.min(100,value/limit*100)).toFixed(1)}%"></i><b>${shown}</b></span>`;
-  const hullCard=(id,pilot)=>{
-   const h=SHIPS[id],mounts=HARDPOINT_SPECS[id],profile=shipTopDownProfile(h.variant);
-   const silhouette=`<svg class="run-hull-image" viewBox="${profileBox(profile).map(v=>+v.toFixed(2)).join(' ')}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(h.name)}"><path d="${shipProfilePath(profile)}" fill="rgba(105,228,242,.07)" stroke="currentColor" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/><path d="${shipProfilePath(profile,true)}" fill="none" stroke="currentColor" stroke-width="1" vector-effect="non-scaling-stroke" opacity=".6" stroke-linejoin="round"/></svg>`;
-   const counts=[['Guns',mounts.guns.length,'equipment'],['Missiles',mounts.launchers.length,'missile'],['Turrets',mounts.turrets.length],['Systems',mounts.utility.length],['Drones',mounts.droneBays.length]];
-   return `<span class="run-hull-head"><b class="run-hull-name">${esc(h.name)}</b><span class="run-hull-role">T${h.tier} · ${esc(t(shipRole(h.role)))}</span>${pilot?`<span class="run-pilot">${esc(pilot)}</span>`:''}</span><span class="run-hull-plate">${silhouette}<i class="run-tier">${ROMAN[h.tier]}</i></span><span class="run-bars">${bar('SHIELD',h.shield,max.shield,num(h.shield))}${bar('HULL',h.hull,max.hull,num(h.hull))}${bar('Speed',h.maxSpeed,max.speed,num(displaySpeed(h.maxSpeed)))}${bar('ENERGY',h.reactorOutput??0,max.power,`${num(h.reactorOutput??0)}/s`)}</span><span class="run-mount-counts">${counts.map(([label,n,icon])=>`<i title="${esc(t(label))}"><b>${icon?uiIcon(icon,12):''}${n}</b><small>${esc(t(label))}</small></i>`).join('')}</span>`;
-  };
-  const cards=isHull?hulls.map(id=>command('hull',id,hullCard(id),'class="run-offer run-hull-card"')).join('')
-   :candidates.map(c=>command('wingman',c.id,hullCard(c.hullId,upgrading?currentWing.name:c.name),'class="run-offer run-hull-card"')).join('');
+  const cards=isHull?hulls.map(id=>command('hull',id,renderHullCard(id,{num}),'class="run-offer run-hull-card"')).join('')
+   :candidates.map(c=>command('wingman',c.id,renderHullCard(c.hullId,{num,pilot:upgrading?currentWing.name:c.name}),'class="run-offer run-hull-card"')).join('');
   body=`<div class="run-offers ${isHull?'run-hulls':'run-wingmen'}">${cards}</div>`;
   footer=leave;
  }else if(!r.rewardChosen){

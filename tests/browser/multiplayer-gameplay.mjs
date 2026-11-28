@@ -168,10 +168,37 @@ try {
     await waitSetting(guest, 'mode', 'ffa');
     await setting(host, 'siteId').selectOption('verge-lanes');
     await waitSetting(guest, 'siteId', 'verge-lanes');
-    await setting(host, 'starter').selectOption('wayfarer');
-    await setting(guest, 'starter').selectOption('scrapper');
+    await action(host, 'open-loadout').click();
+    await screen(host, 'loadout').waitFor();
+    assert.equal(await action(host, 'starter').count(), 3);
+    await host.screenshot({path:out + '/' + hostProfile + '-starter-hulls.png'});
+    await action(host, 'loadout-equipment').click();
+    const gun = action(host, 'starter-gear').and(host.locator('[data-match-id="pulse-cannon"]'));
+    await gun.click();
+    await gun.and(host.locator('[aria-pressed="true"]')).waitFor();
+    await action(host, 'confirm-loadout').click();
+    await screen(host, 'lobby').waitFor();
+    assert.ok(await action(host, 'start').isDisabled(), 'The guest has not confirmed a fit');
+
+    await action(guest, 'open-loadout').click();
+    await action(guest, 'starter').and(guest.locator('[data-match-id="scrapper"]')).click();
+    await guest.locator('[data-match-action="starter"][data-match-id="scrapper"][aria-pressed="true"]').waitFor();
+    await guest.screenshot({path:out + '/' + guestProfile + '-starter-hulls.png'});
+    await action(guest, 'loadout-equipment').click();
+    assert.ok(await guest.locator('.match-scroll').evaluate(scroll => {
+        const viewport = scroll.getBoundingClientRect();
+        return [...scroll.querySelectorAll('.match-gear-option, .match-fit-readout')].every(item => item.getBoundingClientRect().bottom <= viewport.bottom + 1);
+    }), 'The starter options and stat readout fit in the landscape phone view');
+    const initialPoints = await guest.locator('.match-loadout-score b').textContent();
+    const module = action(guest, 'starter-gear').and(guest.locator('[data-match-id="capacitor-bank"]'));
+    await module.click();
+    await module.and(guest.locator('[aria-pressed="true"]')).waitFor();
+    assert.notEqual(await guest.locator('.match-loadout-score b').textContent(), initialPoints);
+    await guest.screenshot({path:out + '/' + guestProfile + '-starter-equipment.png'});
+    await action(guest, 'confirm-loadout').click();
     const guestRow = host.locator('.match-table tbody tr').filter({hasText:guestName});
     await guestRow.getByText('Balor', {exact:true}).waitFor();
+    await guestRow.getByText('Ready', {exact:true}).waitFor();
     const expectedScore = Number(await guestRow.locator('td').last().textContent());
     assert.ok(expectedScore > 0);
     await guest.screenshot({path:out + '/' + guestProfile + '-lobby.png'});
@@ -179,6 +206,14 @@ try {
 
     await action(host, 'start').click();
     await Promise.all([flight(host, 'wayfarer', guestName), flight(guest, 'scrapper', hostName)]);
+    assert.equal(await host.evaluate(() => __VOID_PRIVATEER__.getRuntime().save.player.outfitting.loadouts.wayfarer.guns[0]), 'pulse-cannon');
+    assert.equal(await guest.evaluate(() => __VOID_PRIVATEER__.getRuntime().save.player.outfitting.loadouts.scrapper.utility[0]), 'capacitor-bank');
+    const pilotDistance = () => host.evaluate(() => {
+        const world = __VOID_PRIVATEER__.getRuntime().arena.multiplayer.controller.world;
+        const [a, b] = world.actors();
+        return Math.hypot(...a.position.map((value, index) => value - b.position[index]));
+    });
+    assert.ok(await pilotDistance() >= 650, 'Opening deployments start outside immediate weapon range');
     await Promise.all([host.screenshot({path:out + '/' + hostProfile + '-hud.png'}), guest.screenshot({path:out + '/' + guestProfile + '-hud.png'})]);
     const rotation = await host.evaluate(() => [...__VOID_PRIVATEER__.getRuntime().ships[0].rotation]);
     const stick = await boxCenter(guest.locator('[data-touch-stick]'));
@@ -281,6 +316,7 @@ try {
     await flight(host, 'speedster', guestName);
     await guest.waitForFunction(() => __VOID_PRIVATEER__.getRuntime().ships.some(s =>
         s.shipId === 'speedster' && s.hull === s.maxHull && s.life === 2));
+    assert.ok(await pilotDistance() >= 650, 'The relaunch stays outside immediate range of the killer');
     console.log('Guest fire killed the host. Score, 1,000 credits, hull purchase and relaunch passed.');
 
     await guest.locator('[data-ui-command="pause"]').click();
@@ -298,7 +334,11 @@ try {
     await guest.screenshot({path:out + '/' + guestProfile + '-result.png'});
     await action(host, 'rematch').click();
     await Promise.all([screen(host, 'lobby').waitFor(), screen(guest, 'lobby').waitFor()]);
-    assert.ok(await action(host, 'start').isEnabled());
+    assert.ok(await action(host, 'start').isDisabled(), 'A rematch requires fresh confirmation');
+    await action(guest, 'open-loadout').click();
+    await action(guest, 'loadout-equipment').click();
+    assert.equal(await module.getAttribute('aria-pressed'), 'true', 'The chosen fit carries over as a preference');
+    await action(guest, 'confirm-loadout').click();
     await screen(host, 'lobby').locator('[data-ui-command="multiplayer-back"]').click();
     await screen(guest, 'disconnected').waitFor();
     await screen(guest, 'disconnected').locator('[data-ui-command="multiplayer-back"]').click();

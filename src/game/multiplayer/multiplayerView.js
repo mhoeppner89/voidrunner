@@ -1,7 +1,13 @@
 import { ARENA_SITES } from '../arenaSites.js';
+import { runShipTotals } from '../arenaRunView.js';
 import { SHIPS } from '../data.js';
-import { t } from '../i18n.js';
+import { hullCardMaxima, renderHullCard } from '../hullCardView.js';
+import { getLanguage, t } from '../i18n.js';
+import { equipmentIcon } from '../itemIcons.js';
+import { OUTFIT_ITEMS } from '../outfitting.js';
 import { formatCredits } from '../random.js';
+import { BOT_CHARACTERS, BOT_DIFFICULTIES, BOT_DIFFICULTY_LABELS } from './botProfiles.js';
+import { multiplayerKillPoints, starterMultiplayerFit, STARTER_GEAR } from './matchShop.js';
 import { MULTIPLAYER_STARTER_IDS } from './pilotFitting.js';
 
 const html = value => String(value ?? '').replace(/[&<>"']/g, char => ({
@@ -13,6 +19,12 @@ const option = (value, label, current) => `<option value="${html(value)}"${selec
 const button = (action, label, { primary = false, disabled = false } = {}) => `<button type="button" data-match-action="${action}" class="match-button${primary ? ' match-primary' : ''}"${unavailable(disabled)}>${html(label)}</button>`;
 const back = label => `<button type="button" class="match-button" data-ui-command="multiplayer-back">${html(label)}</button>`;
 const literal = label => html(t(label));
+const starterMaxima = hullCardMaxima(MULTIPLAYER_STARTER_IDS);
+const gearNote = {
+    'beam-emitter': 'Instant beam pulses', 'pulse-cannon': 'Steady projectile fire', 'ripper': 'Wide spread at close range',
+    'capacitor-bank': 'More energy storage',
+    'recovery-shield': 'Faster shield recovery', 'thrusters-mk2': 'Faster turns',
+};
 
 export function matchClock(seconds = 0) {
     const total = Math.max(0, Math.ceil(seconds - 1e-6));
@@ -23,14 +35,17 @@ const teamLabel = team => team === 'red' ? t('Red team') : t('Blue team');
 
 function roster(state, localId, score = false) {
     const rows = score ? state.standings.players : state.players;
-    const header = score ? `<th>${literal('Kills')}</th><th>${literal('Deaths')}</th><th>${literal('Points')}</th>` : `<th>${literal('Points per kill')}</th>`;
+    const header = score ? `<th>${literal('Kills')}</th><th>${literal('Deaths')}</th><th>${literal('Points')}</th>`
+        : `<th>${literal('Loadout')}</th><th>${literal('Points per kill')}</th>`;
     const body = rows.map(pilot => {
-        const suffix = pilot.id === localId ? t('You') : pilot.id === state.hostId ? t('Host') : '';
+        const suffix = pilot.bot ? `${t('Bot')} · ${t(BOT_DIFFICULTY_LABELS[pilot.bot.difficulty])}`
+            : pilot.id === localId ? t('You') : pilot.id === state.hostId ? t('Host') : '';
         const name = `<td><b>${html(pilot.name)}</b>${suffix ? ` <small>${html(suffix)}</small>` : ''}${pilot.connected ? '' : ` <small>${literal('Left')}</small>`}</td>`;
         const team = state.settings.mode === 'teams'
             ? `<td class="match-team ${html(pilot.team)}">${pilot.team ? html(teamLabel(pilot.team)) : '—'}</td>` : '';
         const hull = `<td>${html(SHIPS[pilot.shipId]?.name)}</td>`;
-        return `<tr>${name}${team}${hull}${score ? `<td>${html(pilot.kills)}</td><td>${html(pilot.deaths)}</td><td><strong>${html(pilot.score)}</strong></td>` : `<td>${html(pilot.pointsPerKill)}</td>`}</tr>`;
+        const status = `<td class="${pilot.starterReady ? 'match-ready' : ''}">${literal(pilot.starterReady ? 'Ready' : 'Unconfirmed')}</td>`;
+        return `<tr>${name}${team}${hull}${score ? `<td>${html(pilot.kills)}</td><td>${html(pilot.deaths)}</td><td><strong>${html(pilot.score)}</strong></td>` : `${status}<td>${html(pilot.pointsPerKill)}</td>`}</tr>`;
     }).join('');
     const teams = score && state.standings.teams.length ? `<div class="match-team-totals">${state.standings.teams.map(team =>
         `<span class="match-team ${html(team.id)}">${html(teamLabel(team.id))} <b>${html(team.score)}</b></span>`).join('')}</div>` : '';
@@ -75,6 +90,31 @@ function invitation(model) {
     </section>`;
 }
 
+function botControls(model, teamMode) {
+    if (!model.host) return '';
+    const bots = model.state.players.filter(pilot => pilot.bot);
+    const available = Object.entries(BOT_CHARACTERS).filter(([id]) => !bots.some(pilot => pilot.bot.characterId === id));
+    const character = available.some(([id]) => id === model.botCharacter) ? model.botCharacter : available[0]?.[0];
+    const add = available.length ? `<div class="match-bot-add">
+        <select aria-label="${literal('Bot character')}" data-match-setting="bot-character"${unavailable(model.state.players.length >= 4)}>
+            ${available.map(([id, profile]) => option(id, `${profile.name} · ${t(profile.style)}`, character)).join('')}
+        </select>${button('add-bot', t('Add bot'), { disabled: model.state.players.length >= 4 || model.busy })}
+    </div>` : '';
+    const rows = bots.map(pilot => {
+        const id = html(pilot.id);
+        const profile = BOT_CHARACTERS[pilot.bot.characterId];
+        return `<div class="match-bot-row${teamMode ? ' has-team' : ''}"><span><b>${html(pilot.name)}</b><small>${literal(profile.style)}</small></span>
+            <select aria-label="${html(t('{name} difficulty', { name: pilot.name }))}" data-match-setting="bot-difficulty" data-match-id="${id}">
+                ${BOT_DIFFICULTIES.map(value => option(value, t(BOT_DIFFICULTY_LABELS[value]), pilot.bot.difficulty)).join('')}
+            </select>
+            ${teamMode ? `<select aria-label="${html(t('{name} team', { name: pilot.name }))}" data-match-setting="bot-team" data-match-id="${id}">
+                ${option('', t('Choose team'), pilot.team ?? '')}${option('red', teamLabel('red'), pilot.team)}${option('blue', teamLabel('blue'), pilot.team)}
+            </select>` : ''}
+            <button type="button" class="match-button" data-match-action="remove-bot" data-match-id="${id}" aria-label="${html(t('Remove {name}', { name: pilot.name }))}">${literal('Remove bot')}</button></div>`;
+    }).join('');
+    return `<section class="match-bots" aria-label="${literal('Bots')}"><h3>${literal('Bots')}</h3>${rows}${add}</section>`;
+}
+
 function lobby(model) {
     const ready = model.state.canStart;
     const teamMode = model.state.settings.mode === 'teams';
@@ -82,15 +122,60 @@ function lobby(model) {
         title: t('Multiplayer lobby'),
         body: `${settings(model)}${roster(model.state, model.localId)}
             <div class="match-settings match-fit">
-                <label>${literal('Starting hull')}<select data-match-setting="starter">
-                    ${MULTIPLAYER_STARTER_IDS.map(id => option(id, SHIPS[id].name, model.pilot?.starterShipId)).join('')}
-                </select></label>
                 ${teamMode ? `<label>${literal('Your team')}<select data-match-setting="team">
                     ${option('', t('Choose team'), model.pilot?.team ?? '')}${option('red', teamLabel('red'), model.pilot?.team)}${option('blue', teamLabel('blue'), model.pilot?.team)}
                 </select></label>` : ''}
-            </div>${invitation(model)}`,
-        footer: `${back(t('Leave room'))}${model.host ? button('start', t('Start round'), { primary: true, disabled: !ready || model.busy }) : ''}`,
-        hint: ready ? '' : teamMode ? t('Two pilots per team are needed to start.') : t('At least two pilots are needed to start.'),
+            </div>${botControls(model, teamMode)}${invitation(model)}`,
+        footer: `${back(t('Leave room'))}${button('open-loadout', t(model.pilot.starterReady ? 'Review loadout' : 'Choose loadout'), { primary: !model.pilot.starterReady })}${model.host ? button('start', t('Start round'), { primary: model.pilot.starterReady, disabled: !ready || model.busy }) : ''}`,
+        hint: ready ? '' : model.state.hasEnoughPilots ? t('Waiting for every pilot to confirm their loadout.')
+            : teamMode ? t('Two pilots per team are needed to start.') : t('At least two pilots are needed to start.'),
+    };
+}
+
+function startingLoadout(model) {
+    const { starterShipId: shipId, starterGear, pointsPerKill } = model.pilot;
+    const formatter = new Intl.NumberFormat(getLanguage(), { maximumFractionDigits: 1 });
+    const num = value => formatter.format(value);
+    const score = `<span class="match-loadout-score">${html(SHIPS[shipId].name)} <b>${html(pointsPerKill)} ${literal('pts / kill')}</b></span>`;
+    if (model.loadoutStage !== 'equipment') {
+        const cards = MULTIPLAYER_STARTER_IDS.map(id => {
+            const active = shipId === id;
+            const points = multiplayerKillPoints(id, starterMultiplayerFit(id, starterGear));
+            return `<button type="button" class="run-offer run-hull-card${active ? ' is-selected' : ''}" data-match-action="starter" data-match-id="${html(id)}" aria-pressed="${active}">
+                ${renderHullCard(id, { num, maxima: starterMaxima, showMounts: false, caption: `${num(points)} ${t('pts / kill')}` })}
+            </button>`;
+        }).join('');
+        return {
+            title: t('Choose a starting hull'),
+            body: `<div class="run-offers match-hulls">${cards}</div>`,
+            footer: `${score}${back(t('Back to lobby'))}${button('loadout-equipment', t('Fit equipment'), { primary: true })}`,
+        };
+    }
+
+    const outfit = starterMultiplayerFit(shipId, starterGear);
+    const fit = outfit.loadouts[shipId];
+    const stock = starterMultiplayerFit(shipId).loadouts[shipId];
+    const picker = (slot, title) => {
+        const items = [stock[slot][0], ...STARTER_GEAR[slot].filter(id => id !== stock[slot][0])];
+        return `<section class="match-gear-group" aria-label="${literal(title)}"><h3>${literal(title)}</h3>${items.map((id, index) => {
+            const item = OUTFIT_ITEMS[id];
+            const active = fit[slot][0] === id;
+            const name = id ? t(item.name) : t('No module');
+            const note = index === 0 ? t('Stock fit') : t(gearNote[id]);
+            const image = item ? equipmentIcon(item, 'match-gear-image') : '<span class="match-gear-empty" aria-hidden="true">—</span>';
+            return `<button type="button" class="match-gear-option" aria-pressed="${active}" data-match-action="starter-gear" data-match-slot="${slot}" data-match-id="${index ? html(id) : ''}">
+                <span class="match-gear-icon" aria-hidden="true">${image}</span><span><b>${html(name)}</b><small>${html(note)}</small></span>
+            </button>`;
+        }).join('')}</section>`;
+    };
+    const stats = runShipTotals({ shipId, outfitting: outfit });
+    const readout = [['Sustained fire', `${num(stats.sustained)}/s`], ['Energy capacity', num(stats.energy)],
+        ['Shield recharge', `${num(stats.recharge)}/s`], ['Turning', `${num(stats.turn * 180 / Math.PI)}°/s²`]];
+    const totals = `<dl class="match-fit-readout">${readout.map(([label, value]) => `<div><dt>${literal(label)}</dt><dd>${html(value)}</dd></div>`).join('')}</dl>`;
+    return {
+        title: t('Fit your starting equipment'),
+        body: `<div class="match-gear-pickers"><div>${picker('guns', 'First gun mount')}${totals}</div>${picker('utility', 'Utility mount')}</div>`,
+        footer: `${score}${button('loadout-hull', t('Back to hulls'))}${button('confirm-loadout', t('Confirm loadout'), { primary: true })}`,
     };
 }
 
@@ -164,7 +249,7 @@ export class MultiplayerView {
         });
         this.panel.addEventListener('change', event => {
             const field = event.target;
-            if (field.dataset.matchSetting) action('setting', { key: field.dataset.matchSetting, value: field.value });
+            if (field.dataset.matchSetting) action('setting', { key: field.dataset.matchSetting, value: field.value, id: field.dataset.matchId });
         });
         this.panel.addEventListener('input', event => {
             const field = event.target;
@@ -185,6 +270,7 @@ export class MultiplayerView {
             };
         } else if (screen === 'join') view = joining(model);
         else if (screen === 'lobby') view = lobby(model);
+        else if (screen === 'loadout') view = startingLoadout(model);
         else if (screen === 'shop') view = shop(model);
         else if (screen === 'score' || screen === 'ended') view = scores(model, screen === 'ended');
         else if (screen === 'preparing') view = {
@@ -200,10 +286,15 @@ export class MultiplayerView {
         const openDetails = [...this.panel.querySelectorAll('details[open]')].map(item => item.dataset.matchDetails);
         const closeDetails = [...this.panel.querySelectorAll('details:not([open])')].map(item => item.dataset.matchDetails);
         const previous = this.panel.dataset.screen;
+        const previousStage = this.panel.dataset.loadoutStage;
         const focus = document.activeElement;
         const keepNameFocus = previous === screen && focus?.matches('[data-match-field="name"]') && this.panel.contains(focus);
+        const keepControl = this.panel.contains(focus) && (
+            screen === 'loadout' && focus.matches('[data-match-action="starter"], [data-match-action="starter-gear"]')
+            || screen === 'lobby' && focus.matches('[data-match-setting]')) ? focus.dataset : undefined;
         const selection = keepNameFocus ? [focus.selectionStart, focus.selectionEnd] : undefined;
         this.panel.dataset.screen = screen;
+        this.panel.dataset.loadoutStage = screen === 'loadout' ? model.loadoutStage : '';
         this.panel.innerHTML = `<article class="match-card">
             <header><h2 id="multiplayer-heading" tabindex="-1">${html(view.title)}</h2></header>
             <div class="match-scroll">${view.body}</div>
@@ -212,7 +303,7 @@ export class MultiplayerView {
         </article>`;
         this.panel.classList.remove('is-hidden');
         this.ui.root.querySelector('#title-screen').inert = true;
-        if (previous !== screen) this.panel.querySelector('h2').focus({ preventScroll: true });
+        if (previous !== screen || previousStage !== this.panel.dataset.loadoutStage) this.panel.querySelector('h2').focus({ preventScroll: true });
         else {
             this.panel.querySelector('.match-scroll').scrollTop = scroll;
             for (const details of this.panel.querySelectorAll('details')) {
@@ -223,6 +314,12 @@ export class MultiplayerView {
                 const input = this.panel.querySelector('[data-match-field="name"]');
                 input?.focus({ preventScroll: true });
                 input?.setSelectionRange(...selection);
+            }
+            if (keepControl) {
+                const replacement = [...this.panel.querySelectorAll('[data-match-action], [data-match-setting]')].find(({ dataset }) =>
+                    dataset.matchAction === keepControl.matchAction && dataset.matchSetting === keepControl.matchSetting
+                    && dataset.matchId === keepControl.matchId && dataset.matchSlot === keepControl.matchSlot);
+                replacement?.focus({ preventScroll: true });
             }
         }
     }
