@@ -3,6 +3,7 @@ import * as THREE from 'three';
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const delta = new THREE.Quaternion(), euler = new THREE.Euler();
 const error = new THREE.Quaternion();
+const npcAxes = new THREE.Vector3();
 
 // Both pilots use these integrators. Inputs are bounded local thrust/rotation
 // commands; steering never replaces a velocity vector with a new heading.
@@ -16,7 +17,7 @@ export function integrateFlightTurn(orientation, angularVelocity, x, y, z, accel
     orientation.multiply(delta).normalize();
 }
 
-export function steerFlightTurn(orientation, angularVelocity, desired, stats, assisted, burning, dt, trackingRate, precision=1) {
+export function flightTurnAxes(orientation, angularVelocity, desired, stats, assisted, burning, trackingRate, precision, out) {
     error.copy(orientation).invert().multiply(desired).normalize();
     if (error.w < 0) error.set(-error.x,-error.y,-error.z,-error.w);
     const length = Math.hypot(error.x,error.y,error.z);
@@ -25,11 +26,15 @@ export function steerFlightTurn(orientation, angularVelocity, desired, stats, as
     const gain = stats.angularAcceleration * (burning ? 2 : 1);
     const damping = stats.angularDamping * (assisted ? 1 : 0.38);
     const positionGain=3*precision,rateGain=3*Math.sqrt(precision);
-    integrateFlightTurn(orientation,angularVelocity,
+    return out.set(
         (error.x*scale*positionGain+(trackingRate?.x??0)*rateGain-angularVelocity.x*(rateGain-damping))/gain,
         (error.y*scale*positionGain+(trackingRate?.y??0)*rateGain-angularVelocity.y*(rateGain-damping))/gain,
-        (error.z*scale*positionGain+(trackingRate?.z??0)*rateGain-angularVelocity.z*(rateGain-damping))/gain,
-        stats.angularAcceleration,stats.angularDamping,assisted,burning,dt);
+        (error.z*scale*positionGain+(trackingRate?.z??0)*rateGain-angularVelocity.z*(rateGain-damping))/gain);
+}
+
+export function steerFlightTurn(orientation, angularVelocity, desired, stats, assisted, burning, dt, trackingRate, precision=1) {
+    const axes = flightTurnAxes(orientation, angularVelocity, desired, stats, assisted, burning, trackingRate, precision, npcAxes);
+    integrateFlightTurn(orientation, angularVelocity, axes.x, axes.y, axes.z, stats.angularAcceleration, stats.angularDamping, assisted, burning, dt);
 }
 
 export function integrateFlightVelocity(velocity, forward, targetSpeed, speedCeiling, acceleration, assisted, burning, throttle, dt, lateralMultiplier=1) {

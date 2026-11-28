@@ -1,11 +1,14 @@
 import { Quaternion, Vector3 } from 'three';
 import { arenaSite } from '../arenaSites.js';
+import { advanceCoverSearches, interruptFieldTactic } from '../combatTactics.js';
 import { SHIPS } from '../data.js';
+import { advanceFieldRoadmap } from '../fieldRoadmap.js';
+import { registerHitReaction } from '../flightDynamics.js';
 import { seededRandom } from '../random.js';
 import { SHIP_COLLIDERS, shipVsObstacle, shipVsShip } from '../shipCollision.js';
 import { GRAVEYARD_MODEL_COLLIDER_MAX_RADIUS } from '../worldData.js';
 import { applyPilotWeaponHit } from './combatDamage.js';
-import { BOT_REFIT_SECONDS, MatchBot, refitMatchBot } from './matchBots.js';
+import { BOT_REFIT_SECONDS, MatchBot, MatchBotEnvironment, refitMatchBot } from './matchBots.js';
 import { createMatchCombat, initPilotCombat, stepMatchCombat } from './matchCombat.js';
 import { stepPilotFlight } from './pilotFlight.js';
 import { acceptPilotInput, createPilotInput, takePilotActions } from './pilotInput.js';
@@ -131,9 +134,17 @@ export class MatchWorld {
         if (this.normal.lengthSq() < 1) this.normal.copy(FORWARD);
         this.rotation.setFromUnitVectors(FORWARD, this.normal.normalize()).toArray(actor.rotation);
         actor.scale = 1;
+        actor.faction = actor.team || actor.id;
+        actor.speed = actor.stats.maxSpeed;
+        actor.afterburnSpeed = actor.stats.afterburnSpeed;
+        actor.maxHull = actor.stats.hull;
+        actor.maxShield = actor.stats.shield;
         initPilotCombat(actor);
         const bot = this.match.players.get(actor.id)?.bot;
-        if (bot) this.bots.set(actor.id, new MatchBot(actor, bot, `${this.match.seed}:${this.match.round}`, ARENA_LIMIT));
+        if (bot) {
+            this.botEnvironment ??= new MatchBotEnvironment(this);
+            this.bots.set(actor.id, new MatchBot(actor, bot, `${this.match.seed}:${this.match.round}`, ARENA_LIMIT));
+        }
         // Continue rejecting stale packets across respawns and accept input
         // only with the life number of this actor.
         this.inputs.set(actor.id, createPilotInput());
@@ -175,11 +186,16 @@ export class MatchWorld {
         this.session.renderer.updateWorld(MATCH_STEP);
         if (this.botRespawns.size) this.relaunchBots(time);
         const actors = this.actors();
+        if (this.bots.size) {
+            this.botEnvironment.ships = actors;
+            if (this.site.instanceId) advanceFieldRoadmap(this.session, 2);
+            advanceCoverSearches(this.botEnvironment);
+        }
         const actions = new Map();
         for (const actor of actors) {
             const input = this.inputs.get(actor.id);
             if (!input) continue;
-            const command = this.bots.get(actor.id)?.actions(this, actors, time) ?? takePilotActions(input, this.tick);
+            const command = this.bots.get(actor.id)?.actions(this.botEnvironment, time, MATCH_STEP) ?? takePilotActions(input, this.tick);
             actions.set(actor.id, command);
             stepPilotFlight(actor, actor.stats, command, MATCH_STEP);
             this.resolveTerrain(actor, time);
@@ -187,6 +203,12 @@ export class MatchWorld {
         this.resolveShipContacts(actors, time);
         const events = stepMatchCombat(this.combat, actors.filter(actor => actor.hull > 0), actions, time, MATCH_STEP);
         for (const event of events) {
+            const bot = event.type === 'hit' && this.bots.get(event.targetId)?.actor;
+            if (bot && !event.killed && event.ownerId) {
+                bot.combatThreatId = event.ownerId;
+                bot.combatThreatUntil = time + 2;
+                registerHitReaction(bot, time, event.shield + event.hull);
+            }
             if (event.killed) this.recordDeath(event.targetId, event.ownerId, event.targetLife, event.ownerLife);
             this.events.push(event);
         }
@@ -202,7 +224,10 @@ export class MatchWorld {
         const result = this.match.recordDeath(victimId, killerId, { victimLife, killerLife, round: this.match.round });
         if (!result?.ok) return;
         this.inputs.delete(victimId);
-        if (this.bots.delete(victimId)) this.botRespawns.set(victimId, { due: this.tick * MATCH_STEP + BOT_REFIT_SECONDS });
+        if (this.bots.delete(victimId)) {
+            interruptFieldTactic(this.botEnvironment, result.actor);
+            this.botRespawns.set(victimId, { due: this.tick * MATCH_STEP + BOT_REFIT_SECONDS });
+        }
         this.lastDeath.set(victimId, new Vector3().fromArray(result.actor.position));
         this.events.push({
             type: 'death', targetId: victimId, ownerId: result.killerId, points: result.points,
@@ -245,6 +270,10 @@ export class MatchWorld {
             this.session.forEachHullObstacle(position, FIELD_REACH + reach, reach, obstacle => {
                 if (!shipVsObstacle(position, rotation, actor.variant, actor.scale, obstacle, contact)) return;
                 normal.set(contact.x, contact.y, contact.z);
+                if (actor.fieldNav) {
+                    actor.combatBumpAt = time;
+                    actor.fieldNav.contactNormal.copy(normal);
+                }
                 position.addScaledVector(normal, contact.push + .04);
                 const inward = -velocity.dot(normal);
                 if (inward > 0) velocity.addScaledVector(normal, inward * 1.5);

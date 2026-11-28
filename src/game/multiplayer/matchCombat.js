@@ -1,12 +1,13 @@
 import { Quaternion, Vector3 } from 'three';
 import { spendEnergy } from '../combatResources.js';
+import { npcShotDirection, npcTriggerReady, recordNpcShot } from '../npcGunnery.js';
 import { seededRandom } from '../random.js';
 import { SHIP_MOUNT_ANCHORS } from '../shipMounts.js';
 import { disruptionFactor } from '../weaponDamage.js';
 import { rackLockProgress, relativeIntercept, torpedoMobilityFactor } from '../weaponFlight.js';
 import { mountedGunEntries, mountedLauncherEntries, weaponAssistCone, weaponForSlot } from '../weapons.js';
 import { stepPilotRecovery } from './combatDamage.js';
-import { fireMatchBeam, fireMatchRound, resolveMatchFire } from './matchProjectiles.js';
+import { fireMatchBeam, fireMatchRound, hullExtents, resolveMatchFire } from './matchProjectiles.js';
 import { createTurretSession, stepPilotTurrets } from './matchTurrets.js';
 
 const rotation = new Quaternion(), targetRotation = new Quaternion();
@@ -86,11 +87,20 @@ function aimedDirection(combat, actor, target, weapon) {
     direction.multiplyScalar(distance).add(center).sub(muzzle).normalize();
 }
 
+function aimMatchBotGun(combat, actor, target, entry, input) {
+    if (!target) return false;
+    const { weapon } = entry;
+    lead.copy(input.gunAim);
+    if (weapon.kind === 'beam') lead.fromArray(target.position).sub(muzzle).normalize();
+    if (!npcTriggerReady(actor, weapon, nose.dot(lead), combat.time)) return false;
+    const distance = center.distanceTo(bearing.fromArray(target.position));
+    if (!npcShotDirection(actor, weapon, lead, direction, combat.time, distance, Math.max(...hullExtents(target)))) return false;
+    if (weapon.kind !== 'beam') direction.multiplyScalar(distance).add(center).sub(muzzle).normalize();
+    return true;
+}
+
 function fireGun(combat, actor, target, entry, life) {
-    const { mount, weapon, index } = entry;
-    muzzle.fromArray(SHIP_MOUNT_ANCHORS[actor.shipId]?.guns[index] ?? gunAnchor)
-        .multiplyScalar(actor.scale ?? 1).applyQuaternion(rotation).add(center);
-    aimedDirection(combat, actor, target, weapon);
+    const { mount, weapon } = entry;
     if (weapon.kind === 'beam') {
         fireMatchBeam(combat, actor, weapon, mount.id, muzzle, direction);
         return;
@@ -116,7 +126,7 @@ function fireGun(combat, actor, target, entry, life) {
     }
 }
 
-function fireGuns(combat, actor, life, target, factor) {
+function fireGuns(combat, actor, life, target, factor, input) {
     const { guns, groups, readyAt } = life;
     if (life.switchAt > combat.time) return;
     const start = life.nextGun;
@@ -128,10 +138,21 @@ function fireGuns(combat, actor, life, target, factor) {
         const alternating = groups.firingModes[group] === 'alternating';
         if (alternating && combat.time < life.groupAt[group]) continue;
         if (weapon.ammoId && !(actor.ammo[weapon.ammoId] > 0)) continue;
+        if (input.gunAim && entry.index !== input.gunIndex) continue;
+        if (input.gunAim && actor.energy + 1e-9 < weapon.energyCost * factor) continue;
+        muzzle.fromArray(SHIP_MOUNT_ANCHORS[actor.shipId]?.guns[entry.index] ?? gunAnchor)
+            .multiplyScalar(actor.scale ?? 1).applyQuaternion(rotation).add(center);
+        if (input.gunAim) {
+            if (!aimMatchBotGun(combat, actor, target, entry, input)) continue;
+        } else aimedDirection(combat, actor, target, weapon);
         if (!spendEnergy(actor, weapon.energyCost * factor)) { life.nextGun = index; break; }
         fireGun(combat, actor, target, entry, life);
         if (weapon.ammoId) actor.ammo[weapon.ammoId]--;
         readyAt[entry.mount.id] = combat.time + weapon.cooldown * factor;
+        if (input.gunAim) {
+            actor.combatFit.fireAt[actor.combatWeaponIndex] = readyAt[entry.mount.id];
+            recordNpcShot(actor, combat.time);
+        }
         if (alternating) life.groupAt[group] = combat.time + factor / life.rates[group];
         life.nextGun = (index + 1) % guns.length;
     }
@@ -237,7 +258,7 @@ export function stepMatchCombat(combat, actors, actions, time, dt) {
         const distance = updateLocks(combat, actor, life, target, dt);
         const factor = disruptionFactor(actor, time);
         if (input.missile && target && distance !== undefined) fireRacks(combat, actor, life, target, distance, factor);
-        if (input.fire) fireGuns(combat, actor, life, target, factor);
+        if (input.fire) fireGuns(combat, actor, life, target, factor, input);
         if (life.hasTurrets) stepPilotTurrets(combat, actor, target, dt);
     }
     resolveMatchFire(combat, dt);

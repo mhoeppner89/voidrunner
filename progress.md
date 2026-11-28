@@ -2260,3 +2260,11 @@ Download/startup optimization: cold Pixel 7 measurements found unused capital hu
 - Hidden-window startup uses message tasks for its loading slices. Terrain, planet textures, and audio preparation share that scheduler. A hidden multiplayer canvas defers optional shader warmup until rendering is needed.
 - Passed the final native Mac solo-start and Bonjour tests, both solo modes in native WebKit on the iPhone simulator, a throttled WebKit startup fixture, browser solo/public/mixed matches, and all 1,783 automated tests. Both phones were disconnected during this pass.
 - Ran full five- and ten-minute fixed-step rounds across all 11 Arena maps. Every match recorded combat hits, reached results, and returned to the lobby for a rematch. Desktop, Android Chrome and iPhone WebKit also passed Career, Arena, Arena Run, Spectator, combat, landing, and offline resume checks.
+
+## Multiplayer bot flight
+
+- The original multiplayer controller chased a lead point with a fixed throttle curve, a short missile dodge, and local obstacle probes. It had its own aim and reaction settings.
+- Multiplayer pilots now share Arena's pursuit planning, pilot temperaments, gunnery, threat prediction, terrain steering, shield recovery, team roles, and combat maneuvers. Their commands go through the host's usual pilot flight and weapon simulation. The multiplayer roster, character fits, and refit paths are preserved.
+- A bot tracks a visible opponent and searches from the last sighting after losing contact. The host owns bot input and movement. Shared combat state stays local to the host.
+- The seeded combat checks recorded hits from every bot at every Arena site. The 2v2 fixture split the two allied bots into pressure and flank roles. Three skill levels reacted to an inbound shot with the Arena timing.
+- Verified the packed build in desktop Chromium free-for-all, iPhone WebKit 2v2, and a linked desktop-to-iPhone browser 2v2 with two humans and two bots. The solo tests covered fire, refits, relaunch and rematches. The mixed test reached results on both browsers and rematched.

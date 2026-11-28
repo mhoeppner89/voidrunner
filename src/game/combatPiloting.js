@@ -20,7 +20,7 @@ export function observeIncomingFire(session,ship) {
   const missile=p.kind==='missile'||p.kind==='torpedo';
   if(missile && (p.lostTrack || p.targetId!==ship.id))continue;
   if(p.life<=0||p.ownerId===ship.id||scan.seen.has(p.salvo??p.id??p)||!session.projectileCanHitShip(p,ship))continue;
-  const i=p.slot*3,pos=session.projStore.pos,vel=session.projStore.vel;
+  const i=session.projStore?p.slot*3:0,pos=session.projStore?.pos??p.position,vel=session.projStore?.vel??p.velocity;
   const x=pos[i]-ship.position[0],y=pos[i+1]-ship.position[1],z=pos[i+2]-ship.position[2];
   const viewRange=missile?800:400;
   if(x*x+y*y+z*z>viewRange*viewRange)continue;
@@ -54,7 +54,7 @@ export function observeIncomingFire(session,ship) {
   }
   ship.combatThreatId=best.ownerId;ship.combatThreatUntil=now+2;
   if(WEAPONS[best.weaponId])ship.observedWeaponRange=Math.max(ship.observedWeaponRange??0,weaponRange(WEAPONS[best.weaponId]));
-  const damage=weaponDamage(ship.shield,best.damage,WEAPONS[best.weaponId]);
+  const damage=weaponDamage(ship.shield,best.damage,session.projStore?WEAPONS[best.weaponId]:best.hitWeapon);
   registerHitReaction(ship,now,damage.shield+damage.hull,true);
  }
 }

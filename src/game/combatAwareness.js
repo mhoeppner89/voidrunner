@@ -83,7 +83,7 @@ function awareness(session,ship,now){
   if(session.lineBlocked(s.position,s.end,ship.id)||session.canSee&&!session.canSee(ship.position,other.position,other.dark,Math.hypot(...other.velocity),other.speed))continue;
   let c=s.pool.get(other.id);
   if(!c){c={id:other.id,ship:other,position:new THREE.Vector3(),nose:new THREE.Vector3()};s.pool.set(other.id,c);}
-  c.seenAt=now;c.position.copy(s.end);c.distance=distance;c.nose.copy(FORWARD).applyQuaternion(s.q.fromArray(other.rotation));c.facing=-c.nose.dot(s.delta)/Math.max(1,distance);
+  c.ship=other;c.seenAt=now;c.position.copy(s.end);c.distance=distance;c.nose.copy(FORWARD).applyQuaternion(s.q.fromArray(other.rotation));c.facing=-c.nose.dot(s.delta)/Math.max(1,distance);
   s.contacts.push(c);s.center.add(c.position);
  }
  const player=session.save.player;

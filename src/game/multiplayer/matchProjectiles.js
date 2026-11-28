@@ -23,6 +23,7 @@ export function fireMatchRound(combat, owner, weapon, mountId, muzzle, direction
     const shot = {
         id: 'p-' + ++combat.serial, slot: combat.projectiles.length, ownerId: owner.id, targetId: target?.id,
         weaponId: weapon.id, mountId, kind: launcher ? 'missile' : weapon.kind,
+        hitWeapon: weapon,
         damage: options.damage ?? weapon.damageFlat ?? weapon.damage, tint: weapon.tint,
         life: weapon.life, position, velocity: velocity.copy(direction).multiplyScalar(weapon.speed)
             .add(targetVelocity.fromArray(owner.velocity)).toArray(),
