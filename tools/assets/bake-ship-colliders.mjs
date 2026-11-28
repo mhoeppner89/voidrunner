@@ -16,7 +16,7 @@ for(const [variant,config] of Object.entries(GLB_SHIP_CONFIG)){
  root.rotation.y=config.yaw;root.scale.setScalar(config.scale*(config.baseScale??1));root.updateMatrixWorld(true);
  const source=config.collisionSource?JSON.parse(await readFile(config.collisionSource,'utf8')):null;
  const components=source?.groups;
- const pods=components?Object.keys(components).filter(k=>/^(pod_|stack_|bay_|rack_|emitter(?:_rotor)?$)/.test(k)):[];
+ const pods=components&&!source.fixed_groups?Object.keys(components).filter(k=>/^(pod_|stack_|bay_|rack_|emitter(?:_rotor)?$)/.test(k)):[];
  for(const part of (pods.length?[null,'body',...pods]:[null])){
  const vertices=[],indices=[],unique=new Map(),point=new T.Vector3(),groupEnds={};
  if(components){
@@ -26,7 +26,7 @@ for(const [variant,config] of Object.entries(GLB_SHIP_CONFIG)){
    const offset=vertices.length/3;
    for(const point of group.vertices)for(const coordinate of point)vertices.push(coordinate/2);
    for(const face of group.triangles)for(const index of face)indices.push(offset+index);
-   if(!part&&(variant==='siege'||variant==='picket'))groupEnds[name]=vertices.length/3;
+   if(!part&&(source.fixed_groups||variant==='siege'||variant==='picket'))groupEnds[name]=vertices.length/3;
   }
  }else root.traverse(mesh=>{if(!mesh.isMesh)return;const p=mesh.geometry.attributes.position,index=mesh.geometry.index,count=index?.count??p.count;
   for(let i=0;i<count;i++){point.fromBufferAttribute(p,index?index.getX(i):i).applyMatrix4(mesh.matrixWorld);

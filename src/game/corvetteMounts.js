@@ -1,4 +1,5 @@
 import {careerRaidTier} from './careerDanger.js';
+import {SKIDBLADNIR_LAUNCH_SOCKETS,SKIDBLADNIR_MOUNTS} from './skidbladnirMounts.js';
 
 // Socket positions are in the validated, full-size flight frame (+X starboard, -Z bow).
 const up=[0,1,0], down=[0,-1,0], aft=[0,0,1];
@@ -46,6 +47,14 @@ export function patrolCorvette(faction,region,rng){
     const variant=faction==='alliance'?'siege':faction==='concord'?'picket':undefined;
     return variant&&careerRaidTier(region)>=2&&rng()<.10?variant:undefined;
 }
+export function patrolCapital(faction,region,rng){
+    if(faction!=='alliance')return patrolCorvette(faction,region,rng);
+    const tier=careerRaidTier(region);
+    if(tier<2)return;
+    const roll=rng();
+    if(roll<.10)return 'siege';
+    if(region.danger>=.5&&roll<.15)return 'skidbladnir';
+}
 function picketSeat(node,kind,label,position){
     return {...seat(node,kind,label,position),restDirection:[0,0,-1]};
 }
@@ -86,11 +95,22 @@ const frigateSystems=[
     ...['port','centre','starboard'].map((name,i)=>({node:'engine_'+name,kind:'engine',label:name.toUpperCase()+' ENGINE',position:[(i-1)*8,-.94,52],
         normal:aft,hull:150,hitShape:'cylinder',hitRadius:3.8,hitHalfLength:3.6,hitCenterOffset:[0,0,-3.6],exhaustRadius:3})),
 ];
+const oldRookeryBayHull=300;
+const rookeryBayHull=180;
+const rookeryBays=[-1,1].flatMap(bearing=>[-17.5,13].map((z,i)=>{
+    const side=bearing<0?'port':'starboard';
+    return {node:`bay_${side}_${i+1}`,kind:'bay',label:`${side.toUpperCase()} BAY ${i+1}`,
+        position:[bearing*5,0,z],normal:[bearing,0,0],bearing,hull:rookeryBayHull,radius:4,markerLift:.4,exportedSurface:true};
+}));
 export const ROOKERY_LAUNCH={
-    every:25,cap:8,mast:'mast',fighter:'scrapper',
-    bays:[{subsystem:'bay_port',socket:'launch_port'},{subsystem:'bay_starboard',socket:'launch_starboard'}],
-    sockets:Object.fromEntries([-1,1].map(side=>['launch_'+(side<0?'port':'starboard'),{
-        game_position:[side*11.6578,-.07,-27.14],direction_game:[side*.26066583,0,-.96542901]}])),
+    mast:'mast',fighter:'scrapper',
+    bays:[rookeryBays[0],rookeryBays[2],rookeryBays[1],rookeryBays[3]]
+        .map(({node})=>({subsystem:node,socket:node.replace('bay_','launch_')})),
+    sockets:Object.fromEntries(rookeryBays.map(({node,position:[,,z],bearing})=>[node.replace('bay_','launch_'),{
+        start_game_position:[bearing*14.4,0,z],game_position:[bearing*24.6,0,z],direction_game:[bearing,0,0]}])),
+};
+export const SKIDBLADNIR_LAUNCH={fighter:'speedster',sockets:SKIDBLADNIR_LAUNCH_SOCKETS,
+    bays:Object.keys(SKIDBLADNIR_LAUNCH_SOCKETS).map(socket=>({subsystem:socket.replace('launch_','bay_'),socket})),
 };
 export const TRAFFIC_HULLS={...CORVETTES,
     caravan:{name:'Brigid',capitalClass:'frigate',shield:500,hull:2000,speed:20,turn:.15,regen:10,cargoHolds:4,
@@ -100,11 +120,13 @@ export const TRAFFIC_HULLS={...CORVETTES,
             ...Array.from({length:4},(_,i)=>{const side=i%2?1:-1;return {node:'stack_'+i,kind:'stack',label:'CARGO STACK '+(i+1),hull:150,normal:[side,0,0],
                 position:[side*15.85,0,i<2?-16:12],hitShape:'box',hitHalfExtents:[5.35,5.1,10.92],hitCenterOffset:[-side*5.35,-.18,0],partBit:1<<i};})]},
     rookery:{name:'Red Brigid',capitalClass:'frigate',shield:500,hull:2400,speed:20,turn:.15,regen:10,preferredRange:1200,launch:ROOKERY_LAUNCH,
-        role:'escort',faction:'pirates',readout:'GUNS {guns}/2 · BAYS {bays}/2',mounts:[...frigateSystems,
+        role:'escort',faction:'pirates',readout:'GUNS {guns}/2 · BAYS {bays}/4',mounts:[...frigateSystems,
             ...[-1,1].map((side,i)=>({...broadsides[i],node:'mount_broadside_'+(side<0?'port':'starboard'),position:[side*17.88,4.03,-2]})),
             {node:'mast',kind:'mast',label:'FLIGHT CONTROL',hull:120,normal:up,position:[0,13.36,-2],hitShape:'box',hitHalfExtents:[4.4,5.2,5.9],hitCenterOffset:[0,-5.2,0]},
-            ...[-1,1].map((side,i)=>({node:'bay_'+(side<0?'port':'starboard'),kind:'bay',label:side<0?'PORT BAY':'STARBOARD BAY',hull:300,normal:[side,0,0],
-                position:[side*19.95,0,-2],hitShape:'box',hitHalfExtents:[8,5.75,28.3],hitCenterOffset:[-side*8,.45,-3.15],partBit:1<<i,bearing:side}))]},
+            ...rookeryBays]},
+    skidbladnir:{name:'Skidbladnir',capitalClass:'frigate',shield:500,hull:2300,speed:22,turn:.16,regen:10,preferredRange:1300,
+        standoffCruise:.35,role:'patrol',faction:'alliance',readout:'TURRETS {turrets}/4 · BAYS {bays}/6',
+        mounts:SKIDBLADNIR_MOUNTS,launch:SKIDBLADNIR_LAUNCH},
 };
 export const CORVETTE_TRAFFIC={convoyChance:.15,raidChance:.15,minRaidTier:2,bargeShare:1/3};
 export const FRIGATE_TRAFFIC={convoyChance:.05,minConvoyTier:2,towChance:.25,raidChance:.05,minRaidTier:3,raidEscorts:2};
@@ -122,4 +144,22 @@ export function raidCorvette(region,rng){return (region.piratePressure??1)>0&&ca
 // damage to the surviving systems and both replacement defence mounts.
 export function restorePicketMounts(values,layout) {
     return layout===2?values:[...values.slice(0,4),values[5],values[6],values[7],values[7]];
+}
+
+export function currentRookeryBay(node) {
+    return node==='bay_port'||node==='bay_starboard'?node+'_1':node;
+}
+
+export function restoreRookeryBays(ship) {
+    if(ship.variant!=='rookery'||ship.capitalMountHull?.length!==13)return;
+    const old=ship.capitalMountHull;
+    // The old side assembly was one damage pool. Carry its condition across
+    // both new berths on that side while preserving damage to the other systems.
+    ship.capitalMountHull=[...old.slice(0,11),...rookeryBays.map(({bearing})=>{
+        const side=bearing<0?0:1;
+        return (ship.missingPods&(1<<side))?0:rookeryBayHull*old[11+side]/oldRookeryBayHull;
+    })];
+    ship.missingPods=0;
+    const turrets=ship.combatFit?.turrets;
+    if(turrets?.length===13)turrets.push(null,null);
 }

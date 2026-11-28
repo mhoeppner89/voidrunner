@@ -130,10 +130,18 @@
   {
     "variant": "rookery",
     "path": "assets/models/capital/rookery.glb",
-    "sha256": "66f61a2b45f8c929fc405a4bb65820a5b28034d6fc1be1bd33d361dabfc99998",
-    "contourVertices": 80,
-    "glassContours": 8,
-    "aspect": 0.36458333333333337
+    "sha256": "ce35f0bfc4216492c334b77d69cea4d4d855424779670bf0ca34df52f05ed274",
+    "contourVertices": 76,
+    "glassContours": 10,
+    "aspect": 0.5
+  },
+  {
+    "variant": "skidbladnir",
+    "path": "assets/models/capital/skidbladnir.glb",
+    "sha256": "41735d40c0527b5e0db6649647515c66fe763be89ba067f397829d7bfa414f61",
+    "contourVertices": 67,
+    "glassContours": 12,
+    "aspect": 0.3333333333333333
   },
   {
     "variant": "drover",

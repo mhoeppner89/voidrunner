@@ -88,10 +88,7 @@ export function capitalCollisionVariant(variant,missing){
     if(SHIP_COLLIDERS[key])return key;
     const groups=SHIP_COLLISION_DATA[variant].parts,vertices=[],indices=[],boxes=[];
     for(const name of Object.keys(groups)){
-        if(name.startsWith('bay_')){
-            const lost=Boolean(missing&(name.startsWith('bay_port')?1:2));
-            if(lost!==name.endsWith('_damaged'))continue;
-        }else if(name==='emitter'||name==='emitter_rotor'){if(missing&1)continue;}else if(name!=='body'&&(missing&(1<<Number(name.split('_')[1]))))continue;
+        if(name==='emitter'||name==='emitter_rotor'){if(missing&1)continue;}else if(name!=='body'&&(missing&(1<<Number(name.split('_')[1]))))continue;
         const part=collisionPart(variant,name),offset=vertices.length/3;
         for(const v of part.meshVerts)vertices.push(v);
         for(const i of part.meshIndices)indices.push(offset+i);

@@ -2,8 +2,9 @@
 // y is bow-to-stern length. These show existing structure, never change the hull.
 const box=(x0,y0,x1,y1)=>[[x0,y0],[x1,y0],[x1,y1],[x0,y1],[x0,y0]];
 export const SCHEMATIC_DETAILS={
+ skidbladnir:{features:['forward pilothouse','six flight decks','three stern engines'],paths:[box(0,.07,.23,.18),...[.33,.50,.66].map(z=>box(.51,z-.055,.92,z+.055)),box(0,.74,.23,.80),box(.25,.92,.49,.99)]},
  caravan:{features:['bridge','four container stacks','drone hangar'],paths:[[[0,.12],[.47,.12]],[[.32,.24],[.32,.7]],[[.32,.46],[.94,.46]],[[0,.8],[.75,.8]]]},
- rookery:{features:['ram','flight deck','twin launch rails'],paths:[[[0,.14],[.45,.14]],[[.48,.26],[.58,.68]],[[.8,.29],[.8,.66]],[[0,.8],[.68,.8]]]},
+ rookery:{features:['armored ram','four fighter hangars','broadside gun platforms'],paths:[[[0,.14],[.36,.14]],...[.36,.64].map(z=>box(.23,z-.088,.91,z+.088)),box(.48,.48,.72,.53),[[0,.82],[.47,.82]]]},
  drover:{features:['bridge','six cargo pods','engine block'],paths:[[[0,.18],[.45,.18]],[[.25,.25],[.25,.7]],[[.25,.38],[.75,.38]],[[.25,.54],[.75,.54]],[[0,.74],[.65,.74]]]},
  ironjaw:{features:['bridge','broadside sponsons','port booster'],paths:[[[0,.2],[.45,.2]],[[.3,.27],[.3,.56]],[[.3,.48],[.55,.48]],[[0,.75],[.6,.75]]]},
  siege:{features:['three accelerator rods','tandem capacitor drums','paired flank lasers'],paths:[[[.24,.06],[.24,.55]],...[.65,.77].map(z=>[[0,z-.042],[.29,z-.03],[.40,z],[.29,z+.03],[0,z+.042]]),box(.68,.75,.92,.80)]},

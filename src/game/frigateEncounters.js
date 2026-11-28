@@ -5,16 +5,16 @@ import {restoreNpcDrones} from './npcDrones.js';
 import {applyCapitalSubsystemEffects} from './capitalCombat.js';
 import {restoreHeimdallLasers} from './capitalHulls.js';
 import {capitalCollisionVariant} from './shipCollision.js';
-import {launchCycle} from './arenaBattle.js';
+import {carrierSlots} from './arenaBattle.js';
 import {LOCATIONS,spawnClearance} from './data.js';
-import {TRAFFIC_HULLS,restorePicketMounts} from './corvetteMounts.js';
+import {TRAFFIC_HULLS,currentRookeryBay,restorePicketMounts,restoreRookeryBays} from './corvetteMounts.js';
 
 const fields = [
     'id','name','role','variant','hullId','faction','guild','livery','instanceId','pilot','task','destination',
     'position','rotation','velocity','portraitIndex','recognitionName','lastResolvedPlayer','playerIntelPosition','hull','maxHull','shield','maxShield','energy','shieldDelay','combatFit',
     'capitalClass','capitalSpawnKey','capitalMountHull','missingPods','lostDroneBays','ecmStoppedAt',
     'cargo','equipmentRecords','lootKey','repairDronesHeld','hostile','targetId','combatThreatId','combatThreatUntil',
-    'frigateEncounterId','launchOwner','formationSlot','formationPoint','formationTrail','convoyEscape','convoyPort',
+    'frigateEncounterId','launchOwner','launchBay','carrierLaunch','formationSlot','formationPoint','formationTrail','convoyEscape','convoyPort',
     'convoyFormed','convoyDistress','scanned','dark','surrendered','poweredDown','standingDown','fleeing','claimed','driveWear','crippled',
     'playerDamageTaken','identifiedByPlayer','playerIdentified','playerAwareness','playerSensorAwareness',
     'fireCooldown','missileCooldown','spawnTime','lifetime','attackPhase','stationDock','stationTraffic','stationDockCompleted','mugCapable','pendingMug','pendingMugLeaderId',
@@ -25,7 +25,8 @@ function checkpointShip(ship) {
     for(const key of fields)if(ship[key]!==undefined)state[key]=ship[key];
     if(ship.variant==='picket')state.picketLayout=2;
     return {state,leader:ship.convoyLeader?.id,
-        lanes:ship.carrierBattle?.lanes?.map(({subsystem,remaining,retryIn})=>({subsystem,remaining,retryIn})),
+        lanes:ship.carrierBattle?.lanes?.map(({subsystem,fighterId,nextAt,retryAt,replacement,controlLost})=>
+            ({subsystem,fighterId,nextAt,retryAt,replacement,controlLost})),
         drones:ship.droneFleet&&Object.values(ship.droneFleet.unitsById).map(({prevPosition,prevRotation,...unit})=>unit)};
 }
 export function checkpointFrigateEncounter(session) {
@@ -74,6 +75,8 @@ export function restoreFrigateEncounter(session,legacyRange) {
                 :session.spawnShip(state.role,state.position,undefined,state.name,state.pilot,{hullId:state.hullId,faction:state.faction,guild:state.guild});
             Object.assign(ship,structuredClone(state));
             restoreHeimdallLasers(ship);
+            restoreRookeryBays(ship);
+            if(ship.launchBay)ship.launchBay=currentRookeryBay(ship.launchBay);
             if(ship.variant==='picket'){
                 ship.capitalMountHull=restorePicketMounts(ship.capitalMountHull,state.picketLayout);
                 ship.combatFit.turrets=restorePicketMounts(ship.combatFit.turrets,state.picketLayout);
@@ -84,17 +87,34 @@ export function restoreFrigateEncounter(session,legacyRange) {
             for(const {item} of ship.equipmentRecords??[])registerInventoryDefinitions({items:{[item.id]:item}});
             if(TRAFFIC_HULLS[ship.variant])ship.collisionVariant=capitalCollisionVariant(ship.variant,ship.missingPods);
             if(ship.capitalClass)applyCapitalSubsystemEffects(ship);
-            if(lanes){
+            if(lanes&&TRAFFIC_HULLS[ship.variant]?.launch){
                 const battle=ship.carrierBattle={target:ship,trafficCarrier:ship};
-                for(const bay of launchCycle(battle,TRAFFIC_HULLS[ship.variant].launch,0)){
-                    const record=lanes.find(lane=>lane.subsystem===bay.subsystem);
-                    if(record){bay.remaining=record.remaining;bay.retryIn=record.retryIn??0;}
+                const now=session.save.world.time;
+                for(const bay of carrierSlots(battle,TRAFFIC_HULLS[ship.variant].launch,now)){
+                    const record=lanes.find(lane=>currentRookeryBay(lane.subsystem)===bay.subsystem);
+                    if(!record)continue;
+                    bay.fighterId=record.fighterId;
+                    bay.nextAt=record.nextAt??(Number.isFinite(record.remaining)?now+record.remaining:bay.nextAt);
+                    bay.retryAt=record.retryAt??(Number.isFinite(record.retryIn)?now+record.retryIn:undefined);
+                    bay.replacement=record.replacement;bay.controlLost=record.controlLost;
                 }
             }
             if(drones)restoreNpcDrones(session,ship,drones);
             ships.set(ship.id,ship);
         }
         for(const {state,leader} of saved.members)if(leader)ships.get(state.id).convoyLeader=ships.get(leader);
+        for(const ship of ships.values())if(ship.carrierBattle){
+            const slots=ship.carrierBattle.lanes;
+            for(const bay of slots)if(bay.fighterId)bay.fighter=ships.get(bay.fighterId);
+            // Before berths were saved, surviving fighters only named their
+            // carrier. Assign one to each free bay and keep any excess aloft.
+            for(const fighter of ships.values()){
+                if(fighter.launchOwner!==ship.id||fighter.launchBay)continue;
+                const bay=slots.find(slot=>!slot.fighterId&&ship.capitalMountHull[slot.index]>0);
+                if(!bay)break;
+                bay.fighter=fighter;bay.fighterId=fighter.id;fighter.launchBay=bay.subsystem;
+            }
+        }
         session.entityCounter=Math.max(session.entityCounter,saved.entityCounter??0);
         session.frigateTrafficReady=true;
         return true;

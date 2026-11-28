@@ -103,24 +103,34 @@ test('escort broadcasts each threshold and wins only when the living Drover jump
  const fail=stage(13);
  fail.runBattle.target.hull=0;advance(fail,1);assert.equal(fail.runBattle.outcome,'failed');
 });
-test('both carrier bays launch at their own sockets, share a survivor cap, and lose rate with the mast',()=>{
- const s=reachPrimary(stage(10));
- const wave=RUN_WAVES[9],b=s.runBattle,carrier=b.target,mounts=CAPITAL_HULLS.rookery.mounts;
- assert.equal(carrier.variant,'rookery');assert.equal(wave.launch.cap,8);
- const part=node=>mounts.find(m=>m.node===node).index;
- let elapsed=s.save.world.time-s.save.arenaRun.startedAt;const step=duration=>{for(let i=0;i<duration*10;i++){elapsed+=.1;s.save.world.time+=.1;tickBattle(s,wave,elapsed,.1);}};
- step(31);const alive=()=>opponents(s).filter(x=>x.arenaLaunched);
- assert.equal(alive().length,4);
- const local=alive().map(x=>new THREE.Vector3(...x.position).sub(new THREE.Vector3(...carrier.position)).applyQuaternion(new THREE.Quaternion(...carrier.rotation).invert()).x);
- assert.ok(local[0]<-10&&local[1]<local[0]&&local[2]>10&&local[3]>local[2]);
- assert.ok(alive().every(x=>new THREE.Vector3(...x.position).distanceTo(new THREE.Vector3(...carrier.position))<120));
- for(const fighter of alive())fighter.position[1]+=500;
- step(30);assert.equal(alive().length,8);step(30);assert.equal(alive().length,8);
- carrier.capitalMountHull[part('bay_port')]=0;carrier.capitalMountHull[part('mast')]=0;
- alive().forEach(x=>x.hull=0);step(6);assert.equal(alive().length,2);
- for(const fighter of alive())fighter.position[1]+=500;
- step(40);assert.equal(alive().length,2);step(11);assert.equal(alive().length,4);
- carrier.capitalMountHull[part('bay_starboard')]=0;alive().forEach(x=>x.hull=0);step(60);assert.equal(alive().length,0);
+test('Arena carriers fill their own hangars once and replace only losses from intact bays',()=>{
+ for(const [level,id,count] of [[10,'rookery',4],[15,'skidbladnir',6]]){
+  const s=reachPrimary(stage(level));
+  const wave=RUN_WAVES[level-1],b=s.runBattle,carrier=b.target,mounts=CAPITAL_HULLS[id].mounts;
+  assert.equal(carrier.variant,id);assert.equal(wave.launch.bays.length,count);
+  const step=duration=>{for(let i=0;i<Math.round(duration*10);i++)advance(s,.1);};
+  const alive=()=>opponents(s).filter(x=>x.arenaLaunched);
+  for(let i=0;i<24;i++){
+   step(1);
+   for(const fighter of alive())fighter.position[1]+=100;
+  }
+  assert.equal(alive().length,count);
+  assert.equal(new Set(alive().map(f=>f.launchBay)).size,count);
+  const original=alive().map(f=>f.id);
+  step(60);assert.deepEqual(alive().map(f=>f.id),original);
+  const [disabled,loss]=alive();
+  const mount=mounts.find(m=>m.node===disabled.launchBay);
+  carrier.capitalMountHull[mount.index]=0;
+  const mast=mounts.find(m=>m.kind==='mast');if(mast)carrier.capitalMountHull[mast.index]=0;
+  assert.equal(alive().length,count,'disabling a bay leaves its deployed fighter aloft');
+  disabled.hull=0;loss.hull=0;
+  step(.1); // The scripted loss is observed on the next fixed step.
+  step(29.9);assert.equal(alive().length,count-2);
+  step(.1);assert.equal(alive().length,count-1);
+  assert.ok(alive().some(f=>f.launchBay===loss.launchBay&&f.id!==loss.id));
+  assert.ok(!alive().some(f=>f.launchBay===disabled.launchBay));
+  step(60);assert.equal(alive().length,count-1);
+ }
 });
 test('destroy objectives resolve on the primary; the carrier also requires all launched fighters',()=>{
  const s=reachPrimary(stage(10)),b=s.runBattle;

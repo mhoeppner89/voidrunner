@@ -1,4 +1,4 @@
-import {ROOKERY_LAUNCH} from './corvetteMounts.js';
+import {ROOKERY_LAUNCH,SKIDBLADNIR_LAUNCH} from './corvetteMounts.js';
 import {arenaSite} from './arenaSites.js';
 import {equipmentBaseId,equipmentRating,RARITY_ORDER,NAMED_EQUIPMENT} from './equipmentCatalog.js';
 import {DRONE_TYPES,createDroneUnit} from './droneData.js';
@@ -108,7 +108,7 @@ export const RUN_ACTS=[
     group(novice('mule'),veteran('torsas')),
     group(veteran('atlas')),
     group(capital('caravan','veteran'),novice('wayfarer'))]),
-  level("Red Brigid","verge-lanes","Destroy the Red Brigid and its launched Balors. Each intact bay launches fighters.",[
+  level("Red Brigid","verge-lanes","Red Brigid launches four Balors. Disable its hangars to stop replacements.",[
     group(veteran('demon'),novice('speedster')),
     group(capital('rookery','veteran')),
     {...group(veteran('scrapper'),novice('scrapper')),at:35,hullBelow:.6}],{faction:'pirates',objective:{kind:'destroy',label:'Destroy carrier',done:'Carrier destroyed',failed:'Carrier escaped',clearLaunches:true},launch:{...ROOKERY_LAUNCH,fighter:veteran(ROOKERY_LAUNCH.fighter)}}),
@@ -130,10 +130,10 @@ export const RUN_ACTS=[
     group(patrolGuard('lancer'),patrolGuard('legionary'),patrolGuard('andromeda')),
     {...group(capital('siege','veteran'),veteran('speedster',1)),at:40},
     {...group(strikeAce('astra'),patrolGuard('legionary')),at:40,hullBelow:.65}]),
-  level("Veteran wing","shardbelt-chimney","An Odin opens the attack. Save ordnance for the Artemis ace.",[
+  level("Veteran wing","shardbelt-chimney","The Skidbladnir fields six Loki fighters. Disable its hangars to prevent replacements.",[
     group(strikeAce('astra',1),veteran('speedster'),patrolGuard('legionary')),
     group(patrolGuard('legionary'),veteran('andromeda',1),patrolGuard('astra')),
-    group(strikeAce('lancer',2),patrolGuard('andromeda'),veteran('speedster'))]),
+    group(capital('skidbladnir','veteran'))],{objective:{kind:'destroy',label:'Destroy carrier',done:'Carrier destroyed',failed:'Carrier escaped',clearLaunches:true},launch:{...SKIDBLADNIR_LAUNCH,fighter:veteran(SKIDBLADNIR_LAUNCH.fighter)}}),
  ]},
  {id:'concord',name:'Concord Frontier Fleet',faction:'concord',waves:[
   level("Show of force","verge-lanes","A Mercury ace leads the first patrol onto the lanes.",[

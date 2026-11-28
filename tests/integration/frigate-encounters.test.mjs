@@ -5,13 +5,16 @@ import {tutorialFixture} from '../helpers/tutorial.mjs';
 import {createNewSave,loadGame} from '../../src/game/save.js';
 import {LOCATIONS} from '../../src/game/data.js';
 import {CAPITAL_HULLS} from '../../src/game/capitalHulls.js';
-import {updateTrafficLaunches,battleState} from '../../src/game/arenaBattle.js';
-import {ROOKERY_LAUNCH,raidCarrier,raidCorvette} from '../../src/game/corvetteMounts.js';
+import {carrierFighterDestroyed,updateCarrierDeparture,updateTrafficLaunches,battleState} from '../../src/game/arenaBattle.js';
+import {ROOKERY_LAUNCH,SKIDBLADNIR_LAUNCH,patrolCapital,raidCarrier,raidCorvette} from '../../src/game/corvetteMounts.js';
 import {careerRegion} from '../../src/game/careerDanger.js';
 import {applyCapitalSubsystemEffects,updateCapitalBroadsideAttack} from '../../src/game/capitalCombat.js';
 import {updateNpcDrones,damageNpcDrone} from '../../src/game/npcDrones.js';
 import {repairTargetEligible,selectRepairTarget} from '../../src/game/repairDrones.js';
 import {RUN_WAVES} from '../../src/game/arenaRun.js';
+import {shipVsShip} from '../../src/game/shipCollision.js';
+import {npcShipScaleForVariant} from '../../src/game/render.js';
+import {checkpointFrigateEncounter} from '../../src/game/frigateEncounters.js';
 
 function session(seed=718){
     const s=tutorialFixture('earn-standing').session;
@@ -29,6 +32,11 @@ function carrier(s){
     const c=s.spawnTrafficCapital('rookery',[0,90000,0],true);c.rotation=[0,0,0,1];c.targetId='player';return c;
 }
 const launched=(s,c)=>s.ships.filter(f=>f.launchOwner===c.id&&f.hull>0);
+function launchStep(s,c,dt,config=ROOKERY_LAUNCH){
+    s.save.world.time+=dt;
+    updateTrafficLaunches(s,c,config);
+}
+
 function deploy(s){for(let i=0;i<360;i++){s.save.world.time+=1/60;updateNpcDrones(s,1/60);}}
 function drones(ship){return Object.values(ship.droneFleet.unitsById).map(u=>[u.id,u.hull,u.state,[...u.position]]);}
 test('a late Boreal checkpoint restores the same moving convoy, cargo, escorts and physical drones twice',()=>{
@@ -48,16 +56,25 @@ test('a late Boreal checkpoint restores the same moving convoy, cargo, escorts a
         assert.equal(s.ships.length,count);assert.equal(new Set(s.ships.map(x=>x.id)).size,count);
     }
 });
-test('carrier reload preserves moving hulls, damaged launched fighters and the two live bay clocks',()=>{
-    let s=session();const c=carrier(s);updateTrafficLaunches(s,c,ROOKERY_LAUNCH,25);
-    const flight=launched(s,c);assert.equal(flight.length,4);flight[0].hull-=17;flight[1].position[0]+=15;c.position[2]+=70;
-    updateTrafficLaunches(s,c,ROOKERY_LAUNCH,7);
-    const expected=flight.map(f=>[f.id,f.hull,f.position]);
-    for(let pass=0;pass<2;pass++){s=reload(s);const restored=s.ships.find(x=>x.variant==='rookery');assert.equal(restored?.id,c.id);
-        assert.deepEqual(restored.carrierBattle.lanes.map(b=>b.remaining),[18,18]);assert.deepEqual(launched(s,restored).map(f=>[f.id,f.hull,f.position]),expected);}
+test('carrier reload restores a living berth and the exact remaining replacement clock',()=>{
+    let s=session();const c=carrier(s);launchStep(s,c,12);
+    const flight=launched(s,c);assert.equal(flight.length,4);flight[1].hull-=17;c.position[2]+=70;
+    flight[0].hull=0;carrierFighterDestroyed(s,flight[0]);
+    launchStep(s,c,7);
+    const surviving=flight[1], expected=flight.slice(1).map(fighter=>[fighter.id,fighter.hull,fighter.position]);
+    for(let pass=0;pass<2;pass++){
+        s=reload(s);const restored=s.ships.find(x=>x.variant==='rookery');assert.equal(restored?.id,c.id);
+        const [lost,live]=restored.carrierBattle.lanes;
+        assert.equal(lost.nextAt-s.save.world.time,23);
+        assert.equal(live.fighter.id,surviving.id);
+        assert.deepEqual(launched(s,restored).map(f=>[f.id,f.hull,f.position]),expected);
+    }
+    const restored=s.ships.find(x=>x.id===c.id);
+    launchStep(s,restored,22.99);assert.equal(launched(s,restored).length,3);
+    launchStep(s,restored,.01);assert.equal(launched(s,restored).length,4);
 });
 test('the same saved spawn restores only once, and surviving launches retain their IDs after carrier loss',()=>{
-    let s=session();const c=carrier(s);updateTrafficLaunches(s,c,ROOKERY_LAUNCH,25);
+    let s=session();const c=carrier(s);launchStep(s,c,12);
     const ids=launched(s,c).map(ship=>ship.id);const savedKey=c.capitalSpawnKey;
     s=reload(s);
     assert.equal(s.spawnTrafficCapital('rookery',[0,90000,0],true),s.ships.find(ship=>ship.capitalSpawnKey===savedKey));
@@ -69,32 +86,162 @@ test('the same saved spawn restores only once, and surviving launches retain the
     }
     assert.ok(!ids.includes(s.spawnShip('escort',[0,90500,0]).id));
 });
-test('a rock across the port rail holds its pair and the clear starboard bay launches',()=>{
-    const s=session(),c=carrier(s),a=ROOKERY_LAUNCH.sockets.launch_port;
-    const p=new THREE.Vector3(...a.game_position).add(new THREE.Vector3(...c.position)).addScaledVector(new THREE.Vector3(...a.direction_game),52);
-    s.activeFieldObstacles=()=>[{x:p.x,y:p.y,z:p.z,radius:16,collisionRadius:16}];
-    updateTrafficLaunches(s,c,ROOKERY_LAUNCH,25);
-    assert.equal(launched(s,c).length,2);assert.ok(launched(s,c).every(f=>f.position[0]>0));
+test('old carrier checkpoints keep excess fighters without letting the carrier add to them',()=>{
+    const s=session(),c=carrier(s);launchStep(s,c,12);
+    const extra=s.spawnShip('escort',[0,90500,0],undefined,undefined,undefined,{faction:'pirates',hullId:'scrapper'});
+    extra.launchOwner=c.id;extra.frigateEncounterId=c.id;
+    checkpointFrigateEncounter(s);
+    const saved=structuredClone(s.save);
+    for(const member of saved.world.frigateEncounter.members){
+        delete member.state.launchBay;
+        if(member.lanes)member.lanes=member.lanes.map(({subsystem})=>({subsystem,remaining:0,retryIn:0}));
+    }
+    const resumed=session();resumed.save=saved;resumed.spawnInitialTraffic();
+    const restored=resumed.ships.find(ship=>ship.id===c.id);
+    const wing=launched(resumed,restored);
+    assert.equal(wing.length,5);
+    assert.equal(wing.filter(ship=>Boolean(ship.launchBay)).length,4);
+    wing[0].hull=0;carrierFighterDestroyed(resumed,wing[0]);
+    launchStep(resumed,restored,31);assert.equal(launched(resumed,restored).length,4);
+    wing.find(ship=>ship.id===extra.id).hull=0;
+    launchStep(resumed,restored,1);assert.equal(launched(resumed,restored).length,4);
+    assert.ok(launched(resumed,restored).every(ship=>ship.launchBay));
+});
+test('four Balors visibly exit their own hangars, following a moving and turning carrier',()=>{
+    const s=session(),c=carrier(s);
+    launchStep(s,c,12);
+    const wing=launched(s,c);
+    assert.equal(wing.length,4);
+    const forward=new THREE.Vector3(0,0,-1), axis=new THREE.Vector3(0,1,0);
+    const point=new THREE.Vector3(),origin=new THREE.Vector3(),heading=new THREE.Vector3();
+    const parent=new THREE.Quaternion(),inverse=new THREE.Quaternion(),rotation=new THREE.Quaternion();
+    for(const f of wing){
+        const socket=ROOKERY_LAUNCH.sockets[f.launchBay.replace('bay_','launch_')];
+        assert.deepEqual(point.fromArray(f.position).sub(origin.fromArray(c.position)).toArray(),socket.start_game_position);
+    }
+    const durations=new Map(wing.map(f=>[f,f.carrierLaunch.duration]));
+    for(let step=0;step<150;step++){
+        c.position[0]+=4/60;c.position[2]+=9/60;
+        parent.setFromAxisAngle(axis,step/260).toArray(c.rotation);
+        inverse.copy(parent).invert();origin.fromArray(c.position);
+        for(const f of wing){
+            if(!f.carrierLaunch)continue;
+            assert.equal(updateCarrierDeparture(s,f,1/60),true);
+            const socket=ROOKERY_LAUNCH.sockets[f.launchBay.replace('bay_','launch_')];
+            rotation.fromArray(f.rotation);
+            heading.copy(forward).applyQuaternion(rotation).applyQuaternion(inverse);
+            assert.ok(heading.dot(new THREE.Vector3().fromArray(socket.direction_game))>.9999);
+            point.fromArray(f.position);
+            assert.equal(shipVsShip(origin,parent,'rookery',npcShipScaleForVariant('rookery'),
+                point,rotation,'scrapper',npcShipScaleForVariant('scrapper'),{}),false,
+                `${f.launchBay} intersects the carrier at step ${step}`);
+            point.sub(origin).applyQuaternion(inverse);
+            assert.ok(Math.abs(point.y)<.00001&&Math.abs(point.z-socket.game_position[2])<.00001);
+            if(step/60<durations.get(f)-.03)assert.ok(f.carrierLaunch);
+            if(!f.carrierLaunch)assert.ok(Math.abs(point.x)>Math.abs(socket.game_position[0])+10);
+        }
+    }
+    assert.ok(wing.every(f=>!f.carrierLaunch));
+});
+test('reloading during a launch preserves the current rail position and never duplicates the fighter',()=>{
+    let s=session();const c=carrier(s);
+    launchStep(s,c,6);
+    const [f]=launched(s,c);
+    updateCarrierDeparture(s,f,.7);
+    const expected=structuredClone({launch:f.carrierLaunch,position:f.position});
+    s=reload(s);
+    const restored=s.ships.find(ship=>ship.id===c.id),fighter=s.ships.find(ship=>ship.id===f.id);
+    assert.deepEqual({launch:fighter.carrierLaunch,position:fighter.position},expected);
+    updateTrafficLaunches(s,restored,ROOKERY_LAUNCH);
+    assert.deepEqual(launched(s,restored),[fighter]);
+    const before=fighter.position[0];updateCarrierDeparture(s,fighter,.1);
+    assert.ok(fighter.position[0]<before);
+});
+test('a Balor already on the rail continues outward after the carrier is destroyed',()=>{
+    const s=session(),c=carrier(s);c.velocity=[0,0,5];
+    launchStep(s,c,6);
+    const [f]=launched(s,c);updateCarrierDeparture(s,f,.4);
+    const before=[...f.position];
+    c.hull=0;s.ships.splice(s.ships.indexOf(c),1);
+    updateCarrierDeparture(s,f,.5);
+    assert.ok(f.position[0]<before[0]);
+    assert.equal(f.position[2],before[2]+2.5,'the last carrier frame keeps drifting');
+    updateCarrierDeparture(s,f,2);
+    assert.equal(f.carrierLaunch,undefined);
+    assert.ok(f.position.every(Number.isFinite)&&f.hull>0);
+});
+test('a legacy two-bay carrier restores the damaged side and its occupied fighter slot',()=>{
+    const s=session(),c=carrier(s);launchStep(s,c,7.5);
+    checkpointFrigateEncounter(s);
+    const saved=structuredClone(s.save);
+    const carrierRecord=saved.world.frigateEncounter.members.find(member=>member.state.id===c.id);
+    carrierRecord.state.capitalMountHull=[...c.capitalMountHull.slice(0,11),0,150];
+    carrierRecord.state.missingPods=1;
+    carrierRecord.state.combatFit.turrets.length=13;
+    carrierRecord.lanes=carrierRecord.lanes.slice(0,2);
+    for(const lane of carrierRecord.lanes)lane.subsystem=lane.subsystem.replace('_1','');
+    for(const {state} of saved.world.frigateEncounter.members)if(state.launchOwner===c.id){
+        state.launchBay=state.launchBay.replace('_1','');
+        delete state.carrierLaunch;
+    }
+    const resumed=session();resumed.save=saved;resumed.spawnInitialTraffic();
+    const restored=resumed.ships.find(ship=>ship.id===c.id),wing=launched(resumed,restored);
+    assert.deepEqual(restored.capitalMountHull.slice(11),[0,0,90,90]);
+    assert.equal(restored.missingPods,0);
+    assert.equal(restored.combatFit.turrets.length,15);
+    assert.deepEqual(wing.map(f=>f.launchBay),['bay_port_1','bay_starboard_1']);
+    assert.deepEqual(restored.carrierBattle.lanes.slice(0,2).map(bay=>bay.fighterId),wing.map(f=>f.id));
+});
+test('a rock across the port rail holds that berth while the other three bays launch',()=>{
+    const s=session(),c=carrier(s);
+    const [x,y,z]=ROOKERY_LAUNCH.sockets.launch_port_1.game_position;
+    s.activeFieldObstacles=()=>[{x:x-10,y:y+90000,z,radius:4,collisionRadius:4}];
+    launchStep(s,c,12);
+    assert.equal(launched(s,c).length,3);
+    assert.ok(!launched(s,c).some(f=>f.launchBay==='bay_port_1'));
 });
 test('a fighter occupying a rail endpoint holds that bay until the exit is clear',()=>{
-    const first=session(),model=carrier(first);updateTrafficLaunches(first,model,ROOKERY_LAUNCH,25);
-    const s=session(),c=carrier(s),guard=s.spawnShip('escort',[...launched(first,model)[0].position],undefined,undefined,undefined,{hullId:'scrapper'});
-    updateTrafficLaunches(s,c,ROOKERY_LAUNCH,25);assert.equal(launched(s,c).length,2);guard.position[1]+=500;
-    updateTrafficLaunches(s,c,ROOKERY_LAUNCH,1);assert.equal(launched(s,c).length,2);
-    updateTrafficLaunches(s,c,ROOKERY_LAUNCH,1);assert.equal(launched(s,c).length,4);
+    const first=session(),model=carrier(first);launchStep(first,model,6);
+    const [pilot]=launched(first,model);updateCarrierDeparture(first,pilot,pilot.carrierLaunch.duration);
+    const s=session(),c=carrier(s),guard=s.spawnShip('escort',pilot.position,undefined,undefined,undefined,{hullId:'scrapper'});
+    launchStep(s,c,12);assert.equal(launched(s,c).length,3);guard.position[1]+=500;
+    launchStep(s,c,1);assert.equal(launched(s,c).length,3);
+    launchStep(s,c,1);assert.equal(launched(s,c).length,4);
 });
 test('continuous rail obstruction backs off each bay for two simulated seconds',()=>{
-    const s=session(),c=carrier(s);s.activeFieldObstacles=()=>[{x:0,y:90000,z:-190,radius:1,box:{hx:85,hy:40,hz:131,qx:0,qy:0,qz:0,qw:1}}];
+    const s=session(),c=carrier(s);s.activeFieldObstacles=()=>[{x:0,y:90000,z:0,radius:1,box:{hx:90,hy:40,hz:90,qx:0,qy:0,qz:0,qw:1}}];
     let checks=0;const clear=s.siteSpotClear.bind(s);s.siteSpotClear=(...args)=>{checks++;return clear(...args);};
-    updateTrafficLaunches(s,c,ROOKERY_LAUNCH,25);checks=0;
-    for(let i=0;i<60;i++)updateTrafficLaunches(s,c,ROOKERY_LAUNCH,1/60);
+    launchStep(s,c,12);checks=0;
+    for(let i=0;i<60;i++)launchStep(s,c,1/60);
     assert.equal(launched(s,c).length,0);assert.equal(checks,0);
-    const plans=c.carrierBattle.lanes.map(bay=>bay.plans);
-    for(let i=0;i<120;i++)updateTrafficLaunches(s,c,ROOKERY_LAUNCH,1/60);
+    const poses=c.carrierBattle.lanes.map(bay=>bay.pose);
+    for(let i=0;i<120;i++)launchStep(s,c,1/60);
     assert.ok(checks>0);const perRetry=checks;
-    for(let i=0;i<120;i++)updateTrafficLaunches(s,c,ROOKERY_LAUNCH,1/60);
+    for(let i=0;i<120;i++)launchStep(s,c,1/60);
     assert.equal(checks,2*perRetry);
-    c.carrierBattle.lanes.forEach((bay,index)=>assert.equal(bay.plans,plans[index]));
+    c.carrierBattle.lanes.forEach((bay,index)=>assert.equal(bay.pose,poses[index]));
+});
+test('a League patrol fields six Lokis on its own hangars without an extra scripted escort pair',()=>{
+    assert.equal(patrolCapital('alliance',{danger:.99},()=>.12),'skidbladnir');
+    assert.notEqual(patrolCapital('alliance',{danger:.48},()=>.12),'skidbladnir');
+    const s=session();s.save.player.systemId='acheron';
+    const options=s.leagueTrafficOptions('patrol','acheron-belt',()=>.12);
+    assert.equal(options.patrolCapital,'skidbladnir');
+    const carrier=s.spawnShip('patrol',[0,90000,0],undefined,undefined,undefined,options);
+    carrier.rotation=[0,0,0,1];assert.equal(s.ships.length,1);
+    for(let i=0;i<16;i++){
+        launchStep(s,carrier,1,SKIDBLADNIR_LAUNCH);
+        for(const fighter of launched(s,carrier))fighter.position[1]+=100;
+    }
+    const wing=launched(s,carrier);
+    assert.equal(wing.length,6);
+    assert.ok(wing.every(f=>f.hullId==='speedster'&&f.faction==='alliance'&&f.convoyLeader===carrier&&!f.hostile));
+    for(const f of wing){
+        const socket=SKIDBLADNIR_LAUNCH.sockets[f.launchBay.replace('bay_','launch_')];
+        assert.equal(Math.sign(f.position[0]),Math.sign(socket.direction_game[0]));
+        assert.equal(f.position[2],socket.game_position[2]);
+        assert.ok(f.velocity[0]*socket.direction_game[0]>0);
+    }
 });
 test('Rookery avoids the measured 55-unit rock across its pursuit course',()=>{
     const s=session(),c=carrier(s);s.arena={};s.save.player.position=[0,90000,-2200];c.holdFire=true;
@@ -146,7 +293,7 @@ test('eligible pirate raids roll capitals by local danger and pirate presence ac
 test('spectator carriers pass their selected tier to Balors independently of Arena normal and hard tiers',()=>{
     const s=session();s.arena={observer:true};s.observerDifficulty='ace';s.observerAimError=1;
     const c=s.spawnObserverDraftUnit({id:'rooks',shipType:'rookery',team:'red',tier:'ace',fit:'varied',position:[0,0,0]});
-    updateTrafficLaunches(s,c,ROOKERY_LAUNCH,25);assert.equal(c.pilot.tier,'ace');assert.deepEqual(launched(s,c).map(f=>f.pilot.tier),Array(4).fill('ace'));
+    launchStep(s,c,12);assert.equal(c.pilot.tier,'ace');assert.deepEqual(launched(s,c).map(f=>f.pilot.tier),Array(4).fill('ace'));
     assert.deepEqual([false,true].map(h=>battleState(RUN_WAVES[9],9,h).launchFighter.tier),['veteran','ace']);
 });
 

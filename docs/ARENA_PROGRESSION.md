@@ -26,12 +26,12 @@ The 25-level run uses at most three authored groups per level. Encounters build 
      | V, levels 21–24 | 1:45–2:30 | 1:30–2:15 |
      | Level 25 | 3:00–4:30 | 3:00–4:30 |
 
-   - First contact uses two groups. Every level has at most three groups in total, including the two follow-up escort screens at the final frigate. Red Njord's Balor reinforcements travel in its authored groups. Red Brigid launches fighters from its surviving bays.
-4. **Objectives** appear on levels 4 (Red Njord Barrage, since 0.8.2pw), 5, 8, 10, 13 and 25. When an objective is decided, the remaining hostiles break off and jump out within 10 s. They never surrender; that rule holds in Arena.
+   - First contact uses two groups. Every level has at most three groups in total, including the two follow-up escort screens at the final frigate. Red Njord's Balor reinforcements travel in its authored groups. Red Brigid and Skidbladnir launch one fighter per intact hangar and replace losses after 30 seconds.
+4. **Objectives** appear on levels 4 (Red Njord Barrage, since 0.8.2pw), 5, 8, 10, 13, 15 and 25. When an objective is decided, the remaining hostiles break off and jump out within 10 s. They never surrender; that rule holds in Arena.
    - **Failing an objective does not end the run.** The level still counts as cleared, but its reward pick is skipped. Losing the pilot still ends the run, as today.
    - **Objective status on screen:** the objective banner, status strip, ticker and comms log show at the start, at 60/30/10 s left where a timer applies, and with the result. The objective target can be selected as usual.
 5. **Big ships** use the corvette and frigate rules already in the game: subsystem damage, generator and engine subtargets, markers.
-   - Level 9 uses the Caravan tender and its two physical repair drones. Level 10 uses the Rookery carrier and its two independent launch rails. Both hulls have three engines and two shield generators.
+   - Level 9 uses the Brigid tender and its two physical repair drones. Level 10 uses Red Brigid, whose four Balors fly out of individually targetable hangars. Level 15 uses Skidbladnir and its six Loki hangars. All three hulls have three engines and two shield generators. Both carrier objectives require the carrier and its deployed fighters.
 
 ## Pilot power through the run (for reading the table)
 
@@ -65,7 +65,7 @@ The arrows mark authored arrivals. N, V and A stand for novice, veteran and ace.
 | 12 | Courier run | shardbelt-rim | Tyr V (1) + Loki V → Thor V (1) + Loki V + Tyr V → Thor V + Tyr V + Loki V | Clear |
 | 13 | Strike | pale-rings | Thor V (3) + Tyr V + Loki V (1) → Thor A (3) + Loki V → Thor V (3) + Tyr V + Tyr V (1) | Defend Njord |
 | 14 | Honorguard | mourning-battleship | Artemis V + Tyr V + Thor V → Heimdall V + Loki V (1) → Odin A + Tyr V | Clear |
-| 15 | Veteran wing | shardbelt-chimney | Odin A (1) + Loki V + Tyr V → Tyr V + Thor V (1) + Odin V → Artemis A (2) + Thor V + Loki V | Clear |
+| 15 | Veteran wing | shardbelt-chimney | Odin A (1) + Loki V + Tyr V → Tyr V + Thor V (1) + Odin V → Skidbladnir V | Destroy carrier and launched fighters |
 | 16 | Show of force | verge-lanes | Mercury A (1) + Victoria V (1) + Bellona V → Mercury V + Bellona V → Bellona A + Mercury V + Victoria V | Clear |
 | 17 | Victoria dance | mourning-carrier | Victoria A (2) + Bellona V + Victoria V → Victoria V (1) + Bellona V + Victoria V → Victoria V + Victoria V + Bellona V | Clear |
 | 18 | Battery test | acheron-horizon | Bellona A (2) + Victoria V + Bellona V → Bellona A (1) + Victoria V + Bellona V → Bellona V + Bellona V + Bellona V | Clear |

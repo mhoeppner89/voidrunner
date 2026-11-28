@@ -4,6 +4,7 @@ import { advanceCoverSearches, interruptFieldTactic } from '../combatTactics.js'
 import { SHIPS } from '../data.js';
 import { advanceFieldRoadmap } from '../fieldRoadmap.js';
 import { registerHitReaction } from '../flightDynamics.js';
+import { DEPLOYMENT_SECONDS } from '../jumpArrival.js';
 import { seededRandom } from '../random.js';
 import { SHIP_COLLIDERS, shipVsObstacle, shipVsShip } from '../shipCollision.js';
 import { GRAVEYARD_MODEL_COLLIDER_MAX_RADIUS } from '../worldData.js';
@@ -14,6 +15,7 @@ import { stepPilotFlight } from './pilotFlight.js';
 import { acceptPilotInput, createPilotInput, takePilotActions } from './pilotInput.js';
 
 export const MATCH_STEP = 1 / 60;
+export const DEPLOYMENT_TICKS = Math.round(DEPLOYMENT_SECONDS / MATCH_STEP);
 export const ARENA_LIMIT = 1700;
 const FIELD_REACH = Math.max(380, Math.ceil(GRAVEYARD_MODEL_COLLIDER_MAX_RADIUS + 4));
 const FORWARD = new Vector3(0, 0, -1);
@@ -139,6 +141,7 @@ export class MatchWorld {
         actor.afterburnSpeed = actor.stats.afterburnSpeed;
         actor.maxHull = actor.stats.hull;
         actor.maxShield = actor.stats.shield;
+        actor.deployUntilTick = this.tick + DEPLOYMENT_TICKS;
         initPilotCombat(actor);
         const bot = this.match.players.get(actor.id)?.bot;
         if (bot) {
@@ -158,19 +161,22 @@ export class MatchWorld {
     receiveInput(id, packet) {
         const actor = this.match.players.get(id)?.actor;
         const input = this.inputs.get(id);
-        if (!input || !actor || this.bots.has(id) || packet?.life !== actor.life) return;
+        if (!input || !actor || this.tick < actor.deployUntilTick || this.bots.has(id) || packet?.life !== actor.life) return;
         acceptPilotInput(input, packet, this.tick);
     }
 
     advance(seconds) {
         if (this.match.phase !== 'playing' || !(seconds > 0) || !Number.isFinite(seconds)) return;
         const previousBatch = Math.floor(this.tick / 3);
+        const initialDeployment = this.tick < DEPLOYMENT_TICKS;
+        const deploymentTime = initialDeployment ? (DEPLOYMENT_TICKS - this.tick) * MATCH_STEP - this.accumulator : 0;
         this.accumulator = Math.min(this.accumulator + Math.min(seconds, this.match.remainingSeconds), MATCH_STEP * 6);
         while (this.accumulator >= MATCH_STEP && this.match.phase === 'playing') {
             this.accumulator -= MATCH_STEP;
             this.step();
         }
-        const ended = this.match.tick(seconds);
+        const clockSeconds = initialDeployment ? Math.min(seconds, MATCH_STEP * 6) - deploymentTime : seconds;
+        const ended = this.tick >= DEPLOYMENT_TICKS && clockSeconds > 1e-8 && this.match.tick(clockSeconds);
         if (ended || Math.floor(this.tick / 3) !== previousBatch) {
             this.flushEvents();
             const force = ended || this.rosterDirty;
@@ -185,7 +191,9 @@ export class MatchWorld {
         this.session.save.world.time = time;
         this.session.renderer.updateWorld(MATCH_STEP);
         if (this.botRespawns.size) this.relaunchBots(time);
-        const actors = this.actors();
+        // The spawn point reserves space during deployment. Its pilot only
+        // joins the targeting, hit tests and movement once the jump ends.
+        const actors = this.actors().filter(actor => this.tick > actor.deployUntilTick);
         if (this.bots.size) {
             this.botEnvironment.ships = actors;
             if (this.site.instanceId) advanceFieldRoadmap(this.session, 2);
@@ -338,6 +346,7 @@ export class MatchWorld {
             const rack = actor.launcherMagazines[mountId];
             return {
                 id: actor.id, name: pilot.name, team: pilot.team, life: actor.life,
+                deployTicks: Math.max(0, actor.deployUntilTick - this.tick),
                 shipId: actor.shipId, variant: actor.variant, scale: actor.scale,
                 position: [...actor.position], rotation: [...actor.rotation],
                 velocity: [...actor.velocity], angularVelocity: [...actor.angularVelocity],

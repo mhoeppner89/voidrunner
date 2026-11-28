@@ -33,8 +33,8 @@ function define(sockets, readout, extents) {
         const hitCenter = localPosition.map((n, axis) => n + offset[axis]);
         const lift = socket.markerLift ?? markerLift(socket, extents, radius);
         const markerPosition = localPosition.map((n, axis) => n + normal[axis] * lift);
-        const targetable = kind === 'emitter' || kind === 'generator' || kind === 'engine';
-        const compact = kind === 'emitter' ? 'ECM' : targetable ? (kind === 'generator' ? 'SHIELD ' : 'ENGINE ') + serial : undefined;
+        const targetable = kind === 'emitter' || kind === 'generator' || kind === 'engine' || kind === 'bay';
+        const compact = kind === 'emitter' ? 'ECM' : targetable ? (kind === 'generator' ? 'SHIELD ' : kind === 'bay' ? 'BAY ' : 'ENGINE ') + serial : undefined;
         return { ...socket, index, hull, radius, labelKey, compact, normal, localPosition, hitCenter, markerPosition, targetable };
     });
     const engines = mounts.filter(m => m.kind === 'engine');

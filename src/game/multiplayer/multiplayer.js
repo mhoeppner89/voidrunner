@@ -518,11 +518,17 @@ export class Multiplayer {
     applyWorld(snapshot) {
         if (this.state.phase === 'playing') this.live = true;
         else if (!this.live && this.state.phase !== 'ended') return;
-        this.flight.updateSnapshot(snapshot, performance.now());
+        const now = performance.now();
+        const jumpChanged = this.flight.updateSnapshot(snapshot, now);
         if (this.screen === 'preparing' && this.live) {
             this.screen = 'flight';
             this.render();
         }
+        // Draw the boundary once when visible, even if the frame scheduler
+        // is still waking up after the load or refit screen. The host starts
+        // its round timer only after submitting this first cockpit frame.
+        const session = this.flight.session;
+        if (jumpChanged && !document.hidden && !session.ui.isModalOpen) session.syncRender(0, now);
         if (this.screen === 'score') {
             const displayedTime = matchClock(this.remainingSeconds);
             if (displayedTime !== this.displayedTime) this.view.setClock(displayedTime);

@@ -24,11 +24,12 @@ import {canonicalFaction,preferredNpcHull,FACTION_NAMES} from './factions.js';
 import {CapitalMarkers} from './capitalMarkers.js';
 import {OrdnanceMarkers} from './ordnanceMarkers.js';
 import {capitalHull,capitalMountPosition,capitalReadout,restoreHeimdallLasers} from './capitalHulls.js';
-import {updateTrafficLaunches} from './arenaBattle.js';
+import {carrierFighterDestroyed,updateCarrierDeparture,updateTrafficLaunches} from './arenaBattle.js';
 import {advancePicketRotor,capitalRelation,fieldRackProgress,jammed,jammedRound,lockJammed,leavingScreen} from './picketField.js';
-import {TRAFFIC_HULLS,restorePicketMounts,FRIGATE_TRAFFIC,CORVETTE_TRAFFIC,patrolCorvette,convoyVariant,raidCorvette,raidCarrier} from './corvetteMounts.js';
+import {TRAFFIC_HULLS,restorePicketMounts,restoreRookeryBays,FRIGATE_TRAFFIC,CORVETTE_TRAFFIC,patrolCapital,convoyVariant,raidCorvette,raidCarrier} from './corvetteMounts.js';
 import {CRUISER_GUN,equipCruiser,updateCruiserAttack,updateCruiserBatteries,damageCruiserMount,segmentCruiserMountHit,cruiserSubsystemExplosionScale} from './cruiserCombat.js';
 import { prepareLocalPursuit, updateLocalPursuit, driveRecoveryRemaining, PLAYER_RADAR_RANGE, PIRATE_ARRIVAL_MIN } from './combatTravel.js';
+import { ARRIVAL_DROP_SECONDS, DEPLOYMENT_SECONDS } from './jumpArrival.js';
 import { nearestPlayerBerth, playerBerth, playerBerths, setPlayerBerthResolver, preparePlayerLaunch, stepPlayerDocking } from './playerDocking.js';
 import {fittedPlayerBerths,fitSessionPlayerBerths} from './shipLanding.js';
 setPlayerBerthResolver(fitSessionPlayerBerths);
@@ -783,6 +784,7 @@ const HULL_FLIGHT_STATS = {
     'atlas-freighter': { speed: 27, afterburnSpeed: 0, turnRate: 0.55, collisionRadius: 2.9, hullHalfExtents:[3.958028,3.920304,12.33277] }, // trader — ponderous
     caravan: { speed: 20, afterburnSpeed: 0, turnRate: .15, collisionRadius: 26, hullHalfExtents: [8.6,7,26] },
     rookery: { speed: 20, afterburnSpeed: 0, turnRate: .15, collisionRadius: 28, hullHalfExtents: [10,7,28] },
+    skidbladnir: { speed: 22, afterburnSpeed: 0, turnRate: .16, collisionRadius: 30, hullHalfExtents: [11,8,30] },
     drover: { speed: 25, afterburnSpeed: 0, turnRate: .25, collisionRadius: 14, hullHalfExtents: [5.5,4.3,14] },
     ironjaw: { speed: 30, afterburnSpeed: 0, turnRate: .25, collisionRadius: 15, hullHalfExtents: [6.1,4.3,15.1] },
     siege: { speed:22, afterburnSpeed:0, turnRate:Math.PI/18, collisionRadius:16, hullHalfExtents:[4.3,5.4,16] },
@@ -798,7 +800,7 @@ const HULL_FLIGHT_STATS = {
 for(const [variant,profile] of Object.entries(SHIP_COLLIDERS))if(HULL_FLIGHT_STATS[variant]&&variant!=='concord-frigate')HULL_FLIGHT_STATS[variant].hullHalfExtents=profile.extent;
 const PLAYER_HULL_EXTENTS=Object.fromEntries(Object.entries(HULL_FLIGHT_STATS).map(([variant,stats])=>[variant,Object.freeze(stats.hullHalfExtents.map(n=>n*PLAYER_CONTACT_SCALE))]));
 const CAPITAL_CLASS_BY_VARIANT = Object.freeze({
-    drover:'corvette', ironjaw:'corvette', barge:'corvette', siege:'corvette', picket:'corvette', caravan:'frigate', rookery:'frigate',
+    drover:'corvette', ironjaw:'corvette', barge:'corvette', siege:'corvette', picket:'corvette', caravan:'frigate', rookery:'frigate', skidbladnir:'frigate',
     'concord-frigate': 'frigate',
     'concord-cruiser': 'cruiser',
     'concord-carrier': 'carrier',
@@ -2226,6 +2228,7 @@ export class GameSession {
         this.simAccumulator = 0;
         this.arena.editor = false;
         this.arena.started = true;
+        for (const ship of this.ships) ship.jumpArrivalAt = this.save.world.time;
         this.ui.updateObserverView(this.observerViewModel());
         return true;
     }
@@ -2388,6 +2391,8 @@ export class GameSession {
     }
     setupArena(config, announce = true) {
         this.clearCombatDebris();
+        this.deploymentRemaining = config.run || config.multiplayer || config.testMode ? 0 : DEPLOYMENT_SECONDS;
+        this.deploymentDropUntil = undefined;
         this.lostTargetId = undefined;
         // Every arena attempt is a clean sortie: restore all weapon pools and
         // clear session-only heat/cooldowns before spawning the player or
@@ -2516,7 +2521,6 @@ export class GameSession {
                 const envLabel = t(environment === 'asteroid-field' ? 'ASTEROID FIELD' : environment === 'debris-field' ? 'DEBRIS FIELD' : 'OPEN SPACE');
                 const difficultyLabel = t(TIER_LABELS[config.difficulty ?? 'veteran'] ?? 'Veteran').toUpperCase();
                 this.ui.pushEvent(t('COMBAT SIMULATOR · {scenario} · {env} · {difficulty} PILOTS', { scenario: scenario.toUpperCase(), env: envLabel, difficulty: difficultyLabel }), 'info', 5200);
-                this.ui.pushEvent(t('Hostiles inbound. Weapons free.'), 'danger', 3600);
             }
         }
     }
@@ -3074,7 +3078,7 @@ export class GameSession {
         flight.turn = flying && spin ? clamp(Math.hypot(spin[0], spin[1], spin[2]) / 1.4, 0, 1) || 0 : 0;
         flight.yaw = spin ? clamp(spin[1] / 1.2, -1, 1) || 0 : 0;
         flight.shield = stats.shield > 0 ? clamp(this.save.player.shield / stats.shield, 0, 1) || 0 : 1;
-        flight.hyper = this.hyperdriveFx === 'active' || this.hyperdriveFx === 'gate';
+        flight.hyper = this.deploymentActive() || this.hyperdriveFx === 'active' || this.hyperdriveFx === 'gate';
         flight.dockKind = LOCATIONS[this.save.player.dockedAt]?.kind;
         flight.dockId = this.save.player.dockedAt || undefined;
         flight.systemId = this.save.player.systemId;
@@ -3171,7 +3175,19 @@ export class GameSession {
         // The combat roadmap builds in slices, also during an Arena countdown.
         if (this.fieldRoadmap && !this.fieldRoadmap.ready) advanceFieldRoadmap(this, 4);
         if(this.arena?.run&&this.save.arenaRun.phase!=='combat')return;
-        if(this.arena?.run&&this.save.arenaRun.countdown>0){this.tickArenaRun(dt);return;}
+        if (this.arena?.run && this.save.arenaRun.countdown > 0) {
+            this.tickArenaRun(dt);
+            if (this.save.arenaRun.countdown === 0) this.finishDeployment();
+            return;
+        }
+        if (this.deploymentRemaining > 0) {
+            this.deploymentRemaining = Math.max(0, this.deploymentRemaining - dt);
+            if (this.deploymentRemaining < 1e-8) {
+                this.deploymentRemaining = 0;
+                this.finishDeployment();
+            }
+            return;
+        }
         // Headless drivers (probes, tests) may pass sparse action objects:
         // default the numeric axes in place so a missing field can't NaN the
         // throttle and freeze the ship. The frame path always supplies all of
@@ -3297,7 +3313,7 @@ export class GameSession {
         }
     }
     handleActions(actions) {
-        if (this.playerDocking) return;
+        if (this.playerDocking || this.deploymentActive() || (this.arena?.run && this.save.arenaRun?.countdown > 0)) return;
         if(this.save.player.raceReturn){actions.missile=actions.utility=actions.miningDrones=actions.autopilot=actions.jettison=actions.weaponSelect=actions.weaponCycle=actions.launcherCycle=false;}
         // Absolute slider input is an edge: apply even on a zero-step frame.
         if (actions.throttleSet !== undefined) {
@@ -7634,9 +7650,23 @@ export class GameSession {
             this.hyperdriveFx = 'none';
         }
     }
+    deploymentActive() {
+        const run = this.arena?.run && this.save.arenaRun;
+        return this.deploymentRemaining > 0 || this.arena?.multiplayer?.me?.deployTicks > 0
+            || (run?.phase === 'combat' && run.countdown > 0 && run.countdown <= DEPLOYMENT_SECONDS + 1e-8);
+    }
+    finishDeployment() {
+        this.deploymentDropUntil = this.save.world.time + ARRIVAL_DROP_SECONDS;
+        this.audio.play('hyperDrop');
+        if (this.arena && !this.arena.run && !this.arena.multiplayer && this.arena.scenario !== 'free-flight')
+            this.ui.pushEvent(t('Hostiles inbound. Weapons free.'), 'danger', 3600);
+    }
     hyperdriveFxState() {
         // Rendering/HUD inspection must never advance the flight state.
         const now = this.save.world.time;
+        if (this.deploymentActive()) return { fx: 'active', progress: 1 };
+        if (this.deploymentDropUntil > now)
+            return { fx: 'drop', progress: clamp((this.deploymentDropUntil - now) / ARRIVAL_DROP_SECONDS, 0, 1) };
         if (this.hyperdriveFx === 'gate')
             return { fx: 'gate', progress: clamp(1 - (this.hyperdriveFxUntil - now) / GATE_TRANSITION_SECONDS, 0, 1) };
         if (this.hyperdriveFx === 'spooling' && this.autopilot)
@@ -7734,6 +7764,12 @@ export class GameSession {
                     delete ship.burn;
             }
             ship.lifetime += dt;
+            if (ship.hull <= 0) continue;
+            if (ship.carrierLaunch&&updateCarrierDeparture(this,ship,dt)) {
+                this.resolveNpcCollisions(ship);
+                if(ship.combatBumpAt===this.save.world.time)ship.carrierLaunch=undefined;
+                continue;
+            }
             // ?? 0 guard: a spawn path that forgets these fields (probe seeds,
             // future spawners) must not NaN-poison the timers — a NaN
             // fireCooldown silently produced a pirate that NEVER fired.
@@ -7759,6 +7795,10 @@ export class GameSession {
             // travel) now lives there as updateShipAI, with the task layer feeding
             // travel waypoints and the interaction layer running emergent mugs.
             if((ship.variant==='ironjaw'||ship.variant==='barge')&&ship.convoyLeader?.hull>0&&!ship.targetId)ship.targetId=ship.convoyLeader.targetId;
+            if(ship.launchOwner&&ship.convoyLeader?.hull>0&&!ship.surrendered&&!ship.captured){
+                ship.targetId??=ship.convoyLeader.targetId;
+                if(ship.targetId==='player'&&ship.convoyLeader.hostile)ship.hostile=true;
+            }
             const screenTarget=ship.convoyLeader?.variant==='picket'&&ship.targetId
                 ?ship.targetId==='player'?this.save.player:this.ships.find(actor=>actor.id===ship.targetId):undefined;
             const regroup=screenTarget&&leavingScreen(ship,screenTarget.position);
@@ -7808,7 +7848,7 @@ export class GameSession {
             else if (!ship.arenaObjectiveAttacker || !this.flyRunBombingPass(ship,dt))
                 updateShipAI(this, ship, dt);
             if(TRAFFIC_HULLS[ship.variant]?.launch && !ship.arenaRunEnemy && !ship.poweredDown && !ship.captured && !ship.surrendered && !ship.holdFire)
-                updateTrafficLaunches(this,ship,TRAFFIC_HULLS[ship.variant].launch,dt);
+                updateTrafficLaunches(this,ship,TRAFFIC_HULLS[ship.variant].launch);
             if(TRAFFIC_HULLS[ship.variant]&&ship.capitalBatteriesAt!==this.save.world.time){
                 let enemy;
                 if (ship.targetId === 'player') {
@@ -7840,7 +7880,7 @@ export class GameSession {
                 // stack: a greeting never steals the floor from a fight.
                 this.maybeNeutralChatter(ship, position, playerPosition);
             }
-            if (!this.arena && position.distanceTo(playerPosition) > this.playerStats().radarRange * 1.3 && ship.lifetime > 40 && !(ship.pursuitLeaseUntil > this.save.world.time) && !ship.stationDock && !ship.missionId && !ship.captured && (!ship.capitalClass||TRAFFIC_HULLS[ship.variant]) && !ship.tutorialCompanion && !ship.tutorialEnemy && !ship.arenaRunEnemy && !ship.arenaRunWingman) {
+            if (!this.arena && position.distanceTo(playerPosition) > this.playerStats().radarRange * 1.3 && ship.lifetime > 40 && !(ship.pursuitLeaseUntil > this.save.world.time) && !ship.stationDock && !ship.missionId && !ship.captured && !(ship.launchOwner&&ship.convoyLeader?.hull>0) && (!ship.capitalClass||TRAFFIC_HULLS[ship.variant]) && !ship.tutorialCompanion && !ship.tutorialEnemy && !ship.arenaRunEnemy && !ship.arenaRunWingman) {
                 // An NPC hyperdrive hop: trade, smuggle, and flee pilots jump to
                 // another port — mark the departure with a warp streak instead of
                 // a silent cull (renderer.spawnHyperdriveStreak).
@@ -10273,6 +10313,7 @@ export class GameSession {
             const shipPos = this.tmpP0.set(ship.position[0], ship.position[1], ship.position[2]);
             const shipQuat = this.tmpQ.set(ship.rotation[0], ship.rotation[1], ship.rotation[2], ship.rotation[3]);
             if (shipVsShip(playerPos,playerQuat,playerShipVariant(player.shipId),PLAYER_CONTACT_SCALE,shipPos,shipQuat,ship.collisionVariant??npcFlightVariant(ship),npcShipScaleForVariant(npcFlightVariant(ship)),contact)) {
+                if(ship.carrierLaunch)ship.carrierLaunch=undefined;
                 // Snapshot both velocities before any recoil is applied, so each
                 // side's impact reads the true pre-contact closing speed.
                 const pv = player.velocity;
@@ -10325,6 +10366,8 @@ export class GameSession {
                     collided = shipVsShip(shipPos,shipQuat,ship.collisionVariant??npcFlightVariant(ship),npcShipScaleForVariant(npcFlightVariant(ship)),otherPos,otherQuat,other.collisionVariant??npcFlightVariant(other),npcShipScaleForVariant(npcFlightVariant(other)),contact);
                 }
                 if (collided) {
+                    if(ship.carrierLaunch)ship.carrierLaunch=undefined;
+                    if(other.carrierLaunch)other.carrierLaunch=undefined;
                     const otherPos = this.tmpP1;
                     const sv = ship.velocity;
                     const ov = other.velocity;
@@ -11703,6 +11746,7 @@ export class GameSession {
         }
         this.cancelPendingMug(ship);
         ship.hull = 0;
+        if(ship.launchOwner)carrierFighterDestroyed(this,ship);
         if(ship.variant==='caravan'&&ship.droneFleet){
             for(const unit of Object.values(ship.droneFleet.unitsById))
                 if(unit.hull>0&&unit.state!=='stowed'&&unit.position)orphanNpcDrone(this,ship,unit);
@@ -12494,7 +12538,7 @@ export class GameSession {
         if(role==='bounty')return{faction:'independents',guild:'bounty',hullId:careerCombatHull('independents',role,region,rng)};
         const league=!this.arena&&['patrol','trader'].includes(role)&&rng()<leagueTrafficChance(systemId,locationId);
         if(role==='patrol'&&!this.arena&&!isTutorialGuided(this.save)){
-            const faction=league?'alliance':owner,variant=patrolCorvette(faction,region,rng);
+            const faction=league?'alliance':owner,variant=patrolCapital(faction,region,rng);
             if(variant&&this.careerFrigateEncounterOpen())return {faction,patrolCapital:variant};
         }
         if(league)return{faction:'alliance',hullId:careerCombatHull('alliance',role,region,rng)};
@@ -12558,7 +12602,7 @@ export class GameSession {
         if(role==='patrol'&&fleetOptions.patrolCapital){
             const leader=this.spawnTrafficCapital(fleetOptions.patrolCapital,position,true);
             if(leader){
-                if(!leader.convoyFormed){
+                if(!leader.convoyFormed&&!TRAFFIC_HULLS[leader.variant].launch){
                     leader.convoyFormed=true;
                     for(const slot of [-1,1]){
                         const point=this.tmpD.set(slot*55,0,-85).applyQuaternion(this.tmpQ.fromArray(leader.rotation)).add(this.tmpE.fromArray(position));
@@ -12690,6 +12734,7 @@ export class GameSession {
             coverPoint: undefined,
             coverHoldSince: 0,
             spawnTime: this.save.world.time,
+            jumpArrivalAt: this.restoringFrigateEncounter ? undefined : this.save.world.time,
             lifetime: 0,
             arrivalSignatureUntil: !this.arena && (role === 'pirate' || role === 'escort' || role === 'bounty') ? this.save.world.time+12 : 0,
             missionId,
@@ -12823,6 +12868,7 @@ export class GameSession {
             ship.capitalMountHull = [...saved.mounts];
             restoreHeimdallLasers(ship);
             ship.missingPods = saved.missingPods;
+            restoreRookeryBays(ship);
             if(variant==='picket'){
                 ship.capitalMountHull=restorePicketMounts(ship.capitalMountHull,saved.picketLayout);
                 ship.ecmStoppedAt=saved.ecmStoppedAt;
@@ -12851,10 +12897,6 @@ export class GameSession {
         if(m.kind==='engine'&&ship.cargoHolds&&ship.engineThrust===0&&ship.hull>0&&!this.arena&&!ship.surrendered)
             this.surrenderShip(ship,{action:'down'});
         if(m.kind==='hangar')ship.repairDronesHeld=true;
-        if(m.kind==='bay'){
-            const gun=capitalHull(ship).mounts.find(part=>part.kind==='broadside'&&part.bearing===m.bearing);
-            ship.capitalMountHull[gun.index]=0;
-        }
         if(m.kind!=='pod'&&!m.partBit)return;
         const bit=m.partBit??1<<Number(m.node.slice(4));
         if(ship.missingPods&bit)return;
@@ -12865,7 +12907,6 @@ export class GameSession {
             this.playWorldSound?.('ecm-collapse',1,...ship.position);
             return;
         }
-        if(m.kind==='bay')return;
         this.renderer.detachCargoPod?.(ship,m);
         if(this.arena||!ship.cargoHolds)return;
         // Assign any indivisible units to the earliest intact holds. The same
@@ -15601,7 +15642,7 @@ export class GameSession {
     combatSightBlocked() {
         const p=this.save.player;
         return p.hull<=0 || this.deathTimer>0 || p.dockedAt || this.ui.isModalOpen ||
-            this.autopilot || (this.hyperdriveFx && this.hyperdriveFx!=='none');
+            this.deploymentActive() || this.autopilot || (this.hyperdriveFx && this.hyperdriveFx!=='none');
     }
     volleyHitsTarget(ship, aimTarget, speed, fit, spec, group) {
         if(this.gunCooldown>0)return false;
@@ -15701,7 +15742,7 @@ export class GameSession {
             this.renderer.setCockpitVisible(false);
             this.renderer.updateObserverCamera(focus, this.observerZoom, dt);
             const alpha = clamp(this.simAccumulator / SIM_STEP, 0, 1);
-            this.renderer.syncShips(this.ships, alpha);
+            this.renderer.syncShips(this.ships, alpha, this.observerStarted ? this.save.world.time : undefined);
             this.renderer.syncProjectiles(this.projectiles, this.projStore, alpha);
             this.renderer.syncPickups(this.pickups, this.pickupStore, alpha);
             this.renderDroneFleet??={unitsById:{}};this.renderDroneFleet.unitsById=droneUnits(this);
@@ -15719,9 +15760,9 @@ export class GameSession {
         // Interpolation fraction: where the next sim step sits between the last
         // completed step (prev*) and the current state. Zero when docked/paused.
         const alpha = clamp(this.simAccumulator / SIM_STEP, 0, 1);
-        this.renderer.setHyperdriveFx(fxState.fx, fxState.progress);
         this.renderer.raceSpeedIntensity=this.activeRace?.state==='running'?clamp((speed/Math.max(1,stats.maxSpeed)-.8)/.9,0,1):0;
         this.renderer.updateCamera(this.save.player.position, this.save.player.prevPosition, this.save.player.rotation, this.save.player.prevRotation, this.save.player.angularVelocity, clamp(speed / Math.max(1, stats.afterburnSpeed), 0, 2), this.afterburning || (this.autopilot && speed > stats.afterburnSpeed), dt, alpha);
+        this.renderer.setHyperdriveFx(fxState.fx, fxState.progress, dt);
         if(!this.save.settings.reducedDamageEffects && this.shakeStrength>0){
             const age=this.save.world.time-this.shakeAt, fade=Math.max(0,1-age/.24);
             if(fade>0 && age>=0){
@@ -15739,7 +15780,9 @@ export class GameSession {
             ? Number(storm.progress.burstAt) - Number(this.save.world.time)
             : Infinity;
         this.renderer.setSolarFront?.(Number.isFinite(stormLeft) ? clamp((90 - stormLeft) / 90, 0, 1) : 0);
-        this.renderer.syncShips(this.ships, alpha);
+        const arrivalTime = this.deploymentActive() || (this.arena?.run && this.save.arenaRun?.countdown > 0)
+            ? undefined : this.save.world.time;
+        this.renderer.syncShips(this.ships, alpha, arrivalTime);
         this.renderer.syncDistressBeacons?.(this.distressBeaconView());
         this.renderer.syncDistressPocket?.(this.distressPocketView());
         this.renderer.syncProjectiles(this.projectiles, this.projStore, alpha);

@@ -11,6 +11,7 @@ import { SHIPS } from '../../src/game/data.js';
 import { WEAPONS } from '../../src/game/weapons.js';
 import { Vector3 } from 'three';
 import { fieldWorld } from '../helpers/field-world.mjs';
+import { finishMatchDeployment } from '../helpers/multiplayer.mjs';
 
 const noop = () => {};
 const botIds = Object.keys(BOT_CHARACTERS);
@@ -129,6 +130,7 @@ test('bot skill uses the Arena burst profile and reaction delay under incoming f
     const delays = [];
     for (const difficulty of ['novice', 'veteran', 'ace']) {
         const world = startWorld({ bots: ['brick'], difficulty });
+        finishMatchDeployment(world);
         const shooter = world.match.players.get('host').actor;
         const target = world.match.players.get('bot:brick').actor;
         shooter.position.splice(0, 3, 0, 0, 220);
@@ -139,13 +141,14 @@ test('bot skill uses the Arena burst profile and reaction delay under incoming f
         world.step();
         assert.equal(target.combatThreatId, 'host', `${difficulty} detects the incoming projectile`);
         assert.equal(target.shield, target.maxShield, 'the reaction starts before impact');
-        delays.push(Number((target.evasiveLatencyUntil - MATCH_STEP).toFixed(2)));
+        delays.push(Number((target.evasiveLatencyUntil - world.tick * MATCH_STEP).toFixed(2)));
     }
     assert.deepEqual(delays, [.3, .18, .1]);
 });
 
 test('2v2 bot wingmen split pressure and flank roles against the same visible opponent', () => {
     const world = startWorld({ mode: 'teams' });
+    finishMatchDeployment(world);
     const host = world.match.players.get('host').actor;
     const wing = world.actors().find(actor => actor.id !== host.id && actor.team === host.team);
     const [lead, flank] = world.actors().filter(actor => actor.team !== host.team);
@@ -164,6 +167,7 @@ test('2v2 bot wingmen split pressure and flank roles against the same visible op
 
 test('an occluded opponent leaves a last sighting for pursuit and loses the bot’s weapon lock', () => {
     const world = startWorld({ bots: ['brick'] });
+    finishMatchDeployment(world);
     const host = world.match.players.get('host').actor;
     const bot = world.bots.get('bot:brick');
     host.position.splice(0, 3, 0, 0, -350);

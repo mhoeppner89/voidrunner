@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { startWithConfirmedLoadouts } from '../helpers/multiplayer.mjs';
+import { finishMatchDeployment, startWithConfirmedLoadouts } from '../helpers/multiplayer.mjs';
 import test from 'node:test';
 import { Quaternion, Vector3 } from 'three';
 import { createMultiplayerMatch } from '../../src/game/multiplayer/matchRules.js';
@@ -25,6 +25,7 @@ function stagedMatch(session, siteId, teams = false) {
         }
     });
     for (const actor of world.actors()) world.spawn(actor);
+    finishMatchDeployment(world);
     return { world, events };
 }
 
@@ -48,11 +49,12 @@ test('pilots fly apart after an authoritative ram, with damage determined by the
         target.position = [0, 0, 0];
         target.rotation = [0, 1, 0, 0];
         const frame = teams ? 1 / 120 : 1 / 30;
+        const startTick = world.tick;
         for (let i = 0; i < 2 / frame; i++) {
             world.receiveInput(attacker.id, { sequence: i, life: attacker.life, throttleSet: 1 });
             world.advance(frame);
         }
-        assert.equal(world.tick, 120);
+        assert.equal(world.tick - startTick, 120);
         assert.ok(Math.hypot(...target.position) > 1, 'ram displaces the stationary pilot');
         assert.ok(!intersect(attacker, target), 'ships can fly clear');
         const hits = events.filter(event => event.type === 'hit');

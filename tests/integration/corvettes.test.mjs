@@ -26,17 +26,39 @@ function hit(s,ship,m,amount=m.hull){
 }
 
 test('all capital hulls declare their health, labels, sockets, hit areas and selectable systems',()=>{
-    const counts={'concord-frigate':14,'concord-cruiser':14,drover:12,ironjaw:8,siege:7,picket:8,barge:11,caravan:14,rookery:13};
+    const counts={'concord-frigate':14,'concord-cruiser':14,drover:12,ironjaw:8,siege:7,picket:8,barge:11,caravan:14,rookery:15,skidbladnir:15};
     for(const [id,count] of Object.entries(counts)){
         const {mounts}=CAPITAL_HULLS[id];assert.equal(mounts.length,count);assert.ok(mounts.length<=CAPITAL_MARKER_COUNT);
         for(const m of mounts){
             assert.ok(m.hull>0&&m.labelKey&&m.radius>0);
             assert.ok(m.localPosition.every(Number.isFinite)&&m.hitCenter.every(Number.isFinite));
-            assert.ok(Math.abs(Math.hypot(...m.normal)-1)<.01);assert.equal(m.targetable,['generator','engine','emitter'].includes(m.kind));
+            assert.ok(Math.abs(Math.hypot(...m.normal)-1)<.01);assert.equal(m.targetable,['generator','engine','emitter','bay'].includes(m.kind));
         }
         const s=fixture(),ship=s.spawnCapitalShip(id,[0,0,0],'rook');s.save.player.currentTargetId=ship.id;
         const expected=mounts.filter(m=>m.targetable).map(m=>m.index);
         for(const index of [...expected,undefined]){s.cycleCapitalSubtarget();assert.equal(s.getTargetRef().mount,index);}
+    }
+});
+
+test('a shot through each carrier hangar hits its own rear bulkhead and leaves its neighbours intact',()=>{
+    for(const [variant,count] of [['skidbladnir',6],['rookery',4]]){
+        const {s,ship,mounts}=stage(variant);
+        const bays=mounts.filter(m=>m.kind==='bay');
+        assert.equal(bays.length,count);
+        ship.shield=0;
+        for(const mount of bays){
+            const [x,y,z]=mount.localPosition;
+            const from=new THREE.Vector3(Math.sign(x)*62,y,z),to=new THREE.Vector3(0,y,z);
+            const along=segmentShipColliderHit(from,to,ship.position,ship.rotation,ship.variant,2);
+            assert.ok(Number.isFinite(along),mount.node);
+            const hitPoint=from.lerp(to,along);
+            assert.ok(Math.abs(hitPoint.x-x)<1,`${mount.node} has an open entrance up to its bulkhead`);
+            const health=[...ship.capitalMountHull];
+            s.damageShip(ship,mount.hull,'environment',hitPoint.toArray());
+            health[mount.index]=0;
+            assert.deepEqual(ship.capitalMountHull,health);
+        }
+        assert.equal(ship.collisionVariant,undefined,'fixed hangar structure remains part of the hull');
     }
 });
 test('one engine halves speed, two leave a slowing drift, and only a career Drover offers boarding',()=>{
@@ -144,7 +166,7 @@ test('traffic frigates retain their own hull stats and lose a third of thrust pe
         assert.equal(ship.capitalClass,'frigate');
         assert.deepEqual([ship.maxShield,ship.maxHull,ship.speed,ship.turnRate],[500,variant==='caravan'?2000:2400,20,.15]);
         const cycle=mounts.filter(m=>m.targetable);
-        assert.deepEqual(cycle.map(m=>m.kind).sort(),['engine','engine','engine','generator','generator']);
+        assert.deepEqual(cycle.map(m=>m.kind).sort(),[...(variant==='rookery'?['bay','bay','bay','bay']:[]),'engine','engine','engine','generator','generator']);
         ship.shield=0;
         const regen=ship.shieldRegen;
         for(const [i,m] of mounts.filter(m=>m.kind==='generator').entries()){
@@ -200,17 +222,23 @@ test('frigate traffic rolls only on qualifying routes and suppresses a new carri
     assert.notEqual(s.spawnCareerRaider('pirate',[0,0,600],high,()=>0,true).variant,'rookery');
 });
 
-test('career Rookery launches regional Balor pairs up to eight survivors and leaves them fighting',async()=>{
-    const {updateTrafficLaunches}=await import('../../src/game/arenaBattle.js');
+test('career Rookery gives its intact bays one regional Balor each',async()=>{
+    const {carrierFighterDestroyed,updateTrafficLaunches}=await import('../../src/game/arenaBattle.js');
     const {ROOKERY_LAUNCH}=await import('../../src/game/corvetteMounts.js');
     const {s,ship}=stage('rookery',false);
     s.siteSpotClear=()=>true;s.careerRegionAt=()=>({danger:.9});ship.targetId='player';
-    const tick=dt=>updateTrafficLaunches(s,ship,ROOKERY_LAUNCH,dt);
+    const tick=dt=>{s.save.world.time+=dt;updateTrafficLaunches(s,ship,ROOKERY_LAUNCH);};
     const fighters=()=>s.ships.filter(s=>s.hull>0&&s.launchOwner===ship.id);
-    tick(24);assert.equal(fighters().length,0);
-    tick(1);assert.equal(fighters().length,4);
+    tick(5.9);assert.equal(fighters().length,0);
+    tick(.1);assert.equal(fighters().length,1);
+    tick(4.5);assert.equal(fighters().length,4);
     assert.ok(fighters().every(f=>f.hullId==='scrapper'&&f.pilot.tier==='ace'&&f.targetId==='player'));
-    for(const fighter of fighters())fighter.position[1]+=500; // Fly the first pair clear of each rail.
-    tick(25);tick(25);assert.equal(fighters().length,8);
-    ship.hull=0;tick(50);assert.equal(fighters().length,8);
+    const initial=fighters().map(f=>f.id);
+    tick(120);assert.deepEqual(fighters().map(f=>f.id),initial);
+    const [lost,...survivors]=fighters();
+    lost.hull=0;carrierFighterDestroyed(s,lost);
+    tick(29.99);assert.deepEqual(fighters(),survivors);
+    tick(.01);assert.equal(fighters().length,4);
+    assert.ok(fighters().some(f=>f.launchBay===lost.launchBay&&f.id!==lost.id));
+    ship.hull=0;fighters()[0].hull=0;tick(120);assert.equal(fighters().length,3);
 });

@@ -140,20 +140,20 @@ test('Hard promotes carrier-launched fighters',()=>{
  assert.ok(opp(s).filter(x=>x.arenaLaunched).every(x=>x.pilot.tier==='ace'));
 });
 test('moving socket warning reuses its pose and its Three.js scratch objects',()=>{
- const s=stage(10),d=reach(s),b=s.runBattle,wave={...RUN_WAVES[9],launch:{...RUN_WAVES[9].launch,every:25,sockets:{port:{game_position:[-10,0,-12],direction_game:[-1,0,0]}},bays:[{subsystem:'bay_port',socket:'port'}]}};
+ const s=stage(10),d=reach(s),b=s.runBattle,wave=RUN_WAVES[9];
+ b.groups.length=b.group;
  s.renderer.camera=new T.PerspectiveCamera();s.renderer.viewportWidth=1440;s.renderer.viewportHeight=900;
  const markers=new Set();s.ui.setRunInbound=point=>{if(point)markers.add(point);};
  let elapsed=s.save.world.time-s.save.arenaRun.startedAt;
- const step=()=>{s.save.world.time+=1/60;tickBattle(s,wave,elapsed+=1/60,1/60);};
- for(let i=0;i<30*60&&!b.warning?.bay;i++)step();
- assert.ok(b.warning?.bay);
- // Exclude the authored escort warning that preceded the carrier launch.
+ const step=()=>{s.save.world.time+=1/60;tickBattle(s,wave,elapsed+=1/60);};
+ for(let i=0;i<6*60&&!b.wingWarning;i++)step();
+ assert.ok(b.wingWarning?.bay);
  markers.clear();
- const original=b.warning.entry,position=original.position,before=position[0],vectors=new Set(),rotations=new Set();
+ const original=b.wingWarning.entry,position=original.position,before=position[0],vectors=new Set(),rotations=new Set();
  const watch=(type,set)=>{const fn=type.prototype.fromArray;type.prototype.fromArray=function(...args){set.add(this);return fn.apply(this,args);};return ()=>{type.prototype.fromArray=fn;};};
  const restoreV=watch(T.Vector3,vectors),restoreQ=watch(T.Quaternion,rotations);
  try{for(let i=0;i<60;i++){d.position[0]++;step();}}finally{restoreV();restoreQ();}
- assert.equal(b.warning.entry,original);assert.equal(b.warning.entry.position,position);assert.ok(Math.abs(position[0]-before-60)<.01);
+ assert.equal(b.wingWarning.entry,original);assert.equal(b.wingWarning.entry.position,position);assert.ok(Math.abs(position[0]-before-60)<.01);
  assert.ok(vectors.size<=3&&rotations.size<=2);assert.equal(markers.size,1);
 });
 test('a defended Drover thanks the pilot after the last wave, jumps 2.5 s later and the level ends a second after',()=>{

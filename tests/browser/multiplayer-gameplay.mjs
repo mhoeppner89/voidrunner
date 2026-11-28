@@ -43,11 +43,22 @@ async function newDevice(name, browser, settings) {
         errors.push(name + ': ' + error.message);
         console.error(name, error.stack);
     });
+    page.on('console', message => {
+        if (message.text().startsWith('Frame error')) errors.push(name + ': ' + message.text());
+    });
     await page.addInitScript(() => {
         localStorage.setItem('voidrunner-lang', 'en');
         localStorage.setItem('void-privateer-settings-v1', JSON.stringify({language:'en', music:0, effects:0, vibration:false}));
         const Audio = window.AudioContext ?? window.webkitAudioContext;
         if (Audio) Audio.prototype.resume = async function () { await this.suspend(); };
+        window.deploymentFxLog = [];
+        new MutationObserver(records => {
+            for (const { target } of records) {
+                const fx = target.dataset.hyperdriveFx;
+                const life = window.__VOID_PRIVATEER__?.getRuntime()?.arena?.multiplayer?.me?.life;
+                if (life && (fx === 'active' || fx === 'drop')) window.deploymentFxLog.push([life, fx]);
+            }
+        }).observe(document, {attributes:true, subtree:true, attributeFilter:['data-hyperdrive-fx']});
         // Persist the coverage across a normal reload by the service worker.
         const storage = Storage.prototype;
         const record = operation => sessionStorage.setItem('mp-save-writes',
@@ -68,6 +79,7 @@ async function flight(page, shipId, opponent) {
         const runtime = window.__VOID_PRIVATEER__?.getRuntime();
         const frame = document.querySelector('.painted-cockpit-frame');
         return runtime?.arena?.multiplayer && runtime.save.player.shipId === ship && runtime.save.player.hull > 0 &&
+            runtime.arena.multiplayer.me?.deployTicks === 0 &&
             runtime.ships.some(s => s.matchPilot && s.name === opponent) &&
             document.querySelector('#game-shell')?.dataset.cockpitPaint === ship &&
             frame?.complete && frame.naturalWidth > 0 &&
@@ -77,6 +89,11 @@ async function flight(page, shipId, opponent) {
     }, [shipId, opponent], {timeout:180_000});
     for (const display of ['own','radar','target']) assert.ok(await page.locator('.cockpit-screen-' + display).isVisible());
     assert.ok(await page.locator('#viewport canvas').isVisible());
+}
+
+async function deploymentFx(page, life) {
+    await page.waitForFunction(life => ['active', 'drop'].every(fx =>
+        window.deploymentFxLog.some(([seenLife, seenFx]) => fx === seenFx && life === seenLife)), life, {timeout:5000});
 }
 
 async function boxCenter(locator) {
@@ -205,8 +222,10 @@ try {
     await guest.screenshot({path:out + '/' + guestProfile + '-lobby.png'});
     console.log(hostProfile, 'host and', guestProfile, 'guest joined via', joinMethod, 'and replicated lobby settings.');
 
+    await host.bringToFront();
     await action(host, 'start').click();
     await Promise.all([flight(host, 'wayfarer', guestName), flight(guest, 'scrapper', hostName)]);
+    await Promise.all([deploymentFx(host, 1), deploymentFx(guest, 1)]);
     assert.equal(await host.evaluate(() => __VOID_PRIVATEER__.getRuntime().save.player.outfitting.loadouts.wayfarer.guns[0]), 'pulse-cannon');
     assert.equal(await guest.evaluate(() => __VOID_PRIVATEER__.getRuntime().save.player.outfitting.loadouts.scrapper.utility[0]), 'capacitor-bank');
     const pilotDistance = () => host.evaluate(() => {
@@ -315,6 +334,7 @@ try {
     await host.waitForFunction(() => document.querySelector('.match-bank > b')?.textContent.replace(/\D/g,'') === '0');
     await action(host, 'respawn').click();
     await flight(host, 'speedster', guestName);
+    await deploymentFx(host, 2);
     await guest.waitForFunction(() => __VOID_PRIVATEER__.getRuntime().ships.some(s =>
         s.shipId === 'speedster' && s.hull === s.maxHull && s.life === 2));
     assert.ok(await pilotDistance() >= 650, 'The relaunch stays outside immediate range of the killer');
@@ -390,6 +410,7 @@ try {
                 ship:rt?.save.player.shipId, foes:rt?.ships.map(s => [s.shipId,s.hull,s.shield]), tick:rt?.save.world.time,
                 q:rt?.save.player.rotation, velocity:rt?.save.player.velocity, input:rt?.arena.multiplayer.me?.targetId,
                 energy:rt?.save.player.energy, shots:rt?.projectiles.length,
+                deploymentFx:window.deploymentFxLog, frameErrorAt:rt?.frameErrorAt,
                 ticker:document.querySelector('#screen-event-ticker .ticker-line')?.title,
             };
         }).catch(() => null);

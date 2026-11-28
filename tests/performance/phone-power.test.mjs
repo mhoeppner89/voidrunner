@@ -149,7 +149,7 @@ test('moving collision geometry keeps its full simulation rate while cosmetic wo
     r.graveyard=[{moving:true,position:[0,0,0],drift:[0,2,0],rotation:[0,0,0],spin:[0,0,1]}];
     r.jumpPointVisuals=[];r.locationMeshes=new Map();
     let cosmetics=0,fxTime=0;
-    r.updateHyperdriveFx=dt=>{cosmetics++;fxTime+=dt;};r.updateWreckNodeInstances=()=>{};r.updateEffects=()=>{};
+    r.updatePdcTracers=dt=>{cosmetics++;fxTime+=dt;};r.updateWreckNodeInstances=()=>{};r.updateEffects=()=>{};
     for(let i=1;i<=60;i++){r.updateWorld(1/60);if(i%2===0)r.updateWorldVisuals();}
     assert.ok(Math.abs(r.asteroids[0].position[0]-LOCATIONS.shardbelt.position[0]-3)<1e-6);
     assert.ok(Math.abs(r.graveyard[0].position[1]-2)<1e-9);

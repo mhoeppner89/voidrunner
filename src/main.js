@@ -646,7 +646,7 @@ window.__VOID_PRIVATEER__ = {
     observerClearFormation: () => session?.observerClearFormation(),
     observerRemoveShip: (unitId) => session?.observerRemoveShip(unitId),
     getState: () => session?.save ?? cachedSave,
-    spawnFrigate: variant => ['caravan','rookery'].includes(variant) ? session?.spawnTrafficCapital(variant,undefined,true)?.id : undefined,
+    spawnFrigate: variant => ['caravan','rookery','skidbladnir'].includes(variant) ? session?.spawnTrafficCapital(variant,undefined,true)?.id : undefined,
     spawnCorvette: variant => session?.spawnCorvette(variant)?.id,
     getRuntime: () => session,
     startPerformanceCapture: async (options = {}) => {

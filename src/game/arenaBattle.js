@@ -94,7 +94,7 @@ function objectiveTick(session,wave,battle,elapsed) {
     if(!objective || !target)return;
     if(objective.kind==='destroy'){
         if(alive(target))return;
-        if(objective.clearLaunches && session.ships.some(s=>s.arenaLaunched&&alive(s))){
+        if(objective.clearLaunches && session.ships.some(s=>s.launchOwner===target.id&&alive(s))){
             if(!battle.carrierDown)logObjective(session,t('Carrier down. Destroy the launched fighters.'),'warning',t('Clear fighters'));
             battle.carrierDown=true;return;
         }
@@ -149,7 +149,7 @@ function publishObjective(session,wave,battle,elapsed) {
     let status;
     if(decided)status=t(decided==='success'?objective.done??'Complete':objective.failed??'Failed');
     else if(objective.kind!=='destroy')status=t('Jump {time}',{time:clock(battle.remaining??objective.seconds)});
-    else if(battle.carrierDown){let n=0;for(const ship of session.ships)if(ship.arenaLaunched&&alive(ship))n++;status=t('Fighters {count}',{count:n});}
+    else if(battle.carrierDown){let n=0;for(const ship of session.ships)if(ship.launchOwner===target.id&&alive(ship))n++;status=t('Fighters {count}',{count:n});}
     else if(objective.clearLaunches){const bays=capitalHull(target).mounts.filter(m=>m.kind==='bay');status=t('Bays {left}/{total}',{left:bays.filter(m=>target.capitalMountHull[m.index]>0).length,total:bays.length});}
     else status=t('Destroy');
     session.ui.setObjectiveStrip({name:target.name,status,
@@ -158,11 +158,12 @@ function publishObjective(session,wave,battle,elapsed) {
 }
 function announce(session,warning,elapsed) {
     if(!warning.announced){
-        warning.at=Math.max(warning.at,elapsed+WARNING);
+        if(!warning.bay)warning.at=Math.max(warning.at,elapsed+WARNING);
         warning.announced=true;
         const battle=session.runBattle;
         const title=warning.bay?t('CONTACTS'):t('WAVE {wave}/{total}',{wave:battle.group+1,total:battle.groups.length});
-        session.runRadio(warning.line,title,t('INBOUND {seconds} S',{seconds:WARNING}));
+        const seconds=warning.bay?Math.max(1,Math.ceil(warning.at-elapsed-.0001)):WARNING;
+        session.runRadio(warning.line,title,t('INBOUND {seconds} S',{seconds}));
     }
     const point=warning.entry.position;
     if(!session.renderer.camera)return;
@@ -178,53 +179,63 @@ function announce(session,warning,elapsed) {
     marker.seconds=Math.max(0,Math.ceil(warning.at-elapsed));
     session.ui.setRunInbound?.(marker);
 }
-// Bays progress independently. A destroyed mast slows the remaining launch
-// cycle immediately. A bay names its damageable subsystem and flight socket.
-export function launchCycle(battle,config,dt) {
-    const target=battle.target;
-    if(!alive(target))return [];
-    const mounts=capitalHull(target).mounts;
-    if(!battle.lanes){
-        battle.mastIndex=config.mast?mounts.findIndex(m=>m.node===config.mast):undefined;
-        battle.lanes=(config.bays??[{}]).map(bay=>({...bay,index:bay.subsystem?mounts.findIndex(m=>m.node===bay.subsystem):undefined,
-            anchor:config.sockets?.[bay.socket],remaining:config.every}));
+// Each hangar owns one fighter. An intact bay keeps its slot occupied for the
+// full life of that fighter, regardless of where it flies.
+export const CARRIER_REPLACEMENT_SECONDS = 30;
+const FIRST_LAUNCH_SECONDS = 6;
+const LAUNCH_STAGGER_SECONDS = 1.5;
+const RAIL_RETRY_SECONDS = 2;
+
+export function carrierSlots(battle, config, startTime) {
+    if (!battle.lanes) {
+        const mounts = capitalHull(battle.target).mounts;
+        battle.mastIndex = config.mast ? mounts.findIndex(m => m.node === config.mast) : undefined;
+        battle.lanes = config.bays.map((bay, order) => ({
+            ...bay, order, index: mounts.findIndex(m => m.node === bay.subsystem),
+            anchor: config.sockets?.[bay.socket], nextAt: startTime + FIRST_LAUNCH_SECONDS + order * LAUNCH_STAGGER_SECONDS,
+        }));
     }
-    const mastDisabled=battle.mastIndex!==undefined&&!(target.capitalMountHull[battle.mastIndex]>0);
-    const rate=mastDisabled?.5:1;
-    const lanes=battle.lanes;
-    for(const bay of lanes){
-        bay.rate=rate;
-        bay.open=bay.index===undefined||target.capitalMountHull[bay.index]>0;
-        bay.retryIn=Math.max(0,(bay.retryIn??0)-dt);
-        if(bay.open)bay.remaining=Math.max(0,bay.remaining-dt*rate);
-    }
-    return lanes;
+    return battle.lanes;
 }
-function launchEntry(session,battle,bay) {
-    if(!bay.socket)return entry(session,battle.serial,true);
-    const ship=battle.target;
-    if(!bay.pose){
-        const mount=bay.anchor?null:capitalHull(ship).mounts.find(m=>m.node===bay.socket);
-        if(!bay.anchor&&!mount)return null;
-        bay.mount=mount;
-        bay.pose={position:[0,0,0],socket:{normal:bay.anchor?.direction_game??mount.normal,rotation:ship.rotation}};
-        bay.point=new THREE.Vector3();bay.origin=new THREE.Vector3();bay.rotation=new THREE.Quaternion();
+function loseFighter(bay, at) {
+    bay.fighter = undefined;
+    bay.fighterId = undefined;
+    bay.nextAt = at + CARRIER_REPLACEMENT_SECONDS;
+    bay.retryAt = undefined;
+    bay.replacement = true;
+    bay.warned = false;
+}
+export function carrierFighterDestroyed(session, fighter) {
+    if (!fighter.launchOwner || !fighter.launchBay) return;
+    const owner = session.ships.find(ship => ship.id === fighter.launchOwner);
+    const battle = session.runBattle?.target === owner ? session.runBattle : owner?.carrierBattle;
+    const bay = battle?.lanes?.find(slot => slot.subsystem === fighter.launchBay);
+    if (bay?.fighterId === fighter.id) loseFighter(bay, session.save.world.time);
+}
+function launchEntry(battle, bay) {
+    const ship = battle.target;
+    if (!bay.pose) {
+        const mount = bay.anchor ? null : capitalHull(ship).mounts.find(m => m.node === bay.socket);
+        if (!bay.anchor && !mount) return null;
+        bay.mount = mount;
+        bay.pose = {position: [0,0,0]};
+        bay.point = new THREE.Vector3();bay.origin = new THREE.Vector3();
+        bay.outward = new THREE.Vector3();bay.rotation = new THREE.Quaternion();
     }
-    if(bay.anchor)bay.point.fromArray(bay.anchor.game_position).applyQuaternion(bay.rotation.fromArray(ship.rotation)).add(bay.origin.fromArray(ship.position));
+    bay.rotation.fromArray(ship.rotation);
+    if (bay.anchor) bay.point.fromArray(bay.anchor.game_position).applyQuaternion(bay.rotation).add(bay.origin.fromArray(ship.position));
     else capitalMountPosition(ship,bay.mount.index,bay.point);
-    bay.pose.socket.rotation=ship.rotation;
     bay.point.toArray(bay.pose.position);
     return bay.pose;
 }
 const capPosition=new THREE.Vector3(),capRotation=new THREE.Quaternion(),contact={};
-// Reserve the two exits together. Move far enough to clear the carrier, then
-// sweep the rail to those fixed exits. An obstruction holds this bay in place.
-function railPair(session,battle,bay,anchor,spec) {
-    const carrier=battle.target,variant=SHIPS[spec.hullId]?.variant??spec.hullId;
+// Find the closest clear exit outside the carrier. Rechecking from the
+// moving socket keeps a blocked hangar from launching through cover or traffic.
+function railExit(session, carrier, bay, anchor, spec) {
+    const variant=SHIPS[spec.hullId]?.variant??spec.hullId;
     const radius=Math.max(18,(SHIP_COLLIDERS[variant]?.contactRadius??18)*npcShipScaleForVariant(variant)+3);
-    const outward=bay.outward??=new THREE.Vector3(),plans=bay.plans??=[{position:[0,0,0]},{position:[0,0,0]}];
-    outward.fromArray(anchor.socket.normal).applyQuaternion(bay.rotation.fromArray(carrier.rotation)).normalize();
-    const point=bay.point,origin=bay.origin.fromArray(anchor.position);
+    const {point,outward}=bay,origin=bay.origin.fromArray(anchor.position);
+    outward.fromArray(bay.anchor?.direction_game ?? bay.mount.normal).applyQuaternion(bay.rotation).normalize();
     capPosition.fromArray(carrier.position);capRotation.fromArray(carrier.rotation);
     let distance=16;
     for(;distance<=256;distance+=8){
@@ -232,25 +243,30 @@ function railPair(session,battle,bay,anchor,spec) {
         if(!shipVsSphere(capPosition,capRotation,carrier.collisionVariant??carrier.variant,npcShipScaleForVariant(carrier.variant),point.x,point.y,point.z,radius,contact))break;
     }
     if(distance>256)return null;
-    const spacing=Math.max(40,radius*2),reach=distance+spacing;
+    const start=bay.anchor?.start_game_position;
+    const interior=start?point.fromArray(start).distanceTo(capPosition.fromArray(bay.anchor.game_position)):0;
     const obstacles=session.launchRailObstacles(),site=arenaSite(session.arenaStage?.siteId);
     // Inflating by half the sample interval encloses the entire swept volume.
-    if(obstacles.length)for(let d=0;d<reach+8;d+=8){
-        point.copy(origin).addScaledVector(outward,Math.min(d,reach));
+    if(obstacles.length)for(let d=-interior;d<distance+8;d+=8){
+        point.copy(origin).addScaledVector(outward,Math.min(d,distance));
         if(!session.siteSpotClear(site,point,obstacles,radius+4))return null;
     }
-    for(let i=0;i<2;i++){
-        point.copy(origin).addScaledVector(outward,distance+i*spacing);
+    const player=session.save.player;
+    for(let d=start?-interior:distance;d<distance+8;d+=8){
+        point.copy(origin).addScaledVector(outward,Math.min(d,distance));
         for(const ship of session.ships){
-            if(!alive(ship))continue;
+            if(!alive(ship)||ship===carrier)continue;
             const model=ship.collisionVariant??ship.variant;
             if(shipVsSphere(capPosition.fromArray(ship.position),capRotation.fromArray(ship.rotation),model,npcShipScaleForVariant(ship.variant),point.x,point.y,point.z,radius,contact))return null;
         }
-        const player=session.save.player;
         if(!session.arena?.observer&&!player.dockedAt&&capPosition.fromArray(player.position).distanceTo(point)<radius+session.playerCollisionRadius())return null;
-        point.toArray(plans[i].position);
     }
-    return plans;
+    if(start){
+        point.fromArray(start).applyQuaternion(bay.rotation).add(capPosition.fromArray(carrier.position));
+        anchor.railLength=distance+interior;
+    }
+    point.toArray(anchor.position);
+    return anchor;
 }
 // Find space near the advertised entry for conventional group arrivals.
 function formationEntry(session,anchor,index,spec,capitals,obstacles){
@@ -306,33 +322,15 @@ function groupPlans(session,specs,anchor) {
     }
     return plans;
 }
-function arrive(session,battle,specs,anchor,bay) {
-    const plans=bay?.socket?railPair(session,battle,bay,anchor,specs[0]):groupPlans(session,specs,anchor);
+function arrive(session,battle,specs,anchor) {
+    const plans=groupPlans(session,specs,anchor);
     if(!plans)return false;
-    if(battle.trafficCarrier){
-        const carrier=battle.trafficCarrier;
-        specs[0].tier=carrier.observerTeam?carrier.pilot.tier:REGION_TIERS[careerRaidTier(session.careerRegionAt(carrier.position))-1];
-    }
     const screen=specs.some(spec=>spec.hullId==='picket')?[]:null;
     for(const [i,spec] of specs.entries()){
-        const carrier=battle.trafficCarrier;
-        const ship=carrier?session.spawnShip('escort',plans[i].position,undefined,undefined,
-            {tier:spec.tier},{faction:carrier.faction,hullId:spec.hullId}):session.spawnRunShip(spec,battle.serial++,plans[i]);
+        const ship=session.spawnRunShip(spec,battle.serial++,plans[i]);
         if(!ship)return false;
         screen?.push(ship);
         if(spec.primary)battle.target=ship;
-        if(bay){
-            ship.launchOwner=battle.target.id;
-            ship.frigateEncounterId=battle.target.frigateEncounterId;
-            if(carrier){
-                ship.targetId=carrier.targetId;ship.hostile=carrier.hostile;ship.observerTeam=carrier.observerTeam;
-                ship.observerShipType=carrier.observerTeam?spec.hullId:undefined;
-            }else ship.arenaLaunched=true;
-            if(bay.socket){
-                bay.rotation.setFromUnitVectors(NOSE,bay.outward).toArray(ship.rotation);
-                bay.point.fromArray(battle.target.velocity).addScaledVector(bay.outward,ship.speed*.5).toArray(ship.velocity);
-            }
-        }
         if(spec.attackObjective){ship.arenaObjectiveAttacker=true;ship.targetId=battle.target?.id;}
     }
     if(screen){
@@ -344,20 +342,128 @@ function arrive(session,battle,specs,anchor,bay) {
     }
     return true;
 }
-// Career and spectator carriers use the same socket transform, clearance and pair placement.
-export function updateTrafficLaunches(session,ship,config,dt){
-    const battle=ship.carrierBattle??={target:ship,trafficCarrier:ship};
-    const lanes=launchCycle(battle,config,dt);
-    for(const bay of lanes){
-        if(!bay.open||bay.remaining>0||bay.retryIn>.00001)continue;
-        let count=0;
-        for(const fighter of session.ships)if(fighter.launchOwner===ship.id&&alive(fighter))count++;
-        if(count+2>config.cap)return;
-        const fighter=battle.fighter??={hullId:config.fighter};
-        const pair=battle.pair??=[fighter,fighter],slot=launchEntry(session,battle,bay);
-        if(slot&&arrive(session,battle,pair,slot,bay))bay.remaining=config.every;
-        else bay.retryIn=2;
+function deployFighter(session, battle, bay, spec) {
+    const carrier = battle.target, origin = launchEntry(battle, bay);
+    const plan = origin && railExit(session, carrier, bay, origin, spec);
+    if (!plan) return false;
+    const traffic = battle.trafficCarrier;
+    let fighter;
+    if (traffic) {
+        const tier=carrier.observerTeam?carrier.pilot.tier:REGION_TIERS[careerRaidTier(session.careerRegionAt(carrier.position))-1];
+        fighter=session.spawnShip('escort',plan.position,undefined,undefined,{tier},{faction:carrier.faction,hullId:spec.hullId});
+    } else fighter=session.spawnRunShip(spec,battle.serial++,plan);
+    if (!fighter) return false;
+    fighter.launchOwner=carrier.id;
+    fighter.launchBay=bay.subsystem;
+    fighter.frigateEncounterId=carrier.frigateEncounterId;
+    if (traffic) {
+        fighter.targetId=carrier.targetId;fighter.hostile=carrier.hostile;fighter.observerTeam=carrier.observerTeam;
+        fighter.observerShipType=carrier.observerTeam?spec.hullId:undefined;
+        if (!carrier.observerTeam) {
+            fighter.convoyLeader=carrier;
+            fighter.formationSlot=(Math.sign(bay.anchor?.direction_game[0]) || 1)*(1+bay.order%3*.45);
+            fighter.formationPoint=[0,0,0];
+            fighter.formationTrail=55+bay.order%3*20;
+        }
+    } else fighter.arenaLaunched=true;
+    bay.rotation.setFromUnitVectors(NOSE,bay.outward).toArray(fighter.rotation);
+    if(bay.anchor?.start_game_position){
+        fighter.carrierLaunch={
+            localStart:bay.anchor.start_game_position,localDirection:bay.anchor.direction_game,
+            length:plan.railLength,duration:Math.max(1.8,plan.railLength/(fighter.speed*.48)),elapsed:0,
+            framePosition:[...carrier.position],frameRotation:[...carrier.rotation],frameVelocity:[...carrier.velocity],
+        };
     }
+    const rail=fighter.carrierLaunch;
+    const speed=rail?rail.length*.2/rail.duration:fighter.speed*.5;
+    bay.point.fromArray(carrier.velocity).addScaledVector(bay.outward,speed).toArray(fighter.velocity);
+    bay.fighter=fighter;bay.fighterId=fighter.id;
+    return true;
+}
+
+const departurePoint=new THREE.Vector3(),departureDirection=new THREE.Vector3();
+const departureRotation=new THREE.Quaternion(),departureFrame=new THREE.Quaternion();
+export function updateCarrierDeparture(session,fighter,dt){
+    const rail=fighter.carrierLaunch;
+    if(!rail)return false;
+    if(fighter.captured||fighter.surrendered||fighter.poweredDown){
+        fighter.carrierLaunch=undefined;
+        return false;
+    }
+    const carrier=session.ships.find(ship=>ship.id===fighter.launchOwner&&alive(ship));
+    for(let i=0;i<3;i++){
+        rail.framePosition[i]=carrier?carrier.position[i]:rail.framePosition[i]+rail.frameVelocity[i]*dt;
+        if(carrier)rail.frameVelocity[i]=carrier.velocity[i];
+    }
+    if(carrier)for(let i=0;i<4;i++)rail.frameRotation[i]=carrier.rotation[i];
+    rail.elapsed=Math.min(rail.duration,rail.elapsed+dt);
+    const progress=rail.elapsed/rail.duration;
+    const distance=rail.length*progress*(.2+.8*progress);
+    departureFrame.fromArray(rail.frameRotation);
+    departureDirection.fromArray(rail.localDirection);
+    departurePoint.fromArray(rail.localStart).addScaledVector(departureDirection,distance).applyQuaternion(departureFrame);
+    departurePoint.x+=rail.framePosition[0];departurePoint.y+=rail.framePosition[1];departurePoint.z+=rail.framePosition[2];
+    departureDirection.applyQuaternion(departureFrame);
+    departureRotation.setFromUnitVectors(NOSE,departureDirection).toArray(fighter.rotation);
+    if(dt>0){
+        fighter.velocity[0]=(departurePoint.x-fighter.position[0])/dt;
+        fighter.velocity[1]=(departurePoint.y-fighter.position[1])/dt;
+        fighter.velocity[2]=(departurePoint.z-fighter.position[2])/dt;
+    }
+    departurePoint.toArray(fighter.position);
+    if(rail.elapsed>=rail.duration)fighter.carrierLaunch=undefined;
+    return true;
+}
+function updateCarrierWing(session,battle,config,spec) {
+    const carrier=battle.target;
+    if(!alive(carrier)||carrier.poweredDown||carrier.captured||carrier.surrendered)return [];
+    const now=session.save.world.time;
+    const lanes=carrierSlots(battle,config,carrier.spawnTime??now);
+    const mastDisabled=battle.mastIndex!==undefined&&!(carrier.capitalMountHull[battle.mastIndex]>0);
+    for(const bay of lanes){
+        if(bay.fighter?.hull===0)loseFighter(bay,now);
+        bay.open=carrier.capitalMountHull[bay.index]>0;
+        if(!bay.open||bay.fighterId)continue;
+        // Flight-control loss delays the opening launch only. Combat losses
+        // always get their full, fixed 30-second turnaround.
+        if(mastDisabled&&!bay.replacement&&!bay.controlLost){
+            bay.nextAt+=Math.max(0,bay.nextAt-now);
+            bay.controlLost=true;
+        }
+        if(now+1e-6<Math.max(bay.nextAt,bay.retryAt??0))continue;
+        // Legacy saves can have more pilots than bays. Let those pilots fly
+        // out their existing lives before filling spare berths.
+        let aloft=0;
+        for(const fighter of session.ships)if(fighter.launchOwner===carrier.id&&alive(fighter))aloft++;
+        if(aloft>=lanes.length)break;
+        if(!deployFighter(session,battle,bay,spec))bay.retryAt=now+RAIL_RETRY_SECONDS;
+    }
+    return lanes;
+}
+export function updateTrafficLaunches(session,ship,config) {
+    const battle=ship.carrierBattle??={target:ship,trafficCarrier:ship,fighter:{hullId:config.fighter}};
+    return updateCarrierWing(session,battle,config,battle.fighter??={hullId:config.fighter});
+}
+function warnCarrierWing(session,battle,lanes,elapsed) {
+    const now=session.save.world.time;
+    let warning=battle.wingWarning;
+    if(warning&&(!warning.bay.open||warning.bay.fighterId||!alive(battle.target))){
+        battle.wingWarning=null;
+        if(!battle.warning)session.ui.setRunInbound?.(null);
+        warning=null;
+    }
+    if(battle.warning)return;
+    if(!warning){
+        const bay=lanes.find(slot=>slot.open&&!slot.fighterId&&!slot.warned&&slot.nextAt-now<=WARNING+.001);
+        if(!bay)return;
+        const anchor=launchEntry(battle,bay);
+        if(!anchor)return;
+        warning=battle.wingWarning={bay,at:elapsed+Math.max(0,bay.nextAt-now),entry:anchor,line:t('Carrier fighter inbound.')};
+        bay.warned=true;
+    }
+    warning.entry=launchEntry(battle,warning.bay);
+    warning.at=elapsed+Math.max(0,warning.bay.nextAt-now,(warning.bay.retryAt??0)-now);
+    announce(session,warning,elapsed);
 }
 function opening(session,wave,battle,elapsed) {
     const group=battle.groups[0],transport=wave.objective?.transport;
@@ -378,7 +484,7 @@ function opening(session,wave,battle,elapsed) {
     }
     return true;
 }
-export function tickBattle(session,wave,elapsed,dt) {
+export function tickBattle(session,wave,elapsed) {
     const battle=session.runBattle;
     if(!battle.group){opening(session,wave,battle,elapsed);return false;}
     if(!battle.outcome)objectiveTick(session,wave,battle,elapsed);
@@ -392,77 +498,40 @@ export function tickBattle(session,wave,elapsed,dt) {
         battle.endAt??=elapsed+1;
         return elapsed>=battle.endAt;
     }
-    let survivors=0,launched=0;
-    for(const ship of session.ships)if(ship.arenaRunEnemy&&alive(ship)){
-        survivors++;if(ship.arenaLaunched)launched++;
-    }
+    let survivors=0;
+    for(const ship of session.ships)if(ship.arenaRunEnemy&&alive(ship))survivors++;
     const group=battle.groups[battle.group];
-    const lanes=wave.launch?launchCycle(battle,wave.launch,dt):[];
-    for(const bay of lanes){
-        if(!bay.warned||!bay.open||bay.retryIn>.00001||launched+2>wave.launch.cap)continue;
-        if(arrive(session,battle,battle.launchPair,launchEntry(session,battle,bay),bay)){
-            bay.remaining=wave.launch.every;bay.warned=false;launched+=2;survivors+=2;
-        }else bay.retryIn=2;
-    }
+    const lanes=wave.launch&&battle.target?updateCarrierWing(session,battle,wave.launch,battle.launchFighter):[];
     let pending=battle.warning;
-    if(!pending){
-        let specs,at,line,bay;
-        if(group&&fits(session,battle,group.enemies,group.limit)){
-            let deadline=battle.lastArrival+battle.interval;
-            if(group.at!==undefined)deadline=Math.min(deadline,(battle.primaryAt??0)+group.at);
-            const hullGate=group.hullBelow&&battle.target?.hull<battle.target.maxHull*group.hullBelow;
-            const earliest=battle.lastArrival+MIN_GROUP_INTERVAL;
-            if(elapsed>=earliest-WARNING&&(survivors<=1||hullGate||elapsed>=deadline-WARNING)){
-                specs=group.enemies;at=Math.max(earliest,elapsed+WARNING);
-                line=t('Group {group}/{total} inbound.',{group:battle.group+1,total:battle.groups.length});
-            }
-        }
-        if(wave.launch&&launched+2<=wave.launch.cap){
-            bay=lanes.find(b=>b.open&&!b.warned&&b.remaining<=WARNING*b.rate);
-            if(bay){specs=battle.launchPair??=[battle.launchFighter,battle.launchFighter];at=elapsed+WARNING;}
-        }
-        if(specs){
-            let anchor=bay?launchEntry(session,battle,bay):entry(session,battle.serial,true);
+    if(!pending&&group&&fits(session,battle,group.enemies,group.limit)){
+        let deadline=battle.lastArrival+battle.interval;
+        if(group.at!==undefined)deadline=Math.min(deadline,(battle.primaryAt??0)+group.at);
+        const hullGate=group.hullBelow&&battle.target?.hull<battle.target.maxHull*group.hullBelow;
+        const earliest=battle.lastArrival+MIN_GROUP_INTERVAL;
+        if(elapsed>=earliest-WARNING&&(survivors<=1||hullGate||elapsed>=deadline-WARNING)){
+            const specs=group.enemies;
+            let anchor=entry(session,battle.serial,true);
             if(anchor&&isRunCapital(specs[0]))anchor=session.runCapitalEntry(specs[0],anchor);
-            if(anchor){
-                line??=t('Reinforcements inbound.');
-                const marked=bay?.socket?anchor:{...anchor,position:[...anchor.position]};
-                pending=battle.warning={specs,at,line,entry:marked,bay,limit:bay?battle.limit:group.limit};
-            }
+            if(anchor)pending=battle.warning={specs,at:Math.max(earliest,elapsed+WARNING),
+                line:t('Group {group}/{total} inbound.',{group:battle.group+1,total:battle.groups.length}),
+                entry:{...anchor,position:[...anchor.position]},limit:group.limit};
         }
     }
     if(pending){
-        const {bay,specs}=pending;
-        if(bay&&(!bay.open||!alive(battle.target))){
+        announce(session,pending,elapsed);
+        const {specs}=pending;
+        if(elapsed>=pending.at&&fits(session,battle,specs,pending.limit)&&arrive(session,battle,specs,pending.entry)){
+            battle.group++;battle.lastArrival=elapsed;
+            const arrival=t('Group {group}/{total}',{group:battle.group,total:battle.groups.length});
+            session.ui.pushEvent(arrival,'info',4000,arrival);
+            if(specs.some(s=>s.primary)){
+                battle.primaryAt=elapsed;
+                if(wave.objective?.seconds)runTransport(session,battle.target,wave.objective.seconds);
+                if(wave.objective)logObjective(session,t(wave.hint),'info',t(wave.objective.label));
+            }
             battle.warning=null;session.ui.setRunInbound?.(null);
-        }else{
-            if(bay){
-                pending.at=Math.max(pending.at,elapsed+bay.remaining/bay.rate);
-                if(bay.socket)pending.entry=launchEntry(session,battle,bay);
-            }
-            announce(session,pending,elapsed);
-            if(pending.announced && elapsed>=pending.at && (bay?bay.remaining<=.001:fits(session,battle,specs,pending.limit))){
-                if(bay){
-                    for(const lane of lanes){
-                        if(!lane.open||lane.warned||lane.remaining>.001||launched+2>wave.launch.cap)continue;
-                        if(arrive(session,battle,specs,launchEntry(session,battle,lane),lane)){
-                            lane.remaining=wave.launch.every;launched+=2;
-                        }else{lane.retryIn=2;lane.warned=true;}
-                    }
-                    battle.warning=null;session.ui.setRunInbound?.(null);
-                }else if(arrive(session,battle,specs,pending.entry)){
-                    battle.group++;battle.lastArrival=elapsed;
-                    const arrival=t('Group {group}/{total}',{group:battle.group,total:battle.groups.length});
-                    session.ui.pushEvent(arrival,'info',4000,arrival);
-                    if(specs.some(s=>s.primary)){
-                        battle.primaryAt=elapsed;
-                        if(wave.objective?.seconds)runTransport(session,battle.target,wave.objective.seconds);
-                        if(wave.objective)logObjective(session,t(wave.hint),'info',t(wave.objective.label));
-                    }
-                    battle.warning=null;session.ui.setRunInbound?.(null);
-                }
-            }
         }
     }
+    if(wave.launch)warnCarrierWing(session,battle,lanes,elapsed);
     return !wave.objective && battle.group===battle.groups.length && !session.ships.some(s=>s.arenaRunEnemy&&alive(s));
 }

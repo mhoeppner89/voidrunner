@@ -290,19 +290,37 @@
   {
     "variant": "rookery",
     "path": "assets/models/capital/rookery.glb",
-    "sha256": "66f61a2b45f8c929fc405a4bb65820a5b28034d6fc1be1bd33d361dabfc99998",
-    "triangles": 3156,
-    "vertices": 1748,
-    "boxes": 699,
+    "sha256": "ce35f0bfc4216492c334b77d69cea4d4d855424779670bf0ca34df52f05ed274",
+    "triangles": 4220,
+    "vertices": 2372,
+    "boxes": 983,
+    "grid": [
+      64,
+      48,
+      128
+    ],
+    "extent": [
+      13.422499656677248,
+      7.525386333465576,
+      28.000000000000007
+    ]
+  },
+  {
+    "variant": "skidbladnir",
+    "path": "assets/models/capital/skidbladnir.glb",
+    "sha256": "41735d40c0527b5e0db6649647515c66fe763be89ba067f397829d7bfa414f61",
+    "triangles": 4328,
+    "vertices": 2384,
+    "boxes": 588,
     "grid": [
       48,
       48,
       128
     ],
     "extent": [
-      9.967499732971193,
-      7.525386333465576,
-      28.000000000000007
+      9.561002581133923,
+      13.055000791512441,
+      29.000006931051075
     ]
   },
   {

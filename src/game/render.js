@@ -50,6 +50,7 @@ import { buildStationColliderAsync } from './stationCollision.js';
 import { stationModelOffsetZ, stationVisualSurfaceRadius } from './stationTraffic.js';
 import {stationYaw,stationRotatePoint} from './stationOrientation.js';
 import { LaserFx, stepTransientEffect } from './laserFx.js';
+import { takeShipJumpArrival } from './jumpArrival.js';
 const tupleToVector = (tuple, out = new THREE.Vector3()) => out.set(tuple[0], tuple[1], tuple[2]);
 const NEG_Z = new THREE.Vector3(0, 0, -1);
 const UP_AXIS = new THREE.Vector3(0, 1, 0);
@@ -148,7 +149,7 @@ export const GLB_SHIP_CONFIG = {
     // one actually enters the scene. Carrier and cruiser were normalized to a
     // two-unit longitudinal axis during export; their scales are measured from
     // the shipped battleship bounds for exact 0.8x and 0.5x visible lengths.
-    ...Object.fromEntries(['caravan','rookery'].map(variant => [variant, {
+    ...Object.fromEntries(['caravan','rookery','skidbladnir'].map(variant => [variant, {
         path: 'assets/models/capital/'+variant+'.glb', yaw: -Math.PI / 2, scale: 26, baseScale: 1,
         enginePorts: [], preload: false, preserveColor: true, authoredPaint: true,
         collisionSource: 'authoring/models/'+variant+'/support/collision.json',
@@ -3789,14 +3790,6 @@ export class SpaceRenderer {
             wrapper.add(wrapper.userData.battleshipArmament);
         }
         if(config.authoredPaint){
-            if(variant==='rookery'){
-                wrapper.userData.damagedBays=capitalHull({variant}).mounts.map(m=>{
-                    if(m.kind!=='bay')return null;
-                    const damaged=group.getObjectByName(m.node+'_damaged');
-                    damaged.visible=false;
-                    return damaged;
-                });
-            }
             wrapper.userData.corvetteParts=capitalHull({variant}).mounts.map(m=>['engine','generator','pod','booster','stack','bay','hangar','mast','rack','dish','capacitor','rangefinder','emitter'].includes(m.kind)?group.getObjectByName(m.node):null);
         }
         if(variant==='concord-carrier')wrapper.userData.carrierArmament=bindCarrierArmament(group);
@@ -3842,6 +3835,8 @@ export class SpaceRenderer {
         const glbMesh = this.createGlbShipMesh(entity, model, GLB_SHIP_CONFIG[resolvedVariant], resolvedVariant);
         glbMesh.position.copy(voxelMesh.position);
         glbMesh.quaternion.copy(voxelMesh.quaternion);
+        glbMesh.visible = voxelMesh.visible;
+        glbMesh.userData.jumpReveal = voxelMesh.userData.jumpReveal;
         this.dynamicRoot.remove(voxelMesh);
         this.disposeObject(voxelMesh);
         this.dynamicRoot.add(glbMesh);
@@ -3898,20 +3893,12 @@ export class SpaceRenderer {
             const parts=mesh.userData.corvetteParts,mounts=capitalHull(entity).mounts;
             for(let i=0;i<parts.length;i++)if(parts[i]){
                 const health=entity.capitalMountHull[i];
-                if(mounts[i].kind==='bay'){
-                    const damaged=mesh.userData.damagedBays[i];
-                    if(parts[i].visible!==Boolean(health)){
-                        parts[i].visible=health>0;
-                        damaged.scale.setScalar(health?0:1);damaged.visible=!health;damaged.updateMatrix();
-                        // The swapped bay changes the fracture template; build it before the hull dies.
-                        this.wreckFactory?.schedule(mesh);
-                    }
-                }else if(mounts[i].kind==='pod'||mounts[i].kind==='stack'||mounts[i].kind==='rack')parts[i].visible=health>0;
+                if(mounts[i].kind==='pod'||mounts[i].kind==='stack'||mounts[i].kind==='rack')parts[i].visible=health>0;
                 else if(!health)setFrigateComponentDamage(parts[i],0,mounts[i].hull);
             }
         }
     }
-    syncShips(entities, alpha = 0) {
+    syncShips(entities, alpha = 0, arrivalTime) {
         const revision = ++this.shipSyncRevision,exhaustTime=performance.now()*.001;
         let liveCount = 0;
         entities.forEach((entity) => {
@@ -3996,7 +3983,10 @@ export class SpaceRenderer {
             const baseScale = Number(mesh.userData.baseScale ?? 1);
             // Rigid hulls keep a fixed scale. Engine effects carry the animation.
             mesh.scale.setScalar(entity.matchPilot ? baseScale / npcShipScaleForVariant(variant) : baseScale);
-            mesh.visible = entity.hull > 0 && !entity.jumpPursuit;
+            if (arrivalTime !== undefined && takeShipJumpArrival(entity, arrivalTime))
+                mesh.userData.jumpReveal = this.spawnShipArrival(mesh, entity);
+            if (mesh.userData.jumpReveal?.done) mesh.userData.jumpReveal = undefined;
+            mesh.visible = entity.hull > 0 && !entity.jumpPursuit && !mesh.userData.jumpReveal;
             const emissiveIntensity = entity.race ? 0.24 + damage * 0.12 : entity.hostile ? 0.18 + damage * 0.28 : damage * 0.12;
             const emissiveMaterials = mesh.userData.emissiveMaterials;
             if (emissiveMaterials) {
@@ -4042,7 +4032,7 @@ export class SpaceRenderer {
             if (flares) {
                 const variant = mesh.userData.variant;
                 const glow = ENGINE_GLOW_TUNING[variant];
-                const boost = entity.burning ? ENGINE_FLARE_BURNING_BOOST : entity.race ? 1.65 : entity.hostile && entity.targetId ? ENGINE_FLARE_HOSTILE_BOOST : 1;
+                const boost = entity.burning || entity.carrierLaunch ? ENGINE_FLARE_BURNING_BOOST : entity.race ? 1.65 : entity.hostile && entity.targetId ? ENGINE_FLARE_HOSTILE_BOOST : 1;
                 const baseOpacity = (flares[0]?.userData.baseOpacity ?? (variant === 'atlas-freighter' ? ENGINE_FLARE_OPACITY_ATLAS : ENGINE_FLARE_OPACITY)) * (glow?.flareOpacity ?? 1);
                 const baseSize = (flares[0]?.userData.baseSize ?? (variant === 'atlas-freighter' ? ENGINE_FLARE_SIZE_ATLAS : ENGINE_FLARE_SIZE)) * (glow?.flareScale ?? 1);
                 for (let flareIndex=0;flareIndex<flares.length;flareIndex++) {
@@ -5585,7 +5575,7 @@ export class SpaceRenderer {
         this.observerPlacementPlane.constant = -planeY;
         return this.raycaster.ray.intersectPlane(this.observerPlacementPlane, out) ?? undefined;
     }
-    setHyperdriveFx(fx, progress) {
+    setHyperdriveFx(fx, progress, dt = 0) {
         const state = fx && fx !== 'none' ? fx : 'none';
         if (state !== this.hyperdriveFxState) {
             this.hyperdriveFxPulse = state === 'active' || state === 'gate' || state === 'drop' || state === 'interrupt' ? 1 : 0;
@@ -5596,6 +5586,7 @@ export class SpaceRenderer {
         this.hyperdriveFxProgress = clamp(progress, 0, 1);
         if (this.shell && this.shell.dataset.hyperdriveFx !== state)
             this.shell.dataset.hyperdriveFx = state;
+        if (state !== 'none' || this.hyperdriveFxRoot.visible) this.updateHyperdriveFx(dt);
     }
     updateObserverCamera(center, zoom, dt = 0) {
         const x = center?.isVector3 ? center.x : Number(center?.[0] ?? 0);
@@ -6196,6 +6187,64 @@ export class SpaceRenderer {
         this.scene.add(streak);
         this.effects.push({ object: streak, streak, velocities: [], life: 0.75, maxLife: 0.75 });
     }
+    spawnShipArrival(mesh, ship) {
+        const distance = this.camera.position.distanceTo(mesh.position);
+        if (distance > (ship.capitalClass ? 4500 : 2300) || (this.activeShipArrivals ?? 0) >= 8) return;
+        this.camera.updateMatrixWorld();
+        const view = this.tmpPosition.copy(mesh.position).applyMatrix4(this.camera.matrixWorldInverse);
+        if (view.z >= 0) return;
+        view.applyMatrix4(this.camera.projectionMatrix);
+        if (Math.abs(view.x) > 1.15 || Math.abs(view.y) > 1.15) return;
+
+        const object = new THREE.Group();
+        object.name = 'ship-jump-arrival';
+        object.position.copy(mesh.position);
+        object.quaternion.copy(mesh.quaternion);
+        const texture = this.hyperdriveFlashMaterial.map;
+        const appearance = { map: texture, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false };
+        const trailPaint = new THREE.MeshBasicMaterial({ ...appearance, color: 0x79c9ff, side: THREE.DoubleSide, forceSinglePass: true });
+        const flashPaint = new THREE.SpriteMaterial({ ...appearance, color: 0xcaf0ff });
+        const geometry = new THREE.PlaneGeometry();
+        const trail = new THREE.Group();
+        const horizontal = new THREE.Mesh(geometry, trailPaint);
+        horizontal.rotation.x = Math.PI * .5;
+        const vertical = new THREE.Mesh(geometry, trailPaint);
+        vertical.rotation.set(Math.PI * .5, 0, Math.PI * .5, 'ZYX');
+        trail.add(horizontal, vertical);
+        const flash = new THREE.Sprite(flashPaint);
+        object.add(trail, flash);
+        this.scene.add(object);
+
+        const size = ship.capitalClass ? 3.2 : 1;
+        const motion = this.reducedHyperdriveMotion ? .2 : 1;
+        const life = .48;
+        const reveal = { done: false };
+        let age = 0;
+        const update = (dt) => {
+            age += dt;
+            const inbound = Math.max(0, 1 - age / .14);
+            reveal.done = age >= .11;
+            const fade = Math.max(0, 1 - Math.max(0, age - .14) / (life - .14));
+            const offset = 125 * size * inbound * inbound * motion;
+            const length = 160 * size * fade * motion;
+            trail.position.z = offset + length * .5;
+            trail.scale.set(5 * size * fade, 5 * size * fade, length);
+            trailPaint.opacity = fade * (.44 + .3 * inbound) * (motion < 1 ? .5 : 1);
+            flash.position.z = offset;
+            flash.scale.setScalar((11 + 29 * (1 - inbound)) * size);
+            flashPaint.opacity = fade * fade * (.3 + .48 * (1 - inbound)) * (motion < 1 ? .55 : 1);
+        };
+        update(0);
+        this.activeShipArrivals = (this.activeShipArrivals ?? 0) + 1;
+        this.effects.push({ object, life, maxLife: life, update, dispose: () => {
+            reveal.done = true;
+            this.activeShipArrivals--;
+            geometry.dispose();
+            trailPaint.dispose();
+            flashPaint.dispose();
+        } });
+        return reveal;
+    }
     clearEffects() {
         if(this.flakBursts)for(const burst of this.flakBursts)burst.object.removeFromParent();
         if(this.coverVisuals){
@@ -6307,7 +6356,6 @@ export class SpaceRenderer {
             // it at the next draw and rebuild it again on every slow frame.
             if(this.skyTime>=mesh.userData.expiresAt){this.scene.remove(mesh);this.disposeObject(mesh);this.turretMeshes.delete(id);}
         }
-        this.updateHyperdriveFx(dt);
         if (this.starShimmer) {
             const baseOpacity = this.starShimmer.userData.baseOpacity ?? 0.3;
             this.starShimmer.opacity = baseOpacity + Math.sin(this.skyTime * 2.4) * 0.055;

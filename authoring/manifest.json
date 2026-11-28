@@ -174,9 +174,16 @@
     {
       "id": "rookery",
       "runtime": "assets/models/capital/rookery.glb",
-      "runtimeSha256": "66f61a2b45f8c929fc405a4bb65820a5b28034d6fc1be1bd33d361dabfc99998",
+      "runtimeSha256": "ce35f0bfc4216492c334b77d69cea4d4d855424779670bf0ca34df52f05ed274",
       "source": "authoring/models/rookery/rookery.blend",
-      "sourceSha256": "cfd2aa57b52e882c45dc95eeb07730e4825d9171508eefa36be8861faa43ad5b"
+      "sourceSha256": "be7c7af0bc626d62218017ab94f2b645ad8ff359571a5a1686813b41c18a180b"
+    },
+    {
+      "id": "skidbladnir",
+      "runtime": "assets/models/capital/skidbladnir.glb",
+      "runtimeSha256": "41735d40c0527b5e0db6649647515c66fe763be89ba067f397829d7bfa414f61",
+      "source": "authoring/models/skidbladnir/skidbladnir.blend",
+      "sourceSha256": "e29b0498f931ee0a611850a6d1842483a69abd8cabb007736eb0613b344709db"
     },
     {
       "id": "concord-frigate",

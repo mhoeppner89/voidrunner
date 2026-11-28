@@ -337,7 +337,6 @@ export function updateCorvetteWeapons(session,ship,dt,targetPosition,targetVeloc
    continue;
   }
   if(m.kind!=='broadside')continue;
-  if(ship.variant==='rookery' && ((ship.missingPods??0) & (m.bearing<0?1:2)))continue;
   const gun=s.mounts[m.index],weapon=CORVETTE_BROADSIDE;
   capitalMountPosition(ship,m.index,s.position);
   s.normal.set(m.bearing,0,0).applyQuaternion(s.q);

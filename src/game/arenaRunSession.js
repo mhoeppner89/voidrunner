@@ -375,7 +375,7 @@ export const ArenaRunMethods={
   return Boolean(position&&this.spawnRunShip(spec,index,{...planned,position}));
  },
  runCapitalEntry(spec,entry){
-  const radius=spec.role==='frigate'?140:spec.hullId==='caravan'||spec.hullId==='rookery'?65:42,obstacles=this.activeFieldObstacles();
+  const radius=spec.role==='frigate'?140:['caravan','rookery','skidbladnir'].includes(spec.hullId)?65:42,obstacles=this.activeFieldObstacles();
   const point=new THREE.Vector3().fromArray(entry.position);
   if(this.entryPositionClear(point,obstacles,radius))return {...entry,largeClear:true};
   const origin=new THREE.Vector3().fromArray(this.save.player.position);
@@ -430,7 +430,7 @@ export const ArenaRunMethods={
  tickArenaRun(dt){
   const r=this.save.arenaRun;if(!r||r.phase!=='combat')return;
   this.syncWingmanOrders();
-  if(r.countdown>0){r.countdown=Math.max(0,r.countdown-dt);const site=arenaSite(RUN_WAVES[r.wave].site);this.ui.showRunCountdown?.(Math.ceil(r.countdown),t(RUN_WAVES[r.wave].name),`${t(site.name)} · ${t(site.place)}`);if(r.countdown>0)return;r.startedAt=this.save.world.time;}
+  if(r.countdown>0){r.countdown=r.countdown-dt>1e-8?r.countdown-dt:0;const site=arenaSite(RUN_WAVES[r.wave].site);this.ui.showRunCountdown?.(Math.ceil(r.countdown),t(RUN_WAVES[r.wave].name),`${t(site.name)} · ${t(site.place)}`);if(r.countdown>0)return;r.startedAt=this.save.world.time;}
   r.elapsed+=dt;const wave=RUN_WAVES[r.wave],elapsed=this.save.world.time-r.startedAt;
   // Arena opponents never flee, surrender or hold fire, and they press the
   // player by default — but a lock onto a living wingman is left alone so the
@@ -446,7 +446,7 @@ export const ArenaRunMethods={
    if(ship.targetId!=='player'&&!this.livingWingmanId(ship.targetId))ship.targetId=this.arenaThreatTarget(ship);
   }
   this.syncRunWingmen();
-  if(tickBattle(this,wave,elapsed,dt)){
+  if(tickBattle(this,wave,elapsed)){
    // The last kill deserves its moment: hold the battlefield for a couple of
    // seconds so the death bloom plays out before the round flips to prepare.
    // Pending reinforcements still gate the clear above, and the pilot's own

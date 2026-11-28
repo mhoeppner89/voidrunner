@@ -4847,7 +4847,7 @@ export class GameUI {
             setHudText(this.el('#capital-subtarget-label'), compact);
             setHudText(this.el('#capital-subtarget-health'), selected ? (health === 0 ? t('OFF') : health + '%') : '');
             subtarget.classList.toggle('is-disabled-component',health===0);
-            setHudTitle(subtarget, t('Choose a generator, engine or hull'));
+            setHudTitle(subtarget, t('Choose a subsystem or hull'));
             setHudAttribute(subtarget, 'aria-label', `${subtarget.title}: ${label}${selected?' '+health+'%':''}`);
         }
         const bracket = this.el('#target-bracket');

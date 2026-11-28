@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { startWithConfirmedLoadouts } from '../helpers/multiplayer.mjs';
+import { finishMatchDeployment, startWithConfirmedLoadouts } from '../helpers/multiplayer.mjs';
 import test from 'node:test';
 import { Quaternion, Vector3 } from 'three';
 import { ARENA_SITES } from '../../src/game/arenaSites.js';
@@ -54,6 +54,7 @@ test('all multiplayer Arena sites admit four pilots and respawns and enforce the
         assert.ok(match.recordDeath(ids[1], ids[2]).ok);
         world.spawn(match.respawn(ids[1]).actor);
         checkFleet();
+        finishMatchDeployment(world);
         const actor = world.actors()[0];
         // Find an open section of this site's boundary; propulsion and terrain
         // contact use the same MatchWorld.step as the browser host.

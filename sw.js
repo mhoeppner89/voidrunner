@@ -2,7 +2,7 @@
 // and any future code-split modules enter this cache when the app requests
 // them, instead of blocking the first service-worker install on every asset
 // in the game.
-const CACHE = 'voidrunner-v719-multiplayer-bot-ai';
+const CACHE = 'voidrunner-v722-jump-arrivals';
 
 // Static title imports and the first room for an offline return. Flight code
 // and optional models enter the release cache when a session requests them.
@@ -78,6 +78,7 @@ const CORE_ASSETS = [
   './src/game/ordnanceMarkers.js',
   './src/game/capitalMarkerCount.js',
   './src/game/corvetteMounts.js',
+  './src/game/skidbladnirMounts.js',
   './src/game/cruiserModelData.js',
   './src/game/audio.js',
   './src/game/arenaRun.js',

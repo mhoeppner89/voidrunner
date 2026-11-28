@@ -2268,3 +2268,23 @@ Download/startup optimization: cold Pixel 7 measurements found unused capital hu
 - A bot tracks a visible opponent and searches from the last sighting after losing contact. The host owns bot input and movement. Shared combat state stays local to the host.
 - The seeded combat checks recorded hits from every bot at every Arena site. The 2v2 fixture split the two allied bots into pressure and flank roles. Three skill levels reacted to an inbound shot with the Arena timing.
 - Verified the packed build in desktop Chromium free-for-all, iPhone WebKit 2v2, and a linked desktop-to-iPhone browser 2v2 with two humans and two bots. The solo tests covered fire, refits, relaunch and rematches. The mixed test reached results on both browsers and rematched.
+
+## Frigate carrier wings
+
+- Astra 6.2 modeled the League Skidbladnir from the provided carrier reference, with three open hangars on each side. Its GLB, physical collision and subsystem surfaces, and target monitor schematic use the same asset path as the existing frigates.
+- Skidbladnir launches six Lokis and Red Brigid launches two Balors. Each bay keeps one living fighter registered. Fighter destruction starts that bay's 30-second replacement clock. Destroyed bays and carriers stop launching. Fighters already in flight keep fighting.
+- Arena Run's Veteran wing ends with Skidbladnir. League patrols can field it in high-danger lanes. Both carriers share launch logic in Career, Arena Run and Spectator. Career saves preserve live berths and replacement deadlines.
+- All 1,789 automated tests and the packed build passed. Desktop Chromium and iPhone WebKit verified the rendered hangars, target monitor, six-fighter deployment, disabled-bay appearance, and 30-second replacement. A desktop Arena run reached six simultaneous live fighters in Shardbelt Chimney.
+
+## Red Brigid’s four hangars
+
+- Astra 6.2 rebuilt the pirate conversion with two open, numbered hangars per side. Each has a fixed, damageable bulkhead and room for an unscaled Balor.
+- Balors appear inside their bay, accelerate through its mouth on a carrier-local rail, then begin normal flight. The rail follows carrier movement and survives career checkpoint reloads. There are four slots, with the same 30-second replacement rule.
+- Old two-bay checkpoints map live fighters and remaining timers to the first berth on each side and carry old bay damage across both new hangars on that side.
+- All 1,793 automated checks and the packed build passed. Chromium and iPhone WebKit deployed four Balors through their own bays. The cockpit recording under `output/red-brigid` shows the first fighter at its original scale crossing the hangar mouth and entering free flight.
+
+## Hyperdrive arrivals
+
+- Ships arriving in view use a short inbound streak and flash at their existing spawn point. Career traffic and pursuers, Arena reinforcements, Spectator fleets and multiplayer pilots use the same effect. Carrier bays, station departures and race grids keep their physical launch paths.
+- Practice and multiplayer pilots spend two seconds in hyperdrive before controls resume. Arena Run uses the final two seconds of its existing countdown. The multiplayer host reserves each spawn point, holds the opening clock, and keeps jumping pilots out of collision and weapons checks until arrival. Relaunches use the same protected entry while the round continues.
+- All 1,796 automated checks and the packed build passed. Verified the cockpit, traffic and Spectator views on desktop Chromium, Android Chrome and iPhone WebKit. A linked desktop-to-iPhone browser match verified the opening jump, phone controls, scoring, refit and relaunch, then a mixed human and bot rematch.

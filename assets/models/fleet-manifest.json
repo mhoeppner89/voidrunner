@@ -289,7 +289,7 @@
       "id": "rookery",
       "variant": "rookery",
       "path": "assets/models/capital/rookery.glb",
-      "sha256": "66f61a2b45f8c929fc405a4bb65820a5b28034d6fc1be1bd33d361dabfc99998",
+      "sha256": "ce35f0bfc4216492c334b77d69cea4d4d855424779670bf0ca34df52f05ed274",
       "category": "capital",
       "factions": [
         "pirates"

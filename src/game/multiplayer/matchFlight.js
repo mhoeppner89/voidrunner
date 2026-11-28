@@ -57,10 +57,13 @@ export class MatchFlight {
         }
         controller.remainingSeconds = snapshot.remainingSeconds;
         const me = snapshot.actors.find(actor => actor.id === controller.localId);
+        const enteredJump = me?.deployTicks > 0 && me.life !== this.me?.life;
+        const exitedJump = me && me.life === this.me?.life && this.me.deployTicks > 0 && me.deployTicks === 0;
+        if (exitedJump) session.finishDeployment();
         this.me = me;
         this.updateLocalPilot(me);
         const oldShips = new Map(session.ships.map(ship => [ship.id, ship]));
-        session.ships = snapshot.actors.filter(actor => actor.id !== controller.localId).map(actor => {
+        session.ships = snapshot.actors.filter(actor => actor.id !== controller.localId && !(actor.deployTicks > 0)).map(actor => {
             const previous = oldShips.get(actor.id);
             const livePrevious = previous?.life === actor.life ? previous : undefined;
             const team = controller.localPilot()?.team;
@@ -69,6 +72,7 @@ export class MatchFlight {
                 ...actor, matchPilot: true, identifiedByPlayer: true, scanned: true,
                 role: hostile ? 'pirate' : 'patrol', hostile, faction: factionFor(actor, team),
                 arenaFriendlyObjective: !hostile, playerSensorAwareness: 1,
+                jumpArrivalAt: livePrevious ? livePrevious.jumpArrivalAt : snapshot.tick * MATCH_STEP,
                 engineThrust: actor.throttle, burning: actor.afterburning,
                 prevPosition: livePrevious?.position ?? actor.position,
                 prevRotation: livePrevious?.rotation ?? actor.rotation,
@@ -77,6 +81,7 @@ export class MatchFlight {
             };
         });
         this.updateProjectiles(snapshot.projectiles);
+        return enteredJump || exitedJump;
     }
 
     updateLocalPilot(me) {
@@ -176,9 +181,11 @@ export class MatchFlight {
         const actions = session.input.getActions();
         if (actions.pause || (!modal && this.me && (actions.shipMenu || actions.map || actions.controllerDisconnected)))
             this.controller.flightMenu();
-        const flying = this.controller.live && this.me && !session.ui.isModalOpen && document.hasFocus();
+        const flying = this.controller.live && this.me && !(this.me.deployTicks > 0)
+            && !session.ui.isModalOpen && document.hasFocus();
         if (flying) session.ui.updateCockpitKit(dt, actions);
-        if (this.controller.live && this.me) this.sendInput(flying ? actions : {}, session.save.settings, now);
+        if (this.me?.deployTicks > 0) this.pendingActions = {};
+        else if (this.controller.live && this.me) this.sendInput(flying ? actions : {}, session.save.settings, now);
         if (this.matchTick < 0) return;
         this.updateAudio(dt);
         // Render between the two latest host snapshots. Local input continues
@@ -224,6 +231,7 @@ export class MatchFlight {
         updateMissileWarning(audioFlight, alive ? session.projectiles : null, session.projStore, player, session.audio.outputLatency?.() ?? 0);
         if (audioFlight.missileBreak) session.ui.flashBreakCue?.();
         audioFlight.speed = Math.min(1.4, Math.hypot(...player.velocity) / Math.max(1, stats.maxSpeed));
+        audioFlight.hyper = this.me?.deployTicks > 0;
         audioFlight.shield = player.shield / Math.max(1, stats.shield);
         const hostileLock = Math.max(0, ...session.ships.filter(ship => ship.hostile && ship.targetId === this.controller.localId).map(ship => ship.lockProgress));
         audioFlight.lockState = audioFlight.trackingMissile ? 'missile' : hostileLock === 1 ? 'locked' : hostileLock > 0 ? 'acquiring' : 'off';

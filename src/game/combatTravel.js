@@ -60,7 +60,7 @@ export function updateLocalPursuit(session) {
         ship.arrivalSignatureUntil=time+12;ship.pursuitLeaseUntil=time+45;
         new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,-1),new THREE.Vector3(...jump.target).sub(new THREE.Vector3(...ship.position)).normalize()).toArray(ship.rotation);
         if(ship.prevRotation)for(let i=0;i<4;i++)ship.prevRotation[i]=ship.rotation[i];
-        session.renderer?.spawnHyperdriveStreak?.(ship.position,jump.target.map((v,i)=>v-ship.position[i]),0xf0b66b);
+        ship.jumpArrivalAt=time;
         delete ship.jumpPursuit;
         session.setMonitorStatus(t('PURSUERS ARRIVING'),2600);
     }
