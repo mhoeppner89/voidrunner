@@ -9849,6 +9849,17 @@ dealer's tabs, or its two-column showroom) used to stretch the whole dock to
 #game-shell[data-cockpit-paint] .touch-left .touch-throttle::before{content:none}
 #game-shell[data-cockpit-paint] .painted-throttle-rail{display:block;position:absolute;left:25%;top:0;width:50%;height:100%;border:1px solid var(--console-brass);border-radius:3px;background:repeating-linear-gradient(to top,var(--cockpit-throttle-bg) 0 14px,var(--cockpit-throttle-tick) 15px,var(--cockpit-throttle-bg) 16px);pointer-events:none;overflow:visible}
 #game-shell[data-cockpit-paint] .painted-throttle-rail .touch-throttle-thumb{left:-3px;right:-3px;background:linear-gradient(var(--cockpit-lever-hi),var(--cockpit-lever-lo));border:1px solid var(--cockpit-lever-edge);box-shadow:none}
+/* These controls cross the height of a landscape camera cutout. Offset their
+   entire touch targets while keeping the painted stick on its fixed mount. */
+@media (orientation:landscape) and (pointer:coarse), (orientation:landscape) and (max-width:900px) {
+  #game-shell[data-cockpit-touch=true] .touch-left .touch-throttle {
+    left:max(0px, calc(env(safe-area-inset-left, 0px) - 3px));
+  }
+  #game-shell[data-cockpit-touch=true] .touch-right :is(.touch-boost-right, .touch-fire) {
+    position:relative;
+    right:max(0px, calc(env(safe-area-inset-right, 0px) - 3px));
+  }
+}
 #game-shell[data-cockpit-paint] .hud-corner-buttons button,
 #game-shell[data-cockpit-paint] #hud-wing-tactics .hud-wing-btn{border:2px solid var(--cockpit-control-edge);border-radius:6px;background:linear-gradient(145deg,var(--cockpit-control-hi),var(--cockpit-control-bg) 65%,var(--cockpit-control-low));box-shadow:inset 0 1px var(--cockpit-control-glint),inset 0 -3px var(--cockpit-control-shadow),0 2px 2px #0008;color:var(--cockpit-control-ink);text-shadow:none;font-family:var(--flight-font)}
 #game-shell[data-cockpit-paint] .hud-corner-buttons button:is(:active,.is-active),

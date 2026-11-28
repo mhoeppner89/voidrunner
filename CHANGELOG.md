@@ -1,3 +1,23 @@
+## 0.8.2qg — Flight performance and room recovery
+
+- Build the same NPC routes with fewer terrain calculations and avoid temporary vectors in Career location checks.
+- Restart multiplayer rooms cleanly after a guest leaves during startup, a roster update or a rematch. Share one encoding of each match snapshot across guests.
+- Use a lightweight controller discovery timer when no controller is present. A connected controller keeps its existing input cadence.
+- Reuse depth and colour targets, skip invisible effects, and avoid an off-screen Azure ring pass.
+
+## 0.8.2qf — Flight rendering and multiplayer impacts
+
+- Apply flight resolution changes at the start of the next draw so the previous frame stays visible.
+- Separate colliding multiplayer ships and keep terrain impacts from corrupting ship positions.
+- Show fighter debris after multiplayer kills using the Arena breakup effects.
+- Keep painted cockpit touch controls clear of landscape camera cutouts.
+- Stop iOS text selection and long-press menus from interrupting the flight stick and throttle.
+
+## 0.8.2qe — Nearby rooms in installed apps
+
+- Installed builds open the full game from bundled assets. Their multiplayer menu discovers nearby Voidrunner rooms over Wi‑Fi and lets you join by tapping a room.
+- Native apps use the same match rules and ship controls as the browser game. The device that creates the room runs the match.
+
 ## 0.8.2qd — LAN multiplayer
 
 - Play free-for-all or 2v2 on the same Wi-Fi, with one browser hosting and up to three guests. The host picks any Arena site and a five- or ten-minute round. Team deathmatch has a friendly-fire setting.

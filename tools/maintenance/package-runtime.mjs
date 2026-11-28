@@ -1,5 +1,5 @@
 import {execFileSync} from 'node:child_process';
-import {access, cp, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile} from 'node:fs/promises';
+import {access, chmod, cp, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile} from 'node:fs/promises';
 import {basename, dirname, join, relative, resolve, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {gzipSync} from 'node:zlib';
@@ -84,6 +84,8 @@ await mkdir(scratch,{recursive:true});
 const output = await mkdtemp(join(scratch,'runtime-build-'));
 try {
     await packageRuntime(output);
+    // Native resource copies preserve the staging directory's mode.
+    await chmod(output, 0o755);
     await rm(resolve('dist'),{recursive:true,force:true});
     await rename(output,resolve('dist'));
     console.log('Packaged game runtime in dist/.');

@@ -3,10 +3,12 @@ import {createServer} from 'node:http';
 // Disconnect a test-only origin instead of toggling the browser-wide offline
 // flag: WebKit's automation backend can fail navigation internally with that
 // flag before its service worker gets to handle the request.
-export async function createOfflineTestOrigin(base){
+export async function createOfflineTestOrigin(base, fixtures = new Map()){
  let stallGameModule=false;const stalled=new Set();
  const server=createServer(async(req,res)=>{
-  if(stallGameModule&&new URL(req.url,'http://test').pathname==='/src/game/game.js'){stalled.add(res);res.once('close',()=>stalled.delete(res));return;}
+  const pathname=new URL(req.url,'http://test').pathname;
+  if(stallGameModule&&pathname==='/src/game/game.js'){stalled.add(res);res.once('close',()=>stalled.delete(res));return;}
+  if(fixtures.has(pathname)){res.writeHead(200,{'content-type':'text/html; charset=utf-8'});res.end(fixtures.get(pathname));return;}
   try{const response=await fetch(base+req.url);res.writeHead(response.status,{'content-type':response.headers.get('content-type')??'application/octet-stream'});res.end(Buffer.from(await response.arrayBuffer()));}
   catch{if(!res.destroyed){res.writeHead(502);res.end('Preview upstream unavailable');}}
  });

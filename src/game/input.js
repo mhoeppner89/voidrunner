@@ -293,7 +293,17 @@ export class InputManager {
         this.touchBindings.push([target, type, listener, options]);
     }
     bindTouchControls() {
+        const stick = this.root.querySelector('[data-touch-stick]');
         const throttle = this.root.querySelector('[data-touch-throttle]');
+        // WebKit can start its text loupe on a held finger even when the
+        // pointerdown was handled. These analog pads use Pointer Events.
+        const preventNativeHold = event => event.preventDefault();
+        for (const pad of [stick, throttle]) {
+            if (!pad) continue;
+            this.addTouchListener(pad, 'touchstart', preventNativeHold, { passive: false });
+            this.addTouchListener(pad, 'selectstart', preventNativeHold);
+            this.addTouchListener(pad, 'contextmenu', preventNativeHold);
+        }
         const thumb = this.root.querySelector('[data-touch-throttle-thumb]');
         if (throttle && thumb) {
             const update = (event) => {
@@ -352,7 +362,6 @@ export class InputManager {
                     release(event);
             });
         });
-        const stick = this.root.querySelector('[data-touch-stick]');
         const knob = this.root.querySelector('[data-touch-stick-knob]');
         if (stick && knob) {
             this.joystickKnob = knob;

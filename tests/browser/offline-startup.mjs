@@ -1,6 +1,6 @@
 import {chromium,webkit,devices} from 'playwright';
 import {existsSync} from 'node:fs';
-import {mkdir,writeFile,readFile} from 'node:fs/promises';
+import {mkdir,writeFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {createOfflineTestOrigin} from '../helpers/offline-origin.mjs';
 import {paintedCockpitAssets} from '../../src/game/cockpitDefinitions.js';
@@ -10,17 +10,21 @@ await isolateBrowserHulls(import.meta.url);
 import {fleetPaintPath} from '../../src/game/fleetPaintCatalog.js';
 
 const base=(process.env.VR_BASE_URL??'http://127.0.0.1:4192').replace(/\/$/,'');
+const worker=await fetch(base+'/sw.js');
+assert.ok(worker.ok, 'The game server must serve its service worker');
+const currentCache=(await worker.text()).match(/const CACHE = '([^']+)'/)?.[1];
+assert.ok(currentCache, 'The served worker must declare a release cache');
 const hulls=(process.env.VR_COCKPIT_HULLS??process.env.VR_COCKPIT_HULL??'wayfarer').split(',');
 for(const hull of hulls){
 const sourceCockpitAssets=paintedCockpitAssets(hull).map(url=>'assets/'+new URL(url).pathname.split('/assets/').at(-1));
 const modelAssets=[`assets/models/ships/${hull}.glb`,...(hull==='scrapper'?['concord','alliance','independents'].map(paint=>fleetPaintPath(hull,paint)):[])];
 const out=`output/offline-startup/${hull}`;await mkdir(out,{recursive:true});
-const currentCache=(await readFile(new URL('../../sw.js',import.meta.url),'utf8')).match(/const CACHE = '([^']+)'/)[1];
-await writeFile(`${out}/report-fixture.html`,'<!doctype html><title>Cached QA report</title><h1>Cached QA report</h1>');
+const reportPath=`/${out}/report-fixture.html`;
+const fixtures=new Map([[reportPath,'<!doctype html><title>Cached QA report</title><h1>Cached QA report</h1>']]);
 const profiles=[['desktop',chromium,{viewport:{width:1440,height:900}}],['android',chromium,devices['Pixel 7 landscape']],['iphone',webkit,devices['iPhone 13 landscape']]].filter(([name])=>!process.env.VR_PROFILES||process.env.VR_PROFILES.split(',').includes(name));
 const report=[];
 for(const [name,engine,device] of profiles){
- const origin=await createOfflineTestOrigin(base);
+ const origin=await createOfflineTestOrigin(base,fixtures);
  const browser=await engine.launch({headless:true,...(engine===chromium?{...(existsSync('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')?{executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'}:{}),args:['--no-sandbox','--disable-gpu-sandbox','--mute-audio','--use-gl=angle','--use-angle=swiftshader']}:{})});
  try{
   // Intentionally allow service workers and omit startup-probe. The other
@@ -76,7 +80,7 @@ for(const [name,engine,device] of profiles){
   const chapterCount=await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().tutorialSummary().chapterCount);assert.equal(chapterCount,6);
   await page.waitForFunction(async ({name,modelAssets,cockpitAssets})=>{if(!(await caches.keys()).includes(name))return false;const c=await caches.open(name);return(await Promise.all(['art/locations/simplified/helix-hd-v1.webp','art/portraits/simplified/rin-vek-hd-v1.webp',...modelAssets,'assets/fonts/void-vga-text.ttf',...cockpitAssets,'src/game/cockpitArtwork.js','src/game/cockpitDefinitions.js','src/game/retroDisplay.js','src/game/pixelResolve.js','src/game/illustratedLighting.js'].map(p=>c.match(new URL(p,document.baseURI))))).every(Boolean);},{name:currentCache,modelAssets,cockpitAssets});
   // Cache a real report, then prove an unvisited report is not the game.
-  phase='report navigation';await page.goto(`${origin.url}/${out}/report-fixture.html`);await page.locator('h1').filter({hasText:'Cached QA report'}).waitFor();
+  phase='report navigation';await page.goto(origin.url+reportPath);await page.locator('h1').filter({hasText:'Cached QA report'}).waitFor();
   await page.waitForFunction(async name=>Boolean(await(await caches.open(name)).match(location.href)),currentCache);
   phase='offline reports';await origin.disconnect();await page.reload();assert.equal(await page.title(),'Cached QA report');
   const unavailable=await page.goto(`${origin.url}/${out}/never-visited/index.html`);assert.equal(unavailable.status(),503);assert.equal(await page.title(),'Page unavailable offline');assert.equal(await page.locator('#app').count(),0);await page.screenshot({path:`${out}/${name}-uncached-report.png`});

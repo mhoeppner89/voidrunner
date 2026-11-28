@@ -172,6 +172,20 @@ test('ring bounds reject offscreen ray marching and keep overhead and inside-rin
     r.camera.lookAt(0,0,2000);r.render();assert.equal(calls,5,'scene, three bloom passes and composite only');
     calls=0;r.camera.lookAt(0,0,0);r.render();assert.equal(calls,6,'visible ring adds its volume pass');
     calls=0;r.camera.position.set(200,0,0);r.camera.lookAt(200,100,0);r.render();assert.equal(calls,6,'horizontal inside-ring view retains its volume');
+    calls=0;r.camera.position.set(0,0,150);r.camera.lookAt(0,0,300);r.render();
+    assert.ok(r.viewFrustum.intersectsSphere(volume.bounds));
+    assert.equal(calls,5,'looking away above the ring skips its full-screen pass');
+    r.ringParticles.update=()=>true;calls=0;r.render();
+    assert.equal(calls,7,'a lingering cockpit particle still composites over the scene');
+    r.ringParticles.update=()=>false;
+    r.qualityMode='low';calls=0;r.render();
+    assert.equal(calls,2,'Low uses the scene and colour resolve only');
+    assert.equal(r.pixelSceneTarget,undefined,'switching off bloom reuses the existing HDR colour and depth');
+    assert.equal(r.bloomCompositeMaterial.uniforms.tScene.value,r.bloomSceneTarget.texture);
+    assert.equal(r.bloomCompositeMaterial.uniforms.tDepth.value,r.bloomSceneTarget.depthTexture);
+    assert.equal(r.bloomCompositeMaterial.uniforms.uStrength.value,0);
+    r.qualityMode='high';calls=0;r.render();
+    assert.equal(calls,5);assert.equal(r.bloomCompositeMaterial.uniforms.uStrength.value,.6);
     r.ringVolumeTarget?.dispose();volume.mesh.geometry.dispose();volume.mesh.material.dispose();
 });
 test('steady engine settings stop adding audio automation, changes still apply',()=>{

@@ -5,6 +5,7 @@ import { MENU_CONTROLLER_BINDINGS as DEFAULT_MENU, CONTROLLER_BUTTON_LABELS } fr
 const CONTROLS = 'button, a[href], input, select, textarea, summary, [role="button"], [role="tab"], [tabindex="0"]';
 const PANELS = ['#rotate-notice', '#new-career-panel', '#pause-panel', '#adventure-panel', '#story-panel', '#chat-panel', '#ship-panel', '#map-panel', '#arena-panel', '#observer-panel', '#multiplayer-panel', '#title-screen', '#dock-screen'];
 const BACK = ['cancel-new-career', 'close-options', 'resume-flight', 'close-chat', 'close-ship', 'close-map', 'close-story', 'adventure-exit', 'close-arena', 'observer-exit', 'multiplayer-back'];
+const IDLE_PAD_CHECK_MS = 125;
 const visible = element => Boolean(element && !element.disabled && !element.closest('[hidden], .is-hidden, [inert]') && element.getClientRects().length);
 
 // One lightweight UI poller survives title/session changes. Flight input stays
@@ -30,7 +31,28 @@ export class ControllerUI {
         window.addEventListener('keydown', this.onBindingKey, true);
         window.addEventListener('blur', this.onBlur);
         this.tick = this.tick.bind(this);
-        this.frame = requestAnimationFrame(this.tick);
+        this.onGamepadChange = () => this.requestPollFrame();
+        this.onVisibility = () => {
+            if (document.hidden) this.stopPolling();
+            else this.requestPollFrame();
+        };
+        window.addEventListener('gamepadconnected', this.onGamepadChange);
+        window.addEventListener('gamepaddisconnected', this.onGamepadChange);
+        document.addEventListener('visibilitychange', this.onVisibility);
+        this.requestPollFrame();
+    }
+
+    requestPollFrame() {
+        if (document.hidden) return;
+        clearTimeout(this.pollTimer);
+        this.pollTimer = undefined;
+        this.frame ??= requestAnimationFrame(this.tick);
+    }
+
+    stopPolling() {
+        cancelAnimationFrame(this.frame);
+        clearTimeout(this.pollTimer);
+        this.frame = this.pollTimer = undefined;
     }
     get blocksFlight() {
         return Boolean(this.bindingCapture || this.bindingTest) || visible(this.ui.planetTransitOverlay) || visible(this.root.querySelector('#loading-screen'));
@@ -39,6 +61,7 @@ export class ControllerUI {
         this.cancelBinding('');
         this.bindingCapture={context,action,ready:false,padId:undefined};
         this.armed=false;
+        this.requestPollFrame();
         this.ui.renderControllerBindings();
         const button=this.root.querySelector(`[data-ui-command="controller-bind"][data-binding-context="${context}"][data-binding-action="${action}"]`);
         if(button){button.textContent=t('Press a button…');button.classList.add('is-capturing');this.focus(button);}
@@ -55,6 +78,7 @@ export class ControllerUI {
     }
     startButtonTest() {
         this.cancelBinding('');this.bindingTest=true;this.testReady=false;this.armed=false;
+        this.requestPollFrame();
         this.ui.renderControllerBindings();
         this.ui.controllerBindingStatus(t('Press buttons to test. Back or Esc ends the test.'));
     }
@@ -163,10 +187,24 @@ export class ControllerUI {
         }
     }
     tick(now) {
-        this.frame = requestAnimationFrame(this.tick);
-        if (now - (this.lastPoll ?? 0) < 32 || document.hidden) return;
+        this.frame = undefined;
+        if (document.hidden) return;
+        if (now - (this.lastPoll ?? -Infinity) < 32) {
+            this.requestPollFrame();
+            return;
+        }
         this.lastPoll = now;
         const pad = connectedGamepad(this.padIndex);
+        if (pad) this.requestPollFrame();
+        else {
+            // Some embedded browsers expose a pad only after its first input.
+            // Keep discovery as a timer so a touch-only device needs no frame
+            // callbacks, including when the title or a pause menu is idle.
+            this.pollTimer = setTimeout(() => {
+                this.pollTimer = undefined;
+                this.tick(performance.now());
+            }, IDLE_PAD_CHECK_MS);
+        }
         // The settings panel starts with the disconnected message. Revisit it
         // on disconnect or during assignment, without polling the DOM in flight.
         if (!pad && this.padIndex === undefined && !this.bindingCapture && !this.bindingTest) return;
@@ -279,11 +317,14 @@ export class ControllerUI {
         if (scroll) this.scroll(scope, scroll * 22);
     }
     dispose() {
-        cancelAnimationFrame(this.frame);
+        this.stopPolling();
         this.clearFocus();
         this.root.removeEventListener('pointerdown', this.onPointer);
         this.root.removeEventListener('keydown', this.onPointer);
         window.removeEventListener('blur', this.onBlur);
         window.removeEventListener('keydown', this.onBindingKey, true);
+        window.removeEventListener('gamepadconnected', this.onGamepadChange);
+        window.removeEventListener('gamepaddisconnected', this.onGamepadChange);
+        document.removeEventListener('visibilitychange', this.onVisibility);
     }
 }

@@ -123,7 +123,7 @@ const forecastOrientation = new THREE.Quaternion(), escapeOrientation = new THRE
 const FORWARD = new THREE.Vector3(0, 0, -1);
 const UP = new THREE.Vector3(0, 1, 0);
 const RIGHT = new THREE.Vector3(1, 0, 0);
-const npcDistanceSq = (from, point) => {
+const tupleDistanceSq = (from, point) => {
     const dx = point[0] - from[0];
     const dy = point[1] - from[1];
     const dz = point[2] - from[2];
@@ -2701,11 +2701,11 @@ export class GameSession {
         if(Number.isInteger(target.mount)&&capitalHull(this.ships.find(s=>s.id===target.id)??{})?.mounts[target.mount]?.targetable)this.capitalSubtarget={id:target.id,index:target.mount};
     }
     updateActiveInstance(force = false) {
-        const player = vec(this.save.player.position);
+        const player = this.save.player.position;
         let next;
         let nearestDistance = Number.POSITIVE_INFINITY;
         for (const id of this.currentNavLocationIds()) {
-            const distance = player.distanceTo(vec(LOCATIONS[id].position));
+            const distance = Math.sqrt(tupleDistanceSq(player, LOCATIONS[id].position));
             if (distance <= locationInstanceRadius(id) && distance < nearestDistance) {
                 next = id;
                 nearestDistance = distance;
@@ -5200,7 +5200,7 @@ export class GameSession {
             const lock=this.rackLocks?.get(key);
             if(!entry.rounds||!lock||lock.target.id!==targetId||
                 this.launcherReadyAt?.[`${p.shipId}:${key}`]>this.save.world.time||
-                npcDistanceSq(p.position,lock.target.position)>entry.launcher.lockRange**2)continue;
+                tupleDistanceSq(p.position,lock.target.position)>entry.launcher.lockRange**2)continue;
             if(mode==='together'){
                 if(lock.tooFast)return true;
             }else{
@@ -6713,7 +6713,7 @@ export class GameSession {
     targetableRepairDrone(id) {
         const unit = this.npcDroneUnits?.[id];
         if (unit?.targetable && unit.hull > 0 && unit.position && unit.state !== 'stowed' &&
-            npcDistanceSq(unit.position, this.save.player.position) <= this.playerStats().radarRange ** 2) return unit;
+            tupleDistanceSq(unit.position, this.save.player.position) <= this.playerStats().radarRange ** 2) return unit;
     }
     droneContact(unit) {
         return {kind:'drone', id:unit.id, position:unit.position, name:t('Repair Drone')};
@@ -7911,7 +7911,7 @@ export class GameSession {
         if (!ship?.pilot || player.dockedAt || this.arena?.observer || !this.chatterOpen()
             || this.ui?.isModalOpen
             || this.save.world.time < (this.tutorialRadioUntil ?? 0)
-            || npcDistanceSq(ship.position, player.position) > 1500 ** 2) return;
+            || tupleDistanceSq(ship.position, player.position) > 1500 ** 2) return;
         const lines = TACTICAL_LINES[event];
         const sequence = this.tacticalLineSequence ?? 0;
         let index = ((ship.portraitIndex ?? 0) + sequence) % lines.length;
@@ -9143,7 +9143,7 @@ export class GameSession {
             for (const entry of this.ships) {
                 if (entry.targetId !== ship.id || !npcTargetIsValid(this, ship, entry, observerCombat, true))
                     continue;
-                const distance = npcDistanceSq(ship.position, entry.position);
+                const distance = tupleDistanceSq(ship.position, entry.position);
                 if (entry.id === ship.targetId) {
                     currentAttacker = entry;
                     currentDistSq = distance;
@@ -9194,7 +9194,7 @@ export class GameSession {
             let bestDistSq = Infinity;
             if (!observerCombat && hunter && playerAvailable && this.shipTracksPlayer(ship)) {
                 nearest = 'player';
-                bestDistSq = npcDistanceSq(ship.position, this.save.player.position);
+                bestDistSq = tupleDistanceSq(ship.position, this.save.player.position);
             }
             for (const entry of this.ships) {
                 if (!npcTargetIsValid(this, ship, entry, observerCombat))
@@ -9203,7 +9203,7 @@ export class GameSession {
                     && !this.canSee(ship.position, entry.position, entry.dark, npcSpeed(entry.velocity), entry.speed)
                     && !(entry.targetId === 'player' && this.shipTracksPlayer(ship)))
                     continue;
-                const distance = npcDistanceSq(ship.position, entry.position);
+                const distance = tupleDistanceSq(ship.position, entry.position);
                 if (distance < bestDistSq) {
                     bestDistSq = distance;
                     nearest = entry;
@@ -10381,7 +10381,7 @@ export class GameSession {
                 if(candidate===ship||candidate.instanceId!==ship.instanceId)continue;
                 if(ship.arenaRunWingman||ship.tutorialCompanion){
                     if(ship.wingOrder!=='aggressive'||!candidate.hostile||
-                        npcDistanceSq(player.position,candidate.position)>WING_ORDER_GATE.aggressive.acquire**2)continue;
+                        tupleDistanceSq(player.position,candidate.position)>WING_ORDER_GATE.aggressive.acquire**2)continue;
                 }else if(ship.arenaRunEnemy){
                     if(!candidate.arenaRunWingman&&!candidate.arenaFriendlyObjective)continue;
                 }else if(!npcTargetIsValid(this,ship,candidate,!!ship.observerTeam,true))continue;
@@ -12472,7 +12472,7 @@ export class GameSession {
         const player=this.save.player.position;
         for(const ship of this.ships){
             if(ship.hull>0&&!ship.surrendered&&!ship.captured&&(ship.frigateEncounterId||TRAFFIC_HULLS[ship.variant]?.capitalClass==='frigate')&&
-                npcDistanceSq(ship.position,player)<ENCOUNTER_LOCK_RADIUS**2)return true;
+                tupleDistanceSq(ship.position,player)<ENCOUNTER_LOCK_RADIUS**2)return true;
         }
         return false;
     }
@@ -12481,7 +12481,7 @@ export class GameSession {
         const player = this.save.player.position;
         return !this.ships.some(ship => ship.hull > 0 && !ship.captured && !ship.surrendered &&
             (ship.hostile || TRAFFIC_HULLS[ship.variant]) &&
-            npcDistanceSq(ship.position, player) < ENCOUNTER_LOCK_RADIUS ** 2);
+            tupleDistanceSq(ship.position, player) < ENCOUNTER_LOCK_RADIUS ** 2);
     }
     leagueTrafficOptions(role,locationId,rng) {
         const location=LOCATIONS[locationId],systemId=this.save.player.systemId;
@@ -12945,12 +12945,12 @@ export class GameSession {
     updateDiscovery() {
         if (this.arena)
             return;
-        const player = vec(this.save.player.position);
+        const player = this.save.player;
         for (const id of this.currentNavLocationIds()) {
             const location = LOCATIONS[id];
             const discoveryRadius = location.radius + (location.kind === 'planet' ? 160 : 120);
-            if (player.distanceTo(vec(location.position)) <= discoveryRadius && !this.save.player.discovered.includes(id)) {
-                this.save.player.discovered.push(id);
+            if (Math.sqrt(tupleDistanceSq(player.position, location.position)) <= discoveryRadius && !player.discovered.includes(id)) {
+                player.discovered.push(id);
                 this.ui.pushSensor(t('NAV DISCOVERY: {name}', { name: location.name }), 'success', 4600);
                 this.audio.play('discovery');
             }
@@ -13327,6 +13327,10 @@ export class GameSession {
         return (this.save.world.underworld?.[locationId] ?? 0) >= SYNDICATE_DEN_FAVOR;
     }
     activeDockObstacle() {
+        // Every visibility ray checks the active dock. Fields and open space
+        // have no dock radius, so they need no copy or search of the port list.
+        if (!LOCATIONS[this.activeInstanceId]?.dockRadius)
+            return undefined;
         const dockLocation = this.currentDockLocationIds().find((id) => id === this.activeInstanceId);
         if (!dockLocation)
             return undefined;
@@ -13504,18 +13508,24 @@ export class GameSession {
         // Class fields initialize these in the real constructor, but headless
         // harnesses build sessions via Object.create — keep the box path robust
         // to whatever the caller left on the instance.
-        if (!(this.tmpEntryQuaternion instanceof THREE.Quaternion))
-            this.tmpEntryQuaternion = new THREE.Quaternion();
         if (!(this.tmpEntryInverseQuaternion instanceof THREE.Quaternion))
             this.tmpEntryInverseQuaternion = new THREE.Quaternion();
         this.tmpEntryLocal ??= new THREE.Vector3();
         const clearanceSq = clearance * clearance;
+        const padding = Math.abs(clearance) + 1e-6;
         for (const obstacle of obstacles) {
+            const ox = position.x - obstacle.x;
+            const oy = position.y - obstacle.y;
+            const oz = position.z - obstacle.z;
             if (obstacle.box) {
                 const box = obstacle.box;
-                this.tmpEntryQuaternion.set(box.qx, box.qy, box.qz, box.qw);
-                this.tmpEntryInverseQuaternion.copy(this.tmpEntryQuaternion).invert();
-                this.tmpEntryLocal.set(position.x - obstacle.x, position.y - obstacle.y, position.z - obstacle.z).applyQuaternion(this.tmpEntryInverseQuaternion);
+                // The sum bounds the projection of all three half-extents onto
+                // any world axis, even for a thin wreck rotated across the path.
+                const reach = box.hx + box.hy + box.hz + padding;
+                if (Math.abs(ox) > reach || Math.abs(oy) > reach || Math.abs(oz) > reach)
+                    continue;
+                this.tmpEntryInverseQuaternion.set(box.qx, box.qy, box.qz, box.qw).invert();
+                this.tmpEntryLocal.set(ox, oy, oz).applyQuaternion(this.tmpEntryInverseQuaternion);
                 const closestX = clamp(this.tmpEntryLocal.x, -box.hx, box.hx);
                 const closestY = clamp(this.tmpEntryLocal.y, -box.hy, box.hy);
                 const closestZ = clamp(this.tmpEntryLocal.z, -box.hz, box.hz);
@@ -13526,11 +13536,8 @@ export class GameSession {
                     return false;
             }
             else {
-                const dx = position.x - obstacle.x;
-                const dy = position.y - obstacle.y;
-                const dz = position.z - obstacle.z;
                 const minimum = obstacle.collisionRadius + clearance;
-                if (dx * dx + dy * dy + dz * dz < minimum * minimum)
+                if (ox * ox + oy * oy + oz * oz < minimum * minimum)
                     return false;
             }
         }

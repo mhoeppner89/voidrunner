@@ -2,6 +2,7 @@ import { t } from '../i18n.js';
 import { createMultiplayerMatch } from './matchRules.js';
 import { createStarterPilotFitting } from './pilotFitting.js';
 import { PeerLink, roomTokenFromUrl } from './peerLink.js';
+import { NativeLink, nativeBridgeAvailable } from './nativeLink.js';
 import { MatchWorld } from './matchWorld.js';
 import { MatchFlight } from './matchFlight.js';
 import { MultiplayerView, matchClock } from './multiplayerView.js';
@@ -28,13 +29,16 @@ export class Multiplayer {
         this.joinCode = '';
         this.reply = '';
         this.remainingSeconds = 0;
+        this.native = nativeBridgeAvailable();
+        this.nativeRooms = [];
     }
 
     open(fromInvite) {
         if (this.link) return;
-        this.roomToken = fromInvite ? roomTokenFromUrl() : undefined;
+        this.roomToken = !this.native && fromInvite ? roomTokenFromUrl() : undefined;
         this.screen = this.roomToken ? 'join' : 'welcome';
         this.status = '';
+        if (this.native) this.makeLink('guest').browse();
         this.render();
     }
 
@@ -78,6 +82,19 @@ export class Multiplayer {
         if (action === 'show-join') {
             this.screen = 'join';
             this.status = '';
+            return this.render();
+        }
+        if (action === 'refresh-nearby' && this.native && !this.host) {
+            this.nativeRooms = [];
+            this.status = '';
+            this.link?.browse();
+            return this.render();
+        }
+        if (action === 'join-nearby' && this.native && !this.host && !this.joiningNearby
+            && this.nativeRooms.some(room => room.id === args.matchId)) {
+            this.joiningNearby = args.matchId;
+            this.status = t('Connecting to the host…');
+            if (!this.link?.join(args.matchId)) this.joiningNearby = undefined;
             return this.render();
         }
         if (action.startsWith('copy-')) {
@@ -127,13 +144,34 @@ export class Multiplayer {
     }
 
     makeLink(role) {
-        const link = new PeerLink({
+        const Transport = this.native ? NativeLink : PeerLink;
+        const link = new Transport({
             role,
             onOpen: id => { if (this.link === link) this.connected(id); },
             onMessage: (id, message) => { if (this.link === link) this.receive(id, message); },
             onClose: (id, reason) => { if (this.link === link) this.disconnected(id, reason); },
+            onRooms: rooms => {
+                if (this.link !== link || this.screen !== 'welcome') return;
+                this.nativeRooms = rooms;
+                this.render();
+            },
+            onHosting: () => {
+                if (this.link !== link) return;
+                this.nativeHosting = true;
+                this.status = '';
+                if (this.screen === 'lobby') this.render();
+            },
             onError: error => {
                 if (this.link === link) {
+                    if (this.native) {
+                        this.joiningNearby = undefined;
+                        this.nativeHosting = false;
+                        this.status = error.code === 'permission'
+                            ? t('Allow Voidrunner to access the local network, then try again.')
+                            : t('Could not connect on Wi-Fi. Check the network and try again.');
+                        this.render();
+                        return;
+                    }
                     if (this.host && error.status === 410) {
                         this.roomUrl = '';
                         if (this.screen === 'lobby') void this.openRoomLink(link);
@@ -149,12 +187,14 @@ export class Multiplayer {
     }
 
     hostRoom() {
+        if (this.native) this.closeLink();
         const link = this.makeLink('host');
         this.host = true;
         this.localId = HOST;
         this.match = createMultiplayerMatch({ hostId: HOST, hostName: this.name, seed: Math.floor(Math.random() * 0x100000000) });
+        if (this.native) link.host(this.match.players.get(HOST).name);
         this.distributeState();
-        void this.openRoomLink(link);
+        if (!this.native) void this.openRoomLink(link);
     }
 
     openRoomLink(link) {
@@ -229,9 +269,10 @@ export class Multiplayer {
         if (message.type === 'error') {
             if (!this.localId) {
                 const link = this.link;
-                this.link = undefined;
-                link.close();
+                this.closeLink();
                 this.guestReply = '';
+                this.joiningNearby = undefined;
+                if (this.native && link) this.makeLink('guest').browse();
             }
             this.status = typeof message.text === 'string' ? message.text : t('The room is unavailable.');
             this.render();
@@ -285,11 +326,14 @@ export class Multiplayer {
 
     distributeState() {
         const state = this.match.snapshot();
+        if (this.native) this.link.setVisibility(state.phase === 'lobby' && state.players.length < 4);
+        this.applyState(state, this.match.shopFor(HOST));
         for (const peer of this.link.peerIds) {
+            // A reliable send can close a slow peer and publish a newer roster immediately.
+            if (this.state !== state) break;
             if (!this.match.players.get(peer)?.connected) continue;
             this.send(peer, { type: 'state', state, shop: this.match.shopFor(peer) });
         }
-        this.applyState(state, this.match.shopFor(HOST));
     }
 
     applyState(state, shop) {
@@ -301,7 +345,7 @@ export class Multiplayer {
         if (state.phase === 'lobby') {
             if (previous?.phase !== 'lobby' && this.flight) this.clearFlight();
             this.screen = 'lobby';
-            if (this.host && previous?.phase === 'ended' && !this.roomUrl) void this.openRoomLink(this.link);
+            if (!this.native && this.host && previous?.phase === 'ended' && !this.roomUrl) void this.openRoomLink(this.link);
         } else if (state.phase === 'ended') {
             this.live = false;
             this.stopClock();
@@ -320,11 +364,21 @@ export class Multiplayer {
         this.flight = flight;
         this.screen = 'preparing';
         this.render();
-        const session = await this.startFlight({
+        // Session startup is shared by the title and the arena. Let a cancelled load
+        // finish and dispose its session before a rematch requests a new one.
+        if (this.loadingFlight) {
+            await this.loadingFlight;
+            if (this.flight !== flight || this.state?.phase !== 'playing') return;
+        }
+        const loading = this.loadingFlight = this.startFlight({
             multiplayer: flight, scenario: 'free-flight', site: state.settings.siteId, seed: state.seed, starterPlayer: fit.player,
         });
-        if (this.flight !== flight) {
+        const session = await loading;
+        this.loadingFlight = undefined;
+        if (this.flight !== flight || this.state?.phase !== 'playing') {
             if (session) this.stopFlight(session);
+            if (this.flight === flight) this.flight = undefined;
+            if (this.screen) this.render();
             return;
         }
         if (!session) {
@@ -351,6 +405,7 @@ export class Multiplayer {
         this.live = true;
         for (const pilot of this.match.connectedPlayers()) this.sendFit(pilot.id);
         this.publishWorld(true);
+        if (!this.live) return;
         let last = performance.now();
         this.clock = setInterval(() => {
             const now = performance.now();
@@ -386,9 +441,11 @@ export class Multiplayer {
             this.screen = 'flight';
             this.render();
         }
-        const displayedTime = matchClock(this.remainingSeconds);
-        if (this.screen === 'score' && displayedTime !== this.displayedTime) this.view.setClock(displayedTime);
-        this.displayedTime = displayedTime;
+        if (this.screen === 'score') {
+            const displayedTime = matchClock(this.remainingSeconds);
+            if (displayedTime !== this.displayedTime) this.view.setClock(displayedTime);
+            this.displayedTime = displayedTime;
+        }
     }
 
     sendInput(input, reliable) {
@@ -436,15 +493,20 @@ export class Multiplayer {
         this.stopFlight();
     }
 
-    leave() {
+    closeLink() {
         const link = this.link;
-        if (link && !this.host) this.send(HOST, { type: 'leave' });
         this.link = undefined;
         link?.close();
+    }
+
+    leave() {
+        if (this.link && !this.host) this.send(HOST, { type: 'leave' });
+        this.closeLink();
         if (this.flight) this.clearFlight();
         Object.assign(this, {
             state: undefined, shop: undefined, match: undefined, host: false, localId: undefined,
             status: '', screen: '', invite: '', reply: '', roomUrl: '', roomToken: undefined, guestReply: '', busy: undefined,
+            nativeRooms: [], nativeHosting: false, joiningNearby: undefined,
         });
         if (roomTokenFromUrl()) history.replaceState(null, '', location.pathname + location.search);
         this.render();

@@ -1,5 +1,5 @@
-// The host fixture only stages the two poses for the firing pass. All lobby
-// changes, flight controls, damage, purchases and relaunches use the real UI.
+// The host fixture stages the collision and firing poses. Lobby changes,
+// flight controls, purchases and relaunches use the real UI.
 import assert from 'node:assert/strict';
 import {existsSync} from 'node:fs';
 import {mkdir} from 'node:fs/promises';
@@ -29,7 +29,9 @@ const waitSetting = (page, key, value) => page.waitForFunction(([key, value]) =>
     document.querySelector(`[data-match-setting="${key}"]`)?.value === value, [key,value]);
 
 async function newDevice(name, browser, settings) {
-    const page = await browser.newPage({...settings, serviceWorkers:'allow'});
+    // The no-service case mocks a failed POST. A controlling worker can hide
+    // that request from Playwright's route interception in WebKit.
+    const page = await browser.newPage({...settings, serviceWorkers:joinMethod === 'codes' ? 'block' : 'allow'});
     page.setDefaultTimeout(timeout);
     pages.push([name, page]);
     if (joinMethod === 'codes') {
@@ -198,6 +200,40 @@ try {
         const held = rt.arena.multiplayer.controller.world.inputs.get(rt.ships[0].id)?.held;
         return held?.pitch === 0 && held.yaw === 0;
     });
+    const separated = await host.evaluate(async () => {
+        const [{ Vector3, Quaternion }, { shipVsShip }] = await Promise.all([
+            import('three'), import('./src/game/shipCollision.js'),
+        ]);
+        const { controller } = __VOID_PRIVATEER__.getRuntime().arena.multiplayer;
+        const world = controller.world;
+        const [a, b] = world.actors();
+        const { x, y, z } = world.center;
+        a.position.splice(0, 3, x, y, z + 3);
+        b.position.splice(0, 3, x, y, z);
+        a.rotation.splice(0, 4, 0, 0, 0, 1);
+        b.rotation.splice(0, 4, 0, 1, 0, 0);
+        for (const actor of [a, b]) {
+            actor.velocity.fill(0);
+            actor.angularVelocity.fill(0);
+            actor.throttle = 0;
+        }
+        const overlaps = () => shipVsShip(
+            new Vector3(...a.position), new Quaternion(...a.rotation), a.variant, a.scale,
+            new Vector3(...b.position), new Quaternion(...b.rotation), b.variant, b.scale, {},
+        );
+        const startedOverlapping = overlaps();
+        for (let i = 0; i < 12; i++) world.step();
+        if (!startedOverlapping || overlaps() || ![...a.position, ...b.position].every(Number.isFinite))
+            throw Error('Overlapping multiplayer hulls did not separate with finite positions.');
+        controller.publishWorld(true);
+        return { host: a.position.slice(), guest: b.position.slice() };
+    });
+    await guest.waitForFunction(expected => {
+        const {save, ships} = __VOID_PRIVATEER__.getRuntime();
+        const close = (actual, want) => actual?.every((n, i) => Number.isFinite(n) && Math.abs(n - want[i]) < 1);
+        return close(save.player.position, expected.guest) && close(ships[0]?.position, expected.host);
+    }, separated);
+    console.log('Overlapping Hestia and Balor hulls separated on the host and both positions reached the guest.');
     assert.equal(await host.evaluate(() => __VOID_PRIVATEER__.stageMultiplayerDuel()), true);
     await guest.waitForFunction(() => {
         const {save, ships} = __VOID_PRIVATEER__.getRuntime();
@@ -217,6 +253,20 @@ try {
         await host.waitForFunction(shield => __VOID_PRIVATEER__.getRuntime().save.player.shield < shield, shield, {timeout:20_000});
         await screen(host, 'shop').waitFor({timeout:40_000});
     } finally { await guest.mouse.up(); }
+    for (const page of [host, guest]) {
+        const debris = await page.evaluate(() => {
+            const {renderer} = __VOID_PRIVATEER__.getRuntime();
+            const wreck = renderer.effects.find(effect => effect.combatWreck);
+            const plates = renderer.effects.find(effect => effect.maxLife === 14 && effect.object.children[0]?.isInstancedMesh);
+            return {
+                sections: wreck?.sections.length ?? 0,
+                attached: wreck?.object.parent === renderer.scene,
+                plates: plates?.object.children[0].count ?? 0,
+            };
+        });
+        assert.ok(debris.attached && debris.sections >= 5, `Destroyed hull must break up on both peers: ${JSON.stringify(debris)}`);
+        assert.equal(debris.plates, 36);
+    }
     const victimRow = host.locator('.match-table tbody tr').filter({hasText:hostName});
     assert.equal(await victimRow.locator('td').nth(3).innerText(), '1', 'Host death is recorded once');
     assert.equal(await guestRow.locator('td').nth(2).innerText(), '1', 'Guest gets the kill');

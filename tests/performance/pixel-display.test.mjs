@@ -31,6 +31,43 @@ test('pixel resolve reuses buffers each frame and releases the previous target o
  r.renderer.domElement.width=720;r.ensurePixelPipeline();assert.equal(disposed,1);assert.notEqual(r.pixelSceneTarget,target);assert.equal(r.pixelSceneTarget.width,720);assert.equal(r.pixelResolveMaterial,material);
  r.pixelSceneTarget.dispose();material.dispose();geometry.dispose();
 });
+test('flight resizes the drawing buffer only while drawing its replacement frame', () => {
+    const viewport = {width: 852, height: 393};
+    const container = {getBoundingClientRect: () => viewport};
+    const view = new SpaceRenderer(container, 0, [], [], [], 'high', 'helios-verge', new Map(), [], true);
+    const canvas = {width: 300, height: 150, style: {}, dataset: {}};
+    const operations = [];
+    view.container = container;
+    view.isIOS = true;
+    view.updateWorldVisuals = () => {};
+    view.renderer = {
+        domElement: canvas,
+        setSize(width, height) {
+            Object.assign(canvas, {width, height});
+            operations.push('clear');
+        },
+    };
+    view.renderPixelScene = () => operations.push('draw');
+    view.setQualityMode('high');
+    view.setQualityScale(0.82);
+    view.render();
+    assert.deepEqual(operations, ['clear', 'draw']);
+    assert.equal(canvas.width, 512);
+
+    operations.length = 0;
+    view.setQualityScale(0.67);
+    view.resize();
+    assert.deepEqual(operations, [], 'the last submitted frame survives until the next draw');
+    assert.equal(canvas.width, 512);
+    view.render();
+    assert.deepEqual(operations, ['clear', 'draw'], 'pending changes apply once before the new scene');
+    assert.equal(canvas.width, 426);
+
+    operations.length = 0;
+    view.resize();
+    view.render();
+    assert.deepEqual(operations, ['draw'], 'unchanged dimensions preserve the buffers');
+});
 test('scene edges use only supported, bounded multisampling',()=>{
  const renderer=counts=>({getContext:()=>({getInternalformatParameter:()=>counts})});
  assert.equal(pixelTargetSamples(renderer(new Int32Array([8,4,2]))),2);assert.equal(pixelTargetSamples(renderer([8,4])),0);assert.equal(pixelTargetSamples(renderer([8])),0);assert.equal(pixelTargetSamples({}),0);

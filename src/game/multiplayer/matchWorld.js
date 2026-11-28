@@ -2,7 +2,6 @@ import { Quaternion, Vector3 } from 'three';
 import { arenaSite } from '../arenaSites.js';
 import { SHIP_COLLIDERS, shipVsObstacle, shipVsShip } from '../shipCollision.js';
 import { GRAVEYARD_MODEL_COLLIDER_MAX_RADIUS } from '../worldData.js';
-import { activeLauncherMagazine } from '../weapons.js';
 import { applyPilotWeaponHit } from './combatDamage.js';
 import { createMatchCombat, initPilotCombat, stepMatchCombat } from './matchCombat.js';
 import { stepPilotFlight } from './pilotFlight.js';
@@ -162,6 +161,7 @@ export class MatchWorld {
         this.events.push({
             type: 'death', targetId: victimId, ownerId: result.killerId, points: result.points,
             credits: result.credits, position: [...result.actor.position],
+            variant: result.actor.variant, rotation: [...result.actor.rotation], velocity: [...result.actor.velocity],
         });
     }
 
@@ -176,7 +176,7 @@ export class MatchWorld {
             this.session.forEachHullObstacle(position, FIELD_REACH + reach, reach, obstacle => {
                 if (!shipVsObstacle(position, rotation, actor.variant, actor.scale, obstacle, contact)) return;
                 normal.set(contact.x, contact.y, contact.z);
-                position.addScaledVector(normal, contact.depth + .04);
+                position.addScaledVector(normal, contact.push + .04);
                 const inward = -velocity.dot(normal);
                 if (inward > 0) velocity.addScaledVector(normal, inward * 1.5);
                 damage = Math.max(damage, Math.min(actor.stats.hull / 4, (inward - 3) * 1.65));
@@ -209,7 +209,7 @@ export class MatchWorld {
                 otherRotation.fromArray(b.rotation);
                 if (!shipVsShip(position, rotation, a.variant, a.scale, otherPosition, otherRotation, b.variant, b.scale, contact)) continue;
                 normal.set(contact.x, contact.y, contact.z);
-                const separation = contact.depth * .5 + .04;
+                const separation = contact.push * .5 + .04;
                 position.addScaledVector(normal, separation).toArray(a.position);
                 otherPosition.addScaledVector(normal, -separation).toArray(b.position);
                 const closing = this.velocity.fromArray(b.velocity).sub(this.otherPosition.fromArray(a.velocity)).dot(normal);
@@ -235,7 +235,9 @@ export class MatchWorld {
 
     snapshot() {
         const actors = this.actors().map(actor => {
-            const pilot = this.match.players.get(actor.id), rack = activeLauncherMagazine(actor);
+            const pilot = this.match.players.get(actor.id);
+            const mountId = actor.activeLauncherMountId;
+            const rack = actor.launcherMagazines[mountId];
             return {
                 id: actor.id, name: pilot.name, team: pilot.team, life: actor.life,
                 shipId: actor.shipId, variant: actor.variant, scale: actor.scale,
@@ -245,7 +247,7 @@ export class MatchWorld {
                 shield: actor.shield, maxShield: actor.stats.shield, hull: actor.hull, maxHull: actor.stats.hull,
                 energy: actor.energy, weaponId: actor.weaponId, group: actor.activeGroup, missiles: actor.missiles,
                 targetId: actor.targetId, lockProgress: actor.lockProgress ?? 0,
-                rack: rack ? { mountId: rack.mount.id, rounds: rack.rounds } : undefined,
+                rack: rack ? { mountId, rounds: rack.rounds } : undefined,
             };
         });
         const projectiles = this.combat.projectiles.map(shot => ({

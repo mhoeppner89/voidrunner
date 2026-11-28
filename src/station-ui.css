@@ -1674,6 +1674,9 @@
 .match-bank { align-items: baseline; margin-bottom: 12px; }
 .match-bank b, .match-result { color: #ffd585; }
 .match-invite { margin-top: 12px; }
+.match-nearby-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.match-nearby-heading h3 { margin: 0; font-size: 1em; color: #aeefdf; }
+.match-invite .match-shop-row b { min-width: 0; overflow-wrap: anywhere; }
 .match-code-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; margin: 5px 0 8px; }
 .match-card details { border: 1px solid #314e5d; padding: 7px 9px; margin-block: 6px; background: #0e1a27; }
 .match-card details summary { min-height: 32px; align-content: center; cursor: pointer; color: #aeefdf; font-weight: 700; }

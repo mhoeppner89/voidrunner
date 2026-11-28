@@ -148,11 +148,24 @@ export function createRingVolume(surface, radius, composite = false) {
     mesh.renderOrder = 10;
     mesh.raycast = () => {};
     if (composite) mesh.frustumCulled = false;
+    const axis = new THREE.Vector3(0,0,1).applyQuaternion(surface.quaternion);
     return {
         mesh,
         // Conservative physical bounds, independent of the fullscreen
         // composite quad. Offscreen rings need no depth reads or ray marching.
         bounds: new THREE.Sphere(mesh.position.clone(), radius * 2.741),
+        intersectsFrustum(frustum) {
+            // Support distance of the tilted, finite cylinder along each
+            // frustum-plane normal. Include a margin for shader precision.
+            for (const plane of frustum.planes) {
+                const distance = plane.distanceToPoint(mesh.position);
+                if (distance >= 0) continue;
+                const axial = Math.abs(plane.normal.dot(axis));
+                const radial = Math.sqrt(Math.max(0, 1 - axial * axial));
+                if (distance < -radius * (2.74 * radial + .004 * axial + .002)) return false;
+            }
+            return true;
+        },
         update(cameraPosition, camera, sceneTarget) {
             if (composite) {
                 viewToRing.multiplyMatrices(inverseMatrix,camera.matrixWorld);

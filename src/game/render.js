@@ -436,7 +436,9 @@ export class SpaceRenderer {
             // WebGL path. iOS gets the performance context because its render
             // profile is already capped for battery and fill-rate reasons.
             powerPreference: this.touchDevice && !this.isIOS ? 'low-power' : 'high-performance',
-            depth: true,
+            // Geometry uses the scene target's depth texture. The canvas
+            // receives only the final full-screen colour pass.
+            depth: false,
             stencil: false,
         });
         configureShaderDiagnostics(this.renderer);
@@ -519,7 +521,7 @@ export class SpaceRenderer {
         this.containerResizeObserver.observe(this.container);
         this.renderer.domElement.addEventListener('webglcontextlost', this.onContextLost);
         this.renderer.domElement.addEventListener('webglcontextrestored', this.onContextRestored);
-        this.resize();
+        this.applyResize();
         // iOS uses the bounded scene resolve. Desktop retains bloom; phones
         // do not allocate its blur targets or run those extra passes.
         if (!this.isIOS)
@@ -614,6 +616,7 @@ export class SpaceRenderer {
         const solarFront = new THREE.Sprite(new THREE.SpriteMaterial({
             map: this.starTexture('#fff0c8', '#ff3d12'),
             transparent: true,
+            visible: false,
             opacity: 0,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
@@ -3910,8 +3913,10 @@ export class SpaceRenderer {
     }
     syncShips(entities, alpha = 0) {
         const revision = ++this.shipSyncRevision,exhaustTime=performance.now()*.001;
+        let liveCount = 0;
         entities.forEach((entity) => {
             let mesh = this.shipMeshes.get(entity.id);
+            if (mesh?.userData.syncRevision !== revision) liveCount++;
             const variant = shipVariantForEntity(entity);
             // Fetch a hull only once it can matter on screen: the locked target
             // always, fighters within 2.5 km, capital hulls within 6 km. A far
@@ -4045,19 +4050,19 @@ export class SpaceRenderer {
                     const engine=entity.capitalClass==='cruiser'?capitalHull(entity).engines[flareIndex]:undefined;
                     const output=entity.capitalClass==='frigate'?frigateEngineFraction(entity,flareIndex):engine?(entity.capitalMountHull?.[engine.index]??engine.hull)/engine.hull:1;
                     flare.material.opacity = entity.stationDock?.phase === "docked" ? 0 : baseOpacity * boost * output * (entity.crippled ? .24+.22*Math.sin(exhaustTime*31+flareIndex) : 1);
+                    flare.material.visible = flare.material.opacity !== 0;
                     flare.scale.setScalar(baseSize * (boost > 1 ? 1.08 : 1));
                 }
             }
         });
-        // Identity can change without a count change. Mark during the existing
-        // update pass, then retire unseen meshes without building live arrays.
-        for (const [key, mesh] of this.shipMeshes) {
-            if (mesh.userData.syncRevision !== revision) {
+        // Every current ID is in the map now. An equal-count replacement
+        // leaves an extra old entry until this sweep removes it.
+        if (this.shipMeshes.size > liveCount) {
+            for (const [key, mesh] of this.shipMeshes) {
+                if (mesh.userData.syncRevision === revision) continue;
                 this.dynamicRoot.remove(mesh);
-                if (mesh.userData.glb)
-                    this.disposeGlbShip(mesh);
-                else
-                    this.disposeObject(mesh);
+                if (mesh.userData.glb) this.disposeGlbShip(mesh);
+                else this.disposeObject(mesh);
                 this.shipMeshes.delete(key);
             }
         }
@@ -4364,11 +4369,13 @@ export class SpaceRenderer {
     }
     syncProjectiles(projectiles, store, alpha = 0) {
         const revision = ++this.projectileSyncRevision;
+        let liveCount = 0;
         const pos = store.pos;
         const vel = store.vel;
         const prevPos = store.prevPos;
         projectiles.forEach((projectile) => {
             let mesh = this.projectileMeshes.get(projectile.slot);
+            if (mesh?.userData.syncRevision !== revision) liveCount++;
             if (mesh && (mesh.userData.projectileKind !== projectile.kind || mesh.userData.projectileFaction !== projectile.faction || mesh.userData.projectileLauncher !== projectile.launcherId || mesh.userData.projectileTint !== projectile.tint)) {
                 this.retireProjectileMesh(mesh);
                 this.projectileMeshes.delete(projectile.slot);
@@ -4426,8 +4433,7 @@ export class SpaceRenderer {
                     plume.material.opacity = 0.35 + Math.sin(this.skyTime * 47 + projectile.slot * 3.3) * 0.08;
             }
         });
-        // Identity can change without a count change. Mark during the existing
-        // update pass, then retire unseen meshes without building live arrays.
+        if (this.projectileMeshes.size === liveCount) return;
         for (const [key, mesh] of this.projectileMeshes) {
             if (mesh.userData.syncRevision !== revision) {
                 this.retireProjectileMesh(mesh);
@@ -4437,10 +4443,12 @@ export class SpaceRenderer {
     }
     syncPickups(pickups, store, alpha = 0) {
         const revision = ++this.pickupSyncRevision;
+        let liveCount = 0;
         const pos = store.pos;
         const prevPos = store.prevPos;
         pickups.forEach((pickup) => {
             let mesh = this.pickupMeshes.get(pickup.slot);
+            if (mesh?.userData.syncRevision !== revision) liveCount++;
             if (mesh && mesh.userData.pickupSource !== pickup.source) {
                 this.dynamicRoot.remove(mesh);
                 this.disposeObject(mesh);
@@ -4475,8 +4483,7 @@ export class SpaceRenderer {
             const time=this.skyTime??0;
             mesh.rotation.set(time*.055,time*.085,time*.025);
         });
-        // Identity can change without a count change. Mark during the existing
-        // update pass, then retire unseen meshes without building live arrays.
+        if (this.pickupMeshes.size === liveCount) return;
         for (const [key, mesh] of this.pickupMeshes) {
             if (mesh.userData.syncRevision !== revision) {
                 this.dynamicRoot.remove(mesh);
@@ -4796,6 +4803,7 @@ export class SpaceRenderer {
             return;
         const value = clamp(Number(intensity) || 0, 0, 1);
         this.solarFront.material.opacity = value * 0.34;
+        this.solarFront.material.visible = value > 0;
         this.solarFront.scale.setScalar(150000 + value * 80000);
     }
     createDistressBeaconMesh() {
@@ -5711,7 +5719,29 @@ export class SpaceRenderer {
         const effect=createDetachedPod(pod,ship,mount.normal[0]);
         pod.visible=false;this.scene.add(effect.object);this.effects.push(effect);
     }
-    spawnShipWreck(ship, variant, explosionScale, sections=[]) {
+    spawnPilotWreck(ship, explosionScale) {
+        // A world snapshot can remove the victim before the reliable death
+        // event arrives. The local pilot also has no exterior mesh in flight.
+        let source = this.shipMeshes.get(ship.id);
+        if (source?.userData.variant !== ship.variant) source = null;
+        let temporary;
+        const model = this.glbShipModels.get(ship.variant);
+        if (!source?.userData.glb && model) {
+            temporary = this.createGlbShipMesh(ship, model, GLB_SHIP_CONFIG[ship.variant], ship.variant);
+            temporary.scale.setScalar(temporary.userData.baseScale / npcShipScaleForVariant(ship.variant));
+            source = temporary;
+        }
+        try {
+            const anchor = this.spawnShipWreck(ship, ship.variant, explosionScale, [], source ?? null);
+            // The live mesh may still be interpolating an earlier snapshot.
+            anchor.position.fromArray(ship.position);
+            if (anchor.userData.wreckSections && ship.rotation) anchor.quaternion.fromArray(ship.rotation);
+            return anchor;
+        } finally {
+            if (temporary) this.disposeGlbShip(temporary);
+        }
+    }
+    spawnShipWreck(ship, variant, explosionScale, sections=[], source=this.shipMeshes?.get(ship.id)) {
         const fragments=createHullDebris(ship.position,Math.max(.5,explosionScale*.65),ship.velocity,ship.capitalClass?1:0);
         this.scene.add(fragments.object);this.effects.push(fragments);
         // Retire older cosmetic wrecks before debris-heavy battles accumulate
@@ -5719,7 +5749,6 @@ export class SpaceRenderer {
         const limit=this.qualityMode==='low'||this.touchDevice||this.isIOS||this.viewportWidth<1000?3:6;
         const wrecks=this.effects.filter(effect=>effect.combatWreck&&effect.life>0);
         if(wrecks.length>=limit)wrecks[0].life=0;
-        const source=this.shipMeshes?.get(ship.id);
         let effect;
         if(source?.userData.glb){
             this.syncCapitalParts(source,ship);
@@ -6823,7 +6852,7 @@ export class SpaceRenderer {
             // The world always renders to a linear scene target. Only the final
             // fullscreen resolve needs a canvas (sRGB/tone-mapped) variant.
             let sceneTarget;
-            if (!this.isIOS && (this.bloomEnabled() || this.ringVolumeEnabled)) {
+            if (!this.isIOS && (this.bloomSceneTarget || this.bloomEnabled() || this.ringVolumeEnabled)) {
                 if (!this.bloomSceneTarget) this.createBloomPipeline();
                 sceneTarget = this.bloomSceneTarget;
             } else {
@@ -6905,6 +6934,7 @@ export class SpaceRenderer {
         this.updateCombatLootNodes();
         if (this.contextLost)
             return;
+        if (this.resizePending) this.applyResize();
         this.updateWorldVisuals();
         this.updateMissionMarker();
         // Keep the atmosphere shells' camera-distance uniform fresh so the
@@ -6931,7 +6961,7 @@ export class SpaceRenderer {
                 this.updateAsteroidInstances(refresh ? undefined : this.viewFrustum);
             }
         }
-        const volumeActive = !this.isIOS && this.ringVolumeEnabled && this.locationMeshes.get('azure')?.visible
+        const ringNearby = !this.isIOS && this.ringVolumeEnabled && this.locationMeshes.get('azure')?.visible
             && this.viewFrustum.intersectsSphere(this.ringVolume.bounds);
         if (this.ringVolumeEnabled && this.azureRingSurface)
             this.azureRingSurface.visible = this.isIOS ? Boolean(this.locationMeshes.get('azure')?.visible) : false;
@@ -6939,7 +6969,9 @@ export class SpaceRenderer {
         // Phones and low quality share the depth-aware pixel resolve, without
         // allocating bloom blur buffers or running glow passes. Both paths
         // render the world once at the bounded logical pixel resolution.
-        if (!bloomOn && !volumeActive) {
+        // An existing bloom pipeline can resolve the same HDR scene with
+        // strength zero. Keep using its colour and depth buffers on Low.
+        if (!bloomOn && !ringNearby && !this.bloomSceneTarget) {
             this.renderPixelScene();
             this.ringParticleDt = 0;
             return;
@@ -6950,27 +6982,28 @@ export class SpaceRenderer {
         this.renderer.setRenderTarget(this.bloomSceneTarget);
         this.renderer.render(this.scene, this.camera);
         let sceneTexture = this.bloomSceneTarget.texture;
-        if (volumeActive) {
-            this.ringVolumeTarget ??= new THREE.WebGLRenderTarget(this.bloomSceneTarget.width, this.bloomSceneTarget.height, {
-                type: THREE.HalfFloatType, depthBuffer: false, stencilBuffer: false,
-                minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
-                colorSpace: THREE.LinearSRGBColorSpace,
-            });
+        if (ringNearby) {
             this.ringVolume.update(cam, this.camera, this.bloomSceneTarget);
-            this.renderer.setRenderTarget(this.ringVolumeTarget);
-            this.renderer.render(this.ringVolume.mesh, this.bloomCamera);
             const particlesVisible = this.ringParticles.update(this.camera,
                 this.ringVolume.mesh.material.uniforms.localCamera.value,
                 this.ringParticleDt ?? 0, !this.hyperdriveFxRoot.visible, this.bloomSceneTarget);
-            if (particlesVisible) {
-                const autoClear = this.renderer.autoClear;
-                this.renderer.autoClear = false;
-                try { this.renderer.render(this.ringParticles.mesh, this.camera); }
-                finally { this.renderer.autoClear = autoClear; }
+            if (particlesVisible || this.ringVolume.intersectsFrustum(this.viewFrustum)) {
+                this.ringVolumeTarget ??= new THREE.WebGLRenderTarget(this.bloomSceneTarget.width, this.bloomSceneTarget.height, {
+                    type: THREE.HalfFloatType, depthBuffer: false, stencilBuffer: false,
+                    minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+                    colorSpace: THREE.LinearSRGBColorSpace,
+                });
+                this.renderer.setRenderTarget(this.ringVolumeTarget);
+                this.renderer.render(this.ringVolume.mesh, this.bloomCamera);
+                if (particlesVisible) {
+                    const autoClear = this.renderer.autoClear;
+                    this.renderer.autoClear = false;
+                    try { this.renderer.render(this.ringParticles.mesh, this.camera); }
+                    finally { this.renderer.autoClear = autoClear; }
+                }
+                sceneTexture = this.ringVolumeTarget.texture;
             }
-            sceneTexture = this.ringVolumeTarget.texture;
-        }
-        if (!volumeActive && this.ringParticles) {
+        } else if (bloomOn && this.ringParticles) {
             this.ringParticles.update(this.camera, this.camera.position, 0, false, this.bloomSceneTarget);
         }
         this.ringParticleDt = 0;
@@ -7054,7 +7087,13 @@ export class SpaceRenderer {
         this.resize();
     }
     resize = () => {
+        // The quality governor runs after the flight draw. Changing canvas
+        // dimensions there clears the frame before WebKit can present it.
+        this.resizePending = true;
         this.renderRevision = (this.renderRevision ?? 0) + 1;
+    };
+    applyResize() {
+        this.resizePending = false;
         const rect = this.container.getBoundingClientRect();
         this.viewportWidth = Math.max(1, rect.width);
         this.viewportHeight = Math.max(1, rect.height);
@@ -7081,7 +7120,7 @@ export class SpaceRenderer {
         if (outputChanged&&this.bloomSceneTarget)
             this.resizeBloomTargets();
         if(outputChanged&&this.pixelSceneTarget)this.ensurePixelPipeline();
-    };
+    }
     onContextLost = (event) => {
         event.preventDefault();
         this.contextLost = true;

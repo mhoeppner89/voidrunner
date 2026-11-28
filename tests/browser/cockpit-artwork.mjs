@@ -36,6 +36,28 @@ for(const [name,engine,device]of profiles){
   await page.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime()?.ui.cockpitArtwork?.layout);
   await page.evaluate(async()=>{const r=__VOID_PRIVATEER__.getRuntime();await r.ui.cockpitArtwork.ready;r.ui.cockpitArtwork.invalidate();});
   await page.waitForTimeout(150);
+  if(name==='android'){
+   // CDP supplies real CSS safe-area env() values in either landscape orientation.
+   const cdp=await page.context().newCDPSession(page);
+   const positions=()=>page.evaluate(()=>{
+    const box=selector=>document.querySelector(selector).getBoundingClientRect();
+    return {throttle:box('[data-touch-throttle]').left,rail:box('.painted-throttle-rail').left,
+     boost:innerWidth-box('.touch-boost-right').right,fire:innerWidth-box('.touch-fire').right,
+     stick:box('[data-touch-stick]').x,base:box('.painted-stick-mount image').x,screen:box('.cockpit-screen-target').x};
+   });
+   const original=await positions();
+   for(const insets of [{left:62,right:0},{left:0,right:62}]){
+    await cdp.send('Emulation.setSafeAreaInsetsOverride',{insets});
+    const p=await positions();
+    assert.equal(p.throttle,Math.max(original.throttle,insets.left));
+    assert.equal(p.rail-p.throttle,original.rail-original.throttle);
+    assert.equal(p.boost,Math.max(original.boost,insets.right));
+    assert.equal(p.fire,Math.max(original.fire,insets.right));
+    for(const part of ['stick','base','screen'])assert.equal(p[part],original[part],part);
+   }
+   await cdp.send('Emulation.setSafeAreaInsetsOverride',{insets:{}});
+   await cdp.detach();
+  }
   const geometry=await page.evaluate(()=>{
    const r=__VOID_PRIVATEER__.getRuntime(),c=r.ui.cockpitArtwork,box=s=>{const e=document.querySelector(s),b=e.getBoundingClientRect();return {x:b.x,y:b.y,w:b.width,h:b.height,right:b.right,bottom:b.bottom};};
    return {hull:r.save.player.shipId,underlap:c.definition.glassUnderlap??3,source:c.definition.shell,layout:structuredClone(c.layout),frame:box('.painted-cockpit-frame'),screens:Object.fromEntries(['own','radar','target'].map(k=>[k,box('.cockpit-screen-'+k)])),hand:box('.painted-pilot-hand'),jump:box('#hyperdrive-card'),rail:box('.painted-throttle-rail'),throttle:box('[data-touch-throttle]'),stick:box('[data-touch-stick]'),base:box('.painted-stick-mount image'),baseSource:document.querySelector('.painted-stick-mount image').getAttribute('href'),baseShapes:document.querySelectorAll('.painted-stick-mount path,.painted-stick-mount ellipse').length,mask:document.querySelector('.canopy-art-mask').getAttribute('href'),touch:document.querySelector('#game-shell').dataset.cockpitTouch,damage:(()=>{for(let y=2;y<110;y++)for(let x=70;x<300;x++)if(c.alpha[y*371+x]>240)return r.ui.cockpitPointVisible(c.layout.left+(x+.5)/371*c.layout.width,c.layout.top+(y+.5)/170*c.layout.height);throw Error('No opaque canopy sample');})(),glass:r.ui.cockpitPointVisible(innerWidth*.5,innerHeight*.38),monitor:r.ui.cockpitPointVisible(innerWidth*.5,innerHeight*.85),loadError:c.loadError};

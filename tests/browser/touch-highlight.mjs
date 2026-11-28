@@ -33,6 +33,27 @@ for(const [name,engine,device] of [['android',chromium,devices['Pixel 7 landscap
    return bad;
   });
   assert.deepEqual(report,[],`${name}: controls and sprites must not highlight`);
+  const nativeHoldAllowed=element=>['touchstart','selectstart','contextmenu'].map(type=>
+   element.dispatchEvent(new Event(type,{bubbles:true,cancelable:true})));
+  for(const pad of ['[data-touch-stick]','[data-touch-throttle]']){
+   assert.deepEqual(await page.locator(pad).evaluate(nativeHoldAllowed),[false,false,false]);
+  }
+  if(engine===chromium){
+   const cdp=await page.context().newCDPSession(page);
+   const stick=await page.locator('[data-touch-stick]').boundingBox();
+   const x=stick.x+stick.width/2,y=stick.y+stick.height/2;
+   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+   await page.waitForTimeout(1000);
+   const initial=await page.evaluate(()=>[...__VOID_PRIVATEER__.getRuntime().save.player.rotation]);
+   await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+30,y}]});
+   await page.waitForFunction(initial=>{
+    const r=__VOID_PRIVATEER__.getRuntime(),dot=r.save.player.rotation.reduce((n,v,i)=>n+v*initial[i],0);
+    return r.input.joystickX>.2&&Math.abs(dot)<.9999;
+   },initial,{timeout:5000});
+   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+   await page.waitForFunction(()=>__VOID_PRIVATEER__.getRuntime().input.joystickX===0);
+   await cdp.detach();
+  }
   // A long press on the stick and on the painted frame selects nothing.
   for(const selector of ['[data-touch-stick]','.painted-cockpit-frame','.painted-xpdr']){
    const box=await page.locator(selector).first().boundingBox();if(!box)continue;
@@ -42,6 +63,13 @@ for(const [name,engine,device] of [['android',chromium,devices['Pixel 7 landscap
    await page.waitForTimeout(700);
    assert.equal(await page.evaluate(()=>String(window.getSelection()??'')),'',`${name}: ${selector} long press selects nothing`);
   }
-  console.log(name,'touch controls and sprites never highlight, select or call out');
+  await page.evaluate(()=>__VOID_PRIVATEER__.getRuntime().quitToTitle());
+  await page.locator('[data-ui-command="multiplayer"]').tap();
+  const field=page.locator('[data-match-field="name"]');
+  assert.deepEqual(await field.evaluate(nativeHoldAllowed),[true,true,true]);
+  await field.fill('Pilot Name');
+  await field.press('End');await field.press('Shift+ArrowLeft');
+  assert.equal(await field.evaluate(el=>el.value.slice(el.selectionStart,el.selectionEnd)),'e');
+  console.log(name,'flight controls suppress native holds and pilot names stay editable');
  }finally{await browser.close();}
 }

@@ -241,7 +241,17 @@ export class MatchFlight {
             const own = event.ownerId === this.controller.localId;
             const weapon = WEAPONS[event.weaponId] ?? LAUNCHERS[event.weaponId];
             if (event.type === 'death') {
-                session.renderer.spawnExplosion(event.position, !own, 1.35);
+                const local = event.targetId === this.controller.localId;
+                const victim = local ? this.me : session.ships.find(ship => ship.id === event.targetId);
+                const pilot = this.controller.state.players.find(entry => entry.id === event.targetId);
+                const ship = {
+                    id: event.targetId, variant: event.variant ?? victim?.variant,
+                    faction: local ? 'player' : factionFor(pilot, this.controller.localPilot()?.team),
+                    position: event.position, rotation: event.rotation ?? victim?.rotation,
+                    velocity: event.velocity ?? victim?.velocity,
+                };
+                const explosion = session.renderer.spawnExplosion(ship.position, !own, 1.35, ship.velocity);
+                explosion.followObject = session.renderer.spawnPilotWreck(ship, 1.35);
                 session.playWorldSound('explosion', 1, x, y, z);
                 if (own && event.points) session.setOwnMonitorStatus(t('+{points} POINTS', { points: event.points }), 2400);
             } else if (event.type === 'beam' || event.type === 'shot') {

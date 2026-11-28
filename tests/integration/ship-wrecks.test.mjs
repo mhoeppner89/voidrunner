@@ -7,10 +7,49 @@ import {createHullDebris} from '../../src/game/explosionFx.js';
 import {buildGlbScene} from '../../src/game/glbLoader.js';
 import {readFile} from 'node:fs/promises';
 import {paintShipMaterial} from '../../src/game/shipLivery.js';
+import {MatchFlight} from '../../src/game/multiplayer/matchFlight.js';
+import {MatchWorld} from '../../src/game/multiplayer/matchWorld.js';
 const actor={id:'wreck-test',position:[40,70,-90],velocity:[5,-2,7]};
 const source=()=>{const root=new T.Group(),texture=new T.DataTexture(new Uint8Array([150,190,210,255]),1,1),material=new T.MeshStandardMaterial({color:0x5678ab,map:texture});root.add(new T.Mesh(new T.BoxGeometry(8,3,18),material));root.position.fromArray(actor.position);root.rotation.set(.2,.4,-.1);return root;};
 const disposer={deferShaderDisposal:()=>false};
 const dispose=o=>SpaceRenderer.prototype.disposeObject.call(disposer,o);
+test('multiplayer wreck follows the death packet even after a snapshot removes the victim', () => {
+    const victim = {...actor, position: [...actor.position], variant: 'kestrel', rotation: [0, 1, 0, 0]};
+    const world = Object.assign(Object.create(MatchWorld.prototype), {
+        match: {round: 1, recordDeath: () => ({ok: true, actor: victim, killerId: 'guest', points: 1})},
+        inputs: new Map(), events: [],
+    });
+    world.recordDeath(victim.id, 'guest', 1);
+    victim.position.fill(0);
+    const [event] = world.events;
+    assert.deepEqual(event.position, actor.position);
+    assert.notEqual(event.rotation, victim.rotation);
+    assert.notEqual(event.velocity, victim.velocity);
+
+    for (const localId of [victim.id, 'guest']) {
+        const model = source();
+        model.position.set(0, 0, 0);
+        model.rotation.set(0, 0, 0);
+        const renderer = Object.assign(Object.create(SpaceRenderer.prototype), {
+            scene: new T.Scene(), effects: [], shipMeshes: new Map(),
+            glbShipModels: new Map([['kestrel', model]]), radialTexture: () => new T.Texture(),
+        });
+        const flight = new MatchFlight({localId, state: {players: []}, localPilot: () => null});
+        flight.session = {renderer, ships: [], playWorldSound() {}, setOwnMonitorStatus() {}};
+        flight.presentEvents(world.events);
+        const [explosion, plates, wreck] = renderer.effects;
+        assert.ok(wreck.combatWreck && wreck.sections.length >= 5);
+        assert.equal(plates.object.children[0].count, 36);
+        assert.equal(explosion.followObject, wreck.object);
+        assert.deepEqual(wreck.object.position.toArray(), event.position);
+        assert.deepEqual(wreck.object.quaternion.toArray(), event.rotation);
+        wreck.update(1);
+        assert.deepEqual(wreck.object.position.toArray(), event.position.map((value, i) => value + event.velocity[i]));
+        renderer.clearEffects();
+        renderer.wreckFactory.dispose();
+        dispose(model);
+    }
+});
 function finite(effect){for(const s of effect.sections)for(const m of s.group.children){const g=m.geometry;for(const a of Object.values(g.attributes))assert.ok([...a.array].every(Number.isFinite));assert.ok(g.attributes.position.count>0);}}
 test('closed model sections retain exterior UVs, expose recessed structure, preserve source buffers and reuse templates',()=>{
  const root=source(),factory=new ShipWreckFactory(),original=root.children[0],positions=Array.from(original.geometry.attributes.position.array),uvs=Array.from(original.geometry.attributes.uv.array);

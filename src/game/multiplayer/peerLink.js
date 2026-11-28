@@ -224,7 +224,7 @@ export class PeerLink {
         }
     }
 
-    send(id, message, {latest = false} = {}) {
+    send(id, message, {latest = false} = {}, encode = JSON.stringify) {
         const peer = this.peers.get(id);
         if (!peer?.open || peer.channel.readyState !== 'open') return false;
         if (latest && peer.channel.bufferedAmount > 32 * 1024) return false;
@@ -233,8 +233,7 @@ export class PeerLink {
             return false;
         }
         try {
-            const text = JSON.stringify(message);
-            sendPacket(peer.channel, text);
+            sendPacket(peer.channel, encode(message));
             return true;
         } catch (error) {
             this.disconnect(id, error.message);
@@ -243,7 +242,9 @@ export class PeerLink {
     }
 
     broadcast(message, options) {
-        for (const [id, peer] of this.peers) if (peer.open) this.send(id, message, options);
+        let text;
+        const encode = () => text ??= JSON.stringify(message);
+        for (const [id, peer] of this.peers) if (peer.open) this.send(id, message, options, encode);
     }
 
     disconnect(id, reason = 'Peer left the session.') {

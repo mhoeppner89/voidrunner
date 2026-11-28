@@ -51,3 +51,29 @@ test('retiring a flash preserves the quad used by other live sprites',()=>{
  r.disposeObject(flash);assert.equal(geometryDisposals,0);assert.equal(materialDisposals,1);
  assert.equal(engine.geometry.attributes.position.count,4);flash.geometry.removeEventListener('dispose',count);engine.material.dispose();
 });
+
+test('steady entity maps skip retirement scans and still retire replaced or duplicate identities',()=>{
+ const {r,store,shot}=fixture();
+ let entriesVisited=0;
+ class TrackedMap extends Map {
+  *[Symbol.iterator]() {
+   for (const entry of super[Symbol.iterator]()) { entriesVisited++; yield entry; }
+  }
+ }
+ Object.assign(r,{shipMeshes:new TrackedMap(),projectileMeshes:new TrackedMap(),pickupMeshes:new TrackedMap(),
+  shipSyncRevision:0,pickupSyncRevision:0,glbShipModels:new Map(),glbShipLoading:new Map(),
+  createShipMesh:entity=>{const mesh=new THREE.Group();mesh.userData.variant=entity.variant;return mesh;}});
+ const ships=Array.from({length:12},(_,i)=>({id:'fighter-'+i,variant:'test-hull',position:[0,0,i],rotation:[0,0,0,1],hull:10,maxHull:10}));
+ const shots=Array.from({length:32},()=>shot());
+ const pickups=Array.from({length:4},(_,i)=>({id:'ore-'+i,slot:store.alloc(),source:'mining'}));
+ const sync=()=>{r.syncShips(ships);r.syncProjectiles(shots,store);r.syncPickups(pickups,store);};
+ sync();
+ for(let frame=0;frame<120;frame++)sync();
+ assert.equal(entriesVisited,0);
+ const replaced=[ships[0],shots[0],pickups[0]];
+ ships[0]=ships[1];shots[0]=shots[1];pickups[0]=pickups[1];sync();
+ assert.equal(r.shipMeshes.has(replaced[0].id),false);
+ assert.equal(r.projectileMeshes.has(replaced[1].slot),false);
+ assert.equal(r.pickupMeshes.has(replaced[2].slot),false);
+ assert.equal(entriesVisited,48,'only the retirement frame walks the maps');
+});

@@ -547,6 +547,7 @@ showTitleScreen();
 if (new URLSearchParams(location.hash.slice(1)).has('room')) void openMultiplayer(true);
 scheduleLikelyFlightWarmup();
 window.addEventListener('pagehide', () => {
+    multiplayer?.closeLink();
     if (session)
         session.persistSave();
 });
@@ -592,7 +593,7 @@ const isProductionBuild = import.meta.env?.PROD ?? location.protocol !== 'file:'
 // The startup matrix performs several deliberate full navigations in one
 // fresh profile. Do not let a background first-install cache race those page
 // loads; ordinary development and production URLs still register normally.
-if ('serviceWorker' in navigator && isProductionBuild && !startupProbe && !document.documentElement.dataset.testBuild) {
+if ('serviceWorker' in navigator && !window.VoidrunnerNative && isProductionBuild && !startupProbe && !document.documentElement.dataset.testBuild) {
     // Register the worker for offline/asset caching. A new deploy's worker
     // takes over on the NEXT full page load (skipWaiting + clients.claim),
     // never by force-reloading the running page — that surprise reload was

@@ -60,6 +60,9 @@ const output = (key, label, value) => `<label class="match-field">${literal(labe
 function invitation(model) {
     const hasSeat = model.state.players.length < 4;
     if (!model.host || !hasSeat) return '';
+    if (model.native) return `<p class="match-invite">${literal(model.nativeHosting
+        ? 'Pilots on this Wi-Fi can see your room in Nearby rooms.'
+        : 'Opening this room on the local network…')}</p>`;
     return `<section class="match-invite">
         ${model.roomUrl ? `<div class="match-code-row">${output('room', 'Room link', model.roomUrl)}</div>` : ''}
         <details data-match-details="manual"${model.invite ? ' open' : ''}><summary>${literal('Invite with codes')}</summary>
@@ -141,6 +144,16 @@ function scores(model, ended) {
     };
 }
 
+function nearbyRooms(model) {
+    const rooms = model.nativeRooms;
+    const entries = rooms.map(room => `<li class="match-shop-row"><b>${html(room.name)}</b>
+        <button type="button" class="match-button match-primary" data-match-action="join-nearby" data-match-id="${html(room.id)}"${unavailable(Boolean(model.joiningNearby))}>${literal('Join')}</button></li>`).join('');
+    return `<section class="match-invite" aria-label="${literal('Nearby rooms')}">
+        <div class="match-nearby-heading"><h3>${literal('Nearby rooms')}</h3>${button('refresh-nearby', t('Refresh'), { disabled: Boolean(model.joiningNearby) })}</div>
+        ${rooms.length ? `<ul class="match-shop-list">${entries}</ul>` : `<p>${literal('No open rooms found on this Wi-Fi.')}</p>`}
+    </section>`;
+}
+
 export class MultiplayerView {
     constructor(ui, action) {
         this.ui = ui;
@@ -166,8 +179,9 @@ export class MultiplayerView {
             view = {
                 title: t('Multiplayer'),
                 body: `<p>${literal('Play with up to three friends on the same Wi-Fi.')}</p>
-                    <label class="match-field">${literal('Pilot name')}<input data-match-field="name" maxlength="24" autocomplete="nickname" value="${html(model.name)}"></label>`,
-                footer: `${back(t('Back'))}${button('show-join', t('Join'))}${button('host', t('Host room'), { primary: true })}`,
+                    <label class="match-field">${literal('Pilot name')}<input data-match-field="name" maxlength="24" autocomplete="nickname" value="${html(model.name)}"></label>
+                    ${model.native ? nearbyRooms(model) : ''}`,
+                footer: `${back(t('Back'))}${model.native ? '' : button('show-join', t('Join'))}${button('host', t('Host room'), { primary: true })}`,
             };
         } else if (screen === 'join') view = joining(model);
         else if (screen === 'lobby') view = lobby(model);
@@ -186,6 +200,9 @@ export class MultiplayerView {
         const openDetails = [...this.panel.querySelectorAll('details[open]')].map(item => item.dataset.matchDetails);
         const closeDetails = [...this.panel.querySelectorAll('details:not([open])')].map(item => item.dataset.matchDetails);
         const previous = this.panel.dataset.screen;
+        const focus = document.activeElement;
+        const keepNameFocus = previous === screen && focus?.matches('[data-match-field="name"]') && this.panel.contains(focus);
+        const selection = keepNameFocus ? [focus.selectionStart, focus.selectionEnd] : undefined;
         this.panel.dataset.screen = screen;
         this.panel.innerHTML = `<article class="match-card">
             <header><h2 id="multiplayer-heading" tabindex="-1">${html(view.title)}</h2></header>
@@ -201,6 +218,11 @@ export class MultiplayerView {
             for (const details of this.panel.querySelectorAll('details')) {
                 if (openDetails.includes(details.dataset.matchDetails)) details.open = true;
                 else if (closeDetails.includes(details.dataset.matchDetails) && details.dataset.matchDetails !== 'manual') details.open = false;
+            }
+            if (selection) {
+                const input = this.panel.querySelector('[data-match-field="name"]');
+                input?.focus({ preventScroll: true });
+                input?.setSelectionRange(...selection);
             }
         }
     }

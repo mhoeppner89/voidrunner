@@ -18,6 +18,48 @@ function fixture() {
         box: { qx: 0, qy: 0, qz: 0, qw: 1 }, meshVerts, meshIndices };
 }
 
+test('entry clearance skips distant boxes and keeps the rotated corners of a wreck', () => {
+    const session = Object.create(GameSession.prototype);
+    let transforms = 0;
+    class CountedPoint extends THREE.Vector3 {
+        applyQuaternion(q) { transforms++; return super.applyQuaternion(q); }
+    }
+    session.tmpEntryLocal = new CountedPoint();
+    const rotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 4);
+    const box = { hx: 90, hy: 90, hz: 1, qx: rotation.x, qy: rotation.y, qz: rotation.z, qw: rotation.w };
+    const plates = Array.from({ length: 128 }, (_, i) => ({ x: 1000 + i * 20, y: 0, z: 0, box }));
+    plates.push({ x: 0, y: 0, z: 0, box });
+    // This corner extends farther along world X than the largest local half-extent.
+    const corner = new THREE.Vector3(89, -89, 0).applyQuaternion(rotation);
+    for (const [z, clear] of [[0, false], [5.99, false], [6, true], [8, true]]) {
+        corner.z = z;
+        assert.equal(session.entryPositionClear(corner, plates, 5), clear);
+    }
+    assert.equal(transforms, 4, 'only the nearby plate needs a local-space test at each pose');
+});
+
+test('field visibility checks leave the dock list alone and still use the streamed station collider', () => {
+    const session = Object.create(GameSession.prototype);
+    session.save = { player: { systemId: 'helios-verge' } };
+    let lookups = 0;
+    session.currentDockLocationIds = function () {
+        lookups++;
+        return GameSession.prototype.currentDockLocationIds.call(this);
+    };
+    for (const id of [undefined, 'shardbelt', 'mourning-line', 'verge-meridian-point']) {
+        session.activeInstanceId = id;
+        assert.equal(session.activeDockObstacle(), undefined);
+    }
+    assert.equal(lookups, 0);
+    session.activeInstanceId = 'helix';
+    assert.equal(session.activeDockObstacle().id, 'helix');
+    const collider = {};
+    session.renderer = { stationColliders: new Map([['helix', collider]]) };
+    assert.equal(session.activeDockObstacle().stationCollider, collider);
+    session.save.player.systemId = 'redwake';
+    assert.equal(session.activeDockObstacle(), undefined);
+});
+
 test('triangle hierarchy preserves surface hits and prunes unrelated triangles', () => {
     const o = fixture(), stats = {};
     assert.equal(segmentMeshHit({ x: 0, y: 0, z: 10 }, { x: 0, y: 0, z: -10 }, o, false, stats), .5);

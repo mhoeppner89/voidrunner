@@ -72,3 +72,25 @@ test('all multiplayer Arena sites admit four pilots and respawns and enforce the
         assert.ok(new Vector3().fromArray(actor.velocity).dot(outward) <= 0, siteId + ' boundary pushes inward');
     }
 });
+
+test('four-pilot snapshots read live rack counts without resolving the full fit again', () => {
+    const match = createMultiplayerMatch({ hostId: ids[0], seed: 718 });
+    for (const id of ids.slice(1)) match.addPlayer(id);
+    match.start(ids[0]);
+    const session = { save: { player: { position: [0, 0, 0] } }, siteSpotClear: () => true };
+    const world = new MatchWorld(match, session, noop, noop);
+    const expected = [];
+    let outfitReads = 0;
+    for (const actor of world.actors()) {
+        world.spawn(actor);
+        const mountId = actor.activeLauncherMountId;
+        assert.ok(mountId);
+        const rounds = --actor.launcherMagazines[mountId].rounds;
+        expected.push({ mountId, rounds });
+        const outfit = actor.outfitting;
+        Object.defineProperty(actor, 'outfitting', { get() { outfitReads++; return outfit; } });
+    }
+    const snapshot = world.snapshot();
+    assert.deepEqual(snapshot.actors.map(actor => actor.rack), expected);
+    assert.equal(outfitReads, 0);
+});
