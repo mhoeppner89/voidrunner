@@ -1,3 +1,9 @@
+## 0.8.2qj — Solo multiplayer launch
+
+- Play vs bots opens a private round without starting a network connection. Start round leads through the loadout and launches as soon as you confirm.
+- Fill the open seats with bots in team deathmatch. Nearby-room discovery starts when you select Find rooms.
+- Keep multiplayer loading responsive when WebKit throttles a hidden window.
+
 ## 0.8.2qi — Multiplayer bots
 
 - Fill open seats with Brick, Latch, or Wisp. Set each bot to Novice, Veteran, or Ace and assign teams in team deathmatch. A single human can play against bots.

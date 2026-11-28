@@ -4,6 +4,7 @@ import { LOCATIONS } from './data.js';
 import { SHARDBELT_FRAGMENTS, fragmentDistance, fragmentToWorld, worldToFragment, parentSkinDistance, parentRockDistance, rockNoise, stoneNoise } from './asteroidFieldLayout.js';
 import { prepareMeshQueryIndex, segmentMeshHit } from './meshQueries.js';
 import { prepareSurfaceMeshIndex } from './surfaceMeshCandidates.js';
+import { yieldStartup } from './startupWork.js';
 
 // Polygonize once on entering flight; all subsequent sessions reuse the same
 // immutable geometry. Closed, volumetric fragments contain real open bores.
@@ -11,9 +12,6 @@ import { prepareSurfaceMeshIndex } from './surfaceMeshCandidates.js';
 // small surface tiles so the spatial grid never queries a field-sized sphere.
 const STEP = 56, TILE = 168;
 let cached,preparing;
-// A regular task boundary gives browsers a chance to paint the loading UI;
-// scheduler.yield() may repeatedly prioritize its own continuation.
-const yieldTerrainWork=()=>new Promise(resolve=>setTimeout(resolve,0));
 const corners = [[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]];
 const tetrahedra = [[0,5,1,6],[0,1,2,6],[0,2,3,6],[0,3,7,6],[0,7,4,6],[0,4,5,6]];
 const edges = [[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]];
@@ -222,7 +220,7 @@ export async function prepareAsteroidTerrain() {
         while(!cached){
             const result=work.next();
             if(result.done){cached=result.value;break;}
-            if(performance.now()>=deadline){await yieldTerrainWork();deadline=performance.now()+8;}
+            if(performance.now()>=deadline){await yieldStartup();deadline=performance.now()+8;}
         }
         return cached;
     })();

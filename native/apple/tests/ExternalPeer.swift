@@ -82,6 +82,7 @@ extension Smoke {
             _ = js(game, "document.querySelector('[data-match-action=start]').click()")
         } else {
             print("Browsing for \(room). Host this room on the phone."); fflush(stdout)
+            _ = js(game, "document.querySelector('[data-match-action=refresh-nearby]').click()")
             let choose = """
             (() => {
                 const button = [...document.querySelectorAll('[data-match-action=join-nearby]')]

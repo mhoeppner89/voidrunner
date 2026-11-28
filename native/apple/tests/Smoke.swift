@@ -58,6 +58,10 @@ extension Smoke {
         window.addEventListener('unhandledrejection', e => qaErrors.push(String(e.reason)));
         const logError = console.error; console.error = (...x) => { qaErrors.push(x.map(String).join(' ')); logError(...x); }; void 0;
         """)
+        if CommandLine.arguments.last == "--bots" {
+            checkBotRound(game)
+            return
+        }
         let resources = """
         const image = new Image(); image.src = './art/title-cockpit.webp'; await image.decode();
         const full = await fetch('./assets/audio/laser-0.mp3');
@@ -164,6 +168,45 @@ extension Smoke {
         observer.stop()
         command("close")
         print("PASS: packaged WebKit title, image, ranged audio, Wasm, Bonjour, native lobby and live match snapshots.")
+    }
+
+    @MainActor static func checkBotRound(_ game: GameView) {
+        _ = js(game, "document.querySelector('[data-ui-command=multiplayer]').click()")
+        wait("installed room controls") {
+            js(game, "!!document.querySelector('[data-match-action=host]')") as? Bool == true
+        }
+        let ready = js(game, """
+        (() => {
+            const action = name => document.querySelector(`[data-match-action="${name}"]`);
+            action('solo-bots').click();
+            return action('start')?.disabled === false;
+        })()
+        """) as? Bool
+        guard ready == true else { fail("Start round is disabled with a bot in the solo room.") }
+        print("Solo Start enabled. WebKit visibility: \(js(game, "document.visibilityState") ?? "unknown")")
+        fflush(stdout)
+        _ = js(game, """
+        (() => {
+            const action = name => document.querySelector(`[data-match-action="${name}"]`);
+            action('start').click();
+            action('loadout-equipment').click();
+            action('confirm-loadout').click();
+        })()
+        """)
+        let deadline = Date().addingTimeInterval(80)
+        while true {
+            if js(game, """
+                (() => { const s = JSON.parse(render_game_to_text());
+                    return s.screen === 'flight' && s.contacts.some(pilot => pilot.id.startsWith('bot:')) && s.remainingSeconds < 299;
+                })()
+                """) as? Bool == true { break }
+            if Date() >= deadline {
+                let status = js(game, "JSON.stringify({errors:qaErrors,visibility:document.visibilityState,screen:JSON.parse(render_game_to_text()).screen,phase:JSON.parse(render_game_to_text()).phase})")
+                fail("Could not enter the solo round: \(String(describing: status))")
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        print("PASS: packaged WebKit entered solo flight and the timer advanced with a bot contact.")
     }
 
     @MainActor static func js(_ game: GameView, _ code: String) -> Any? {

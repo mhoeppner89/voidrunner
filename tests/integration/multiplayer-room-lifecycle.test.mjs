@@ -101,6 +101,25 @@ test('a mixed room waits for human peers to load and sends fitting packets only 
     }
 });
 
+test('solo Start guides the host through confirmation and waits if a guest joins during the loadout', async () => {
+    const room = host([]);
+    assert.ok(room.match.addBot('host', 'brick').ok);
+    room.distributeState();
+    room.prepareRound = () => { room.screen = 'preparing'; room.flight = {}; };
+    await room.act('start');
+    assert.equal(room.screen, 'loadout');
+    assert.ok(room.launchAfterLoadout);
+    room.link.peerIds.push('a');
+    room.receive('a', { v: 3, type: 'hello', name: 'Guest' });
+    await room.act('confirm-loadout');
+    assert.equal(room.match.phase, 'lobby');
+    assert.ok(room.match.players.get('host').starterReady);
+    room.disconnected('a', 'Peer left the session.');
+    await room.act('start');
+    assert.equal(room.match.phase, 'playing');
+    assert.equal(room.screen, 'preparing');
+});
+
 test('a rematch requested during a cancelled load waits for a fresh session before declaring ready', async () => {
     const room = host(['a']);
     room.host = false;

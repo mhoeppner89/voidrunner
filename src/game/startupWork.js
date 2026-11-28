@@ -6,7 +6,19 @@ export function finishStartupWork(work) {
     return step.value;
 }
 
-export const yieldStartup = () => new Promise(resolve => setTimeout(resolve, 0));
+export const yieldStartup = () => new Promise(resolve => {
+    // WebKit clamps timers in hidden windows. Startup can need hundreds of
+    // short yields, so timer clamping can stall a round that is already open.
+    if (typeof document !== 'undefined' && document.hidden && typeof MessageChannel === 'function') {
+        const { port1, port2 } = new MessageChannel();
+        port1.onmessage = () => {
+            port1.close();
+            port2.close();
+            resolve();
+        };
+        port2.postMessage(null);
+    } else setTimeout(resolve, 0);
+});
 
 export async function runStartupWork(work) {
     let deadline = performance.now() + 10;

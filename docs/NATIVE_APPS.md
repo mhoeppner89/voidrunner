@@ -46,11 +46,13 @@ The build audits the signed APK’s `assets/game/` directory before publishing t
 
 After `npm run build`, run `node tests/browser/native-multiplayer-lobby.mjs`. It opens the packaged title screen with a simulated native bridge, joins a room through the UI, checks the host’s lobby assignment, then checks that a full room withdraws and returns when a seat reopens.
 
+After packaging the Mac app, `bash native/apple/build-mac.sh --bots` checks the private launch in native WebKit. It confirms that Start is available with a bot, opens the loadout, and verifies flight and an advancing match timer.
+
 ## Offline play on real devices
 
 1. Install the same release on a physical Android phone, iPhone and Mac. Before opening any app for the first time, connect all three to the same Wi-Fi. Disconnect the router’s internet uplink and turn off mobile data on both phones. Keep local Wi-Fi on. Use a network that allows its devices to reach one another.
 2. Open each app from its installed icon and check that the opening art loads. Choose **New Career → Skip tutorial**, then **Launch** at the station. Check the cockpit, nearby geometry, music and sound effects. Quit and reopen the app while still offline, then select **Resume Flight** and check that the saved career loads.
-3. For each row below, open **Multiplayer** on all three devices and enter distinct pilot names. Allow local-network access if the system asks. Select **Host room** on the host. On each guest, find the host under **Nearby rooms** and select **Join**. Keep each app visible while the round loads. Check that all three pilots appear in the lobby on each device.
+3. For each row below, open **Multiplayer** on all three devices and enter distinct pilot names. Select **Host room** on the host and **Find rooms** on each guest. Allow local-network access if the system asks. On each guest, find the host under **Nearby rooms** and select **Join**. Check that all three pilots appear in the lobby on each device.
 4. On each device, open **Choose loadout**, select a starting ship and confirm the equipment. Start a free-for-all at a different arena site for each host. On all three devices check that ships move, shots and hits are visible, and the timer and scoreboard agree. Confirm that a guest can leave and join again from **Nearby rooms** between rounds. Close the room before switching hosts.
 
 | Host | Guests | Physical test |

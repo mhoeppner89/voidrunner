@@ -41,8 +41,9 @@ test('only the host changes bots, which use ordinary seats and start confirmed',
     assert.ok(match.canStart(), 'one human can play free-for-all');
     assert.ok(match.configure('host', { mode: 'teams' }).ok);
     assert.equal(match.canStart(), false);
-    assert.ok(match.addBot('host', 'latch').ok);
-    assert.ok(match.addBot('host', 'wisp').ok);
+    assert.equal(match.fillBotSeats('guest').code, 'host-only');
+    assert.ok(match.fillBotSeats('host').ok);
+    assert.equal(match.snapshot().players.find(pilot => pilot.id === 'bot:brick').bot.difficulty, 'ace');
     assert.deepEqual(match.connectedHumans().map(pilot => pilot.id), ['host']);
     assert.equal(match.addPlayer('guest').code, 'lobby-full');
     assert.ok(match.canStart(), 'one human and three bots can play 2v2');

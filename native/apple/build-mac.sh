@@ -29,11 +29,12 @@ overlay = {"version": 0, "case-sensitive": "false", "roots": [{"type": "file", "
 PY
     flags+=(-vfsoverlay "$build/clt-overlay.json" -Xcc -ivfsoverlay -Xcc "$build/clt-overlay.json")
 fi
-if [[ "${1:-}" == "--smoke" || "${1:-}" == "--peer" ]]; then
+if [[ "${1:-}" == "--smoke" || "${1:-}" == "--peer" || "${1:-}" == "--bots" ]]; then
     if [[ "$1" == "--peer" && ( "$#" != 3 || ( "$2" != "host" && "$2" != "guest" ) ) ]]; then
         echo "Usage: native/apple/build-mac.sh --peer host|guest 'Room name'" >&2
         exit 2
     fi
+    smoke_mode="$1"
     shift
     runtime="$out/Voidrunner.app/Contents/Resources/dist"
     if [[ ! -f "$runtime/index.html" ]]; then
@@ -48,9 +49,12 @@ if [[ "${1:-}" == "--smoke" || "${1:-}" == "--peer" ]]; then
     xcrun swiftc "${flags[@]}" -target "$(uname -m)-apple-macosx13.3" "$apple_dir/Sources/GameAssets.swift" \
         "$apple_dir/Sources/Nearby.swift" "$apple_dir/Sources/GameView.swift" "$apple_dir"/tests/*.swift -o "$probe/MacOS/AppleSmoke"
     codesign --force --sign - "$build/Smoke.app"
+    if [[ "$smoke_mode" == "--bots" ]]; then
+        exec "$probe/MacOS/AppleSmoke" "$runtime" --bots
+    fi
     exec "$probe/MacOS/AppleSmoke" "$runtime" "$@"
 elif [[ "$#" -gt 0 ]]; then
-    echo "Usage: native/apple/build-mac.sh [--smoke | --peer host|guest 'Room name']" >&2
+    echo "Usage: native/apple/build-mac.sh [--smoke | --bots | --peer host|guest 'Room name']" >&2
     exit 2
 fi
 

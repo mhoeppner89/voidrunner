@@ -5,6 +5,7 @@ import { SOUND_EVENTS, FALLBACK_EVENT } from './soundEvents.js';
 import { ShipEngineAudio } from './audioEngine.js';
 import { AmbienceAudio } from './audioAmbience.js';
 import { MusicDirector } from './audioMusic.js';
+import { yieldStartup } from './startupWork.js';
 
 // Missile warning pacing: approaches counted within this window before the
 // warning settles, and the shortest gap between two break cues.
@@ -178,14 +179,14 @@ export class AudioManager {
         preDelay.delayTime.value = 0.03;
         const convolver = context.createConvolver();
         const tail = this.createImpulseResponse(2.8, 2.4, 1.1);
-        if (firstPaint) await new Promise(resolve => setTimeout(resolve, 0));
+        if (firstPaint) await yieldStartup();
         convolver.buffer = tail;
         const lowCut = context.createBiquadFilter();
         lowCut.type = 'highpass'; lowCut.frequency.value = 130;
         this.reverbInput.connect(preDelay); preDelay.connect(convolver); convolver.connect(lowCut);
         lowCut.connect(gain(0.36, this.mixBus));
 
-        if (firstPaint) await new Promise(resolve => setTimeout(resolve, 0));
+        if (firstPaint) await yieldStartup();
 
         // Short cockpit room: early reflections off the canopy and consoles.
         this.roomSend = gain(1);

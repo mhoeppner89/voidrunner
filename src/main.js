@@ -12,6 +12,7 @@ import { playerBerth } from './game/playerDocking.js';
 import { stationVisualSurfaceRadius } from './game/stationTraffic.js';
 import { tutorialCampaignSummary } from './game/tutorialCampaign.js';
 import { playerStrengthBreakdown } from './game/playerStrength.js';
+import { yieldStartup } from './game/startupWork.js';
 const host = document.querySelector('#app');
 if (!host)
     throw new Error('Missing #app host element.');
@@ -27,6 +28,7 @@ const loadGameSession = () => {
     return gameSessionModulePromise;
 };
 const nextPaint = () => new Promise((resolve) => {
+    if (document.hidden) { resolve(); return; }
     const timer=setTimeout(resolve,250);
     // A single RAF callback runs before paint; wait for the next one so the
     // browser can actually present the loading veil before expensive setup.
@@ -150,7 +152,7 @@ const beginSession = (mode, arena, tutorial = true) => {
         // The generated audio buffers consume random numbers. Finish the mix
         // before generating the same seeded career/arena as synchronous boot.
         await Promise.allSettled([paint, audioManager.mixReady]);
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await yieldStartup();
         const save = arena?.run ? (arena.resume?readArenaRun():newArenaRun(Boolean(arena.hard&&arenaRecord().unlockedHard)))
             : LANDING_PREVIEW_ID && mode !== 'arena' && mode !== 'observer' ? createNewSave(undefined, { tutorial: false })
                 : mode === 'new' || mode === 'arena' || mode === 'observer' ? createNewSave(arena?.multiplayer ? arena.seed : DRONE_TEST_MODE ? 4242 : undefined, { tutorial: mode === 'new' && tutorial && !DRONE_TEST_MODE })

@@ -39,25 +39,37 @@ export class Multiplayer {
     }
 
     open(fromInvite) {
-        if (this.link) return;
+        if (this.link || this.match) return;
         this.roomToken = !this.native && fromInvite ? roomTokenFromUrl() : undefined;
         this.screen = this.roomToken ? 'join' : 'welcome';
         this.status = '';
-        if (this.native) this.makeLink('guest').browse();
         this.render();
     }
 
     render() {
-        this.view.render({ ...this, pilot: this.localPilot(), busy: Boolean(this.busy) });
+        this.view.render({ ...this, pilot: this.localPilot(), soloReady: this.soloReady(), busy: Boolean(this.busy) });
     }
 
     localPilot() {
         return this.state?.players.find(pilot => pilot.id === this.localId);
     }
 
+    soloReady() {
+        return this.host && this.state?.hasEnoughPilots && this.state.players.every(pilot => !pilot.connected || pilot.bot || pilot.id === HOST);
+    }
+
+    openLoadout(launchAfterLoadout = false) {
+        this.screen = 'loadout';
+        this.loadoutStage = 'hull';
+        this.launchAfterLoadout = launchAfterLoadout;
+        this.status = '';
+        this.render();
+    }
+
     back() {
         if (this.screen === 'loadout') {
             this.screen = 'lobby';
+            this.launchAfterLoadout = false;
             this.status = '';
             this.render();
         } else if (this.screen === 'score') {
@@ -88,12 +100,7 @@ export class Multiplayer {
             return;
         }
         if (action === 'leave') return this.leave();
-        if (action === 'open-loadout' && this.screen === 'lobby') {
-            this.screen = 'loadout';
-            this.loadoutStage = 'hull';
-            this.status = '';
-            return this.render();
-        }
+        if (action === 'open-loadout' && this.screen === 'lobby') return this.openLoadout();
         if (this.screen === 'loadout') {
             if (action === 'loadout-equipment' || action === 'loadout-hull') {
                 this.loadoutStage = action === 'loadout-equipment' ? 'equipment' : 'hull';
@@ -102,9 +109,13 @@ export class Multiplayer {
             if (action === 'starter') return this.command(action, { shipId: args.matchId });
             if (action === 'starter-gear') return this.command(action, { slot: args.matchSlot, itemId: args.matchId || null });
             if (action === 'confirm-loadout') {
+                const launch = this.launchAfterLoadout;
+                this.launchAfterLoadout = false;
                 this.screen = 'lobby';
                 this.render();
-                return this.command(action);
+                this.command(action);
+                if (launch && this.soloReady() && this.state.canStart) this.command('start');
+                return;
             }
         }
         if (action === 'show-join') {
@@ -115,7 +126,7 @@ export class Multiplayer {
         if (action === 'refresh-nearby' && this.native && !this.host) {
             this.nativeRooms = [];
             this.status = '';
-            this.link?.browse();
+            (this.link ?? this.makeLink('guest')).browse();
             return this.render();
         }
         if (action === 'join-nearby' && this.native && !this.host && !this.joiningNearby
@@ -147,8 +158,11 @@ export class Multiplayer {
             return this.command(action, { characterId });
         }
         if (action === 'remove-bot') return this.command(action, { id: args.matchId });
+        if (action === 'fill-bots') return this.command(action);
         if (action === 'buy-hull') return this.command(action, { shipId: args.matchId });
         if (action === 'buy-equipment') return this.command(action, { itemId: args.matchId, slot: args.matchSlot, index: Number(args.matchIndex) });
+        if (action === 'start' && this.screen === 'lobby' && this.soloReady() && !this.localPilot()?.starterReady)
+            return this.openLoadout(true);
         if (['start', 'rematch', 'respawn'].includes(action)) return this.command(action);
         if (this.busy) return;
         const task = this.busy = {};
@@ -156,6 +170,7 @@ export class Multiplayer {
         this.render();
         try {
             if (action === 'host') this.hostRoom();
+            if (action === 'solo-bots') this.hostRoom(true);
             if (action === 'join-code') await this.joinRoom();
             if (action === 'make-invite' && this.link) {
                 const invite = await this.link.createInvite();
@@ -224,15 +239,17 @@ export class Multiplayer {
         return link;
     }
 
-    hostRoom() {
-        if (this.native) this.closeLink();
-        const link = this.makeLink('host');
+    hostRoom(localOnly = false) {
+        this.closeLink();
+        const link = localOnly ? undefined : this.makeLink('host');
+        this.localOnly = localOnly;
         this.host = true;
         this.localId = HOST;
         this.match = createMultiplayerMatch({ hostId: HOST, hostName: this.name, seed: Math.floor(Math.random() * 0x100000000) });
-        if (this.native) link.host(this.match.players.get(HOST).name);
+        if (localOnly) this.match.addBot(HOST, 'brick');
+        else if (this.native) link.host(this.match.players.get(HOST).name);
         this.distributeState();
-        if (!this.native) void this.openRoomLink(link);
+        if (link && !this.native) void this.openRoomLink(link);
     }
 
     openRoomLink(link) {
@@ -348,6 +365,7 @@ export class Multiplayer {
             case 'team': result = match.setTeam(id, args.team); break;
             case 'add-bot': result = match.addBot(id, args.characterId); break;
             case 'remove-bot': result = match.removeBot(id, args.id); break;
+            case 'fill-bots': result = match.fillBotSeats(id); break;
             case 'bot-difficulty': result = match.setBotDifficulty(id, args.id, args.difficulty); break;
             case 'bot-team': result = match.setBotTeam(id, args.id, args.team); break;
             case 'start': result = match.start(id); break;
@@ -381,9 +399,9 @@ export class Multiplayer {
 
     distributeState() {
         const state = this.match.snapshot();
-        if (this.native) this.link.setVisibility(state.phase === 'lobby' && state.players.length < 4);
+        if (this.native) this.link?.setVisibility(state.phase === 'lobby' && state.players.length < 4);
         this.applyState(state, this.match.shopFor(HOST));
-        for (const peer of this.link.peerIds) {
+        for (const peer of this.link?.peerIds ?? []) {
             // A reliable send can close a slow peer and publish a newer roster immediately.
             if (this.state !== state) break;
             if (!this.match.players.get(peer)?.connected) continue;
@@ -400,7 +418,7 @@ export class Multiplayer {
         if (state.phase === 'lobby') {
             if (previous?.phase !== 'lobby' && this.flight) this.clearFlight();
             if (previous?.phase !== 'lobby' || this.screen !== 'loadout') this.screen = 'lobby';
-            if (!this.native && this.host && previous?.phase === 'ended' && !this.roomUrl) void this.openRoomLink(this.link);
+            if (!this.native && this.host && this.link && previous?.phase === 'ended' && !this.roomUrl) void this.openRoomLink(this.link);
         } else if (state.phase === 'ended') {
             this.live = false;
             this.stopClock();
@@ -480,7 +498,7 @@ export class Multiplayer {
 
     dropUnready() {
         if (!this.live && this.match?.phase === 'playing')
-            for (const pilot of this.match.connectedHumans()) if (!this.ready.has(pilot.id)) this.link.disconnect(pilot.id, 'Arena loading timed out.');
+            for (const pilot of this.match.connectedHumans()) if (!this.ready.has(pilot.id)) this.link?.disconnect(pilot.id, 'Arena loading timed out.');
     }
 
     sendFit(id) {
@@ -569,6 +587,7 @@ export class Multiplayer {
         if (this.flight) this.clearFlight();
         Object.assign(this, {
             state: undefined, shop: undefined, match: undefined, host: false, localId: undefined,
+            localOnly: false, launchAfterLoadout: false,
             status: '', screen: '', invite: '', reply: '', roomUrl: '', roomToken: undefined, guestReply: '', busy: undefined,
             nativeRooms: [], nativeHosting: false, joiningNearby: undefined,
         });

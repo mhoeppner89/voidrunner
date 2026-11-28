@@ -74,7 +74,7 @@ const output = (key, label, value) => `<label class="match-field">${literal(labe
 
 function invitation(model) {
     const hasSeat = model.state.players.length < 4;
-    if (!model.host || !hasSeat) return '';
+    if (!model.host || !hasSeat || model.localOnly) return '';
     if (model.native) return `<p class="match-invite">${literal(model.nativeHosting
         ? 'Pilots on this Wi-Fi can see your room in Nearby rooms.'
         : 'Opening this room on the local network…')}</p>`;
@@ -112,23 +112,27 @@ function botControls(model, teamMode) {
             </select>` : ''}
             <button type="button" class="match-button" data-match-action="remove-bot" data-match-id="${id}" aria-label="${html(t('Remove {name}', { name: pilot.name }))}">${literal('Remove bot')}</button></div>`;
     }).join('');
-    return `<section class="match-bots" aria-label="${literal('Bots')}"><h3>${literal('Bots')}</h3>${rows}${add}</section>`;
+    const fill = teamMode && model.state.players.length < 4 ? button('fill-bots', t('Fill teams with bots'), { disabled: model.busy }) : '';
+    return `<section class="match-bots" aria-label="${literal('Bots')}"><div class="match-nearby-heading"><h3>${literal('Bots')}</h3>${fill}</div>${rows}${add}</section>`;
 }
 
 function lobby(model) {
-    const ready = model.state.canStart;
+    const ready = model.state.canStart || model.soloReady;
     const teamMode = model.state.settings.mode === 'teams';
+    const loadout = button('open-loadout', t(model.pilot.starterReady ? 'Review loadout' : 'Choose loadout'), { primary: !ready && !model.pilot.starterReady });
+    const start = button('start', t('Start round'), { primary: ready, disabled: !ready || model.busy });
     return {
-        title: t('Multiplayer lobby'),
+        title: t(model.localOnly ? 'Play vs bots' : 'Multiplayer lobby'),
         body: `${settings(model)}${roster(model.state, model.localId)}
             <div class="match-settings match-fit">
                 ${teamMode ? `<label>${literal('Your team')}<select data-match-setting="team">
                     ${option('', t('Choose team'), model.pilot?.team ?? '')}${option('red', teamLabel('red'), model.pilot?.team)}${option('blue', teamLabel('blue'), model.pilot?.team)}
                 </select></label>` : ''}
             </div>${botControls(model, teamMode)}${invitation(model)}`,
-        footer: `${back(t('Leave room'))}${button('open-loadout', t(model.pilot.starterReady ? 'Review loadout' : 'Choose loadout'), { primary: !model.pilot.starterReady })}${model.host ? button('start', t('Start round'), { primary: model.pilot.starterReady, disabled: !ready || model.busy }) : ''}`,
-        hint: ready ? '' : model.state.hasEnoughPilots ? t('Waiting for every pilot to confirm their loadout.')
-            : teamMode ? t('Two pilots per team are needed to start.') : t('At least two pilots are needed to start.'),
+        footer: `${back(t('Leave room'))}${loadout}${model.host ? start : ''}`,
+        hint: ready ? '' : model.state.hasEnoughPilots
+            ? t(model.pilot.starterReady ? 'Waiting for every pilot to confirm their loadout.' : 'Choose and confirm your loadout to get ready.')
+            : teamMode ? t('Two pilots per team are needed to start.') : t('Add a bot or invite a pilot to start.'),
     };
 }
 
@@ -175,7 +179,7 @@ function startingLoadout(model) {
     return {
         title: t('Fit your starting equipment'),
         body: `<div class="match-gear-pickers"><div>${picker('guns', 'First gun mount')}${totals}</div>${picker('utility', 'Utility mount')}</div>`,
-        footer: `${score}${button('loadout-hull', t('Back to hulls'))}${button('confirm-loadout', t('Confirm loadout'), { primary: true })}`,
+        footer: `${score}${button('loadout-hull', t('Back to hulls'))}${button('confirm-loadout', t(model.launchAfterLoadout && model.soloReady ? 'Launch round' : 'Confirm loadout'), { primary: true })}`,
     };
 }
 
@@ -234,8 +238,8 @@ function nearbyRooms(model) {
     const entries = rooms.map(room => `<li class="match-shop-row"><b>${html(room.name)}</b>
         <button type="button" class="match-button match-primary" data-match-action="join-nearby" data-match-id="${html(room.id)}"${unavailable(Boolean(model.joiningNearby))}>${literal('Join')}</button></li>`).join('');
     return `<section class="match-invite" aria-label="${literal('Nearby rooms')}">
-        <div class="match-nearby-heading"><h3>${literal('Nearby rooms')}</h3>${button('refresh-nearby', t('Refresh'), { disabled: Boolean(model.joiningNearby) })}</div>
-        ${rooms.length ? `<ul class="match-shop-list">${entries}</ul>` : `<p>${literal('No open rooms found on this Wi-Fi.')}</p>`}
+        <div class="match-nearby-heading"><h3>${literal('Nearby rooms')}</h3>${button('refresh-nearby', t(model.link ? 'Refresh' : 'Find rooms'), { disabled: Boolean(model.joiningNearby) })}</div>
+        ${rooms.length ? `<ul class="match-shop-list">${entries}</ul>` : model.link ? `<p>${literal('No open rooms found on this Wi-Fi.')}</p>` : ''}
     </section>`;
 }
 
@@ -263,10 +267,10 @@ export class MultiplayerView {
         if (screen === 'welcome') {
             view = {
                 title: t('Multiplayer'),
-                body: `<p>${literal('Play with up to three friends on the same Wi-Fi.')}</p>
+                body: `<p>${literal('Play against bots or with up to three friends on the same Wi-Fi.')}</p>
                     <label class="match-field">${literal('Pilot name')}<input data-match-field="name" maxlength="24" autocomplete="nickname" value="${html(model.name)}"></label>
                     ${model.native ? nearbyRooms(model) : ''}`,
-                footer: `${back(t('Back'))}${model.native ? '' : button('show-join', t('Join'))}${button('host', t('Host room'), { primary: true })}`,
+                footer: `${back(t('Back'))}${model.native ? '' : button('show-join', t('Join'))}${button('host', t('Host room'))}${button('solo-bots', t('Play vs bots'), { primary: true })}`,
             };
         } else if (screen === 'join') view = joining(model);
         else if (screen === 'lobby') view = lobby(model);
@@ -275,7 +279,7 @@ export class MultiplayerView {
         else if (screen === 'score' || screen === 'ended') view = scores(model, screen === 'ended');
         else if (screen === 'preparing') view = {
             title: t('Preparing arena'),
-            body: `<p>${literal('Waiting for every pilot to load the arena.')}</p>`,
+            body: `<p>${literal(model.soloReady ? 'Loading ships and the arena…' : 'Waiting for every pilot to load the arena.')}</p>`,
             footer: back(t('Leave room')),
         };
         else if (screen === 'disconnected') view = {

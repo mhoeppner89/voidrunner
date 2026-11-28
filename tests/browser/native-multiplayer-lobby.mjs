@@ -54,6 +54,8 @@ async function openMultiplayer(page, url, name) {
     await page.goto(url);
     await page.locator('[data-ui-command="multiplayer"]').click();
     await page.locator('[data-match-field="name"]').fill(name);
+    assert.equal(await page.evaluate(() => window.bridgeCommands.length), 0, 'Opening Multiplayer does not request network access');
+    await action(page, 'refresh-nearby').click();
     return command(page, 'browse');
 }
 

@@ -7273,7 +7273,7 @@ export async function preparePlanetSurfaceTextures() {
                 if(result.done){preparedPlanetTextures.set(key,result.value);break;}
                 // Use a normal task boundary so the browser can paint the
                 // loading screen between slices, even on Chromium.
-                if(performance.now()>=deadline){await new Promise(resolve=>setTimeout(resolve,0));deadline=performance.now()+8;}
+                if(performance.now()>=deadline){await yieldStartup();deadline=performance.now()+8;}
             }
         }
     })();

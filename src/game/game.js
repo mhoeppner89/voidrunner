@@ -1571,8 +1571,12 @@ export class GameSession {
         this.renderer.syncProjectiles(this.projectiles, this.projStore);
         this.renderer.syncPickups(this.pickups, this.pickupStore);
         this.renderer.updateCamera(this.save.player.position, this.save.player.prevPosition, this.save.player.rotation, this.save.player.prevRotation, this.save.player.angularVelocity, 0, false, 0, 0);
-        await this.renderer.prepareActiveScene?.();
-        this.renderer.render();
+        // A hidden multiplayer canvas may never finish optional shader
+        // warmup. The next visible frame can compile what it actually uses.
+        if (!this.arena?.multiplayer || typeof document === 'undefined' || !document.hidden) {
+            await this.renderer.prepareActiveScene?.();
+            this.renderer.render();
+        }
         this.flightPrepared = true;
     }
     currentNavLocationIds() {

@@ -117,6 +117,16 @@ class MultiplayerMatch {
         return this.addPilot(`bot:${characterId}`, BOT_CHARACTERS[characterId].name, { characterId, difficulty: 'veteran' });
     }
 
+    fillBotSeats(hostId) {
+        if (hostId !== this.hostId) return fail('host-only');
+        if (this.phase !== 'lobby') return fail('lobby-closed');
+        for (const characterId of Object.keys(BOT_CHARACTERS)) {
+            if (this.players.size === slots.length) break;
+            if (!this.players.has(`bot:${characterId}`)) this.addBot(hostId, characterId);
+        }
+        return pass();
+    }
+
     removeBot(hostId, id) {
         if (hostId !== this.hostId) return fail('host-only');
         if (this.phase !== 'lobby') return fail('lobby-closed');

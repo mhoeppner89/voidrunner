@@ -8,13 +8,14 @@ import {createMultiplayerServer} from '../../tools/multiplayer/serve.mjs';
 
 const hostProfile = process.env.VR_HOST_PROFILE ?? 'desktop';
 const joinMethod = process.env.VR_JOIN_METHOD ?? 'room';
+const mixedBots = process.env.VR_MIXED_BOTS === '1';
 assert.ok(['desktop', 'iphone'].includes(hostProfile), 'Choose desktop or iphone for VR_HOST_PROFILE.');
 assert.ok(['room', 'codes'].includes(joinMethod), 'Choose room or codes for VR_JOIN_METHOD.');
 const guestProfile = hostProfile === 'iphone' ? 'android' : 'iphone';
 const hostName = hostProfile === 'iphone' ? 'iPhone pilot' : 'Desktop pilot';
 const guestName = guestProfile === 'android' ? 'Android pilot' : 'Phone pilot';
 const variant = hostProfile === 'desktop' && joinMethod === 'room' ? '' : '/' + hostProfile + '-' + joinMethod;
-const out = 'output/multiplayer/gameplay' + variant;
+const out = 'output/multiplayer/gameplay' + variant + (mixedBots ? '/mixed-bots' : '');
 await mkdir(out, {recursive:true});
 const browsers = [];
 const pages = [];
@@ -339,6 +340,30 @@ try {
     await action(guest, 'loadout-equipment').click();
     assert.equal(await module.getAttribute('aria-pressed'), 'true', 'The chosen fit carries over as a preference');
     await action(guest, 'confirm-loadout').click();
+    if (mixedBots) {
+        await setting(host, 'mode').selectOption('teams');
+        await action(host, 'fill-bots').click();
+        await screen(guest, 'lobby').getByText('Latch', {exact:true}).waitFor();
+        assert.equal(await screen(guest, 'lobby').locator('.match-table tbody tr').count(), 4);
+        assert.ok(await action(host, 'start').isDisabled(), 'bots cannot bypass the human loadout gate');
+        await action(host, 'open-loadout').click();
+        await action(host, 'loadout-equipment').click();
+        await action(host, 'confirm-loadout').click();
+        await action(host, 'start').click();
+        await Promise.all([flight(host, 'wayfarer', guestName), flight(guest, 'scrapper', hostName)]);
+        for (const page of [host, guest]) await page.waitForFunction(() => {
+            const ships = __VOID_PRIVATEER__.getRuntime()?.ships ?? [];
+            const bots = ships.filter(ship => ship.id.startsWith('bot:'));
+            return bots.length === 2 && bots.filter(bot => bot.hostile).length === 1
+                && bots.some(bot => Math.hypot(...bot.velocity) > 1);
+        });
+        await guest.screenshot({path:out + '/mixed-flight.png'});
+        await host.evaluate(() => window.advanceTime(600_000));
+        await Promise.all([screen(host, 'ended').waitFor(), screen(guest, 'ended').waitFor()]);
+        await action(host, 'rematch').click();
+        await Promise.all([screen(host, 'lobby').waitFor(), screen(guest, 'lobby').waitFor()]);
+        console.log('Mixed 2v2 reached live flight with two humans and two bots, one on each team. Both humans saw results and rematched.');
+    }
     await screen(host, 'lobby').locator('[data-ui-command="multiplayer-back"]').click();
     await screen(guest, 'disconnected').waitFor();
     await screen(guest, 'disconnected').locator('[data-ui-command="multiplayer-back"]').click();
